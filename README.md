@@ -49,13 +49,18 @@ and OpenLocoland is put together from it on your computer. Your Steam game stays
 ## Installing
 
 1. Install Locoland through Steam (any language).
-2. Run `Setup.exe`. It finds the Steam game and installs OpenLocoland into a folder of its own;
-   you choose the language and the two extras there.
+2. Download `Setup.exe` from [Releases](https://github.com/Dysprohol/OpenLocoland/releases) and run
+   it (Windows may warn about an unknown publisher: "More info" > "Run anyway"). It finds the
+   Steam game and installs OpenLocoland into a folder of its own; you choose the language and the
+   two extras there.
 3. Start **Locoland** or **Locoland - map editor** from the desktop or the Start menu.
 
 Running a newer `Setup.exe` updates the game and keeps your maps, scores and progress. The
 player's guide tells the rest, the editor with a step-by-step first mission included:
 [GUIDE.md](docs/GUIDE.md) (English), [PRZEWODNIK.md](docs/PRZEWODNIK.md) (Polish).
+
+This is a test version: bugs and ideas are welcome in
+[Issues](https://github.com/Dysprohol/OpenLocoland/issues).
 
 ## How it was made
 

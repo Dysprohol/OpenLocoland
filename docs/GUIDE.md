@@ -1,6 +1,6 @@
 # OpenLocoland - player's guide
 
-Version 0.1 - a private release for friends. [Polish version: PRZEWODNIK.md](PRZEWODNIK.md)
+Version 0.1 - a test release. [Polish version: PRZEWODNIK.md](PRZEWODNIK.md)
 
 **OpenLocoland** is an unofficial, fan-made new edition of **Locoland** (Gromada / ESDigital
 Games, 2003): the original game runs with fixes for today's Windows, a few improvements, a page

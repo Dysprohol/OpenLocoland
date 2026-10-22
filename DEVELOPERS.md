@@ -2265,7 +2265,7 @@ is understood, except obvious ones with a small, safe fix.
 
 ## Release
 
-The first release is private (for friends): one `Setup.exe` built from the same
+The first release, 0.1, is a test release on the GitHub Releases page: one `Setup.exe` built from the same
 `build.py` code, with nothing of the game in it - the game is assembled on the player's machine
 from their own Steam copy, as `build.py` does it for a developer.
 
@@ -2371,8 +2371,8 @@ downloaded, and the launcher lists only the packs that were built.
 
 ## Distribution
 
-The repository is private. What it would take to publish the fixes (checked October 2026;
-this is not legal advice):
+The repository is public. What publishing the fixes rests on (checked October 2026; this is
+not legal advice):
 
 **Rights holders.** Steam lists Gromada and ESDigital Games as developers and ESDigital Games
 as publisher, "©2015 ESDigital Games Ltd", with the trademark shared with Alawar
@@ -2407,8 +2407,8 @@ The working tree follows these rules: game files and decompiler output are in `.
 our changes are patches (with a line of original context around each change) and override
 files. The repository's history starts from such a tree, so it holds no game file either.
 
-**Before going public:** state that the project is unofficial and
-needs the original game, and ideally ask ESDigital Games for permission - or for the
+**Published that way:** the README states that the project is unofficial and needs the
+original game. Still to do: ideally ask ESDigital Games for permission - or for the
 source code, the way Warzone 2100 was released. The name uses the Locoland trademark the
 way OpenTTD and OpenRCT2 do; if the owners object, it can change.
 

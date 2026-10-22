@@ -1,6 +1,6 @@
 # OpenLocoland - przewodnik gracza
 
-Wersja 0.1 - wydanie prywatne dla znajomych. [English version: GUIDE.md](GUIDE.md)
+Wersja 0.1 - wydanie testowe. [English version: GUIDE.md](GUIDE.md)
 
 **OpenLocoland** to nieoficjalna, fanowska nowa edycja gry **Locoland** (Gromada / ESDigital
 Games, 2003): oryginalna gra działa z poprawkami dla dzisiejszego Windowsa, kilkoma ulepszeniami,
