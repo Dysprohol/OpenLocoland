@@ -71,6 +71,18 @@ Along the way the authors' own map editor turned up inside the engine - the mode
 campaign with, switched off in the game they sold. OpenLocoland switches it back on and builds the
 rest around it: the bar, the tools and the help in the look of the game.
 
+## Plans
+
+- **Multiplayer.** The engine already lists network functions for its mission scripts, but the
+  authors never wrote them. The goal is to play with or against a friend.
+- **New missions.** Our own missions and an alternative campaign made in the editor, next to the
+  original twenty.
+- **More fixes and polish.** The bugs still open in [BUGS.md](BUGS.md), the interface scaled up on
+  big screens, the editor tried in full screen, and whatever turns up while playing.
+- **The engine in readable code.** The understood parts of the engine rewritten in C++ one by one,
+  so the game can grow past the limits of the original program.
+- **A public release**, ideally with the blessing of the rights holders.
+
 ## For developers
 
 - [DEVELOPERS.md](DEVELOPERS.md) - building from the repository, the layout, everything known
