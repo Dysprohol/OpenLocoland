@@ -1,0 +1,12 @@
+EGÉR
+
+OBJEKTUM KIJELÖLÉSE     BAL GOMB RAJTA
+MOZGATÁSA               HÚZÁS BAL GOMBBAL
+FORGATÁSA               GÖRGÕ
+LEHELYEZÉS A SÁVRÓL     BAL GOMB A TÉRKÉPEN
+VISSZA A KIJELÖLÉSHEZ   JOBB GOMB VAGY ESC
+AZ OBJEKTUM PANELJE     JOBB GOMB RAJTA
+NÉZET MOZGATÁSA         KÖZÉPSÕ GOMB
+                        VAGY KÉPERNYÕSZÉL
+EGÉSZ PÁLYASZAKASZ      SHIFT+BAL GOMB
+TÖRLÉSE                 (TÖRLÉS ESZKÖZ)

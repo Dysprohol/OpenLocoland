@@ -1,0 +1,10 @@
+* text=auto eol=lf
+# Game files and our changes to them stay byte for byte (CP1250/CP1251 encodings, CRLF
+# line endings inside patches).
+game/** -text
+lang/** -text
+*.patch -text
+external/**/*.dll binary
+*.bmp binary
+*.png binary
+*.bat text eol=crlf

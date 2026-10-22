@@ -1,0 +1,43 @@
+--- maps/script/constants.lgc
++++ maps/script/constants.lgc
+@@ -17,21 +17,22 @@
+ 
+-//#define KEY_SET_FADE 102       // f - Затемнение
+-//#define KEY_SET_NUKE 110       // n - Молния
+-//#define KEY_SET_SQUALL 119     // w - Порыв ветра
+-//#define KEY_SET_QUAKE 113      // q - Землетрясение
++//#define KEY_SET_FADE 102       // f - Fade
++//#define KEY_SET_NUKE 110       // n - Lightning
++//#define KEY_SET_SQUALL 119     // w - Squall
++//#define KEY_SET_QUAKE 113      // q - Earthquake
+ 
+-#define KEY_MAP_EXIT          27  // Esc - Выход в меню
+-#define KEY_STATEBAR           9  // Tab - включение StateBar
+-#define KEY_OBJECTIVES        79  // O (o) - Объективы
+-#define KEY_UNIT_DELETE       'd' // Убить юнит
+-#define KEY_TRAIN_DELETE       4  // Убить состав - ctrl+d (ctrl+D)
+-#define KEY_REPAIR            'h' // Починить юнит              !!CHEAT!!
+-#define KEY_EXPLOSION         'x' // Взрыв из khon-hunter       !!CHEAT!!
+-#define KEY_VICTORY           'W' // Победа                     !!CHEAT!!
+-#define KEY_BUILD_MODE        'B' // Вход в режим строительства !!CHEAT!!
+-#define KEY_CHANGE_ARMY       'A' // Смена армии                !!CHEAT!!
+-#define KEY_KILLEM_ALL        'K' // "Убрать" все юниты 1 армии !!CHEAT!!
+-#define KEY_SHOW_AIDEBUG      'D' // Показывать AI-дебаг        !!CHEAT!!
+-#define KEY_SET_MONEY         'M' // Дать денег                 !!CHEAT!!
+-#define KEY_CREATE_BIG_TRAIN  '#' // Создать большой состав     !!CHEAT!!
++#define KEY_MAP_EXIT          27  // Esc - Exit to menu
++#define KEY_STATEBAR           9  // Tab - Unit bar (StateBar)
++#define KEY_OBJECTIVES        79  // O (o) - Objectives
++#define KEY_UNIT_DELETE       'd' // Destroy unit
++#define KEY_TRAIN_DELETE       4  // Destroy the whole train - ctrl+d (ctrl+D)
++#define KEY_REPAIR            'h' // Repair unit                       !!CHEAT!!
++#define KEY_EXPLOSION         'x' // Explosion (as khon-hunter)        !!CHEAT!!
++#define KEY_VICTORY           'W' // Victory                           !!CHEAT!!
++#define KEY_BUILD_MODE        'B' // Unit creation mode                !!CHEAT!!
++#define KEY_CHANGE_ARMY       'A' // Change the unit's army            !!CHEAT!!
++#define KEY_KILLEM_ALL        'K' // "Remove" all enemy units          !!CHEAT!!
++#define KEY_SHOW_AIDEBUG      'D' // Show/hide AI debug                !!CHEAT!!
++#define KEY_SET_MONEY         'M' // Give money                        !!CHEAT!!
++#define KEY_CREATE_BIG_TRAIN  '#' // Create a big train                !!CHEAT!!
++#include "maps\script\cheats.lgc"   // KEYS_ENABLE when the launcher's Cheats option is on (LocoFix)
+ 

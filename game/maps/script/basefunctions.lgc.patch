@@ -1,0 +1,10 @@
+--- maps/script/basefunctions.lgc
++++ maps/script/basefunctions.lgc
+@@ -220,3 +220,7 @@
+    int file;
++#ifdef OBJECTIVES_FILE
++   file=FOpen(OBJECTIVES_FILE);
++#else
+    file=FOpen("maps\\l"+sprintf("%02i",LEVEL+1)+"\\objectives.txt");
++#endif
+    while(!FEof(file))

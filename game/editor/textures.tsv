@@ -1,0 +1,17 @@
+# The textures of the editor's ground painting (editor_ground.cpp): where to sample each one in a
+# campaign ground of the player's game (maps\lNN\lNN.vid) - a 128 x 128 patch at x, y of the picture,
+# laid mirrored so it tiles without seams. Nothing of the pictures is kept here, only the places.
+# key: the [Editor] key of its name; english: the name in English.
+key	english	map	x	y
+TexGrass	Grass	l02	1696	1216
+TexLightGrass	Light grass	l15	2624	640
+TexForest	Forest floor	l07	1664	896
+TexSand	Sand	l11	705	1905
+TexDesert	Desert	l10	620	1310
+TexSnow	Snow	l18	1200	1000
+TexIce	Ice	l16	2050	520
+TexRock	Rock	l20	512	64
+TexDarkRock	Dark rock	l20	0	832
+TexLava	Lava	l13	2176	2112
+TexSwamp	Swamp	l06	1100	705
+TexLakeBed	Lake bed	l15	1920	1088

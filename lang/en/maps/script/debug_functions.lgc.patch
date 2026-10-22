@@ -1,0 +1,7 @@
+--- maps/script/debug_functions.lgc
++++ maps/script/debug_functions.lgc
+@@ -26,3 +26,3 @@
+ //           GT=GetTime();
+-     str="Время: "+str;
++     str="Time: "+str;
+      str=str+" | Ix="+itoa(GetInputX())+" Iy="+itoa(GetInputY())+" Gz="+itoa(GetGroundZ(GetInputX(),GetInputY()));

@@ -1,0 +1,32 @@
+{
+  "chunks": [
+    "OBJ ",
+    "GRPH",
+    "HEAD",
+    "GRID",
+    "SPR ",
+    "SPRD",
+    "PLAY",
+    "GROU"
+  ],
+  "graphics": {
+    "environment": "0x1",
+    "gamma": "0000000000000000",
+    "windDirection": 64,
+    "wind": 0.025
+  },
+  "head": {
+    "width": 2048.0,
+    "height": 1536.0,
+    "cameraX": 0.0,
+    "cameraY": 768.0,
+    "time": 93368,
+    "version": 10
+  },
+  "players": [
+    0,
+    0,
+    0,
+    0
+  ]
+}

@@ -1,0 +1,12 @@
+STEROWANIE MYSZ•
+
+ZAZNACZ OBIEKT          LPM NA OBIEKCIE
+PRZESU— OBIEKT          PRZECI•GNIJ LPM
+OBR”∆ OBIEKT            K”£KO MYSZY
+POSTAW OBIEKT Z PASKA   LPM NA MAPIE
+WR”∆ DO ZAZNACZANIA     PPM LUB ESC
+PANEL OBIEKTU           PPM NA NIM
+PRZESU— WIDOK           åRODKOWY PRZYCISK
+                        LUB KRAW Dè EKRANU
+USU— CA£Y ODCINEK       SHIFT+LPM
+TORU                    (NARZ DZIE USU—)

@@ -1,0 +1,14 @@
+KLAWISZE EDYTORA
+
+NARZÊDZIA PASKA         1-9, 0
+OBRÓÆ W PRAWO / W LEWO  R / E
+NASTÊPNA ARMIA          A
+SEMAFOR CZERW./ZIELONY  T
+LINIA PRZY SEMAFORZE    L / SHIFT+L
+USUÑ ZAZNACZENIE        DEL
+COFNIJ / PONÓW          CTRL+Z / CTRL+Y
+DEKORACJA / ODSTÊP      [ ] / < >
+PÊDZEL TERENU / PROMIEÑ M / + -
+PODSYPKA NOWYCH TORÓW   B
+URUCHOM / WSTRZYMAJ     CTRL+R
+POMOC                   F1

@@ -1,0 +1,9 @@
+.venv/
+build/
+__pycache__/
+# language files captured from the player's own Steam install (languages.py)
+captured/
+# generated from the player's own copy of the game: decompile.py and unpack.py
+re/c/
+re/exe/
+re/data/

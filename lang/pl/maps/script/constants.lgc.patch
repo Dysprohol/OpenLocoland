@@ -1,0 +1,43 @@
+--- maps/script/constants.lgc
++++ maps/script/constants.lgc
+@@ -17,21 +17,22 @@
+ 
+-//#define KEY_SET_FADE 102       // f - Затемнение
+-//#define KEY_SET_NUKE 110       // n - Молния
+-//#define KEY_SET_SQUALL 119     // w - Порыв ветра
+-//#define KEY_SET_QUAKE 113      // q - Землетрясение
++//#define KEY_SET_FADE 102       // f - Zaciemnienie
++//#define KEY_SET_NUKE 110       // n - Blyskawica
++//#define KEY_SET_SQUALL 119     // w - Poryw wiatru
++//#define KEY_SET_QUAKE 113      // q - Trzesienie ziemi
+ 
+-#define KEY_MAP_EXIT          27  // Esc - Выход в меню
+-#define KEY_STATEBAR           9  // Tab - включение StateBar
+-#define KEY_OBJECTIVES        79  // O (o) - Объективы
+-#define KEY_UNIT_DELETE       'd' // Убить юнит
+-#define KEY_TRAIN_DELETE       4  // Убить состав - ctrl+d (ctrl+D)
+-#define KEY_REPAIR            'h' // Починить юнит              !!CHEAT!!
+-#define KEY_EXPLOSION         'x' // Взрыв из khon-hunter       !!CHEAT!!
+-#define KEY_VICTORY           'W' // Победа                     !!CHEAT!!
+-#define KEY_BUILD_MODE        'B' // Вход в режим строительства !!CHEAT!!
+-#define KEY_CHANGE_ARMY       'A' // Смена армии                !!CHEAT!!
+-#define KEY_KILLEM_ALL        'K' // "Убрать" все юниты 1 армии !!CHEAT!!
+-#define KEY_SHOW_AIDEBUG      'D' // Показывать AI-дебаг        !!CHEAT!!
+-#define KEY_SET_MONEY         'M' // Дать денег                 !!CHEAT!!
+-#define KEY_CREATE_BIG_TRAIN  '#' // Создать большой состав     !!CHEAT!!
++#define KEY_MAP_EXIT          27  // Esc - Wyjscie do menu
++#define KEY_STATEBAR           9  // Tab - Pasek stanu (StateBar)
++#define KEY_OBJECTIVES        79  // O (o) - Cele misji
++#define KEY_UNIT_DELETE       'd' // Zniszcz jednostke
++#define KEY_TRAIN_DELETE       4  // Zniszcz caly sklad - ctrl+d (ctrl+D)
++#define KEY_REPAIR            'h' // Napraw jednostke                  !!CHEAT!!
++#define KEY_EXPLOSION         'x' // Wybuch (jak khon-hunter)          !!CHEAT!!
++#define KEY_VICTORY           'W' // Zwyciestwo                        !!CHEAT!!
++#define KEY_BUILD_MODE        'B' // Tryb tworzenia jednostek          !!CHEAT!!
++#define KEY_CHANGE_ARMY       'A' // Zmiana armii jednostki            !!CHEAT!!
++#define KEY_KILLEM_ALL        'K' // "Usun" wszystkie jednostki wroga  !!CHEAT!!
++#define KEY_SHOW_AIDEBUG      'D' // Pokaz/ukryj debug AI              !!CHEAT!!
++#define KEY_SET_MONEY         'M' // Daj pieniadze                     !!CHEAT!!
++#define KEY_CREATE_BIG_TRAIN  '#' // Stworz duzy sklad                 !!CHEAT!!
++#include "maps\script\cheats.lgc"   // KEYS_ENABLE when the launcher's Cheats option is on (LocoFix)
+ 

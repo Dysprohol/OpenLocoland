@@ -1,0 +1,3 @@
+// The launcher's All missions option is on: every mission of the strategic map can be played;
+// the stored progress is not changed (LocoFix, options.cpp).
+int option_unlock_all=1;

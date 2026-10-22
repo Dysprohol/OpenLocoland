@@ -1,0 +1,12 @@
+TIPY:
+
+vyber svoji lokomotivu kliknutim levym
+tlacitkem mysi.
+pote najed kurzorem na delo, kurzor zmeni
+tvar a klikni pravym tlacitkem mysi.
+lokomotiva se rozjede a pripoji delo.
+
+nyni najed kurzorem na balvan v ceste.
+jakmile kurzor zmeni tvar, znovu klikni
+pravym tlacitkem mysi.
+lokomotiva dojede k balvanu a znici jej.

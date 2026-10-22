@@ -1,0 +1,15 @@
+{
+  "chunks": [
+    "HEAD",
+    "SURF",
+    "DATA"
+  ],
+  "imageFlags": "0x35",
+  "frameSpeed": 71,
+  "frameCount": 1,
+  "width": 2048,
+  "height": 1536,
+  "kind": "texture",
+  "textures": 48,
+  "ground": true
+}

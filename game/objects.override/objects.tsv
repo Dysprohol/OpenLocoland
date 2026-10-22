@@ -1,0 +1,23 @@
+# VID 938: the side tiles of the state bar (LocoFix status_bar.cpp) - a copy of the bar's
+# own type (VID 450) with four directions - the left tile repeated, the left one next to the
+# bar, the right one next to the bar, the right one repeated (0, 64, 128, 192) - whose image
+# vid\450side.vid build.py cuts from vid\450sbar.vid (patch_data.make_status_bar_sides)
+nvid	name	spriteType	spriteClass	flags	moveMask	sizeX	sizeY	sizeZ	maxHp	speed	speedZ	acceleration	deceleration	rotateTime	nDir	scaleX	scaleY	scaleZ	imageFile
+938	Statebar side	0x400	FRAME	0x2800	0xf	106	60	0	0	0	0	999999	999999	2500	4	1	1	1	vid\450side.vid
+# VID 939: the icons of LocoFix's editor bar (editor_edit.cpp) that the state bar's atlas (VID 455)
+# has no icon for, a texture like VID 455 with one frame per direction; build.py makes
+# vid\939edit.vid from the game's sprites (patch_data.make_editor_icons)
+939	Editor icons	0x400	FRAME	0x2800	0xf	40	40	0	0	0	0	999999	999999	2500	14	1	1	1	vid\939edit.vid
+# VID 940 and 941: the scroll arrows of the custom maps page of the menu (menu.lgc) - the up and
+# down arrows of the player list's difficulty buttons (VID 447/448, their images) as types of
+# their own, so their mouse tips ([MouseTips] MenuVid940AllDir/941) say what they do
+# VID 944: the icons of the editor's palette (editor_panel.cpp), one frame each (the frame drawn by number)
+# - vid\944pal.vid, made by build.py from the objects' own pictures (patch_data.make_editor_palette)
+944	Editor palette	0x400	FRAME	0x2800	0xf	40	40	0	0	0	0	999999	999999	2500	1	1	1	1	vid\944pal.vid
+940	Custom maps up	0x400	FRAME	0x2800	0xf	17	17	0	0	0	0	999999	999999	2500	1	1	1	1	vid\447menu.vid
+941	Custom maps down	0x400	FRAME	0x2800	0xf	17	17	0	0	0	0	999999	999999	2500	1	1	1	1	vid\448menu.vid
+# VID 942 and 943: the editor's Help and Menu buttons in the round sockets at the left end of the bar
+# (LocoFix, not drawn yet) - copies of the pause button (VID 498) and the "up to the menu" button
+# (VID 499) with "?" and three bars instead of their signs (patch_data.make_editor_buttons)
+942	Editor help button	0x400	FRAME	0x2800	0x7	20	20	0	0	0	0	999999	999999	2500	1	1	1	1	vid\942help.vid
+943	Editor menu button	0x400	FRAME	0x2800	0x7	40	40	0	0	0	0	999999	999999	2500	1	1	1	1	vid\943menu.vid

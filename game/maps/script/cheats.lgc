@@ -1,0 +1,4 @@
+// The launcher's Cheats option is off: no KEYS_ENABLE, so dokeys.lgc has no developer keys (the
+// original game). LocoFix (options.cpp) opens cheats_on.lgc in place of this file when it is on.
+// (A file of its own must end with a declaration: the compiler reads one after the last directive.)
+int option_cheats=0;

@@ -1,0 +1,104 @@
+--- maps/script/menuend.lgc
++++ maps/script/menuend.lgc
+@@ -114,3 +114,7 @@
+    int file;
++#ifdef HISCORES_FILE
++   file=FOpen(HISCORES_FILE);
++#else
+    file=FOpen("maps\\l"+sprintf("%02i",LEVEL+1)+"\\hiscores");
++#endif
+    for(i=0;i<5;i++){
+@@ -124,3 +128,7 @@
+    int file;
++#ifdef HISCORES_FILE
++   file=FCreate(HISCORES_FILE);
++#else
+    file=FCreate("maps\\l"+sprintf("%02i",LEVEL+1)+"\\hiscores");
++#endif
+    for(i=0;i<5;i++){
+@@ -174,3 +182,7 @@
+       //поздравление
++#ifdef WIN_FILE
++      file=FOpen(WIN_FILE);
++#else
+       file=FOpen("maps\\l"+sprintf("%02i",LEVEL+1)+"\\win.txt");
++#endif
+       we_are_win=1;
+@@ -204,3 +216,7 @@
+     {
++#ifdef LOOSE_FILE
++      file=FOpen(LOOSE_FILE);
++#else
+       file=FOpen("maps\\l"+sprintf("%02i",LEVEL+1)+"\\loose.txt");
++#endif
+       s=FReadText(file)+"\n\r";
+@@ -332,11 +348,12 @@
+       money_bonus=GetMoney(0)/10;
+-      GivenScores="время="+itoa(time_bonus);
+-      GivenScores=GivenScores+" за $="+itoa(money_bonus);
+-      GivenScores=GivenScores+" уровень="+itoa(BONUS_LEVEL_SCORES);
+-      GivenScores=GivenScores+" наши="+itoa(-ScoresByArmy[0]/100);
+-      GivenScores=GivenScores+" захват="+itoa(ScoresByArmy[2]/100)+"\r\n";
+-      GivenScores=GivenScores+"враг="+itoa(ScoresByArmy[1]/100);
+-      GivenScores=GivenScores+"нейтр.="+itoa(-ScoresByArmy[3]/100);
+-      GivenScores=GivenScores+" враг_истратил="+itoa(999999-GetMoney(1));
++      GivenScores="czas="+itoa(time_bonus);
++      GivenScores=GivenScores+" za $="+itoa(money_bonus);
++      GivenScores=GivenScores+" poziom="+itoa(BONUS_LEVEL_SCORES);
++      GivenScores=GivenScores+" nasi="+itoa(-ScoresByArmy[0]/100);
++      GivenScores=GivenScores+" przejete="+itoa(ScoresByArmy[2]/100)+"\r\n";
++      GivenScores=GivenScores+"wrog="+itoa(ScoresByArmy[1]/100);
++      GivenScores=GivenScores+" neutr.="+itoa(-ScoresByArmy[3]/100);
++      GivenScores=GivenScores+" wrog_wydal="+itoa(999999-GetMoney(1));
+       FinalScores=BONUS_LEVEL_SCORES+time_bonus+money_bonus+(ScoresByArmy[1]-ScoresByArmy[0]+ScoresByArmy[2]-ScoresByArmy[3])/100;
++#ifndef CUSTOM_MAP
+       k=GetReg("SOFTWARE\\Gromada\\steam\\Players","s"+itoa(defpl)+"l"+itoa(LEVEL),"0");
+@@ -357,2 +374,6 @@
+       StoreScores();
++#else
++      TotalScores=GetPlayerScores(defpl);
++      GivenRang=0;
++#endif
+       //запись в таблицу рекордов на уровне
+@@ -366,3 +387,7 @@
+       hiscores_text2=hiscores_text;
++#ifdef HISCORES_FILE
++      file=FOpen(HISCORES_FILE);
++#else
+       file=FOpen("maps\\l"+sprintf("%02i",LEVEL+1)+"\\hiscores");
++#endif
+       for(i=0;i<5;i++){
+@@ -386,3 +411,7 @@
+       FClose(file);
++#ifdef HISCORES_FILE
++      file=FCreate(HISCORES_FILE+".txt");
++#else
+       file=FCreate("maps\\l"+sprintf("%02i",LEVEL+1)+"\\hiscores.txt");
++#endif
+       FWrite(file,GetString("strings","MenuBriefHiscores")+"\n\r\n\r"+hiscores_text);
+@@ -505,2 +534,3 @@
+   defpl=GetReg("SOFTWARE\\Gromada\\steam\\Players","pd","-1");
++#ifndef CUSTOM_MAP
+   if (defpl>-1)
+@@ -508,3 +538,3 @@
+     defle=GetReg("SOFTWARE\\Gromada\\steam\\Players","l"+itoa(defpl),0);
+-    if (defle<=LEVEL)
++    if (defle==LEVEL)
+     {
+@@ -516,2 +546,3 @@
+   }
++#endif
+ }
+@@ -520,2 +551,3 @@
+   defpl=GetReg("SOFTWARE\\Gromada\\steam\\Players","pd","-1");
++#ifndef CUSTOM_MAP
+   if (defpl>-1)
+@@ -523,3 +555,3 @@
+     defle=GetReg("SOFTWARE\\Gromada\\steam\\Players","l"+itoa(defpl),0);
+-    if (defle<=LEVEL)
++    if (defle==LEVEL)
+     {
+@@ -531,2 +563,3 @@
+   }
++#endif
+   end=3;

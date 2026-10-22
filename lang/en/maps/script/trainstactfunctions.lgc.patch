@@ -1,0 +1,41 @@
+--- maps/script/trainstactfunctions.lgc
++++ maps/script/trainstactfunctions.lgc
+@@ -127,5 +127,5 @@
+             if(UnitInTrain(Flagman(0),ai_trains[train])){
+-              s="{т="+itoa(ai_trains_type[train])
+-                 +" з="+itoa(ai_trains_task[train])
+-                 +" з2="+itoa(ai_trains_task2[train])
++              s="{type="+itoa(ai_trains_type[train])
++                 +" task="+itoa(ai_trains_task[train])
++                 +" task2="+itoa(ai_trains_task2[train])
+                  +" t="+itoa((GetTime()-ai_trains_time[train])/1000)
+@@ -135,5 +135,5 @@
+                  +" am="+itoa(TrainProperty(ai_trains[train],PROP_AMMO))
+-                 +" п="+itoa(ai_trains_behave[train])
++                 +" behave="+itoa(ai_trains_behave[train])
+                  +" air="+itoa(GetFreeFlyerWagonInTrain(ai_trains[train],35))+"/"+itoa(GetFreeFlyers(1,40))
+-                 +" ц="+itoa(trtrgt)
++                 +" target="+itoa(trtrgt)
+                  +"}";
+@@ -143,5 +143,5 @@
+             {
+-              s= " т="+itoa(ai_trains_type[train])
+-              +" з="+itoa(ai_trains_task[train])
+-              +" з2="+itoa(ai_trains_task2[train])
++              s= " type="+itoa(ai_trains_type[train])
++              +" task="+itoa(ai_trains_task[train])
++              +" task2="+itoa(ai_trains_task2[train])
+               +" t="+itoa((GetTime()-ai_trains_time[train])/1000)
+@@ -151,3 +151,3 @@
+               +" am="+itoa(TrainProperty(ai_trains[train],PROP_AMMO))
+-              +" п="+itoa(ai_trains_behave[train])
++              +" behave="+itoa(ai_trains_behave[train])
+               +" air="+itoa(GetFreeFlyerWagonInTrain(ai_trains[train],35))+"/"+itoa(GetFreeFlyers(1,40))
+@@ -155,5 +155,5 @@
+               if(UnitInTrain(ai_trains_target[train],Flagman(0)))
+-                s=s+"{цель}";
++                s=s+"{target}";
+               else
+-                s=s+" ц="+itoa(trtrgt);
++                s=s+" target="+itoa(trtrgt);
+               ai_trains_print[train]=PrintText(30,100+train*15,0,s,9);

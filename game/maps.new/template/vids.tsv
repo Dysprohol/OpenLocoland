@@ -1,0 +1,2 @@
+nvid	name	spriteType	spriteClass	flags	moveMask	sizeX	sizeY	sizeZ	maxHp	speed	speedZ	acceleration	deceleration	rotateTime	weaponIndex	damageRadius	damage	linkOffsetX	linkOffsetY	linkOffsetZ	linkNvid	altitude	unknown_54	nDir	gammaR	gammaG	gammaB	gammaA	scaleX	scaleY	scaleZ	imageFile	trailing
+1024	Hardware Prerendered Ground	0x1	SPRITE	0x0	0xf	3.59e-43	3.59e-43	8.4e-44	0	0	0	1.4012e-41	1.4012e-41	0	0	0	0	0	0	0	0	0		1	0	0	0	0	1	1	1	maps\l01\l01.vid	

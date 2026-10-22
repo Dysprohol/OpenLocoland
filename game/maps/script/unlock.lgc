@@ -1,0 +1,3 @@
+// The launcher's All missions option is off: the strategic map unlocks the missions as the
+// player's progress says. LocoFix (options.cpp) opens unlock_on.lgc in place of this file when it is on.
+int option_unlock_all=0;

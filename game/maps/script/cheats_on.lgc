@@ -1,0 +1,3 @@
+// The launcher's Cheats option is on: the developer keys of dokeys.lgc (LocoFix, options.cpp).
+#define KEYS_ENABLE 1
+int option_cheats=1;

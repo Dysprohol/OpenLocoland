@@ -1,0 +1,6 @@
+--- maps/script/constants.lgc
++++ maps/script/constants.lgc
+@@ -36,2 +36,3 @@
+ #define KEY_CREATE_BIG_TRAIN  '#' // Создать большой состав     !!CHEAT!!
++#include "maps\script\cheats.lgc"   // KEYS_ENABLE when the launcher's Cheats option is on (LocoFix)
+ 

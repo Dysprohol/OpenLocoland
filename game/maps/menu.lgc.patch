@@ -1,0 +1,303 @@
+--- maps/menu.lgc
++++ maps/menu.lgc
+@@ -2,2 +2,3 @@
+ #include "maps\Script\menus.lgc"
++#include "maps\script\unlock.lgc"   // option_unlock_all: the launcher's All missions option (LocoFix)
+ #define R_GAMMA 0
+@@ -50,2 +51,19 @@
+ #define MENU_EXIT     6
++#define MENU_CUSTOM   7     // custom maps: the second page of the strategic map
++
++// The custom maps page: the map editor on its first row and under it the maps of CUSTOM_LIST,
++// two lines per map: its folder in maps\ (the map is maps\<folder>\<folder>.map, its briefing
++// pages maps\<folder>\brief.lst) and the title shown in the list and over the briefing. The
++// list has any length: CUSTOM_ROWS of it are shown and it scrolls - the arrows beside it, the
++// mouse wheel, the up and down keys and Page Up / Page Down.
++#define CUSTOM_LIST   "maps\\custom.lst"
++#define CUSTOM_ROWS   6     // map rows shown
++#define CUSTOM_EDITOR 6     // the entry number of the editor (= CUSTOM_ROWS)
++#define CUSTOM_X     -160   // the lamp of a row, from the centre of the picture
++#define CUSTOM_EDIT_Y -60   // the editor's row
++#define CUSTOM_Y     -28    // the first map row
++#define CUSTOM_DY     24    // between the map rows
++#define CUSTOM_ARROW_X 165  // the scroll arrows, beside the first and the last map row
++#define CUSTOM_UP     940   // the difficulty arrows of the player list (VID 447/448) as types of
++#define CUSTOM_DOWN   941   // their own, with their own mouse tips (game/objects.override)
+ 
+@@ -88,2 +106,7 @@
+ string load_list;
++int custommenu_created=0,custom_count=0,custom_top=0,custom_shown=0;
++string custom_folder[6];   // the maps shown: custom_top ... custom_top+custom_shown-1 of the list
++string custom_title[6];
++int custom_text[]={0,0,0,0,0,0,0};   // their texts and the editor's
++string brief_list,brief_title;   // the briefing SetMenuBriefState shows
+ #include "maps\script\maps_create.lgc"
+@@ -154,2 +177,6 @@
+     }
++    if(num==MENU_LEVELS)
++      menu_next=MenuCreate(476,0,X+152,Y+131,30);
++    if(num==MENU_CUSTOM)
++      menu_prev=MenuCreate(475,0,X-151,Y+131,30);
+     if(num==MENU_USER ) menu_brief_text=PrintFile(X-175,Y-70+100,100,GetFileFromList("maps\\menu"+itoa(num)+".lst"),2);
+@@ -191,4 +218,14 @@
+     }
+-    menu_pict=MenuCreate(482+num,0,X,Y,10);
+-    menu_brief_head=PrintText(X+BREIF_HEAD_X,Y+BREIF_HEAD_Y,BREIF_HEAD_Z,GetString("strings","MenuHeader"+itoa(num)),3);
++    if(num==MENU_CUSTOM)
++    {
++      menu_pict=MenuCreate(484,0,X,Y,10);   // an empty picture with the button bar
++      s=GetString("strings","MenuHeader"+itoa(num));
++      if(s=="") s="CUSTOM MAPS";
++    }
++    else
++    {
++      menu_pict=MenuCreate(482+num,0,X,Y,10);
++      s=GetString("strings","MenuHeader"+itoa(num));
++    }
++    menu_brief_head=PrintText(X+BREIF_HEAD_X,Y+BREIF_HEAD_Y,BREIF_HEAD_Z,s,3);
+   }
+@@ -198,2 +235,6 @@
+ SetMenuBriefState(int num){
++  if(num>0){
++    brief_list="maps\\l"+sprintf("%02i",num)+"\\brief.lst";
++    brief_title=GetString("strings","MapHeader"+itoa(num));
++  }
+   if (menu_pict!=-1) Destroy(menu_pict);
+@@ -208,5 +249,5 @@
+   menu_start_text=PrintTextAtCenter(X,Y+131+100,100,GetString("strings","MenuBriefGo"),2);
+-  if(curr_page>0) 
++  if(curr_page>0 || num<0)   // a custom map goes back to the list from its first page
+     menu_prev=MenuCreate(475,0,X-151,Y+131,30);
+-  if(GetCountFromList("maps\\l"+sprintf("%02i",num)+"\\brief.lst")-1>curr_page)
++  if(GetCountFromList(brief_list)-1>curr_page)
+     menu_next=MenuCreate(476,0,X+152,Y+131,30);
+@@ -214,4 +255,4 @@
+     menu_pict=MenuCreate(501,0,X,Y,10);
+-    menu_brief_text=PrintFile(X-175,Y-70+100,100,GetFileFromList("maps\\l"+sprintf("%02i",num)+"\\brief.lst"),2);
+-    menu_brief_head=PrintText(X+BREIF_HEAD_X,Y+BREIF_HEAD_Y,BREIF_HEAD_Z,GetString("strings","MapHeader"+itoa(num)),3);
++    menu_brief_text=PrintFile(X-175,Y-70+100,100,GetFileFromList(brief_list),2);
++    menu_brief_head=PrintText(X+BREIF_HEAD_X,Y+BREIF_HEAD_Y,BREIF_HEAD_Z,brief_title,3);
+   }
+@@ -277,3 +318,3 @@
+     {
+-      if (k<j) Action(MenuCreate(468,j,X+xmaps[j],Y+ymaps[j],20),act_menudisable,0,0);
++      if (k<j && !option_unlock_all) Action(MenuCreate(468,j,X+xmaps[j],Y+ymaps[j],20),act_menudisable,0,0);
+       else 
+@@ -285,2 +326,142 @@
+   levelmenu_created=1;
++}
++KillCustomMenu()
++{
++  int j;
++  if(custommenu_created){
++    Genocide(472);
++    Genocide(CUSTOM_UP);
++    Genocide(CUSTOM_DOWN);
++    for(j=0;j<=CUSTOM_ROWS;j++)
++    {
++      if(custom_text[j]) Destroy(custom_text[j]);
++      custom_text[j]=0;
++    }
++  }
++  custommenu_created=0;
++}
++// the y of row j of the page: CUSTOM_EDITOR is the editor's, the others are map rows
++CustomMenuRowY(int j)
++{
++  if(j==CUSTOM_EDITOR) return CUSTOM_EDIT_Y;
++  return CUSTOM_Y+j*CUSTOM_DY;
++}
++// Reads the list: counts its maps (custom_count) and keeps the CUSTOM_ROWS of them from
++// custom_top on (custom_shown), keeping custom_top within the list.
++ReadCustomList()
++{
++  int file,pass,n;
++  string s,t;
++  for(pass=0;pass<2;pass++)
++  {
++    n=0;
++    custom_shown=0;
++    file=FOpen(CUSTOM_LIST);
++    while(file && !FEof(file))
++    {
++      s=FRead(file);
++      if(s!="")
++      {
++        t=FRead(file);
++        if(pass && n>=custom_top && custom_shown<CUSTOM_ROWS)
++        {
++          custom_folder[custom_shown]=s;
++          custom_title[custom_shown]=t;
++          custom_shown++;
++        }
++        n++;
++      }
++    }
++    FClose(file);
++    custom_count=n;
++    if(custom_top>custom_count-CUSTOM_ROWS) custom_top=custom_count-CUSTOM_ROWS;
++    if(custom_top<0) custom_top=0;
++  }
++}
++// A row: the glowing lamp of the in-game strategic map (it has no mouse tip, unlike the mission
++// dots, VID 468, whose tips name the missions) and the text.
++CustomMenuRowCreate(int j,string s)
++{
++  Action(MenuCreate(472,0,X+CUSTOM_X,Y+CustomMenuRowY(j),20),act_menustandup,0,0);
++  custom_text[j]=PrintText(X+CUSTOM_X+16,Y+CustomMenuRowY(j)-6+100,100,s,2);
++}
++CreateCustomMenu()
++{
++  int j;
++  string s;
++  if(custommenu_created) KillCustomMenu();
++  ReadCustomList();
++  GetRCX(MAIN_X);GetRCY(MAIN_Y);
++  s=GetString("strings","MenuCustomEditor");
++  if(s=="") s="MAP EDITOR";
++  CustomMenuRowCreate(CUSTOM_EDITOR,s);
++  for(j=0;j<custom_shown;j++)
++    CustomMenuRowCreate(j,custom_title[j]);
++  if(custom_top>0)
++    MenuCreate(CUSTOM_UP,0,X+CUSTOM_ARROW_X,Y+CustomMenuRowY(0),20);
++  if(custom_top+custom_shown<custom_count)
++    MenuCreate(CUSTOM_DOWN,0,X+CUSTOM_ARROW_X,Y+CustomMenuRowY(CUSTOM_ROWS-1),20);
++  custommenu_created=1;
++}
++// Moves the list by n maps (up when negative) and shows it again.
++CustomMenuScroll(int n)
++{
++  int top;
++  top=custom_top;
++  custom_top=custom_top+n;
++  if(custom_top>custom_count-CUSTOM_ROWS) custom_top=custom_count-CUSTOM_ROWS;
++  if(custom_top<0) custom_top=0;
++  if(custom_top!=top)
++  {
++    PlaySFX(24);
++    CreateCustomMenu();
++  }
++}
++// The entry under the point (x, y) of the screen - a map row, CUSTOM_EDITOR or -1 for none.
++// The column of the scroll arrows is not a row.
++CustomMenuEntryAt(int x,int y)
++{
++  int j,row_y;
++  GetRCX(MAIN_X);GetRCY(MAIN_Y);
++  if(x<X+CUSTOM_X-12 || x>X+CUSTOM_ARROW_X-12) return -1;
++  for(j=0;j<=CUSTOM_EDITOR;j++)
++    if(j<custom_shown || j==CUSTOM_EDITOR)
++    {
++      row_y=Y+CustomMenuRowY(j);
++      if(y>=row_y-CUSTOM_DY/2 && y<row_y+CUSTOM_DY/2) return j;
++    }
++  return -1;
++}
++// The map editor entry of the custom maps page - the one place the menu starts it from.
++// LocoFix's StartEditorMode (src/LocoFix/restart.cpp, extern number 200, free in export.lgc)
++// starts the game again in its editor mode on the empty template map (game/maps.new/template);
++// File > Load of the editor opens the others.
++extern StartEditorMode(string map) 200;
++// LocoFix's GetMouseWheel (src/LocoFix/menu_input.cpp, extern number 201): the turn of the mouse
++// wheel in this frame, > 0 up - the list of the page scrolls with it.
++extern GetMouseWheel() 201;
++StartEditor()
++{
++  ScrollLock(0);
++  StopMusic();
++  Effect(eff_fade,0);
++  StartEditorMode("maps\\template\\template.map");
++}
++// Entry j of the custom maps page: a map row shows its map's briefing, whose start button loads
++// it like a campaign mission; CUSTOM_EDITOR is the editor. Returns 1 when the menu is left.
++CustomMenuSelect(int j)
++{
++  PlaySFX(24);
++  if(j==CUSTOM_EDITOR)
++  {
++    StartEditor();
++    return 1;
++  }
++  active_map="maps\\"+custom_folder[j]+"\\"+custom_folder[j]+".map";
++  brief_list="maps\\"+custom_folder[j]+"\\brief.lst";
++  brief_title=custom_title[j];
++  curr_page=0;
++  KillCustomMenu();
++  SetMenuBriefState(-1);
++  return 0;
+ }
+@@ -604,2 +785,8 @@
+         }
++        else if(GetReg("SOFTWARE\\Gromada\\steam\\Players","return","0")=="2")
++        {
++           EnableButtons(0);
++           SetMenuState(MENU_CUSTOM);
++           CreateCustomMenu();
++        }
+         else
+@@ -668,5 +855,22 @@
+         {
+-            if(curr_page){ curr_page--;PlaySFX(24);}
+-            if(brief_exists) SetMenuBriefState(brief_state);
+-            else SetMenuState(menu_state);
++            if(!brief_exists && menu_state==MENU_CUSTOM)
++            {
++               PlaySFX(24);
++               KillCustomMenu();
++               SetMenuState(MENU_LEVELS);
++               CreateLevelMenu();
++            }
++            else if(brief_exists && brief_state<0 && !curr_page)
++            {
++               PlaySFX(24);
++               brief_exists=0;
++               SetMenuState(MENU_CUSTOM);
++               CreateCustomMenu();
++            }
++            else
++            {
++               if(curr_page){ curr_page--;PlaySFX(24);}
++               if(brief_exists) SetMenuBriefState(brief_state);
++               else SetMenuState(menu_state);
++            }
+         }
+@@ -674,5 +878,15 @@
+         {
+-            if(GetCountFromList(load_list)-1>curr_page){ curr_page++;PlaySFX(24);}
+-            if(brief_exists) SetMenuBriefState(brief_state);
+-            else SetMenuState(menu_state);
++            if(!brief_exists && menu_state==MENU_LEVELS)
++            {
++               PlaySFX(24);
++               KillLevelMenu();
++               SetMenuState(MENU_CUSTOM);
++               CreateCustomMenu();
++            }
++            else
++            {
++               if(GetCountFromList(load_list)-1>curr_page){ curr_page++;PlaySFX(24);}
++               if(brief_exists) SetMenuBriefState(brief_state);
++               else SetMenuState(menu_state);
++            }
+         }
+@@ -715,2 +929,3 @@
+           KillLevelMenu();
++          KillCustomMenu();
+           KillOptionsMenu();
+@@ -738,2 +953,16 @@
+           }
++        }
++        else if (menu_state==MENU_CUSTOM && !brief_exists){
++          k=-1;
++          if(mvid==CUSTOM_UP) CustomMenuScroll(-1);
++          else if(mvid==CUSTOM_DOWN) CustomMenuScroll(1);
++          else if(mclick==1) k=CustomMenuEntryAt(GetScreenInputX(),GetScreenInputY());
++          l=GetMouseWheel();
++          if(l) CustomMenuScroll(-l);
++          if(GetKey()==VK_UP) CustomMenuScroll(-1);
++          if(GetKey()==VK_DOWN) CustomMenuScroll(1);
++          if(GetKey()==VK_PRIOR) CustomMenuScroll(-CUSTOM_ROWS);
++          if(GetKey()==VK_NEXT) CustomMenuScroll(CUSTOM_ROWS);
++          if(k>-1)
++            if(CustomMenuSelect(k)) return;
+         }

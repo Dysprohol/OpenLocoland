@@ -1,0 +1,277 @@
+# The editor's palette of objects (editor_edit.cpp, File > All objects): group, VID, the army it gets,
+# the [Editor] key of its name and the English name (empty: the game's [Units] name).
+# build.py adds each object's icon (vid\944pal.vid) and the state of a unit of the missions (patch_data.py).
+group	nvid	army	key	english
+GroupMeadow	220	0	Obj220	Flower 1
+GroupMeadow	221	0	Obj221	Flower 2
+GroupMeadow	222	0	Obj222	Flower 3
+GroupMeadow	219	0	Obj219	Wild flowers
+GroupMeadow	224	0	Obj224	Dandelion tree
+GroupMeadow	228	0	Obj228	Brush tree
+GroupMeadow	225	0	Obj225	Water lily
+GroupMeadow	909	0	Obj909	Scarecrow
+GroupMeadow	936	0	Obj936	Round bush
+GroupMeadow	121	0	Obj121	Blue bush
+GroupMeadow	218	0	Obj218	Yellow bush
+GroupMeadow	226	0	Obj226	Grass tuft
+GroupMeadow	223	0	Obj223	Grass patch
+GroupMeadow	248	0	Obj248	Autumn grass
+GroupMeadow	133	0	Obj133	Flower stalks
+GroupMeadow	855	0	Obj855	Small flowers
+GroupMeadow	217	0	Obj217	Reeds
+GroupMeadow	227	0	Obj227	Meadow stone
+GroupForest	136	0	Obj136	Tree 1
+GroupForest	123	0	Obj123	Tree 2
+GroupForest	124	0	Obj124	Glazed tree
+GroupForest	122	0	Obj122	Blue tree
+GroupForest	134	0	Obj134	Bush 1
+GroupForest	135	0	Obj135	Bush 2
+GroupForest	130	0	Obj130	Chanterelle plant
+GroupForest	131	0	Obj131	Shaggy plant
+GroupForest	132	0	Obj132	Chip plant
+GroupForest	120	0	Obj120	Forest grass
+GroupForest	129	0	Obj129	Yellow grass
+GroupDesert	237	0	Obj237	Dry mushroom
+GroupDesert	244	0	Obj244	Bud
+GroupDesert	230	0	Obj230	Thorn bush
+GroupDesert	231	0	Obj231	Agave
+GroupDesert	242	0	Obj242	Red cactus
+GroupDesert	235	0	Obj235	Green cactus
+GroupDesert	233	0	Obj233	Triple cactus
+GroupDesert	243	0	Obj243	Holey cactus
+GroupDesert	234	0	Obj234	Candelabra cactus
+GroupDesert	238	0	Obj238	Desert plant
+GroupDesert	297	0	Obj297	Desert tree 1
+GroupDesert	298	0	Obj298	Desert tree 2
+GroupDesert	246	0	Obj246	Desert cane
+GroupDesert	712	0	Obj712	Squirting cucumbers
+GroupDesert	249	0	Obj249	Carnivorous plant
+GroupDesert	240	0	Obj240	Dry plant
+GroupDesert	236	0	Obj236	Rosette
+GroupDesert	245	0	Obj245	Triangle grass
+GroupDesert	854	0	Obj854	Dry desert grass
+GroupDesert	850	0	Obj850	Flower pot
+GroupDesert	849	0	Obj849	Desert fence
+GroupDesert	865	0	Obj865	Well
+GroupDesert	172	0	Obj172	Wind pump
+GroupDesert	844	0	Obj844	Minaret
+GroupDesert	848	0	Obj848	Ball house
+GroupDesert	843	0	Obj843	Jug house
+GroupDesert	852	0	Obj852	Drying house
+GroupDesert	847	0	Obj847	Colonnade
+GroupDesert	840	0	Obj840	Barrel house
+GroupDesert	846	0	Obj846	Mausoleum
+GroupDesert	845	0	Obj845	Totem
+GroupDesert	841	0	Obj841	Temple
+GroupDesert	842	0	Obj842	Underground house
+GroupIce	283	0	Obj283	Ice stone
+GroupIce	284	0	Obj284	Snowy stone
+GroupIce	277	0	Obj277	Snowy stones
+GroupIce	278	0	Obj278	Snowdrift
+GroupIce	287	0	Obj287	Crystal
+GroupIce	281	0	Obj281	Druse
+GroupIce	280	0	Obj280	Blue druse
+GroupIce	870	0	Obj870	Ball tree
+GroupIce	873	0	Obj873	Teat tree
+GroupIce	289	0	Obj289	Three-ball tree
+GroupIce	286	0	Obj286	Fir
+GroupIce	872	0	Obj872	Icicle
+GroupIce	288	0	Obj288	Ice bush
+GroupIce	282	0	Obj282	Spiky bush
+GroupIce	279	0	Obj279	Ice reeds
+GroupIce	285	0	Obj285	Scattered nuts
+GroupIce	876	0	Obj876	Winter paving
+GroupIce	862	0	Obj862	Pimpled house
+GroupIce	863	0	Obj863	Hut
+GroupIce	861	0	Obj861	Round house
+GroupIce	860	0	Obj860	Tent
+GroupIce	875	0	Obj875	Triple roof house
+GroupIce	864	0	Obj864	Cone house
+GroupIce	874	0	Obj874	Two-level house
+GroupVolcanic	292	0	Obj292	Volcanic rocks
+GroupVolcanic	290	0	Obj290	Volcano
+GroupVolcanic	530	0	Obj530	Open volcano
+GroupVolcanic	441	0	Obj441	Lava eruptions
+GroupVolcanic	801	0	Obj801	Lava stream
+GroupVolcanic	365	0	Obj365	Lava glow
+GroupVolcanic	800	0	Obj800	Rocks
+GroupVolcanic	295	0	Obj295	Lava stone
+GroupVolcanic	294	0	Obj294	Lava gravel
+GroupVolcanic	296	0	Obj296	Volcanic grass
+GroupSwamp	206	0	Obj206	Bubbles
+GroupSwamp	337	0	Obj337	Ripples
+GroupSwamp	213	0	Obj213	Bubble on legs
+GroupSwamp	209	0	Obj209	Bulb
+GroupSwamp	216	0	Obj216	Lantern plant
+GroupSwamp	311	0	Obj311	Lantern glow
+GroupSwamp	211	0	Obj211	Head
+GroupSwamp	215	0	Obj215	Green mushroom
+GroupSwamp	920	0	Obj920	Big mushroom
+GroupSwamp	921	0	Obj921	Small mushroom
+GroupSwamp	180	0	Obj180	Garlic house
+GroupSwamp	181	0	Obj181	Garlic chimney
+GroupSwamp	184	0	Obj184	Footbridge
+GroupSwamp	208	0	Obj208	Cattail
+GroupSwamp	214	0	Obj214	Nails
+GroupSwamp	212	0	Obj212	Yellow swamp grass
+GroupSwamp	925	0	Obj925	Tussock
+GroupSwamp	911	0	Obj911	Swamp reeds
+GroupPark	923	0	Obj923	Round tree
+GroupPark	858	0	Obj858	Park teat tree
+GroupPark	932	0	Obj932	Yellow tree
+GroupPark	934	0	Obj934	Eucalyptus
+GroupPark	933	0	Obj933	Red bush
+GroupPark	922	0	Obj922	Park bush
+GroupPark	859	0	Obj859	Cylinder bush
+GroupPark	903	0	Obj903	Fountain 1
+GroupPark	904	0	Obj904	Fountain 2
+GroupPark	905	0	Obj905	Fountain 3
+GroupPark	851	0	Obj851	Fountain 4
+GroupPark	928	0	Obj928	Pool
+GroupPark	929	0	Obj929	Pool steps
+GroupPark	927	0	Obj927	Statue with pickaxe
+GroupPark	926	0	Obj926	Park paving
+GroupPark	814	0	Obj814	Meadow paving
+GroupPark	109	0	Obj109	Cobble stone
+GroupPirates	141	0	Obj141	Pirate wall
+GroupPirates	160	0	Obj160	High wall
+GroupPirates	161	0	Obj161	Fence posts
+GroupPirates	145	0	Obj145	Border post
+GroupPirates	142	0	Obj142	Corkscrew
+GroupPirates	147	0	Obj147	Broken corkscrew
+GroupPirates	146	0	Obj146	Citadel grate
+GroupPirates	149	0		
+GroupPirates	148	1		
+GroupCity	816	0	Obj816	Tall building 1
+GroupCity	808	0	Obj808	Tall building 2
+GroupCity	819	0	Obj819	Tall building 3
+GroupCity	895	0	Obj895	Block 1
+GroupCity	896	0	Obj896	Block 2
+GroupCity	897	0	Obj897	Block 3
+GroupCity	898	0	Obj898	Block 4
+GroupCity	891	0	Obj891	Tower 1
+GroupCity	892	0	Obj892	Tower 2
+GroupCity	893	0	Obj893	Tower 3
+GroupCity	894	0	Obj894	Tower 4
+GroupCity	900	0	Obj900	Small house 1
+GroupCity	901	0	Obj901	Small house 2
+GroupCity	813	0	Obj813	Round building
+GroupCity	807	0	Obj807	Oil-can house
+GroupCity	806	0	Obj806	Gear house
+GroupCity	810	0	Obj810	Gate house
+GroupCity	811	0	Obj811	Grandstand
+GroupCity	805	0	Obj805	Privy
+GroupCity	812	0	Obj812	Roof chimneys
+GroupCity	902	0	Obj902	Yellow wall
+GroupCity	908	0	Obj908	Brown wall
+GroupCity	899	0	Obj899	Lattice post
+GroupCity	906	0	Obj906	Paved bridge
+GroupCity	832	0	Obj832	Gear pedestal
+GroupCity	835	0	Obj835	Golden gear
+GroupCity	173	0	Obj173	Windmill
+GroupCity	171	0	Obj171	Water tower
+GroupCity	890	0	Obj890	Roof grass
+GroupCity	817	0	Obj817	Curb stone
+GroupCity	853	0	Obj853	Desert curb
+GroupIndustry	165	1		
+GroupIndustry	168	0	Obj168	Mine annex
+GroupIndustry	166	0	Obj166	Conveyor
+GroupIndustry	167	0	Obj167	Mine crane
+GroupIndustry	880	0	Obj880	Factory chimneys
+GroupIndustry	881	0	Obj881	Wide chimneys
+GroupIndustry	291	0	Obj291	Chimney smoke
+GroupIndustry	555	0	Obj555	Chimney glow
+GroupIndustry	520	0	Obj520	Sparks
+GroupIndustry	156	0	Obj156	Oil tank 1
+GroupIndustry	885	0	Obj885	Oil tank 2
+GroupIndustry	632	0	Obj632	Oil pipes
+GroupIndustry	630	0	Obj630	Oil pump
+GroupIndustry	631	0	Obj631	Oil derrick
+GroupIndustry	627	0	Obj627	Pipeline
+GroupIndustry	177	0	Obj177	Ore heap
+GroupIndustry	937	0	Obj937	Mine cart
+GroupIndustry	888	0	Obj888	Barrels
+GroupRailway	170	0		
+GroupRailway	150	0		
+GroupRailway	153	0		
+GroupRailway	151	0		
+GroupRailway	174	0	Obj174	Railway crane
+GroupRailway	887	0	Obj887	Signs
+GroupRailway	818	0	Obj818	Platform stairs
+GroupRailway	804	0	Obj804	Platform
+GroupRailway	776	0	Obj776	Arched bridge
+GroupRailway	626	0	Obj626	Fence
+GroupRailway	831	0	Obj831	Switch sign
+GroupRailway	830	0	Obj830	Sign post
+GroupRailway	871	0	Obj871	Road posts
+GroupRailway	869	0	Obj869	Small road posts
+GroupRailway	411	0	Obj411	Stone on rails
+GroupRailway	100	0	Obj100	Level exit
+GroupFlags	769	0	Obj769	Flagpole
+GroupFlags	770	1	Obj770	Flag 1
+GroupFlags	771	1	Obj771	Flag 2
+GroupFlags	772	1	Obj772	Flag 3
+GroupFlags	773	2	Obj773	Flag 4
+GroupFlags	774	1	Obj774	Flag 5
+GroupFlags	176	0	Obj176	Resource crate
+GroupFlags	886	0	Obj886	Big crate
+GroupFlags	889	0	Obj889	Small crate
+GroupFlags	169	3	Obj169	Money crate
+GroupWrecks	13	0		
+GroupWrecks	94	0		
+GroupWrecks	57	0		
+GroupWrecks	22	0	Obj22	Burnt cart
+GroupWrecks	92	0	Obj92	Burnt cart 2
+GroupWrecks	93	0	Obj93	Cart wreckage
+GroupWrecks	96	0	Obj96	Gun wreckage
+GroupWrecks	98	0	Obj98	Unit wreckage
+GroupUnits	70	1		
+GroupUnits	72	2		
+GroupUnits	77	2		
+GroupUnits	86	1		
+GroupUnits	89	0	Obj89	Mine marker
+GroupUnits	87	2	Obj87	Detonator
+GroupUnits	265	1		
+GroupUnits	517	2		
+GroupUnits	409	1	Obj409	Golem
+GroupUnits	250	2		
+GroupUnits	418	2	Obj418	Fish shoal
+GroupUnits	263	1		
+GroupUnits	416	2	Obj416	Bird
+GroupEffects	504	0	Obj504	Water circles
+GroupEffects	510	0	Obj510	Water noise
+GroupEffects	206	0	Obj206	Bubbles
+GroupEffects	337	0	Obj337	Ripples
+GroupEffects	505	0	Obj505	Polar bears
+GroupEffects	441	0	Obj441	Lava eruptions
+GroupEffects	291	0	Obj291	Chimney smoke
+GroupEffects	520	0	Obj520	Sparks
+GroupEffects	446	0	Obj446	Fire
+GroupEffects	555	0	Obj555	Chimney glow
+GroupEffects	311	0	Obj311	Lantern glow
+GroupEffects	751	0	Obj751	Region
+GroupEffects	752	0	Obj752	Region with rain circles
+GroupEffects	750	0	Obj750	Region of light water
+GroupTrainLocos	5	0		
+GroupTrainLocos	10	0		
+GroupTrainCombat	20	0		
+GroupTrainCombat	25	0		
+GroupTrainCombat	27	0	Obj27	Salute mortar
+GroupTrainCombat	30	0		
+GroupTrainCombat	80	0		
+GroupTrainCombat	62	1		
+GroupTrainCombat	75	1		
+GroupTrainCombat	90	0		
+GroupTrainCombat	82	0		
+GroupTrainCombat	35	0		
+GroupTrainCombat	97	0		
+GroupTrainCombat	15	0		
+GroupTrainSupply	45	0		
+GroupTrainSupply	85	0		
+GroupTrainSupply	55	2		
+GroupTrainSupply	56	2		
+GroupTrainCivil	60	2		
+GroupTrainCivil	50	2		
+GroupTrainCivil	95	2		
+GroupTrainObstacles	351	1		
+GroupTrainObstacles	99	0	Obj99	Railway killer (invisible)

@@ -1,0 +1,12 @@
+MOUSE
+
+SELECT AN OBJECT        LMB ON IT
+MOVE IT                 DRAG WITH LMB
+TURN IT                 WHEEL
+PLACE FROM THE BAR      LMB ON THE MAP
+BACK TO SELECTING       RMB OR ESC
+THE OBJECT'S PANEL      RMB ON IT
+MOVE THE VIEW           MIDDLE BUTTON
+                        OR SCREEN EDGE
+DELETE A WHOLE SECTION  SHIFT+LMB
+OF TRACK                (DELETE TOOL)

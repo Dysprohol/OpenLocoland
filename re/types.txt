@@ -1,0 +1,2306 @@
+# Struct types, vtables, globals and function prototypes of Steam.exe for Ghidra.
+# Applied by tools/ghidra/ApplyTypes.java after symbols.csv on every decompilation; the
+# result is visible in re/c (fields instead of offsets) and re/c/types.h (all structs as C).
+#
+# Syntax (# starts a comment; a comment after a field becomes the field's description):
+#
+#   struct <Name> [<size>]          a struct; fields at explicit offsets, bytes between
+#     <offset> <type> <name>        them stay unknown (types.h shows them as unknown_XXX)
+#   end
+#   vtable <Name> <address> <slots> a struct of function pointers built from the table in
+#     <offset> <name>               the exe; slots not listed are named after the function
+#   end                             in the slot (or vf_XX), typed from its prototype
+#   global <address> <type> <name>  type of a global variable (name as in symbols.csv)
+#   method <address> <Struct>       __thiscall with `this` typed <Struct>*; return value and
+#                                   stack parameters stay as the decompiler finds them
+#   func <address> <return> <convention> <Name>(<type> <name>, ...)
+#                                   the whole prototype (name as in symbols.csv)
+#   local <function> <stack offset> <type> <name>
+#                                   a typed local variable (offset as in Ghidra's local_XX
+#                                   names, e.g. -0x4c)
+#
+# Types: void char byte bool short ushort int uint float double undefined1/2/4, Windows
+# types the program knows (RECT, HWND...), structs from this file; then any number of *
+# and [n] (e.g. Vid*[0x800]). A struct embedded by value must be defined before it is used.
+
+# ==== resource files (objects.res, .map, .vid, demos) ====================================
+
+struct ResFile 0x40
+  0x00 ResFile_vtbl* vtable
+  0x04 uint flags                 # bit 0: a chunk is being written (closed by EndChunk)
+  0x08 int lastAccess             # 0 write, 1 read, 2 seek - fseek is forced when switching
+  0x0c char* name                 # file name (String)
+  0x10 uint signature             # 'RES ' or 'RIFF'
+  0x14 int chunkSize              # data size of the current chunk
+  0x18 int chunkPos               # file position of the current chunk header
+  0x1c int basePos                # file position of the container start
+  0x20 int endPos                 # end of the container (size from the header + 8)
+  0x24 uint chunkFlags            # bit 31: header with a sub-type; bit 8: rewritten
+  0x28 int recordCount            # number of records in the current chunk
+  0x2c int recordPos              # file position of the current record (its size field)
+  0x30 int recordSize             # size of the current record
+  0x34 int chunkSubType
+  0x38 void* file                 # FILE*
+  0x3c uint chunkId               # four-letter name of the current chunk
+end
+
+vtable ResFile_vtbl 0x4754e8 2
+  0x00 Read
+  0x04 Write
+end
+
+# ---- arithmetic coder of the compressed records (ResFile_ReadPacked / ResFile_WritePacked)
+# The .vid frames with imageFlags 0x100 are stored arithmetic-coded: an ImageCodec object (0x2808
+# bytes, vtable 0x47580c, base 0x475830 whose Encode/Decode slots are _purecall) keeps one
+# RangeCoderModel per value of the previous byte, and codes 257 symbols (0-255 and 0x100 = the end
+# of the record) with RangeCoder. Every model rescales by itself (RangeCoderModel_Update). The
+# coder keeps `low` in a float-like form: bits 23-30 are the next byte to output, bits 0-22 the
+# precision; the interval is 12 bits wide (1 << 12), the models sum to at most 2000. The 256 models
+# are built with the CRT vector constructor iterator (ctor RangeCoderModel_Construct).
+
+struct RangeCoder 0x18            # one coder state, used for encoding and for decoding
+  0x00 uint low                   # low; bits 23-30 = the pending output byte, bits 0-22 = the precision
+  0x04 uint range                 # 0x80000000 at the start, normalised to >= 0x800001
+  0x08 uint pending               # encoding: the 0xff bytes waiting behind the pending byte (a carry); decoding: range >> bits
+  0x0c byte buffer                # the pending output byte (encoding) / the last input byte (decoding)
+  0x10 uint byteCount             # bytes written; the flush adds 5 and rounds with its half
+  0x14 void* file                 # FILE*: output (encoding) or input (decoding)
+end
+
+struct RangeCoderModel 0x28       # the adaptive model of one byte context (257 symbols)
+  0x00 int symbolCount            # 257 (0-255 and 0x100 = the end of the record)
+  0x04 int symbolsToRescale       # countdown to the next rescale (set to totalFreq - the residue)
+  0x08 int rescaleResidue         # the remainder carried into the next interval
+  0x0c int totalFreq              # the current total frequency; doubles on every rescale up to maxTotal
+  0x10 int maxTotal               # 2000
+  0x14 int increment              # added to a symbol's frequency on each occurrence (the low short); +1 per rescale
+  0x18 int shift                  # bits - 7 = 5: the log2 of the decoder index resolution
+  0x1c ushort* cumFreqTable       # cumulative frequencies, symbolCount + 1 entries
+  0x20 ushort* freqTable          # frequencies, symbolCount entries
+  0x24 ushort* decoderTable       # cumFreq >> shift -> the first symbol of the range (0x102 bytes)
+end
+
+struct ImageCodec 0x2808          # arithmetic coder of a byte buffer (ResFile_ReadPacked/WritePacked)
+  0x00 ImageCodec_vtbl* vtable    # 0x47580c (0x475830 while it is built): 0x18 Init, 0x1c Encode, 0x20 Decode
+  0x04 int mode                   # 1 = the bytes in order, 2 = the even byte positions first and then the odd ones (.vid frame layout)
+  0x08 RangeCoderModel[256] models # one model per value of the previous byte
+end
+
+vtable ImageCodecBase_vtbl 0x475830 9
+  0x00 Delete
+  0x04 Stub_ReturnZero1Arg
+  0x08 Stub_ReturnZero
+  0x0c NoOp
+  0x10 Stub_Nop1Arg
+  0x14 Stub_ReturnMinusOne
+  0x18 Init
+  0x1c Encode
+  0x20 Decode
+end
+
+vtable ImageCodec_vtbl 0x47580c 9
+  0x00 Delete
+  0x04 Stub_ReturnZero1Arg
+  0x08 Stub_ReturnZero
+  0x0c NoOp
+  0x10 Stub_Nop1Arg
+  0x14 Stub_ReturnMinusOne
+  0x18 Init
+  0x1c Encode
+  0x20 Decode
+end
+
+func 0x402fd0 void __thiscall RangeCoder_StartEncode(RangeCoder* this, byte pendingByte, uint byteCount, void* file)
+func 0x403010 void __thiscall RangeCoder_EncodeSymbol(RangeCoder* this, uint freq, uint cumFreq, int bits)
+func 0x403120 uint __thiscall RangeCoder_DoneEncode(RangeCoder* this)
+func 0x4032e0 int __thiscall RangeCoder_StartDecode(RangeCoder* this, void* file)
+func 0x403340 uint __thiscall RangeCoder_DecodeFreq(RangeCoder* this, byte bits)
+func 0x4033c0 void __thiscall RangeCoder_DecodeUpdate(RangeCoder* this, uint freq, uint cumFreq, uint total)
+func 0x403400 RangeCoderModel* __thiscall RangeCoderModel_Construct(RangeCoderModel* this)
+func 0x403430 void __thiscall RangeCoderModel_Destruct(RangeCoderModel* this)
+func 0x403480 void __thiscall RangeCoderModel_Update(RangeCoderModel* this)
+func 0x403590 void __thiscall RangeCoderModel_Init(RangeCoderModel* this, int symbolCount, int bits, int maxTotal, ushort* frequencies)
+func 0x403650 void __thiscall RangeCoderModel_SetFrequencies(RangeCoderModel* this, ushort* frequencies)
+func 0x4036e0 void __thiscall RangeCoderModel_GetSymbolRange(RangeCoderModel* this, int symbol, uint* freq, uint* cumFreq)
+func 0x403710 int __thiscall RangeCoderModel_GetSymbol(RangeCoderModel* this, uint cumFreq)
+func 0x403760 ushort* __thiscall RangeCoderModel_UpdateSymbol(RangeCoderModel* this, int symbol)
+func 0x403790 void __thiscall ImageCodec_Init(ImageCodec* this)
+func 0x4037b0 int __thiscall ImageCodec_Encode(ImageCodec* this, void* data, int size, void* file)
+func 0x403900 int __thiscall ImageCodec_Decode(ImageCodec* this, void* data, int size, void* file)
+func 0x42b650 int __thiscall Stub_ReturnZero1Arg(void* this, void* arg)
+func 0x42b660 int __thiscall Stub_ReturnMinusOne(void* this)
+
+# ==== world =============================================================================
+# The 16 layer lists at +0x4c are built with `eh vector constructor iterator` (ctor 0x40c370);
+# World_AddObject does `lea ecx, [layer*16 + this + 0x4c]` and calls ObjectList_Add.
+
+struct ObjectList 0x10            # growable GameObject* array (vtable 0x4753e0, base 0x4753e4); deleted objects leave null slots, Game_Step compacts every 4th ms
+  0x00 void* vtable
+  0x04 int count
+  0x08 int capacity
+  0x0c GameObject** items
+end
+
+struct PtrArray 0x10              # generic growable array of 4-byte values (vtable 0x4753e4, ctor 0x422ca0)
+  0x00 void* vtable
+  0x04 int count
+  0x08 int capacity
+  0x0c void** items
+end
+
+struct IdMap 0x20                 # saved object id -> live object, filled by Level_ReadSpr while a map loads (ids are the object pointers of the session that saved the map)
+  0x00 PtrArray ids               # int ids
+  0x10 PtrArray objects           # GameObject* at the same index
+end
+
+struct ObjectMap 0x44             # map hash ("HASH_MAP" in the log, g_objectMap 0x4a9c10): the objects with VID flag 0x40 sit in cells (cell size = half of the largest such VID rounded up to a power of two), the units and avia in +0x34
+  0x00 int boxLeftCellX           # FirstInBox/NextInBox iterator: left cell (input left - 1 cell); boxCellX is reset to it for every row
+  0x04 int boxCellY               # iterator: current cell y (starts at the input top - 1 cell)
+  0x08 int boxRightCellX          # iterator: right cell (input right + 1 cell, clamped to cellCountX - 1)
+  0x0c int boxBottomCellY         # iterator: bottom cell (clamped to cellCountY - 1)
+  0x10 int boxCellX               # iterator: current cell x
+  0x14 int boxItemIndex           # iterator: index in the cell list (the next item NextInBox returns)
+  0x18 int unitIndex              # index for ObjectList_Last/Prev over the unit list (script FirstUnit/NextUnit)
+  0x1c int shift                  # cell number = (cellY << shift) + cellX
+  0x20 int cellCountX             # from mapWidth: 2^shift >= mapWidth - 1
+  0x24 int cellCountY             # mapHeight * invCellSizeY
+  0x28 float invCellSizeX         # 1 / cell size
+  0x2c float invCellSizeY
+  0x30 ObjectList* cells          # cellCountX * cellCountY object lists (CRT vector constructor iterator, elements 0x10 bytes); the array has its length in the 4 bytes before it
+  0x34 ObjectList units           # units and avia; count +0x38, capacity +0x3c, items +0x40
+end
+
+# ---- script machine (.lgc): compiler 0x438810-0x43c6f0, interpreter Script_CallFunction
+# 0x43c940, engine functions Script_CallExtern 0x43e5c0. Opcodes: DEVELOPERS.md "Script machine".
+# Every script variable (globals, function parameters and function variables alike) is a
+# fixed slot at the bottom of the value stack, numbered at compile time; the same stack holds
+# the temporaries and the call frames above them. Functions therefore are not reentrant.
+
+struct ScriptValue 0xc            # a stack slot / variable / temporary (ctor 0x43d8f0 int, 0x442460 object; dtor 0x401ae0)
+  0x00 byte flags                 # 0x1 string (text), 0x2 int (value), 0x4 array (first element of `x[n]`), 0x8 has an initial value (written to demos and precompiled scripts), 0x10 object reference (unit "number"; cleared by Script_ObjectDeleted), 0x20 pointer (`int *p`: indexing goes through the slot number it holds), 0x40 not initialised
+  0x04 int value                  # int, object pointer, or slot number (address) for & and arrays
+  0x08 char* text                 # String; numbers in strings are converted with String_ToInt ("0x.." hex)
+end
+
+struct ScriptSymbol 0x18          # entry of the symbol table (copy 0x43e540, dtor 0x422de0)
+  0x00 char* name                 # String, e.g. "main", "TrainNotAmmo", "F005_15", "F123_DESTROY", a variable or a label
+  0x04 byte kind                  # 1 variable, 2 extern (engine function), 3 script function, 4 string constant, 5 int constant (4 and 5 are never created), 7 label, 8 label used by goto before its definition
+  0x08 char* text                 # String: value of a string constant
+  0x0c int value                  # variable: first slot; extern: function number (65-254, the opcode); function: code offset; label: code offset (kind 8: offset of the last jump operand waiting for it - a chain); int constant: the value
+  0x10 int firstParam             # function / extern: slot of the first parameter (extern parameters hold the default values)
+  0x14 int count                  # variable: number of elements (1, or n for x[n]); function / extern: number of parameters
+end
+
+struct ScriptDefine 0x8           # #define name value (dtor 0x422e50); expanded textually by Script_SkipSpace while compiling, dropped afterwards
+  0x00 char* name                 # String
+  0x04 char* value                # String
+end
+
+struct ScriptValueList 0x10       # the Script's base: the value stack (vtable 0x475520, also the start of Script)
+  0x00 void* vtable
+  0x04 int count
+  0x08 int capacity
+  0x0c ScriptValue* items
+end
+
+struct ScriptSymbolList 0x10      # the Script's symbols (vtable 0x4756ec; the base vector's vtable is 0x4756e4)
+  0x00 void* vtable
+  0x04 int count
+  0x08 int capacity
+  0x0c ScriptSymbol* items
+end
+
+struct ScriptDefineList 0x10      # the Script's #defines while compiling (vtable 0x4756f0; the base vector's vtable is 0x4756e8)
+  0x00 void* vtable
+  0x04 int count
+  0x08 int capacity
+  0x0c ScriptDefine* items
+end
+
+struct Script 0x58                # the .lgc script machine, World+0x14c (one per level: <map name>.lgc and its #includes); released by Script_Release
+  0x00 void* vtable               # 0x475520: the object starts with the value stack (ScriptValueList)
+  0x04 int stackCount             # used slots; variables occupy the bottom, set by the compiler
+  0x08 int stackCapacity
+  0x0c ScriptValue* stack
+  0x10 ScriptSymbolList symbols   # variables, externs, functions and labels; Level_Load binds the functions (kind 3) by name
+  0x20 ScriptDefineList defines   # #define table, only while compiling
+  0x30 char* name                 # file name (String)
+  0x34 byte* code                 # bytecode; 0x3e800 bytes while compiling, then cut to codeSize
+  0x38 int codeSize               # while compiling: write position
+  0x3c char* source               # compiler: read position in the source text
+  0x40 char* sourceEnd            # compiler: end of the source text
+  0x44 char* sourceBuffer         # compiler: file text read at sourceBuffer+0xfe2 (room in front for #define expansion), freed after compiling
+  0x48 int line                   # compiler: current line (0-based; errors print line+1)
+  0x4c int ifdefDepth             # compiler: nesting of #ifdef/#ifndef
+  0x50 int mainFunction           # symbol index of `main` (set when it is compiled; -1 none); Script_CallFunction(-1, ...) runs it
+  0x54 int noExpand               # compiler: 1 while reading the name after #ifdef/#ifndef (no #define expansion)
+end
+
+func 0x438ca0 int __thiscall Script_Load(Script* this, char** fileName)
+func 0x4388e0 int __thiscall Script_Compile(Script* this, char** fileName)
+func 0x438810 void __thiscall Script_Release(Script* this)
+func 0x422ec0 void __thiscall Script_Destruct(Script* this)
+func 0x422fc0 void __thiscall ScriptSymbolList_Construct(ScriptSymbolList* this)
+func 0x422fe0 void __thiscall ScriptDefineList_Construct(ScriptDefineList* this)
+func 0x422c50 void __thiscall ScriptSymbolList_Destruct(ScriptSymbolList* this)
+func 0x423000 void __thiscall ScriptDefineList_Destruct(ScriptDefineList* this)
+func 0x422cc0 void __thiscall ScriptValueList_Delete(ScriptValueList* this, byte flags)
+func 0x423050 void __thiscall ScriptSymbolList_Delete(ScriptSymbolList* this, byte flags)
+func 0x423070 void __thiscall ScriptDefineList_Delete(ScriptDefineList* this, byte flags)
+func 0x422d20 void __thiscall ScriptSymbolList_DeleteBase(ScriptSymbolList* this, byte flags)
+func 0x422d80 void __thiscall ScriptDefineList_DeleteBase(ScriptDefineList* this, byte flags)
+func 0x422b80 void __thiscall ScriptValueList_Destruct(ScriptValueList* this)
+func 0x438ef0 void __thiscall Script_SaveValues(Script* this, ResFile* file)
+func 0x438f30 void __thiscall Script_LoadValues(Script* this, ResFile* file)
+func 0x438f70 void __thiscall Script_CompileError(Script* this, int code, char* text, int value)
+func 0x439040 int __thiscall Script_SkipSpace(Script* this)
+func 0x439670 void __thiscall Script_SkipSpaceNotEnd(Script* this)
+func 0x4396a0 void __thiscall Script_ReadLine(Script* this, char** result)
+func 0x4397b0 int __thiscall Script_ReadName(Script* this, char** result)
+func 0x439860 int __thiscall Script_Accept(Script* this, char* token)
+func 0x4398f0 int __thiscall Script_Expect(Script* this, char* token)
+func 0x439920 int __thiscall Script_CompileConstInt(Script* this)
+func 0x439970 int __thiscall Script_ReadStringLiteral(Script* this, char* buffer)
+func 0x439a50 void __thiscall Script_SetLastSymbolCount(Script* this, int count)
+func 0x439a70 void __thiscall Script_CompileIntDeclaration(Script* this)
+func 0x439e50 void __fastcall StringField_Destruct(void* this)
+func 0x439e70 void __thiscall Script_CompileStringDeclaration(Script* this)
+func 0x43a1e0 void __thiscall Script_CompilePrimary(Script* this)
+func 0x43afe0 void __thiscall Script_EmitBinaryOp(Script* this, int leftStart, int op)
+func 0x43b1c0 void __thiscall Script_CompileTerm(Script* this)
+func 0x43b240 void __thiscall Script_CompileSum(Script* this)
+func 0x43b2a0 void __thiscall Script_CompileComparison(Script* this)
+func 0x43b400 void __thiscall Script_CompileExpression(Script* this)
+func 0x43b4e0 void __thiscall Script_CompileExpressionList(Script* this)
+func 0x43b530 void __thiscall Script_CompileStatement(Script* this, int* breakJumps)
+func 0x43bc10 int __thiscall Script_CompileTopLevel(Script* this)
+func 0x43c6f0 char** __thiscall Script_GetVariableString(Script* this, char** result, char** name)
+func 0x43c940 int __thiscall Script_CallFunction(Script* this, int function, GameObject* object, int arg)
+func 0x43d8c0 int __thiscall String_ToInt(char** this)
+func 0x43d8f0 ScriptValue* __thiscall ScriptValue_InitInt(ScriptValue* this, int value)
+func 0x43d910 ScriptValue* __thiscall ScriptValue_Copy(ScriptValue* this, ScriptValue* source)
+func 0x43d980 int __thiscall Script_ObjectDeleted(Script* this, GameObject* object)
+func 0x43d9d0 void __thiscall ScriptValue_Load(ScriptValue* this, ResFile* file)
+func 0x43da10 void __thiscall ScriptValue_Save(ScriptValue* this, ResFile* file)
+func 0x43da60 int __thiscall ScriptValue_BinaryOp(ScriptValue* this, int op, ScriptValue* right)
+func 0x43de00 void __thiscall Script_Push(Script* this, ScriptValue* value)
+func 0x43de90 void __thiscall ScriptSymbolList_Add(ScriptSymbolList* this, char* name, byte kind, char* text, int value, int firstParam, int count)
+func 0x43e030 void __thiscall ScriptDefineList_Add(ScriptDefineList* this, char* name, char* value)
+func 0x43e2b0 void __thiscall Script_PushValue(Script* this, byte flags, int value, char* text)
+func 0x43e410 void __thiscall Script_ReserveStack(Script* this, int capacity)
+func 0x43e540 ScriptSymbol* __thiscall ScriptSymbol_Copy(ScriptSymbol* this, ScriptSymbol* source)
+func 0x422de0 void __thiscall ScriptSymbol_Destruct(ScriptSymbol* this)
+func 0x422e50 void __thiscall ScriptDefine_Destruct(ScriptDefine* this)
+func 0x401ae0 void __thiscall ScriptValue_Destruct(ScriptValue* this)
+func 0x43e5a0 int __cdecl Script_CallExternGlobal(int function)
+func 0x43e5c0 int __thiscall Script_CallExtern(World* this, int function)
+func 0x442460 ScriptValue* __thiscall ScriptValue_InitObject(ScriptValue* this, GameObject* object)
+func 0x442480 int __thiscall ScriptValue_ToInt(ScriptValue* this)
+func 0x4424c0 char** __thiscall ScriptValue_ToString(ScriptValue* this)
+func 0x442550 void __thiscall Script_PushString(Script* this, char** text)
+func 0x442670 GameObject* __thiscall Script_PopObject(Script* this)
+func 0x442700 void __thiscall Script_PushInt(Script* this, int value)
+func 0x4427b0 void __thiscall Script_PushObject(Script* this, GameObject* object)
+func 0x442870 int __thiscall Script_TopIsString(Script* this)
+func 0x442d70 char** __thiscall String_Copy(char** this, char** source)
+
+struct Mouse 0x1c                 # input state (World+0x230); this of Mouse_HandleMessage; written whole to demo files every frame
+  0x00 uint buttons               # WM_LBUTTONDOWN sets 0x21; arrow keys 0x80 left, 0x100 right, 0x200 down, 0x400 up (World_UpdateScroll); 0x800/0x1000/0x4000/0x8000 other keys; low 5 bits cleared by Mouse_BeginFrame
+  0x04 int unknown4               # cleared every frame
+  0x08 float worldX               # cursor in map coordinates (GetInputX)
+  0x0c float worldY               # GetInputY
+  0x10 float screenX              # cursor in the game area (WM_NCHITTEST)
+  0x14 float screenY
+  0x18 int key                    # GetKey: WM_CHAR code, or WM_KEYDOWN virtual key << 8; cleared every frame
+end
+
+struct Menu 0x18                  # menu objects (MenuLoad/MenuCreate), World+0x24c, ctor 0x424250
+  0x00 void* vtable               # 0x475718
+  0x04 int count
+  0x08 int capacity
+  0x0c GameObject** items
+  0x10 uint clickFlags            # bit 0 left click on an item this frame (MenuLClick), bit 1 right click (MenuRClick)
+  0x14 GameObject* hover          # item under the cursor (Menu_Update)
+end
+
+struct Group 0x24                 # unit group (GROU chunk); World+0x264 is the root of the ring
+  0x00 void* vtable               # 0x4754b8
+  0x04 int count
+  0x08 int capacity
+  0x0c GameObject** items
+  0x10 float centerX              # running average of member x (Group_Add)
+  0x14 float centerY
+  0x20 Group* next                # ring of all groups; the root points to itself when there are none
+end
+
+struct MouseTip 0x8               # World+0x2294: tooltip shown when the cursor rests
+  0x00 void* vtable               # 0x47551c
+  0x04 GameObject* text           # text object (VID 6) with the tip; cleared by MouseTip_Clear 0x425bb0
+end
+
+struct Minimap 0x14               # the strategic map of the interface (drawn by Minimap_Draw): rails, view frame and units by army
+  0x00 uint flags                 # 0x1 dark background
+  0x04 float left                 # screen rectangle
+  0x08 float top
+  0x0c float width
+  0x10 float height
+end
+
+struct MessageItem 0x10           # one message queued in a MessageList (element of the string list at MessageList+0x2f4)
+  0x00 char* text                 # String
+  0x04 int x                      # position the camera moves to when the line is clicked (-1 = none)
+  0x08 int y
+  0x0c uint timeLeft              # ms before the message is shown (Options CNST 25, MessageItem_Init)
+end
+
+struct MessageList 0x314          # the message lines of the state bar (script 114 MessageText; vtable 0x47571c, ctor 0x424900, clear 0x424980, update 0x424a10). A message waits in the list, is shown on the bottom line, and lines move up as they go
+  0x000 MessageList_vtbl* vtable
+  0x004 int lineCount             # 3 lines at a time (constructor argument)
+  0x008 uint scrollInterval       # 15000 ms: the lines move up this long after the last message (constructor argument)
+  0x00c float textX               # 20.0 (constructor argument)
+  0x010 float textY               # 5.0 (constructor argument)
+  0x014 int vidText               # 0xe (14), the VID of the message font fonts\font-Objectives.bmp (constructor argument)
+  0x018 int vidClick              # 0x1c1 (449), the VID of the clickable strip of a line vid\449.vid, 30x21 (constructor argument); MenuNVidUnderCursor, a click moves the camera to the position of the line
+  0x01c int lineShift             # -1, the step in lines used when a line leaves
+  0x020 uint lastUpdate           # g_gameTime of the last scroll
+  0x024 GameObject*[3] clickBars  # the clickable strip of every line (0 = none)
+  0x0d8 GameObject*[3] texts      # the text object of every line (0 = none)
+  0x18c float[3] messageX         # map x of every line, -999999.0 = empty
+  0x240 float[3] messageY         # map y of every line, -999999.0 = empty
+  0x2f4 void* baseVtable          # base subobject (vtable 0x475724): the list of MessageItem, element size 0x10
+  0x2f8 int itemCount
+  0x2fc int itemCapacity
+  0x300 MessageItem* items
+end
+
+vtable Menu_vtbl 0x475718 1
+  0x00 Delete
+end
+vtable MessageList_vtbl 0x47571c 3  # the message lines of the state bar; slot 2 is the deleting destructor of the base subobject (0x475724)
+  0x00 Delete                    # 0x425290
+  0x04 ObjectDeleted             # 0x4249d0: clears a deleted object from the line arrays
+  0x08 DeleteItems               # 0x425180, the same function as slot 0 of the base subobject
+end
+
+struct PlayerBase 0x28            # base class of Player (vtable 0x475894, ctor 0x42d9b0): the state of one army
+  0x00 PlayerBase_vtbl* vtable
+  0x04 int money                  # SetMoney/GetMoney (Player_SetMoney); 1000 on a new level
+  0x08 int type                   # 1 = human (Player_HandleInput checks it), 0/2 = computer (World_Construct makes 1, 0, 2, 0)
+  0x0c int army                   # index in World.players; 0 = the human player (Player_CanBuild)
+  0x10 GameObject* flagman        # the unit under control (SetFlagman(army,unit), Flagman(army)); saved in PLAY
+  0x14 ObjectList bar             # the state bar objects (Player_ShowStateBar, Player_SetPanel); count +0x18, items +0x20
+  0x24 GameObject* cursorUnit     # object under the cursor (World_GetSelectedUnit), a reference is held while set
+end
+
+struct Player 0x380               # one per army, created in World_Construct (ctor 0x42e0f0(type, army)), vtable 0x4758c4
+  0x00 PlayerBase base
+  0x28 uint flags                 # 0x1 select enemy units (debug key 'E', prints CanSelectEnemy); 0x2 clever enemy attack (SetCleverEnemyAttack), set by the constructor
+  0x2c uint panel                 # state bar panel: 0 unit bar, 1 train cars, 2 depot build list, 5 depot queue edit, 6 hidden; bit 0x10 = bar shown (Player_SetPanel)
+  0x30 int queueEntry             # depot panel: queue entry picked for editing (-1 none)
+  0x34 ObjectList unused          # never filled in this exe (only Player_ObjectDeleted removes from it)
+  0x44 MessageList messages       # message lines of the state bar
+  0x358 GameObject*[10] barUnits  # the ten units on the state bar (Player_SetBarSlot)
+end
+
+struct World 0x22a0               # the game object (g_world). Base class "World" (vtable 0x4754f8) is 0x229c bytes; GameWorld (vtable 0x4756f4, allocated in WinMain) adds gameFlags
+  0x000 World_vtbl* vtable
+  0x004 uint flags                # 0x1 editor mode (g_settings+0x220 bit 0, LocoFix --editor: window menu "AppMenu", decals not baked (Vid_Read), no World_SetGroundZ for VID flag 8, no ANI_BIRTH/BIRTH events, terrain on the minimap), 0x4 init done, 0x8 window active, 0x10 paused (Pause), 0x20 loading a level, 0x40 level change requested (nextLevelFile), 0x80 unit selection allowed (SetSelectUnit), 0x100 demo recording, 0x200 demo playing, 0x400 unit info for all units (debug 'i'), 0x800 draw ground grid, 0x1000 Flagman debug, 0x2000 rail debug, 0x4000 group debug, 0x8000 object debug, 0x10000 FPS counter, 0x20000 script events off (World_CallScript does nothing, not even main; LocoFix editor mode holds levels with it), 0x40000 mouse tips/selected unit control (guess)
+  0x00c float gameSpeed           # game ms per real ms (1.0; debug keys '+'/'-'; reset on level release)
+  0x010 char* title               # window title, .cfg [common] Title (String)
+  0x014 char* levelFile           # current map (String): command line, else .cfg StartMap (default maps\logo.map); set by Level_Load
+  0x018 char* nextLevelFile       # map to load next (String): script Load() or the end of a demo; Game_Step loads it when flags 0x40
+  0x01c char* resourcePath        # objects.res (String)
+  0x020 int frameCount            # frames since the level start ("Average fps")
+  0x024 int levelStartTime        # game time at the level start
+  0x028 float mapWidth            # MapSizeX, from HEAD
+  0x02c float mapHeight           # MapSizeY
+  0x030 uint scrollType           # SCROLL_... (SetScrollType)
+  0x034 float boundsLeft          # camera bounds (0..map size after a load)
+  0x038 float boundsRight
+  0x03c float boundsTop
+  0x040 float boundsBottom
+  0x044 float cameraX             # top-left corner of the view in map coordinates
+  0x048 float cameraY
+  0x04c ObjectList[16] layers     # world objects by layer (Vid.layer)
+  0x14c Script script             # .lgc script machine
+  0x1a4 ResFile demo              # demo being recorded (SaveDemo) or played
+  0x1e4 IdMap idMap               # object ids while loading a map
+  0x204 short* grid               # GRID chunk: ground height per 8x8 pixel cell, row-major
+  0x208 int gridWidth             # mapWidth / 8
+  0x20c int gridHeight            # mapHeight / 8
+  0x210 HINSTANCE hInstance
+  0x214 HWND hwnd                 # game window (0 after WM_DESTROY)
+  0x218 HACCEL accelerators       # "AppAccel"
+  0x21c int army                  # army of the local player (Flagman(army) is the controlled unit)
+  0x220 Player*[4] players        # by army
+  0x230 Mouse mouse
+  0x24c Menu menu
+  0x264 Group groups              # root of the group ring
+  0x288 int weaponCount
+  0x28c Weapon* weapons           # WEAP section of objects.res
+  0x290 int vidCount              # highest loaded VID number + 1
+  0x294 Vid*[0x800] vids          # object types by number (nvid); 1024 = map ground
+  0x2294 MouseTip mouseTip
+  0x229c uint gameFlags           # GameWorld only (debug keys): 1 frozen ('P'; 'p' steps a frame), 2 keep running while the window is inactive, 4 draw object numbers ('H'), 8 object-map debug draw ('G')
+end
+
+vtable World_vtbl 0x4754f8 9
+  0x00 Delete
+  0x04 HandleMessage
+  0x08 ObjectDeleted
+  0x0c Run
+  0x10 DrawDebug
+  0x14 ReleaseLevel
+  0x18 LoadLevel
+  0x1c SaveLevel
+  0x20 CreateObject
+end
+vtable GameWorld_vtbl 0x4756f4 9
+  0x00 Delete
+  0x04 HandleMessage
+  0x08 ObjectDeleted
+  0x0c Run
+  0x10 DrawDebug
+  0x14 ReleaseLevel
+  0x18 LoadLevel
+  0x1c SaveLevel
+  0x20 CreateObject
+end
+vtable Player_vtbl 0x4758c4 12
+  0x00 Delete
+  0x04 ObjectDeleted
+  0x08 Save
+  0x0c Load
+  0x10 ReleaseLevel
+  0x14 SetFlagman
+  0x18 HandleInput
+  0x1c ShowStateBar
+  0x20 HideStateBar
+  0x24 MessageText
+  0x28 AddBarUnit               # 0x4309a0, nothing calls it in this exe
+  0x2c GetUnitName              # 0x42de00, inherited from PlayerBase
+end
+vtable PlayerBase_vtbl 0x475894 12  # base class of Player: slots 2, 3 and 11 are the same functions, 7/8/9 are empty stubs
+  0x00 Delete
+  0x04 ObjectDeleted
+  0x08 Save
+  0x0c Load
+  0x10 ReleaseLevel
+  0x14 SetFlagman               # 0x42e060, Player overrides it
+  0x18 NoOp                     # 0x422530 stub
+  0x1c NoOp                     # 0x42e0d0 stub
+  0x20 NoOp                     # 0x42e0d0 stub
+  0x24 NoOpArgs                 # 0x42e0e0 stub
+  0x28 NoOp                     # 0x422530 stub
+  0x2c GetUnitName
+end
+
+# ---- World: constructor/destructor and virtual methods
+func 0x419880 World* __thiscall World_Construct(World* this, HINSTANCE hInstance, HINSTANCE hPrevInstance, char** commandLine, int nCmdShow, void* settings)
+func 0x41bb80 void __thiscall World_Destruct(World* this)
+func 0x4231d0 World* __thiscall World_Delete(World* this, byte flags)
+func 0x41c360 int __thiscall World_HandleMessage(World* this, HWND hwnd, uint msg, uint wParam, int lParam)
+func 0x41bf00 void __thiscall World_ObjectDeleted(World* this, GameObject* object)
+func 0x41bfe0 void __thiscall World_DrawDebug(World* this)
+func 0x41ccd0 void __thiscall Level_Release(World* this)
+func 0x41cff0 void __thiscall Level_Load(World* this, char* fileName)
+func 0x41e0b0 void __thiscall Level_Save(World* this, char* fileName)
+func 0x41eb80 GameObject* __thiscall World_CreateObject(World* this, Vid* vid, float x, float y, float z, uint direction, GameObject* parent)
+func 0x423410 World* __thiscall GameWorld_Construct(World* this, HINSTANCE hInstance, HINSTANCE hPrevInstance, char** commandLine, int nCmdShow, void* settings)
+func 0x4234c0 void __thiscall GameWorld_Destruct(World* this)
+func 0x4234a0 World* __thiscall GameWorld_Delete(World* this, byte flags)
+func 0x423520 void __thiscall GameWorld_ObjectDeleted(World* this, GameObject* object)
+func 0x423550 int __thiscall GameWorld_Run(World* this)
+func 0x423df0 void __thiscall GameWorld_DrawDebug(World* this)
+func 0x423d20 void __thiscall GameWorld_ReleaseLevel(World* this)
+func 0x423ee0 GameObject* __thiscall GameWorld_CreateObject(World* this, Vid* vid, float x, float y, float z, uint direction, GameObject* parent)
+
+# ---- World: non-virtual methods
+func 0x41f3a0 int __thiscall Game_Step(World* this)
+func 0x41c680 void __thiscall SetPosition(World* this, float x, float y, int mode)
+func 0x41c830 void __thiscall World_UpdateScroll(World* this)
+func 0x41e8b0 int __thiscall World_ShowsUnitInfo(World* this, GameObject* unit)
+func 0x41e8e0 void __thiscall SetFlagman(World* this, uint army, GameObject* unit)
+func 0x41e900 GameObject* __thiscall Flagman(World* this, uint army)
+func 0x41e920 GameObject* __thiscall World_GetSelectedUnit(World* this)
+func 0x41e940 int __thiscall World_DemoFrame(World* this)
+func 0x41f0f0 GameObject* __thiscall Level_ReadSprdId(World* this, ResFile* file)
+func 0x41f130 GameObject* __thiscall Level_ReadSprOld(World* this, ResFile* file)
+func 0x41f250 GameObject* __thiscall Level_ReadSpr(World* this, ResFile* file, int version)
+func 0x41f590 int __thiscall World_CallScript(World* this, int function, GameObject* object, int arg)
+func 0x41f5c0 char** __thiscall World_GetMouseTipText(World* this, char** out)
+func 0x41fa70 void __thiscall World_DrawLayer(World* this, int layer)
+func 0x41fc20 void __thiscall World_Pause(World* this)
+func 0x41fc40 void __thiscall World_Resume(World* this)
+func 0x41fcd0 void __thiscall World_RemoveObject(World* this, GameObject* object)
+func 0x41fd10 void __thiscall World_AddObject(World* this, GameObject* object)
+func 0x41fd80 GameObject* __thiscall World_PrevInLayerOfType(World* this, int layer, int* index, uint typeMask)
+func 0x406110 GameObject* __thiscall World_PrevInLayer(World* this, int layer, int* index)
+func 0x442c80 GameObject* __thiscall World_LastInLayer(World* this, int layer, int* index)
+func 0x442c30 Player* __thiscall World_GetPlayer(World* this, uint army)
+func 0x442c50 Vid* __thiscall World_GetVid(World* this, int nvid)
+func 0x4231a0 int __thiscall World_IsVidValid(World* this, int nvid)
+func 0x420e40 void __thiscall World_ClearGrid(World* this)
+func 0x420ec0 float __thiscall GetGroundZ(World* this, float x, float y)
+func 0x420f70 float __thiscall World_GetGroundZForVid(World* this, Vid* vid, float x, float y)
+func 0x421170 void __thiscall World_SetGroundZ(World* this, float x, float y, float z)
+func 0x421200 void __thiscall World_ReleaseLevelVids(World* this)
+func 0x4212d0 void __thiscall Objects_Load(World* this, ResFile* file)
+func 0x421540 void __thiscall World_ExchangeVids(World* this, Vid* a, Vid* b)
+func 0x421630 void __thiscall ReloadVid(World* this)
+func 0x421900 Vid* __thiscall World_LoadVid(World* this, ResFile* file, int nvid)
+func 0x4227e0 void __thiscall World_CreateEmptyGround(World* this)
+func 0x4241e0 char** __thiscall World_GetLevelFile(World* this, char** result)
+func 0x442c10 float __thiscall MapSizeX(World* this)
+func 0x442c20 float __thiscall MapSizeY(World* this)
+method 0x41fdf0 World
+method 0x41fe80 World
+method 0x420840 World
+
+# ---- parts of the world
+func 0x422a00 void __thiscall IdMap_Add(IdMap* this, int id, GameObject* object)
+func 0x4229c0 GameObject* __thiscall IdMap_Find(IdMap* this, int id)
+func 0x422b20 void __thiscall IdMap_Clear(IdMap* this)
+func 0x44b970 void __thiscall ObjectList_Add(ObjectList* this, GameObject* object)
+func 0x44ba10 int __thiscall ObjectList_Remove(ObjectList* this, GameObject* object)
+func 0x40c370 void __thiscall ObjectList_Init(ObjectList* this)
+func 0x40c390 void __thiscall ObjectList_Destroy(ObjectList* this)
+func 0x4179e0 void __thiscall Mouse_Init(Mouse* this)
+func 0x418100 void __thiscall Mouse_BeginFrame(Mouse* this)
+func 0x418130 void __thiscall Mouse_ClearLeftButton(Mouse* this)
+func 0x418160 void __thiscall Mouse_ClearRightButton(Mouse* this)
+func 0x417fb0 void __thiscall Mouse_Save(Mouse* this, ResFile* file)
+func 0x417fd0 void __thiscall Mouse_Load(Mouse* this, ResFile* file)
+func 0x417a10 int __thiscall Mouse_HandleMessage(Mouse* this, HWND hwnd, uint msg, uint wParam, int lParam)
+func 0x424250 void __thiscall Menu_Init(Menu* this)
+func 0x424270 Menu* __thiscall Menu_Delete(Menu* this, byte flags)
+func 0x424290 int __thiscall Menu_Update(Menu* this, Mouse* mouse)
+func 0x416aa0 Group* __thiscall Group_Construct(Group* this, Group* root, GameObject* first)
+func 0x423270 void __thiscall Group_DestructCopy(Group* this)
+func 0x416be0 void __thiscall Group_Add(Group* this, GameObject* object)
+func 0x416c30 void __thiscall Group_SaveAll(Group* this, ResFile* file)
+func 0x416cb0 void __thiscall Group_LoadAll(Group* this, ResFile* file)
+func 0x416d70 void __thiscall Group_ObjectDeleted(Group* this, GameObject* object)
+func 0x416dd0 void __thiscall Group_DrawDebugAll(Group* this)
+func 0x416b10 Group* __thiscall Group_Delete(Group* this, byte flags)
+func 0x416b30 void __thiscall Group_Destruct(Group* this)
+func 0x416b80 void __thiscall Group_DrawDebugIndex(Group* this, int index)
+func 0x417040 ObjectList* __thiscall ObjectList_Delete(ObjectList* this, byte flags)
+func 0x416e10 ObjectMap* __thiscall ObjectMap_Construct(ObjectMap* this, float mapWidth, float mapHeight, int* vids, int vidCount)
+func 0x4170a0 void __thiscall ObjectMap_Destruct(ObjectMap* this)
+func 0x417140 void __thiscall ObjectMap_Add(ObjectMap* this, GameObject* object)
+func 0x417210 uint __thiscall ObjectMap_Remove(ObjectMap* this, GameObject* object)
+func 0x417360 void __thiscall ObjectMap_Move(ObjectMap* this, GameObject* object, float x, float y)
+func 0x4174d0 GameObject* __thiscall AskPlace(ObjectMap* this, Vid* vid, float x, float y, float z)
+func 0x4175e0 int __thiscall ObjectMap_Trace(ObjectMap* this, Vid* vid, float x, float y, float z, float* outX, float* outY, float* outZ)
+func 0x417800 GameObject* __thiscall FirstInBox(ObjectMap* this, float left, float top, float right, float bottom)
+func 0x417950 GameObject* __thiscall NextInBox(ObjectMap* this)
+func 0x417fe0 int __cdecl Input_ParseButton(char* text)
+func 0x425bb0 void __thiscall MouseTip_Clear(MouseTip* this)
+func 0x423160 void __thiscall MouseTip_Destruct(MouseTip* this)
+func 0x423170 void __thiscall MouseTip_Delete(MouseTip* this, byte flags)
+func 0x425bd0 void __thiscall MouseTip_ObjectDeleted(MouseTip* this, GameObject* object)
+func 0x4257f0 void __thiscall MouseTip_Update(MouseTip* this, Mouse* mouse)
+func 0x42dd60 void __thiscall Player_Save(Player* this, ResFile* file)
+func 0x42dd80 void __thiscall Player_Load(Player* this, ResFile* file)
+
+# ---- message list (Player.messages): the state bar messages (DEVELOPERS.md "Player and the state bar")
+func 0x424840 MessageItem* __thiscall MessageItem_Init(MessageItem* this, char* text, int x, int y)
+func 0x424900 MessageList* __thiscall MessageList_Construct(MessageList* this, int vidText, int vidClick, float textX, float textY, int lineCount, int scrollInterval)
+func 0x424980 void __fastcall MessageList_Clear(MessageList* this)
+func 0x4249d0 void __thiscall MessageList_ObjectDeleted(MessageList* this, GameObject* object)
+func 0x424a10 void __fastcall MessageList_Update(MessageList* this)
+func 0x424bf0 void __thiscall MessageList_Add(MessageList* this, char* text, int x, int y)
+func 0x424cf0 void __fastcall MessageList_ShowLine(MessageList* this, MessageItem* item)
+func 0x424ef0 void __fastcall MessageList_Scroll(MessageList* this)
+func 0x425010 void __thiscall MessageList_QueueItem(MessageList* this, char* text, int x, int y, int time)
+func 0x425180 void* __thiscall MessageItemList_Delete(void* this, byte flags)
+func 0x4251e0 void* __thiscall MessageItem_Delete(void* this, byte flags)
+func 0x425240 void __fastcall MessageList_FreeItems(MessageList* this)
+func 0x425290 MessageList* __thiscall MessageList_Delete(MessageList* this, byte flags)
+func 0x4252b0 void __fastcall MessageList_Destruct(MessageList* this)
+func 0x425360 void __thiscall MessageItemList_Destruct(void* this)
+func 0x4325b0 void __thiscall MessageText(Player* this, char* text, int x, int y)
+
+# ---- Player and the state bar (DEVELOPERS.md: Player and the state bar)
+func 0x42d9b0 PlayerBase* __thiscall PlayerBase_Construct(PlayerBase* this, int type, int army)
+func 0x42dac0 PlayerBase* __thiscall PlayerBase_Delete(PlayerBase* this, byte flags)
+func 0x42dae0 void __fastcall PlayerBase_Destruct(PlayerBase* this)
+func 0x42dbc0 void __thiscall PlayerBase_ObjectDeleted(PlayerBase* this, GameObject* object)
+func 0x42dca0 void __fastcall PlayerBase_ReleaseLevel(PlayerBase* this)
+func 0x42e060 void __thiscall PlayerBase_SetFlagman(PlayerBase* this, GameObject* unit)
+func 0x42de00 char* __thiscall Player_GetUnitName(Player* this, char* out)
+func 0x42e020 void __fastcall SpriteRef_LogNotCleared(GameObject** ref)
+func 0x42e0f0 Player* __thiscall Player_Construct(Player* this, int type, int army)
+func 0x42e1b0 Player* __thiscall Player_Delete(Player* this, byte flags)
+func 0x42e1d0 void __fastcall Player_Destruct(Player* this)
+func 0x42e2b0 void __thiscall Player_ObjectDeleted(Player* this, GameObject* object)
+func 0x42e3b0 void __fastcall Player_ReleaseLevel(Player* this)
+func 0x42e430 void __fastcall Player_ShowStateBar(Player* this)
+func 0x42ef10 void __fastcall Player_HideStateBar(Player* this)
+func 0x42f010 int __thiscall StateBar_SetUnitType(Player* this, int slot, GameObject* unit)
+func 0x42f0a0 int __thiscall StateBar_SetVidType(Player* this, int slot, Vid* vid)
+func 0x42f120 int __thiscall StateBar_DrawUnitIcon(Player* this, int slot, Vid* vid)
+func 0x42f210 void __thiscall Player_SetPanel(Player* this, int panel)
+func 0x4301e0 void __thiscall Player_UpdateStateBar(Player* this, Mouse* mouse)
+func 0x4308e0 void __thiscall Player_SetFlagman(Player* this, GameObject* unit)
+func 0x4309a0 void __thiscall Player_AddBarUnit(Player* this, GameObject* unit)
+func 0x430a10 void __thiscall Player_SetBarSlot(Player* this, GameObject* unit, int slot)
+func 0x430b80 int __thiscall Player_CanAfford(Player* this, int nvid)
+func 0x430c70 void __thiscall Player_HandleHotkey(Player* this, Mouse* mouse)
+func 0x430ff0 void __thiscall Player_HandlePanelAction(Player* this, int object, int* index)
+func 0x4313c0 void __thiscall Player_HandleMouse(Player* this, Mouse* mouse)
+func 0x431cc0 void __thiscall Player_HandleInput(Player* this, Mouse* mouse)
+func 0x432240 int __thiscall Object_HasTowerNearby(GameObject* this)
+func 0x432360 int __thiscall Player_CanSelect(Player* this, GameObject* object)
+func 0x432390 int __thiscall Player_CanBuild(Player* this, Vid* vid)
+func 0x4324f0 void __thiscall GameObject_LogError(GameObject* this, int id, char* message, int value)
+func 0x432560 int __fastcall GameObject_ReleaseRef(GameObject* this)
+
+# ---- ResFile (container of .res/.map/.vid/demo files)
+func 0x436590 void __thiscall ResFile_Init(ResFile* this)
+func 0x423090 void __thiscall ResFile_Destruct(ResFile* this)
+func 0x4365d0 void __thiscall ResFile_Close(ResFile* this)
+func 0x4230f0 void __thiscall ResFile_GetName(ResFile* this, char** out)
+func 0x436640 int __thiscall ResFile_OpenFile(ResFile* this, void* file, uint type)
+func 0x436800 int __thiscall ResFile_Open(ResFile* this, char** name, uint type)
+func 0x436880 int __thiscall ResFile_Create(ResFile* this, char** name, uint type)
+func 0x436950 int __thiscall ResFile_Read(ResFile* this, void* buffer, int size)
+func 0x4369b0 int __thiscall ResFile_Write(ResFile* this, void* buffer, int size)
+func 0x436a10 int __thiscall ResFile_ReadPacked(ResFile* this, void* buffer, int size, void* codec)
+func 0x436a60 int __thiscall ResFile_WritePacked(ResFile* this, void* buffer, int size, void* codec)
+func 0x436ac0 int __thiscall ResFile_FindFirst(ResFile* this, uint id)
+func 0x436af0 int __thiscall ResFile_FindNext(ResFile* this, uint id)
+func 0x436c30 int __thiscall ResFile_NextRecord(ResFile* this, uint id)
+func 0x436ca0 int __thiscall ResFile_BeginRecord(ResFile* this, uint id, int rewrite)
+func 0x436d50 void __thiscall ResFile_EndRecord(ResFile* this)
+func 0x436e40 int __thiscall ResFile_LoadRecord(ResFile* this, void** buffer)
+func 0x436f30 int __thiscall ResFile_LoadArray(ResFile* this, uint id, void** array, int recordSize)
+func 0x437070 int __thiscall ResFile_CountRecords(ResFile* this, uint id)
+func 0x4370b0 int __thiscall ResFile_CopyChunk(ResFile* this, ResFile* source, uint id)
+
+# ---- Picture (wrapper, vtable 0x475410) and its implementation (vtable 0x4757a8)
+# The wrapper holds only a pointer to the implementation (+4). Picture_Load picks the class from the
+# file extension (.tga 1, .bmp 2, .flc 3, .z 5, unknown 0) and calls its Open slot. The implementation
+# is an encoded file (a single picture or an animation) with a palette and one frame buffer; a
+# trailing number in the name (name1.tga) means the next frame is in the next numbered file.
+# Errors go to the log as "PICTURE '<name>'" with a code and a short text.
+struct Picture 0xc             # the wrapper every caller holds (vtable 0x475410)
+  0x000 Picture_vtbl* vtable
+  0x004 PictureImpl* impl      # created by Picture_Construct, deleted by Picture_Delete
+  0x008 int type               # the format the implementation was built for (Picture_Load, Picture_Create)
+end
+
+vtable Picture_vtbl 0x475410 4
+  0x00 Delete                  # 0x413180
+  0x04 NextFrame               # 0x413160
+  0x08 Rewind                  # 0x413170
+  0x0c Load                    # 0x4294c0, also builds the object of the right class
+end
+
+struct PictureImpl 0x42c       # the picture/animation object of Picture_Construct (0x42c bytes)
+  0x000 PictureImpl_vtbl* vtable
+  0x004 int frames             # frames of the animation (0 before the file was opened)
+  0x008 int frame              # the frame that is in the buffer (-1 before the first)
+  0x00c int frameTime          # ms per frame (71 by default, the speed field of a FLIC)
+  0x010 int width
+  0x014 int height
+  0x018 int bytesPerPixel      # 1 = palette, 2 = 16-bit 555, 3 = 24-bit, 4 = 32-bit
+  0x01c char* name             # String with the file name (lower case)
+  0x020 FILE* file
+  0x024 uint[256] palette      # palette of an 8-bit picture (the colour chunks of a FLIC)
+  0x424 void* pixels           # the frame buffer, width * height * bytesPerPixel
+  0x428 int dataPos            # offset of the frame data in the file
+end
+
+vtable PictureImpl_vtbl 0x4757a8 5
+  0x00 Delete                  # 0x42bc20, the four classes below override it
+  0x04 NextFrame               # PictureImpl_NextFrame, overridden per format
+  0x08 Rewind                  # PictureImpl_Rewind
+  0x0c Open                    # PictureImpl_Open, overridden per format
+  0x10 Free                    # PictureImpl_Free
+end
+
+vtable PictureTga_vtbl 0x4757bc 5  # .tga/.TGA (type 1; name1.tga, name2.tga, ... are the frames)
+  0x00 Delete
+  0x04 NextFrame
+  0x08 Rewind
+  0x0c Open
+  0x10 Free
+end
+
+vtable PictureZ_vtbl 0x4757d0 5    # .z/.Z ("Z format", type 5, 16-bit RLE frames)
+  0x00 Delete
+  0x04 NextFrame
+  0x08 Rewind
+  0x0c Open
+  0x10 Free
+end
+
+vtable PictureFlic_vtbl 0x4757e4 5 # .flc/.FLC (Autodesk FLIC animation, type 3)
+  0x00 Delete
+  0x04 NextFrame
+  0x08 Rewind
+  0x0c Open
+  0x10 Free
+end
+
+vtable PictureBmp_vtbl 0x4757f8 5  # .bmp/.BMP (type 2, also the numbered frames)
+  0x00 Delete
+  0x04 NextFrame
+  0x08 Rewind
+  0x0c Open
+  0x10 Free
+end
+
+func 0x429480 Picture* __thiscall Picture_Construct(Picture* this)
+func 0x4294c0 int __thiscall Picture_Load(Picture* this, char** name)
+func 0x413160 void __fastcall Picture_NextFrame(Picture* this)
+func 0x413170 void __fastcall Picture_Rewind(Picture* this)
+func 0x4293d0 Picture* __thiscall Picture_Create(Picture* this, int width, int height, int format)
+func 0x427830 PictureImpl* __fastcall PictureImpl_Construct(PictureImpl* this)
+func 0x427870 PictureImpl* __thiscall PictureImpl_ConstructSize(PictureImpl* this, int width, int height, int bytesPerPixel)
+func 0x4278f0 void __thiscall PictureImpl_SetSize(PictureImpl* this, int width, int height, int bytesPerPixel)
+func 0x427990 void __fastcall PictureImpl_Free(PictureImpl* this)
+func 0x4279d0 void __thiscall PictureImpl_SaveTga(PictureImpl* this, char** name, int x, int y, int width, int height)
+func 0x427bf0 uint __thiscall PictureImpl_GetPixel(PictureImpl* this, int x, int y)
+func 0x427ca0 void __thiscall PictureImpl_SetPixel(PictureImpl* this, int x, int y, uint color)
+func 0x427d80 void __thiscall PictureImpl_SetColor(PictureImpl* this, int x, int y, uint color)
+func 0x413120 void __cdecl Picture_SetColor(PictureImpl* impl, int x, int y, uint color)
+func 0x427e80 void __thiscall PictureImpl_GetColor(PictureImpl* this, uint* color, int x, int y)
+func 0x427ff0 void __fastcall PictureImpl_Rewind(PictureImpl* this)
+func 0x428030 void __fastcall PictureImpl_NextFrame(PictureImpl* this)
+func 0x428050 int __thiscall PictureImpl_Open(PictureImpl* this, char** name)
+func 0x428140 int __thiscall PictureFlic_Open(PictureImpl* this, char** name)
+func 0x428250 void __fastcall PictureFlic_ReadFrame(PictureImpl* this)
+func 0x4288c0 int __thiscall PictureTga_ReadHeader(PictureImpl* this, byte* header)
+func 0x4289e0 int __thiscall PictureTga_Open(PictureImpl* this, char** name)
+func 0x428dd0 int __thiscall PictureBmp_ReadHeader(PictureImpl* this, byte* header)
+func 0x428ec0 int __thiscall PictureBmp_Open(PictureImpl* this, char** name)
+func 0x428b20 void __thiscall PictureTga_Rewind(PictureImpl* this)
+func 0x428ba0 void __thiscall PictureTga_NextFrame(PictureImpl* this)
+func 0x428ff0 void __thiscall PictureBmp_Rewind(PictureImpl* this)
+func 0x429070 void __thiscall PictureBmp_NextFrame(PictureImpl* this)
+func 0x4291e0 int __thiscall PictureZ_Open(PictureImpl* this, char** name)
+func 0x429290 void __fastcall PictureZ_ReadFrame(PictureImpl* this)
+func 0x4296e0 void* __thiscall PictureTga_Delete(void* this, byte flags)
+func 0x429700 void* __thiscall PictureZ_Delete(void* this, byte flags)
+func 0x429720 void* __thiscall PictureFlic_Delete(void* this, byte flags)
+func 0x429740 void* __thiscall PictureBmp_Delete(void* this, byte flags)
+func 0x429760 void __fastcall PictureTga_Destruct(PictureImpl* this)
+func 0x4297c0 void __fastcall PictureZ_Destruct(PictureImpl* this)
+func 0x429820 void __fastcall PictureFlic_Destruct(PictureImpl* this)
+func 0x429880 void __fastcall PictureBmp_Destruct(PictureImpl* this)
+struct VidConverter 0x430    # picture to .vid converter (built by VidConverter_Construct 0x4223f0)
+  0x000 VidConverter_vtbl* vtable
+  0x004 Picture* picture       # main picture, its implementation at +0x08
+  0x008 PictureImpl* impl
+  0x010 Picture* picture2      # second picture (colour box / alpha), implementation at +0x14
+  0x014 PictureImpl* impl2
+  0x01c Picture* picture3      # third picture (shadow / ZBuf), implementation at +0x20
+  0x020 PictureImpl* impl3
+  0x024 int type2               # format the converter uses for the second picture (5 = Z format)
+  0x028 uint[256] palette       # palette of the converted image
+  0x428 char* index             # index table of 0x100000 bytes, or 0 while it is not built
+  0x42c int flags               # HEAD flags of the vid, 0x80 = the 2x2 colour box
+end
+
+func 0x429ad0 void __fastcall VidConverter_FreePictures(VidConverter* this)
+func 0x429af0 uint __fastcall VidConverter_Checksum(VidConverter* this)
+func 0x429bd0 void __fastcall VidConverter_RewindPictures(VidConverter* this)
+func 0x429bf0 void __fastcall VidConverter_NextFrames(VidConverter* this)
+func 0x42d260 void __fastcall FontVidConverter_NextFrames(VidConverter* this)
+func 0x42d2f0 void __fastcall FontVidConverter_RewindPictures(VidConverter* this)
+func 0x429c10 uint* __thiscall VidConverter_GetColor(VidConverter* this, uint* color, int x, int y)
+func 0x429d40 uint __thiscall VidConverter_GetAlpha(VidConverter* this, uint x, int y)
+func 0x429db0 uint __thiscall VidConverter_GetShadow(VidConverter* this, int x, int y)
+func 0x429e20 uint __thiscall VidConverter_MapColor(VidConverter* this, uint* color)
+func 0x429fa0 void __thiscall VidConverter_ReplaceIndex(VidConverter* this, uint color, char index)
+func 0x42a030 uint __thiscall VidConverter_ConvertColor(VidConverter* this, uint x, uint y)
+func 0x42a200 void __thiscall VidConverter_GetBounds(VidConverter* this, int* x0, int* y0, int* x1, int* y1)
+func 0x42a3c0 char* __thiscall VidConverter_MakeSurface(VidConverter* this, char* surface, void* tile, uint width, int rows)
+func 0x42a7a0 void __thiscall VidConverter_WriteGroundVid(VidConverter* this, ResFile* res)
+func 0x42b670 int __thiscall VidConverter_BuildShadowPoints(VidConverter* this, short* points)
+func 0x42bc20 void* __thiscall PictureImpl_Delete(void* this, byte flags)
+func 0x42bc40 void __fastcall PictureImpl_Destruct(PictureImpl* this)
+func 0x42bca0 void __fastcall VidConverter_BuildPalette(VidConverter* this)
+func 0x42c3e0 char** __thiscall PictureImpl_GetName(PictureImpl* this, char** result)
+func 0x42c400 void __thiscall PictureImpl_CopyName(PictureImpl* this, char** result)
+func 0x42c470 void __thiscall Picture_LogError(Picture* this, int code, char* text, int value)
+func 0x42c4f0 void __thiscall VidConverter_WriteSpriteVid(VidConverter* this, ResFile* res)
+func 0x42caa0 void __thiscall VidConverter_WriteColorVid(VidConverter* this, ResFile* res)
+func 0x42cb00 uint __thiscall VidConverter_IsPixelOpaque(VidConverter* this, int x, int y)
+
+# ---- File: the FILE* wrapper of the engine (vtable 0x47575c), its two virtuals read and write
+struct File 0x8
+  0x000 File_vtbl* vtable
+  0x004 FILE* file             # closed by File_Destruct
+end
+
+vtable File_vtbl 0x47575c 2
+  0x00 Read                    # 0x4277d0
+  0x04 Write                   # 0x427800
+end
+
+func 0x4277b0 void __fastcall File_Destruct(File* this)
+func 0x4277d0 int __thiscall File_Read(File* this, void* buffer, int size)
+func 0x427800 int __thiscall File_Write(File* this, void* buffer, int size)
+func 0x427080 char** __thiscall String_AddToNumber(char** this, char** result, int delta)
+func 0x4274c0 void __thiscall String_ToWide(char** this, ushort* dest, int count)
+func 0x4274e0 int __thiscall String_Init(char** this, char** source)
+func 0x427500 int __thiscall IniFile_GetInt(char** this, char** section, char** key, int def)
+
+# ---- Log (g_log; vtable 0x475758): error.log, one file per run (DEVELOPERS.md "Support library")
+struct Log 0x40c                # the error log of the game; the path of this run is kept so that the destructor can rename it to error.log
+  0x000 Log_vtbl* vtable
+  0x004 HWND hwnd               # owner of the error MessageBoxA (GetForegroundWindow the first time)
+  0x008 FILE* file              # the open file (0 after Log_Destruct)
+  0x00c char[0x400] path        # the path this run's log was opened with
+end
+
+vtable Log_vtbl 0x475758 1
+  0x00 Delete                   # 0x426330
+end
+
+func 0x425bf0 Log* __thiscall Log_Construct(Log* this, int uniqueName)
+func 0x425ea0 void __fastcall Log_Destruct(Log* this)
+func 0x425f70 void __cdecl Log_ShowError(Log* log, char* format, ...)
+func 0x426000 void __cdecl Log_Overwrite(Log* log, char* format, ...)
+func 0x426080 void __cdecl Log_Write(Log* log, char* format, ...)
+func 0x4260e0 void __cdecl Log_Fatal(Log* log, char* format, ...)
+func 0x426140 void __cdecl Log_Error(Log* log, char* format, int code, char* text, int value, ...)
+func 0x426330 Log* __thiscall Log_Delete(Log* this, byte flags)
+
+# ---- String (char* holder; empty = 0x4a9d6c) helpers used by the loaders
+func 0x426400 uint __thiscall CRC32_Update(uint* crc, byte* data, int length)
+func 0x4187f0 char** __thiscall String_ConcatStringString(char** a, char** dst, char** b)
+func 0x418820 char** __thiscall String_ConcatStringCStr(char** a, char** dst, char* b)
+func 0x418850 char** __cdecl String_ConcatCStrString(char** dst, char* a, char** b)
+func 0x426450 char** __thiscall String_Concat(char** this, char* a, char* b)
+func 0x426830 int __thiscall String_LoadFile(char** this, char** path)
+func 0x4269f0 void __cdecl String_LocalTime(char** result)
+func 0x426aa0 void __cdecl String_LocalDate(char** result)
+func 0x426c20 void __thiscall String_TrimRight(char** this, char* set)
+func 0x426c60 int __thiscall String_Replace(char** this, char* from, char* to)
+func 0x426da0 void __thiscall String_BeforeSubstring(char** this, char** result, char* separator)
+func 0x426fa0 void __thiscall String_AfterLastSubstring(char** this, char** result, char* separator)
+func 0x4264c0 char** __thiscall String_Assign(char** this, char** source)
+func 0x426540 char** __thiscall String_AssignCStr(char** this, char* source)
+func 0x426b50 char** __cdecl String_TempName(char** out, char* dir, char* prefix)
+func 0x426660 char** __thiscall String_AppendCStr(char** this, char* source)
+func 0x426790 void __thiscall String_ReadLine(char** this, ResFile* file)
+func 0x41e070 void __thiscall String_InitN(char** this, char* source, int length)
+func 0x41e810 char** __cdecl String_InitCurrentDirectory(char** out)
+func 0x422360 char** __thiscall String_InitCStr(char** this, char* text)
+func 0x4223c0 char** __thiscall String_BeforeLastValue(char** this, char** sep)
+
+# ==== object types (VID) =================================================================
+# Evidence: Vid_Construct 0x44d960, Vid_Read 0x44dd80 (field order of the OBJ record),
+# Vid_ResetCounters 0x44dba0, World_LoadVid 0x421900, the VID_... cases of
+# GetVidData/SetVidData in Script_Execute (0x440a84 / 0x440eda), and the class methods below.
+# Verified against objects.res: all 687 OBJ records are consumed exactly by this layout.
+
+struct Gamma 0x8                  # colour shift: c' = c * (256 - darken) / 256 + brighten, per byte (B,G,R,A), saturated
+  0x0 uint darken                 # bytes 0..3 = B,G,R,A: amounts taken from the negative record values
+  0x4 uint brighten               # bytes 0..3 = B,G,R,A: amounts taken from the positive record values
+end
+
+struct Weapon 0x44                # WEAP record of objects.res (55 records), World.weapons[Vid.weaponIndex]
+  0x00 int kind                   # (guess) 0/4/8/12/32; Action 0x25 aims 80 px higher when 8
+  0x04 uint flags                 # bits 0x1, 0x10 (with ANI_FIGHT), 0x20, 0x40 tested - meaning unknown
+  0x08 float length               # train cars: distance between the front and rear rail positions, pixels (48 for all cars)
+  0x0c float mass                 # train cars: weight pulled by the locomotives (TrainStats.mass)
+  0x10 float power                # train cars: pulling force; a car with power - mass > 1 is a locomotive (Engine_FindLocomotive)
+  0x14 float detectRange          # VID_DETECTRANGE, pixels
+  0x18 float battleRange          # VID_BATTLERANGE (weapon range), pixels; 0 = no weapon
+  0x1c float aim                  # VID_WEAPONAIM
+  0x20 int reloadTime             # (guess) ms; after ANI_FIGHT the next attack time = this + 5000
+  0x24 int buildTime              # VID_BUILDTIME, ms (Vid_GetBuildTimeSec divides by 1000)
+  0x28 int lifeTime               # VID_LIFETIME, ms; 999999 = unlimited
+  0x2c int ammo                   # VID_AMMO; 999999 = unlimited
+  0x30 int army                   # (guess) army (0-3) given to objects of this VID when created (object flags bits 10-11)
+  0x34 int behave                 # (guess) initial BEH_... of a unit (copied to Unit +0x8c)
+  0x38 int iconFrame              # frame (direction) in vid\455icon.vid shown on the unit bar
+  0x3c int priority               # (guess) compared between two units when choosing targets
+end
+
+struct Vid 0x41c                  # object type ("sizeof VID" in the log); base class, vtable 0x475ac4
+  0x000 Vid_vtbl* vtable
+  0x004 int nvid                  # number in World.vids
+  0x008 char* name                # object name from the OBJ record (String, CP1251)
+  0x00c uint spriteType           # U_... (export.lgc), VID_SPRITETYPE
+  0x010 int spriteClass           # B_... (export.lgc), VID_CLASS; 8 = decoration baked into the ground (shares images only with class 8)
+  0x014 uint flags                # 0x400 hidden (VID_HIDE), 0x800 screen coordinates, 0x8000 top layer, 0x10000 bobbing (sine * altitude), 0x20000 not baked into ground, 0x4000000 radial damage, 0x80000000 no damage to own army
+  0x018 uint moveMask             # VID_MOVE_MASK
+  0x01c float sizeX               # object width in pixels
+  0x020 float sizeY               # object depth (map y) in pixels
+  0x024 float sizeZ               # object height in pixels (collision in z)
+  0x028 int maxHp                 # VID_MAXHP
+  0x02c float speed               # VID_SPEED; px/ms (file value * 0.001, VID_SPEED returns *1000); 999999 = none
+  0x030 float speedZ              # (guess) vertical speed limit, px/ms (file value * 0.001)
+  0x034 float acceleration        # px/ms^2 (file value * 1e-6); 999999 = instant
+  0x038 float deceleration        # px/ms^2 (file value * 1e-6); 999999 = instant
+  0x03c float rotateSpeed         # direction units (256 = full turn) per ms = 256 / file value (ms per turn); 0 = instant
+  0x040 int weaponIndex           # index into World.weapons
+  0x044 float damageRadius        # radius of the damage done on death (with 0x4000000) / extra box size
+  0x048 int damage                # VID_DAMAGE: damage done to objects around on death
+  0x04c float linkOffsetX         # position of the linked object (link) relative to this one
+  0x050 float linkOffsetY
+  0x054 float linkOffsetZ
+  0x058 int linkNvid              # VID number of the linked object (resolved into link)
+  0x05c Vid* link                 # VID_LINK
+  0x060 float altitude            # flight height (avia) / max height step when moving / bobbing amplitude
+  0x064 int nDir                  # VID_NO_DIR: number of directions (frames per animation step)
+  0x068 int[17] animFrames        # frames per direction for each animation (ANI_...)
+  0x0ac int[17] animSfx           # sound number (nsfx) played with each animation
+  0x0f0 float[17] childForward    # child object spawn offset along the object's direction, per animation
+  0x134 float[17] childSide       # child spawn offset across the direction, per animation
+  0x178 float[17] childZ          # child spawn height, per animation
+  0x1bc int[17] childNvid         # VID_CHILD: object created with each animation (smoke, projectile for ANI_FIGHT, wreck for ANI_DEATH)
+  0x200 Vid*[17] child            # childNvid resolved (Vid_ResolveLinks)
+  0x244 int[17] childCount        # VID_NO_CHILD: how many children are created
+  0x288 Gamma gamma               # colour shift from the OBJ record (R,G,B,A values -255..255)
+  0x290 float scaleX              # drawing scale (1.0; 0.5-3.0 for some explosions/particles); forced 1.0 for imageFlags 0x24
+  0x294 float scaleY
+  0x298 float scaleZ
+  0x29c char* imageFile           # image file name (String), e.g. vid\005.vid; also .bmp/.tga (converted on load)
+  0x2a0 ushort imageFlags         # HEAD flags of the .vid: 1 depth, 2 32-bit/alpha, 4 height data, 8 palette, 0x10, 0x20 texture tiles, 0x80 colour boxes, 0x100 compressed; set at load: 0x200 loaded after the first OBJ load (level VIDs), 0x400 per-army palettes
+  0x2a2 ushort frameSpeed         # VID_FRAME_SPEED: ms per animation frame (from HEAD, usually 71)
+  0x2a4 short frameCount          # number of frames in the image (from HEAD)
+  0x2a6 short width               # max frame width (from HEAD)
+  0x2a8 short height              # max frame height (from HEAD)
+  0x2ac int[17] animFirstFrame    # first frame of each animation (computed by Vid_Read)
+  0x2f0 int[17] animFrameCount    # frames of each animation; missing animations borrow another one (computed by Vid_Read)
+  0x334 float halfSizeX           # sizeX / 2
+  0x338 float halfSizeY           # sizeY / 2
+  0x33c int layer                 # World.layers index (set by the InitLayer method)
+  0x340 int dirHalfStep           # 128 / nDir: rounding when turning a direction (0-255) into a frame
+  0x344 int maxUnit               # VID_MAXUNIT, -1 = no limit
+  0x348 int[4] maxUnitArmy        # per-army unit limit (AddUnitLimit), -1 = no limit
+  0x358 int[4] count              # live objects per army (VID_COUNT0-3)
+  0x368 int[4] killed             # VID_KILLEDUNIT0-3
+  0x378 int[4] recolored          # VID_RECOLORUNIT0-3
+  0x388 int[4] maxHpArmy          # VID_MAXHP0-3 (start = maxHp; VID_HP_COEFF changes it)
+  0x398 Gamma[4] armyGamma        # colour shift per army (SetGamma)
+  0x3b8 int[17] animScript        # script function run for each animation (ANI_...): "F<nvid>_<ani>" in the map script, -1 none
+  0x3fc int destroyScript         # script function "F<nvid>_DESTROY", run when an object is deleted, -1 none
+  0x400 int lastCreateTime        # (guess) game time stored when an object of this VID is created
+  0x404 Weapon* weapon            # &World.weapons[weaponIndex] (Objects_Load)
+  0x408 Vid* nextShared           # ring of VIDs sharing one image (clones); this = alone
+  0x40c Vid* original             # VID_EXCHANGEVID swaps
+  0x410 int canMove               # speed or speedZ != 0, or flags & 0x1006
+  0x414 int needsTimer            # (guess) weapon lifeTime != 999999 or flags 0x200000, |1 when a child has flags 0x80; objects then get a 0x20-byte extra block
+  0x418 int notCreateAsChild      # VID_NOT_CREATE_AS_CHILD
+end
+
+struct SpriteVid 0x428            # software RLE sprite ("VID_SOFTWARE"): vtables 0x4755c8 (16-bit screen) and 0x4755fc (32-bit, base class); GroundVid2 uses the same layout
+  0x000 Vid base
+  0x41c int* frameOffsets         # offset of each frame in data ("cadrShift")
+  0x420 int dataSize
+  0x424 byte* data                # [palette per army x4 if imageFlags 0x400][palette][original palette][frames]; palette parts only with imageFlags 8
+end
+
+struct GroundTile 0x24            # one texture tile (<=256x256) of a GroundVid frame
+  0x04 int texture                # index into GroundVid.textures (2 textures per tile)
+  0x08 int offsetX
+  0x0c int offsetY
+  0x10 int width
+  0x14 int height
+  0x18 int x                      # position of the tile in the frame
+  0x1c int y
+  0x20 int next                   # index of the next tile of the same frame, 0 = last
+end
+
+struct GroundVid 0x428            # texture-tiled VID (imageFlags 0x20, 'SURF' chunk): map grounds (lNN.vid), cursors, many effects; vtable 0x475630
+  0x000 Vid base
+  0x41c GroundTile* tiles         # frame f starts at tiles[f]
+  0x420 short textureCount
+  0x424 Texture** textures        # Texture objects, two per tile: colour (P8/DXT1/...) and height (D16, copied into Graphics.depthBuffer by Graphics_BlitToDepthBuffer from GroundVid_Draw)
+end
+
+struct ColorVid 0x424             # imageFlags 0x80: each frame is a solid colour box of sizeX x sizeY; vtable 0x475690
+  0x000 Vid base
+  0x41c int dataSize
+  0x420 uint* colors              # one ARGB colour per frame (DATA chunk)
+end
+
+vtable Vid_vtbl 0x475ac4 11
+  0x00 Clone
+  0x04 Delete
+  0x08 BakeObject
+  0x0c DrawObject
+  0x10 DrawShadow
+  0x14 DrawIntoTile
+  0x18 LoadImage
+  0x1c SetGamma
+  0x20 MarkGroundHeight
+  0x24 GetShadowPointCount
+  0x28 InitLayer
+end
+vtable SpriteVid_vtbl 0x4755c8 13
+  0x00 Clone
+  0x04 Delete
+  0x08 BakeObject
+  0x0c DrawObject
+  0x10 DrawShadow
+  0x14 DrawIntoTile
+  0x18 LoadImage
+  0x1c SetGamma
+  0x20 MarkGroundHeight
+  0x24 GetShadowPointCount
+  0x28 InitLayer
+  0x2c GetPaletteSize
+  0x30 ApplyGamma
+end
+vtable SpriteVid32_vtbl 0x4755fc 13
+  0x00 Clone
+  0x04 Delete
+  0x08 BakeObject
+  0x0c DrawObject
+  0x10 DrawShadow
+  0x14 DrawIntoTile
+  0x18 LoadImage
+  0x1c SetGamma
+  0x20 MarkGroundHeight
+  0x24 GetShadowPointCount
+  0x28 InitLayer
+  0x2c GetPaletteSize
+  0x30 ApplyGamma
+end
+vtable GroundVid_vtbl 0x475630 11
+  0x00 Clone
+  0x04 Delete
+  0x08 BakeObject
+  0x0c DrawObject
+  0x10 DrawShadow
+  0x14 DrawIntoTile
+  0x18 LoadImage
+  0x1c SetGamma
+  0x20 MarkGroundHeight
+  0x24 GetShadowPointCount
+  0x28 InitLayer
+end
+vtable GroundVid2_vtbl 0x47565c 13
+  0x00 Clone
+  0x04 Delete
+  0x08 BakeObject
+  0x0c DrawObject
+  0x10 DrawShadow
+  0x14 DrawIntoTile
+  0x18 LoadImage
+  0x1c SetGamma
+  0x20 MarkGroundHeight
+  0x24 GetShadowPointCount
+  0x28 InitLayer
+  0x2c GetPaletteSize
+  0x30 ApplyGamma
+end
+vtable ColorVid_vtbl 0x475690 11
+  0x00 Clone
+  0x04 Delete
+  0x08 BakeObject
+  0x0c DrawObject
+  0x10 DrawShadow
+  0x14 DrawIntoTile
+  0x18 LoadImage
+  0x1c SetGamma
+  0x20 MarkGroundHeight
+  0x24 GetShadowPointCount
+  0x28 InitLayer
+end
+vtable VidConverter_vtbl 0x4756bc 5
+  0x00 Delete
+  0x0c Load
+end
+vtable FontVidConverter_vtbl 0x4756d0 5
+  0x00 Delete
+  0x04 NextFrames
+  0x08 RewindPictures
+  0x0c Load
+  0x10 FreePictures
+end
+
+# loading
+
+# Vid (base)
+func 0x44d960 Vid* __thiscall Vid_Construct(Vid* this)
+func 0x44dad0 void __thiscall Vid_Destruct(Vid* this)
+func 0x44dab0 Vid* __thiscall Vid_Delete(Vid* this, byte flags)
+func 0x454810 Vid* __thiscall Vid_Clone(Vid* this)
+func 0x44dba0 void __thiscall Vid_ResetCounters(Vid* this)
+func 0x44dc40 void __thiscall Vid_Error(Vid* this, int code, char* text, int value)
+func 0x44dc70 void __thiscall Vid_ResolveLinks(Vid* this)
+func 0x44dd80 void __thiscall Vid_Read(Vid* this, ResFile* res)
+func 0x44e370 void __thiscall Vid_SetGamma(Vid* this, Gamma* gamma, uint army)
+func 0x44e3b0 int __thiscall Vid_GetTotalDamage(Vid* this)
+func 0x44e440 int __thiscall Vid_GetBuildTimeSec(Vid* this)
+func 0x44e490 void __thiscall Vid_SetHidden(Vid* this, int hidden)
+func 0x44e4c0 void __thiscall Vid_SetHpCoeff(Vid* this, uint army, int percent)
+func 0x44e5c0 void __thiscall Vid_SetMaxHpArmy(Vid* this, uint army, int maxHp)
+func 0x44e6b0 float __thiscall Vid_GetVerticalSpeed(Vid* this, float dz, float distance)
+func 0x454910 void __thiscall Vid_InitLayer(Vid* this)
+func 0x40c2a0 int __thiscall Vid_GetAmmo(Vid* this)
+func 0x442890 int __thiscall Vid_HasWeapon(Vid* this)
+func 0x4428b0 int __thiscall Vid_GetMaxHpArmy(Vid* this, int army)
+func 0x4428d0 int __thiscall Vid_GetCountArmy(Vid* this, int army)
+func 0x4428e0 int __thiscall Vid_GetCount(Vid* this)
+func 0x442900 int __thiscall Vid_GetKilledArmy(Vid* this, int army)
+func 0x442920 int __thiscall Vid_GetKilled(Vid* this)
+func 0x442940 int __thiscall Vid_GetRecoloredArmy(Vid* this, int army)
+func 0x442960 int __thiscall Vid_GetRecolored(Vid* this)
+func 0x442980 int __thiscall Vid_GetNotCreateAsChild(Vid* this)
+func 0x442990 void __thiscall Vid_SetNotCreateAsChild(Vid* this, int value)
+func 0x4429a0 uint __thiscall Vid_GetFlag80(Vid* this)
+func 0x4429b0 uint __thiscall Vid_IsHidden(Vid* this)
+
+# Gamma helpers
+func 0x44ec10 void __thiscall Gamma_Copy(Gamma* this, Gamma* src)
+func 0x44ecd0 void __thiscall Gamma_SetBlue(Gamma* this, int value)
+func 0x44f370 uint* __thiscall Color_ApplyGamma(uint* this, Gamma* gamma, uint* color)
+
+# SpriteVid (software sprites, 16-bit 0x4755c8 / 32-bit 0x4755fc / GroundVid2 0x47565c)
+func 0x44ec30 SpriteVid* __thiscall SpriteVid32_CopyConstruct(SpriteVid* this, SpriteVid* src)
+func 0x44ed20 void __thiscall SpriteVid32_Destruct(SpriteVid* this)
+func 0x4227d0 void __thiscall SpriteVid_Destruct(SpriteVid* this)
+func 0x422600 SpriteVid* __thiscall SpriteVid_Clone(SpriteVid* this)
+func 0x422550 SpriteVid* __thiscall SpriteVid32_Clone(SpriteVid* this)
+func 0x4226a0 SpriteVid* __thiscall SpriteVid_Delete(SpriteVid* this, byte flags)
+func 0x4225e0 SpriteVid* __thiscall SpriteVid32_Delete(SpriteVid* this, byte flags)
+func 0x450f10 void __thiscall SpriteVid_Draw(SpriteVid* this, GameObject* obj)
+func 0x44ffd0 void __thiscall SpriteVid32_Draw(SpriteVid* this, GameObject* obj)
+func 0x451df0 void __thiscall SpriteVid_DrawShadow(SpriteVid* this, GameObject* obj)
+func 0x4520f0 void __thiscall SpriteVid_DrawIntoTile(SpriteVid* this, GameObject* obj, GroundTile* tile, void* colorTexture, void* secondTexture)
+func 0x44edc0 void __thiscall SpriteVid_LoadImage(SpriteVid* this, ResFile* res)
+func 0x44f850 void __thiscall SpriteVid_SetGamma(SpriteVid* this, Gamma* gamma, uint army)
+func 0x44fb60 void __thiscall SpriteVid_MarkGroundHeight(SpriteVid* this, GameObject* obj)
+func 0x4225c0 int __thiscall SpriteVid_GetShadowPointCount(SpriteVid* this)
+func 0x44f460 void __thiscall SpriteVid_InitLayer(SpriteVid* this)
+func 0x422660 int __thiscall SpriteVid_GetPaletteSize(SpriteVid* this)
+func 0x4225b0 int __thiscall SpriteVid32_GetPaletteSize(SpriteVid* this)
+func 0x44f5d0 void __thiscall SpriteVid_ApplyGamma(SpriteVid* this, uint* palette, Gamma* gamma)
+func 0x44f4b0 void __thiscall SpriteVid32_ApplyGamma(SpriteVid* this, uint* palette, Gamma* gamma)
+
+# GroundVid (texture tiles, 0x475630) and GroundVid2 (0x47565c)
+func 0x452e50 GroundVid* __thiscall GroundVid_CopyConstruct(GroundVid* this, GroundVid* src)
+func 0x452f00 GroundVid* __thiscall GroundVid_ConstructEmpty(GroundVid* this, int nvid, int width, int height)
+func 0x453350 void __thiscall GroundVid_Destruct(GroundVid* this)
+func 0x4228e0 GroundVid* __thiscall GroundVid_Clone(GroundVid* this)
+func 0x422940 GroundVid* __thiscall GroundVid_Delete(GroundVid* this, byte flags)
+func 0x453420 void __thiscall GroundVid_BakeObject(GroundVid* this, GameObject* obj)
+func 0x4541e0 void __thiscall GroundVid_Draw(GroundVid* this, GameObject* obj)
+func 0x4535c0 void __thiscall GroundVid_LoadImage(GroundVid* this, ResFile* res)
+func 0x454130 void __thiscall GroundVid_InitLayer(GroundVid* this)
+func 0x422960 SpriteVid* __thiscall GroundVid2_Clone(SpriteVid* this)
+func 0x454920 void __thiscall GroundVid2_Draw(SpriteVid* this, GameObject* obj)
+func 0x422b60 void __thiscall GroundVid2_SetGamma(SpriteVid* this, Gamma* gamma, uint army)
+func 0x4551d0 void __thiscall GroundVid2_InitLayer(SpriteVid* this)
+
+# ColorVid (imageFlags 0x80, 0x475690)
+func 0x44e7a0 ColorVid* __thiscall ColorVid_CopyConstruct(ColorVid* this, ColorVid* src)
+func 0x44e840 void __thiscall ColorVid_Destruct(ColorVid* this)
+func 0x422bd0 ColorVid* __thiscall ColorVid_Clone(ColorVid* this)
+func 0x422c30 ColorVid* __thiscall ColorVid_Delete(ColorVid* this, byte flags)
+func 0x44e980 void __thiscall ColorVid_Draw(ColorVid* this, GameObject* obj)
+func 0x44e8d0 void __thiscall ColorVid_LoadImage(ColorVid* this, ResFile* res)
+func 0x44e970 void __thiscall ColorVid_InitLayer(ColorVid* this)
+
+# ==== renderer (g_graphics) ===============================================================
+# Evidence: Graphics_Constructor 0x4140b0 (field init), Graphics_Init 0x40dc10, Graphics_Destruct
+# 0x414490 (release order and log names), Graphics_InitDirectDraw 0x4146e0, Graphics_DrawScene
+# 0x40f0c0, Graphics_DrawEffects 0x40fac0, Effect 0x415a20, the lock code repeated in
+# SpriteVid_Draw/SpriteVid32_Draw, and the script cases of SetWind/GetGamma in Script_Execute.
+
+struct DDPixelFormat 0x20         # DDPIXELFORMAT (DirectDraw); read by PixelFormat_ToD3DFormat 0x413370
+  0x00 uint size
+  0x04 uint flags                 # DDPF_: 0x1 alpha pixels, 0x2 alpha only, 0x4 FourCC, 0x20 8-bit palette, 0x40 RGB, 0x400 z-buffer, 0x4000 stencil
+  0x08 uint fourCC                # 'DXT1' 0x31545844, 'DXT3' 0x33545844... (texture formats 0x475450/0x475470)
+  0x0c uint bitCount              # RGB or z-buffer bit depth
+  0x10 uint redMask               # z-buffer: stencil bit depth
+  0x14 uint greenMask             # 0x7e0 picks R5G6B5 (565) over X1R5G5B5
+  0x18 uint blueMask
+  0x1c uint alphaMask             # 0xf000 = A4R4G4B4, 0x8000 = A1R5G5B5, 0xff000000 = A8R8G8B8
+end
+
+struct DisplayDevice 0x10c        # one DirectDraw driver (Graphics.devices), filled by the DirectDrawEnumerateExA callback 0x4142e0 and Graphics_FilterDisplayMode 0x413e70
+  0x000 char[40] description      # driver description (strncpy 0x27), shown in the launcher
+  0x028 void* guid                # GUID* passed to DirectDrawCreateEx: points to guidData, 0 for the primary display driver
+  0x02c byte[16] guidData         # GUID of a secondary driver
+  0x03c int videoMemory           # DDCAPS.dwVidMemTotal ("Enum Driver: %s - %s VideoMemory=%i"); Graphics_Init compares half of it with 3 screens of 16 bits for triple buffering
+  0x040 int modeCount             # display modes on the launcher list (max 16)
+  0x044 int[16] modeWidth
+  0x084 int[16] modeHeight
+  0x0c4 int[16] modeFormat        # D3DFORMAT code of the mode (PixelFormat_ToD3DFormat): 0x16 X8R8G8B8, 0x17 R5G6B5...
+  0x104 int desktopFormat         # D3DFORMAT of the current desktop mode (GetDisplayMode); windowed mode takes COLOR32 from it
+  0x108 uint flags                # 1 can render in a window (DDCAPS2_CANRENDERWINDOWED and primary driver; without it Graphics_Init forces full screen - LocoFix skips the launcher test of this bit), 2 display not shared with GDI (no DDCAPS_GDI; logged as NONGDI)
+end
+
+struct TLVertex 0x14              # transformed vertex, FVF 0x44 (XYZRHW | DIFFUSE): rain and snow lines. (FVF 0xc4 adds a specular dword, 0x18 bytes - Graphics_FillRect & co.; FVF 0x1c4 adds tu,tv, 0x20 bytes - Texture_Draw)
+  0x00 float x                    # screen pixels
+  0x04 float y
+  0x08 float z                    # 0..1 (0.015625 + height / 8192 for rain/snow)
+  0x0c float rhw                  # always 1.0
+  0x10 uint color                 # ARGB
+end
+
+struct Movie 0x10                 # DirectShow playback (Graphics.movie, this of Movie_Play/StopMovie); all zero when no movie
+  0x00 void* graph                # IGraphBuilder (CoCreateInstance CLSID_FilterGraph 0x475bb0, IID 0x475b50); nonzero while a movie is loaded
+  0x04 void* control              # IMediaControl (IID 0x475ba0): Run 0x1c, Pause 0x20
+  0x08 void* events               # IMediaEvent (IID 0x475b90): WaitForCompletion 0x24 in Movie_IsFinished
+  0x0c void* window               # IVideoWindow (IID 0x475b70): owner = game window, style WS_CHILD|WS_CLIPSIBLINGS, 640x480 centred in the view
+end
+
+vtable Texture_vtbl 0x4754b4 1
+  0x00 Delete
+end
+
+struct Texture 0x1c               # Direct3D texture surface wrapper (Texture_Construct 0x4161b0, vtable 0x4754b4; base vtable 0x4754b0); GroundVid tiles and the three 256x256 scratch textures of Graphics
+  0x00 Texture_vtbl* vtable
+  0x04 void* surface              # IDirectDrawSurface7 (Graphics_CreateSurface kind 2 managed, 4 video memory, 6 z-buffer format); 0 when creation failed
+  0x08 int format                 # D3DFORMAT code actually created: 0x29 P8, 0x17 R5G6B5, 0x18 X1R5G5B5, 0x19 A1R5G5B5, 0x1a A4R4G4B4, 0x50 D16, 'DXT1'/'DXT3'; Texture_Construct falls back P8/DXT1 -> 565 -> 555 -> 1555, DXT3 -> 4444
+  0x0c int width                  # after rounding up to a power of 2 / square (texture caps)
+  0x10 int height
+end
+
+struct Graphics 0xc0c             # the renderer (g_graphics), created in World_Construct (crt_new(0xc0c), Graphics_Constructor, Graphics_Init(hwnd)), deleted in World_Destruct (Graphics_Destruct)
+  0x000 uint flags                # 0x1 drawing suspended for GDI (menu loop / sizing: Graphics_EnterGdiMode; GameWorld_Run then only waits), 0x2 32-bit colour (COLOR32), 0x4 ALPHAPALETTE texture cap, 0x8 AGP textures (D3DDEVCAPS_TEXTURENONLOCALVIDMEM), 0x10 NONGDI (set from DisplayDevice.flags 2 and cleared again by Graphics_Init; Graphics_EndScene then would draw the Windows cursor with GDI), 0x20 software D3D device (RGB device; cleared by Graphics_Init, so always hardware), 0x40 triple buffering (also cleared by Graphics_Init), 0x80 full screen (else WINDOWED), 0x100 VSYNC (g_settings+0x220 bit 1; Flip without DDFLIP_NOVSYNC), 0x200 LOWDETAIL (registry), 0x400 full screen presented with Blt like a window (g_settings+0x220 bit 0, the editor mode: the menu bar stays visible; no effect in a window), 0x800 DOTPRODUCT3 cap, 0x1000 MODULATE2X cap, 0x2000 cached D3DRS_SPECULARENABLE, 0x4000 cached D3DRS_ALPHABLENDENABLE, 0x8000 depth buffer can be BltFast-ed into the z-buffer (else "CAN'T Z BLT", Graphics_TestZBufferBlt)
+  0x008 ushort[256] grayColors    # 16-bit colour of grey level i in the screen format (built by Graphics_Init); fog/snow/light write it into 16-bit textures when P8 is not available
+  0x208 void* backBufferBits      # backBuffer locked for software drawing (Lock lpSurface), 0 when unlocked; SpriteVid_Draw/Graphics_PutPoint lock on demand, D3D drawing unlocks first
+  0x20c float screenWidth         # resolution (ScreenX); interface and menus are laid out against it
+  0x210 float screenHeight        # ScreenY
+  0x214 int backBufferPitch       # backBuffer pitch in pixels (lPitch / 2 or / 4 with COLOR32)
+  0x218 short* depthBits          # depthBuffer locked for software drawing, 0 when unlocked
+  0x21c int depthPitch            # depthBuffer pitch in shorts ("Pitch %i zPitch %i")
+  0x220 float viewLeft            # view rectangle (Graphics_SetViewport); also g_drawClip* and the D3D viewport
+  0x224 float viewRight
+  0x228 float viewTop
+  0x22c float viewBottom
+  0x230 int deviceCount           # DirectDraw drivers with 3D found by the enumeration (launcher list)
+  0x234 DisplayDevice[8] devices
+  0xa94 int device                # selected driver (g_settings Device; 0 when out of range)
+  0xa98 float scrollFromX         # EFF_SCROLL start: view centre in map coordinates when Effect(2) was called
+  0xa9c float scrollFromY
+  0xaa0 int[16] effectVar1        # Effect(effect, var1, ...) by EFF_ number: EFF_NUKE colour, EFF_SCROLL target x
+  0xae0 int[16] effectVar2        # EFF_SCROLL target y
+  0xb20 uint[16] effectStart      # g_realTime when the effect started, 0 = not running (GetEffectState returns -1); Effect(0) clears all
+  0xb60 uint[16] effectDuration   # ms; defaults 0x900 NUKE/FADE, 0x200 SCROLL, 0x400 ALPHAAPPEAR/FADE_OUT, 0x500 FADE_IN
+  0xba0 Gamma gamma               # map colour shift (GRPH, script SetGamma/GetGamma); SetGamma re-applies all VIDs when it changes
+  0xba8 uint environment          # ENV_... bits (SetEnvironment, GRPH): 1/2 shadows, 4 earthquake, 0x40 snow on the ground, 0x80 squall, 0xc00 rain (0x800 starting, 0x400 stopping), 0xc000 snow (0x8000 starting, 0x4000 stopping)
+  0xbac int windDirection         # script SetWind(wind, direct): direct & 0xff (0-255 = full turn, index into g_sinTable); GRPH int
+  0xbb0 float wind                # SetWind wind * 0.001; GRPH float; a squall raises it for 4 s
+  0xbb4 char* fontName            # String: "Courier" (Graphics_Init), then .cfg [graph] Font (World_Construct); not used by Graphics_DrawText (guess: unused)
+  0xbb8 int fontSizeX             # 7, .cfg [graph] FontSizeX
+  0xbbc int fontSizeY             # 8, .cfg [graph] FontSizeY
+  0xbc0 Movie movie               # PlayMovie/StopMovie; while movie.graph is set the frame is not presented
+  0xbd0 HWND hwnd                 # game window (Graphics_Init)
+  0xbd4 Texture* grayTexture      # 256x256 P8 with a grey palette (Graphics_ReloadPalettes; falls back to R5G6B5): scratch for fog ("fog buffer"), ground snow ("snow buffer") and lights ("light buffer")
+  0xbd8 Texture* rgbTexture       # 256x256 R5G6B5 (or 555): EFF_ALPHAAPPEAR copies the snapshot through it; lights alternate between it and grayTexture; its format picks g_redMask16.. (565 or 555)
+  0xbdc Texture* alphaTexture     # 256x256 A4R4G4B4: scratch of GroundVid2_Draw (sprites with per-pixel depth)
+  0xbe4 int displayFormat         # set to 0x17 (R5G6B5) by Graphics_Init before InitDirectDraw; no other reader found (guess)
+  0xbec void* ddraw               # IDirectDraw7 ("DDraw release")
+  0xbf0 void* d3d                 # IDirect3D7 ("d3d release")
+  0xbf4 void* d3dDevice           # IDirect3DDevice7, HAL ("d3dDevice release")
+  0xbf8 void* depthBuffer         # "ZBuffer": system-memory 16-bit z-format surface the software sprite drawing reads and writes (depthBits); copied into zBuffer between the two scene halves. In software mode the same surface as zBuffer
+  0xbfc void* zBuffer             # "ZBufferHard": hardware z-buffer attached to backBuffer
+  0xc00 void* frontBuffer         # primary surface ("frontBuffer release"); flip chain in full screen
+  0xc04 void* backBuffer          # render target: attached back buffer (full screen) or an off-screen 3D surface of the screen size (window)
+  0xc08 void* snapshot            # 16-bit system-memory copy of the front buffer taken by Effect(EFF_ALPHAAPPEAR)
+end
+
+global 0x4a9a14 Graphics* g_graphics
+global 0x47a5d8 uint g_redMask16          # 0xf800 (565) or 0x7c00 (555): 16-bit red mask of rgbTexture's format
+global 0x47a5dc uint g_greenMask16        # 0x7e0 or 0x3e0
+global 0x47a5e0 int g_redShift16          # 8 or 7: (r & 0xf8) << shift
+global 0x47a5e4 int g_greenShift16        # 3 or 2: (g << shift) & green mask
+global 0x47f830 uint* g_drawPalette       # palette of the sprite being drawn (SpriteVid_Draw: per-army palette in the VID data); alpha in the top byte for the blending spans
+global 0x4a9b40 DDPixelFormat g_texFormat565   # texture formats found by Graphics_EnumTextureFormat
+global 0x4a9b60 DDPixelFormat g_texFormat555
+global 0x4a9b80 DDPixelFormat g_texFormat4444
+global 0x4a9ba8 DDPixelFormat g_texFormatP8
+global 0x4a9be0 DDPixelFormat g_zBufferFormat  # 16-bit z format (Graphics_EnumZBufferFormat)
+global 0x4a9ba0 HCURSOR g_gdiCursor              # cursor last drawn by the GDI cursor path of Graphics_EndScene
+global 0x4a9bc8 ICONINFO g_gdiCursorInfo         # its GetIconInfo (hotspot at +4/+8)
+global 0x4a9c00 int g_ddDeviceCount              # counter of the DirectDrawEnumerateExA callback -> Graphics.deviceCount
+global 0x4a9c08 int g_textureMemory              # bytes held by Texture objects (w*h*1 for P8, *2 otherwise)
+global 0x4a9c0c uint g_textureSquareOnly         # D3DPTEXTURECAPS_SQUAREONLY (0x20)
+global 0x4a9c10 ObjectMap g_objectMap           # map hash created by Level_Load for the map size and reused by the next levels
+global 0x47ab30 int g_texturePow2                # D3DPTEXTURECAPS_POW2; forced to 1 by Graphics_ReadTextureCaps
+global 0x47ab34 int g_textureMaxWidth
+global 0x47ab38 int g_textureMaxHeight
+global 0x4a9a18 int g_loadingFrame               # frame of the loading animation (Graphics_ShowLoadingFrame)
+global 0x4a9a1c uint g_loadingFrameTime
+global 0x4a9a08 float g_quakeCameraX             # camera saved while ENV_EARTHQUAKE shakes it
+global 0x489940 float g_quakeCameraY
+global 0x4a9a20 uint g_squallStart               # game time of the squall start
+global 0x47a5e8 float g_squallWind               # wind before the squall, -1 = no squall
+global 0x4a9a24 uint g_groundSnowStart
+global 0x4a9a28 int g_groundSnowLevel            # 0..255, (gameTime - start) >> 7
+global 0x4a9a2c int g_rainDropCount              # 0..250
+global 0x4a6e38 TLVertex[500] g_rainVertices     # 2 per drop
+global 0x4a9a38 int g_snowFlakeCount             # 0..1000
+global 0x489948 TLVertex[6000] g_snowVertices    # 6 per flake (3 lines)
+global 0x4a9a3c int g_lightBufferToggle          # Graphics_DrawLight alternates grayTexture / rgbTexture
+global 0x47c894 float[256] g_sinTable            # sin(i * 2pi / 256), direction units (rain/snow wind, also used by 0x419xxx and 0x42cxxx)
+
+# ---- Graphics methods
+func 0x4140b0 Graphics* __thiscall Graphics_Construct(Graphics* this, void* settings)
+func 0x414490 void __thiscall Graphics_Destruct(Graphics* this)
+func 0x40dc10 int __thiscall Graphics_Init(Graphics* this, HWND hwnd)
+func 0x4146e0 int __thiscall Graphics_InitDirectDraw(Graphics* this, uint flags)
+func 0x4155d0 void* __thiscall Graphics_CreateSurface(Graphics* this, int width, int height, int kind, DDPixelFormat* format)
+func 0x4151b0 void __thiscall Graphics_TestZBufferBlt(Graphics* this)
+func 0x40eea0 void __thiscall Graphics_ReloadPalettes(Graphics* this)
+func 0x414cd0 int __thiscall Graphics_BeginScene(Graphics* this)
+func 0x40f0c0 void __thiscall Graphics_DrawScene(Graphics* this, int drawWorld)
+func 0x415350 int __thiscall Graphics_CopyDepthToZBuffer(Graphics* this)
+func 0x419720 void __thiscall Graphics_LockDepthBuffer(Graphics* this)
+func 0x40fac0 void __thiscall Graphics_DrawEffects(Graphics* this, int draw)
+func 0x414d50 void __thiscall Graphics_EndScene(Graphics* this, int present)
+func 0x414f60 void __thiscall Graphics_SetViewport(Graphics* this, float left, float top, float right, float bottom)
+func 0x415820 void __thiscall Graphics_Clear(Graphics* this, uint color)
+func 0x415910 void __thiscall Graphics_CopyToFrontBuffer(Graphics* this)
+func 0x40f000 void __thiscall Graphics_SetBlend(Graphics* this, int srcBlend, int destBlend)
+func 0x40f050 int __thiscall Graphics_SetRenderState(Graphics* this, int state, uint value)
+func 0x412560 void __thiscall Graphics_LockBackBuffer(Graphics* this)
+func 0x415e40 void __thiscall Graphics_DrawPrimitive(Graphics* this, int type, uint fvf, void* vertices, int vertexSize, int count)
+func 0x415de0 int __thiscall Graphics_BlitToDepthBuffer(Graphics* this, RECT* dst, RECT* src, Texture* texture)
+func 0x411a00 void __thiscall Graphics_DrawVid(Graphics* this, Vid* vid, int frame, float x, float y, float z)
+func 0x40f780 void __thiscall Graphics_ShowLoadingFrame(Graphics* this, Vid* vid)
+func 0x40f8c0 void __thiscall Graphics_SaveScreenshot(Graphics* this, char* fileName, int x, int y, int width, int height)
+func 0x405cd0 void __thiscall Graphics_PutPoint(Graphics* this, float x, float y, uint color)
+func 0x405e70 void __thiscall Graphics_PutPoint2x2(Graphics* this, float x, float y, uint color)
+func 0x412830 void __thiscall Graphics_DrawLine(Graphics* this, float x1, float y1, float x2, float y2, uint color)
+func 0x4127c0 void __thiscall Graphics_DrawRect(Graphics* this, float left, float top, float right, float bottom, uint color)
+func 0x412cd0 void __thiscall Graphics_FillRect(Graphics* this, float left, float top, float right, float bottom, uint color)
+func 0x412a70 void __thiscall Graphics_DarkenRect(Graphics* this, float left, float top, float right, float bottom, uint color)
+func 0x412ba0 void __thiscall Graphics_BrightenRect(Graphics* this, float left, float top, float right, float bottom, uint color)
+func 0x415e90 void __thiscall Graphics_DrawText(Graphics* this, float x, float y, char* text, uint color)
+func 0x411d40 void __thiscall Graphics_EnterGdiMode(Graphics* this)
+func 0x411db0 void __thiscall Graphics_LeaveGdiMode(Graphics* this)
+func 0x4102d0 void __thiscall Graphics_UpdateSquall(Graphics* this)
+func 0x410920 void __thiscall Graphics_DrawGroundSnow(Graphics* this)
+func 0x410e20 void __thiscall Graphics_DrawRain(Graphics* this)
+func 0x411280 void __thiscall Graphics_DrawSnow(Graphics* this)
+method 0x4103c0 Graphics
+method 0x411dd0 Graphics
+func 0x415a20 void __thiscall Effect(Graphics* this, int effect, int var1, int var2, int duration)
+func 0x4100c0 int __thiscall GetEffectState(Graphics* this, int effect)
+func 0x4101d0 void __thiscall SetGamma(Graphics* this, Gamma* gamma)
+func 0x410270 void __thiscall SetEnvironment(Graphics* this, uint env)
+func 0x412e10 void __thiscall PlayMovie(Graphics* this, char* fileName)
+func 0x4125f0 void __thiscall Graphics_ReadMapSettings(Graphics* this, ResFile* file)
+func 0x412660 void __thiscall Graphics_WriteMapSettings(Graphics* this, ResFile* file)
+func 0x412430 void __thiscall Graphics_ReadOldMapSettings(Graphics* this, ResFile* file)
+func 0x4060e0 void __stdcall Graphics_LogError(int code, char* text, int value)
+func 0x40d380 char* __cdecl Graphics_DescribeTextureStage()
+func 0x416040 void __cdecl Graphics_ReadTextureCaps(void* d3dDevice)
+
+# ---- enumeration callbacks (0x413f50 and 0x4142e0 are not functions in Ghidra yet - only passed as pointers)
+func 0x4142e0 int __stdcall Graphics_EnumDevice(void* guid, char* description, char* driverName, DisplayDevice* devices, void* monitor)
+func 0x413e70 int __stdcall Graphics_FilterDisplayMode(void* surfaceDesc, DisplayDevice* device)
+func 0x413f50 int __stdcall Graphics_EnumTextureFormat(DDPixelFormat* format, Graphics* graphics)
+func 0x414030 int __stdcall Graphics_EnumZBufferFormat(DDPixelFormat* format, Graphics* graphics)
+func 0x4131b0 int __thiscall DisplayDevice_FindMode(DisplayDevice* this, int width, int height, int bpp)
+func 0x413210 char** __thiscall DisplayDevice_FormatMode(DisplayDevice* this, char** result, int mode)
+
+# ---- movie
+func 0x412ec0 void __thiscall Movie_Play(Movie* this, char* fileName, int x, int y)
+func 0x413090 int __thiscall Movie_IsFinished(Movie* this)
+func 0x4130c0 void __thiscall StopMovie(Movie* this)
+func 0x416a40 void __thiscall Movie_Destruct(Movie* this)
+func 0x413140 void __thiscall Movie_Pause(Movie* this)
+func 0x413150 void __thiscall Movie_Run(Movie* this)
+
+# ---- textures and surfaces
+func 0x4161b0 Texture* __thiscall Texture_Construct(Texture* this, int width, int height, int format, uint flags)
+func 0x416500 void __thiscall Texture_Destruct(Texture* this)
+func 0x4164e0 Texture* __thiscall Texture_Delete(Texture* this, byte flags)
+func 0x416a50 Texture* __thiscall TextureBase_Delete(Texture* this, byte flags)
+func 0x415f40 int __thiscall Texture_CopyFromSurface(Texture* this, void* surface, RECT* src, int* dstPoint)
+func 0x415fc0 void __thiscall Texture_SetPalette(Texture* this, uint* entries)
+func 0x416540 void __thiscall Texture_Draw(Texture* this, RECT* dst, RECT* src, Gamma* tint)
+func 0x4167c0 void __thiscall Texture_DrawZ(Texture* this, float z1, float z2, RECT* dst, RECT* src, Gamma* tint)
+func 0x4123c0 void* __stdcall Surface_Lock(void* surface, int* pitch, uint flags)
+func 0x413370 int __cdecl PixelFormat_ToD3DFormat(DDPixelFormat* format)
+func 0x413470 char* __cdecl PixelFormat_ToString(DDPixelFormat* format)
+func 0x413e50 int __cdecl PixelFormat_GetBitCount(DDPixelFormat* format)
+func 0x413a30 char* __cdecl D3DFormat_ToString(int format)
+func 0x40d2a0 void __cdecl TextureArg_Append(char* buffer, uint arg)
+
+# ---- colours
+func 0x40f850 void __thiscall Color_SetRGB(uint* this, int r, int g, int b)
+func 0x410020 void __thiscall Color_SetARGB(uint* this, int a, int r, int g, int b)
+func 0x410910 void __thiscall Color_Copy(uint* this, uint* source)
+func 0x4126b0 void __thiscall Color_From16(uint* this, ushort* pixel)
+func 0x412700 uint* __thiscall Color_Blend(uint* this, uint* result, uint color, int alpha)
+func 0x4100a0 Gamma* __thiscall Gamma_SetFromColor(Gamma* this, uint color, uint add)
+
+# ---- World helpers found in the graphics range
+func 0x413330 float __thiscall World_ToScreenX(World* this, float x)
+func 0x413340 float __thiscall World_ToScreenY(World* this, float y)
+
+# ==== game objects (sprites) =============================================================
+# Class tree (constructors call the base constructor first):
+#   GameObject 0x70 (B_SPRITE 9)          -> Primitive (6), Decal (8), Frame (10) -> Text (19),
+#                                            Linker (12), Cannon (5), Region (23), Cursor
+#   GameObject -> Terrain 0x78 (B_TERRAIN 0, B_OBJECT 1) -> Rail (22)
+#                                                        -> Unit 0xa0 (B_UNIT 2) -> Avia (4) -> Balloon (26)
+#                                                                                -> Building (3), Depo (24),
+#                                                                                   Engine (21), Class7 (7),
+#                                                                                   Creature (25) -> CivRobot (20)
+# Unit and Rail embed GameObject and list the two Terrain fields (0x70, 0x74) themselves, so that
+# fields read this->base.x instead of this->base.base.x.
+
+struct Command 0x10               # one entry of an object's command stack (ACT_... + arguments)
+  0x00 int act                    # ACT_...; 0x4a = resume command (bits 8-15 COM_..., var1 = goal, refcounted)
+  0x04 int var1                   # goal object for ACT_ATTACK/ACT_MOVE_TO/0x4a/ACT_LINK_ENGINE/CLASH/FORCELINK
+  0x08 int var2
+  0x0c int var3
+end
+
+struct CommandList 0x10           # command stack ("actionStack"); the last entry runs next
+  0x00 void* vtable               # 0x475a5c, generic list (slot 0 = List_Delete)
+  0x04 int count
+  0x08 int capacity
+  0x0c Command* items
+end
+
+struct ShortList 0x10             # list of shorts (Unit.items)
+  0x00 void* vtable               # 0x475ab4 (slot 0 = ShortList_Delete)
+  0x04 int count
+  0x08 int capacity
+  0x0c short* items
+end
+
+struct ObjectExtra 0x20           # optional per-object record, created when the VID has +0x414 set
+  0x00 float prevX                # position before the last move (saved once per real-time tick by Object_MoveTo)
+  0x04 float prevY
+  0x08 float prevZ
+  0x0c uint prevStamp             # g_realTime when prevX/Y/Z were saved
+  0x10 int lifeTime               # ms until the object dies (ACT_SET_DEATH_TIMER; 999999 = off); starts at weapon lifeTime
+  0x14 int childPeriod            # period (ms) for spawning children of animations whose child VID has flag 0x80 (guess)
+  0x18 int controlX               # player control input of the flagman, set by Object_SetControlInput (guess)
+  0x1c int controlY               # (guess)
+end
+
+struct GameObject 0x70            # "SPRITE" in the engine's log
+  0x00 Object_vtbl* vtable
+  0x04 int state                  # Unit: last result of Object_UpdateAttack (0 fired, 1/2 goal out of range, 3 aiming, 4 no goal, 5 busy, 6 no ammo, 7 no weapon); shown in the debug view
+  0x08 int firstFrame             # first frame of the current animation in the current direction
+  0x0c int frame                  # current frame
+  0x10 int lastFrame              # last frame of the current animation in the current direction
+  0x14 uint updateTime            # g_gameTime of the last Update (the constructor subtracts a random part of frameSpeed)
+  0x18 uint createTime            # g_gameTime of creation; Update does nothing in that tick
+  0x1c Vid* vid
+  0x20 float speed                # current speed, pixels per ms (ACT_SET_SPEED: var1/1000); negative = reverse
+  0x24 float zSpeed               # vertical speed (ACT_SET_ZSPEED: var1/1000)
+  0x28 uint flags                 # 0x1 just built by a depot (trains: until they leave its push line), 0x2 "attacked" script event sent (cleared every 16384 ms), bits 2-6 command (COM_..., ACT_GET_COMMAND), 0x80 moving, 0x100 removed (ACT_UNDO_REMOVE), 0x200 animation sound started, bits 10-11 army, 0x1000 second barrel (toggles per shot), 0x2000/0x4000 goal x/y reached, 0x8000 invisible
+  0x2c int refCount               # references from lists, goals, commands; deleted at 0 ("noRef at Release")
+  0x30 float x
+  0x34 float y
+  0x38 float z
+  0x3c GameObject* goal           # target of the current command (ACT_GET_GOAL), refcounted
+  0x40 GameObject* link           # linked (child) object, chain moved and deleted together (ACT_GET_LINK)
+  0x44 GameObject* uplink         # object this one is linked to (ACT_GET_UPLINK); 0 = moves by itself
+  0x48 int animation              # ANI_... (GetAnimation reads it)
+  0x4c int direction              # 0-255, 0x40 per quarter turn (GetDirection reads it)
+  0x50 int timer                  # ms counter, decremented in Update (ACT_GET_TIMER/ACT_SET_TIMER; COM_PAUSE; reload time)
+  0x54 int hp                     # ACT_GET_HP; max = Vid +0x388[army]
+  0x58 CommandList commands       # command stack (ACT_SAVE writes it)
+  0x68 ObjectExtra* extra         # optional record (lifetime, previous position)
+  0x6c GameObject* priorityTarget # refcounted; preferred by Object_FindTarget, only ever cleared in this exe (guess)
+end
+
+struct Terrain 0x78               # B_TERRAIN, B_OBJECT (vtable 0x475a74); base of Unit and Rail
+  0x00 GameObject base
+  0x70 int repairProgress         # -1 idle; grows until the destroyed linked part (VID link) is rebuilt (guess)
+  0x74 int godMode                # toggled by the debug key G; units keep full ammo
+end
+
+struct Unit 0xa0                  # B_UNIT and the classes derived from it (Terrain -> Unit)
+  0x00 GameObject base
+  0x70 int repairProgress         # Terrain field (guess)
+  0x74 int godMode                # Terrain field
+  0x80 int ammo                   # ammo * 64 (ACT_GET_AMMO returns ammo / 64); starts at weapon ammo
+  0x84 int slotNumber             # number on the unit bar (1-9, -1 none), drawn with VID 8 (font of unit numbers)
+  0x88 int avoidCounter           # steps left of obstacle avoidance; set to 10 when blocked (odd = turning)
+  0x8c uint behave                # BEH_... (ACT_GET_BEHAVE/ACT_SET_BEHAVE)
+  0x90 ShortList items            # nvids (ACT_ADD_ITEM...ACT_GET_ITEM; GetCommands/SetCommands for units, buildings, depots)
+end
+
+struct Avia 0xa0                  # B_AVIA
+  0x00 Unit base
+end
+
+struct Balloon 0xa8               # B_BALLOON
+  0x00 Avia base
+  0xa0 int balloonState           # (guess) set to 1 when released by its carrier
+  0xa4 byte balloonFlag           # (guess)
+end
+
+struct Building 0xac              # B_BUILDING
+  0x00 Unit base
+  0xa0 Vid* buildVid              # unit being built (ACT_BUILD_UNIT); created when the timer runs out
+  0xa4 int servicing              # repair workshop (VID 104): a car of its army needing service is near (Building_UpdateWorkshop)
+  0xa8 Engine* lastCar            # repair workshop: the car it saw within 20 px in the previous step
+end
+
+struct Creature 0xa8              # B_CREATURE
+  0x00 Unit base
+  0xa0 uint creatureFlags         # bit 0: look up the region again
+  0xa4 GameObject* region         # region (B_REGION) the creature lives in
+end
+
+struct CivRobot 0xb8              # B_CIV_ROBOT
+  0x00 Creature base
+  0xac GameObject* target         # refcounted ("PTR_SPRITE ... not clear" on destruction)
+end
+
+struct Depo 0x498                 # B_DEPO: builds train cars from a queue; the price of a car is its build time in seconds (Player.money)
+  0x00 Unit base
+  0xa0 int trainCounter           # number given to the cars it builds (Engine.trainNumber); +1 after the last car of a queue
+  0xa4 short[100] queue           # nvids to build (maxQueue are used)
+  0x16c int[100] timeLeft         # ms left per entry (build time in s * Options.depoBuildTimeUnit)
+  0x2fc int[100] paused           # per entry (Depo_TogglePause)
+  0x48c int building              # 1-based index of the entry being built, 0 = idle
+  0x490 int maxQueue              # 10
+  0x494 int queueCount
+end
+
+# ---- rail network (R_MAP / R_DOT in the engine's log): Rail objects put points (RailDot) at
+# both ends; points closer than 2 px share one RailDot. Trains move from point to point along
+# the links; DEVELOPERS.md "Trains and rails".
+
+struct RailLink 0x14              # one connection of a rail point to a neighbour
+  0x00 RailDot* dot               # the other end
+  0x04 int length                 # pixels: sqrt(dx^2 + (1.5 dy)^2) - y counts 1.5 times (isometric view)
+  0x08 int backLink               # index of the reverse link in dot->links
+  0x0c RailLink* crossing         # a link of another track crossing this one (RailMap_FindCrossings); a moving train on it blocks this link
+  0x10 byte direction             # 0-255 from this point to the other
+end
+
+struct RailDot 0xec               # a rail point ("R_DOT"), created by RailMap_AddDot
+  0x00 int refCount               # rails using the point; RailDot_Release deletes it at 0
+  0x04 int broken                 # 1 while a rail here is destroyed; trains slow down to Options.brokenRailSpeed and repair the rails around when they pass the point
+  0x0c int pushLink               # SetPushLine: the link trains must take from here (-1 none); entering a point against it is not allowed (RailDot_CanPass)
+  0x10 int pushFlag               # SetPushLine push_flag
+  0x14 int semaphore              # SetSemaphore value; 4+army on both ends closes the link for that army
+  0x18 int linkCount              # at most 6 ("Too many links")
+  0x1c RailLink[6] links
+  0x94 int[6] searchDepth         # route search per incoming link (0xfffffff = not reached); [0] is also the depth of RailDot_Flood
+  0xac int[6] searchCost
+  0xc4 int[6] searchDistance
+  0xdc Engine* occupant           # car standing on the point or on the link ahead (Engine_OccupyDots)
+  0xe0 int x
+  0xe4 int y
+  0xe8 int z
+end
+
+struct RailPos 0x10               # where a car end is on the rails
+  0x00 RailDot* dot               # point it left
+  0x04 int distance               # pixels travelled along the link from dot
+  0x08 int fraction               # 1/65536 pixel, carried into distance by Train_Update
+  0x0c int link                   # index into dot->links
+end
+
+struct RailMap 0x20               # all rail points of the level (g_railMap); "R_MAP"
+  0x00 int minX                   # bounds of the points (10000, 10000, 0, 0 when empty)
+  0x04 int minY
+  0x08 int maxX
+  0x0c int maxY
+  0x10 PtrArray dots              # RailDot*, vtable 0x475988
+end
+
+struct TrainStats 0x40            # summary of a train (TrainStats_Compute); TrainProperty reads it
+  0x00 uint flags                 # 0x1 has a car that is not an arsenal, 0x2 has an arsenal (VID 45)
+  0x04 float maxRange             # longest battleRange of the cars and their turrets (cars with ammo)
+  0x08 float minRange             # shortest non-zero battleRange, 0 = none
+  0x0c float power                # sum of Weapon.power
+  0x10 float mass                 # sum of Weapon.mass of the cars and their turrets
+  0x14 float locomotiveMass       # mass of the cars with power (and their turrets)
+  0x18 int maxSpeed               # PROP_SPEED: slowest locomotive (Vid.speed * 1000) reduced by the load; 0 below 5 or without locomotive
+  0x1c int carCount
+  0x20 int hp                     # cars and their turrets
+  0x24 int maxHp
+  0x28 int firepower              # PROP_WEAPON: damage of the armed cars (landing cars: their robots)
+  0x2c int buildTime              # PROP_BUILD_TIME, seconds
+  0x30 int ammoCars               # cars with limited ammo (not the repair car)
+  0x34 int ammo                   # PROP_AMMO_NO
+  0x38 int maxAmmo                # PROP_AMMO_MAX
+  0x3c int ammoPercent            # PROP_AMMO: average of the ammoCars, 100 without them; below 11 the script event TrainNotAmmo
+end
+
+struct Engine 0xad0               # B_ENGINE: a train car (locomotive, wagon, repair car, arsenal...); a train is the chain prevCar/nextCar
+  0x00 Unit base
+  0xa0 uint engineFlags           # bit 0: the car stands backwards in the train (Train_Reverse toggles it)
+  0xa4 Engine* prevCar            # car in front (Engine_GetFirst follows it)
+  0xa8 Engine* nextCar            # car behind (Engine_GetNext)
+  0xac Engine* attackCar          # refcounted; the train's commanded car for COM_ENGINE_ATTACK/ONEATTACK, set on the cars without power
+  0xb0 RailDot* goalDot           # point the train drives to (COM_ENGINE_MOVE/MINE/PATROL); 0 = to the goal object
+  0xb4 RailDot* patrolFrom        # COM_ENGINE_PATROL: the two ends, swapped at each arrival (Train_Stop)
+  0xb8 RailDot* patrolTo
+  0xbc int acceleration           # "Accel" in the debug view: speed change per ms in 1e-6 px/ms (negative = braking)
+  0xc0 float targetSpeed          # speed the train accelerates to (TrainStats.maxSpeed / 1000); the sign is the direction along the rails
+  0xc4 int pushed                 # the train is on a push line with push_flag (a depot exit): it rolls at 0.035 px/ms without own route and can couple to trains of its army
+  0xc8 RailPos front              # front end of the car
+  0xd8 RailPos rear               # rear end, Weapon.length behind (Engine_UpdateRear)
+  0xe8 int balloonAboard          # an airship cart (VID 35): a Balloon marks the cart it is flying to (Balloon_FindCart / Balloon_SetCommand), Balloon_UpdateAttached clears it again when the balloon leaves (+0xe8 = the "airborne" flag of the cart)
+  0xec int lastOfTrain            # the last car of a depot queue: script event TrainCreated when the train leaves the depot's push line
+  0xf0 float lastX                # position in the previous step; a jump of more than 30 px is logged ("схлапывание вагонов")
+  0xf4 float lastY
+  0xf8 float lastZ
+  0xfc int mineReady              # repair car (VID 85) of a train with COM_ENGINE_MINE that still has ammo
+  0x100 uint mineStartTime        # g_gameTime when the stopped repair car started laying the mine (Options.mineLayTime)
+  0x104 int trainNumber           # Depo.trainCounter of the depot that built the car (-1 otherwise); the cars of one queue share it
+  0x108 byte[0x9c4] path          # route: link index taken at each point (RailDot_Search), used for the markers and the reversing test
+  0xacc int pathLength
+end
+
+struct Options 0x68               # constants of objects.res (CNST, loaded by Options_LoadConstants 0x403ad0) - g_options
+  0x00 float scrollSpeedX         # CNST 0 / 1000
+  0x04 float scrollSpeedY         # CNST 1 / 1000
+  0x08 float cnst2                # CNST 2 / 1e6
+  0x0c float gravity              # CNST 3 / 1e6: vertical speed change per ms of shells
+  0x10 int repairAmount           # CNST 4: hp the repair car (VID 85) gives per second
+  0x14 int arsenalAmmo            # CNST 5: ammo the arsenal (VID 45) gives per second
+  0x18 float brokenRailSpeed      # CNST 6 / 1000: speed limit on a broken rail point (not for the repair car)
+  0x1c float cnst7                # CNST 7 / 1000
+  0x24 int depoBuildTimeUnit      # CNST 9 (guess: ms per unit of depot build queue)
+  0x28 int debugMode              # CNST 10 is skipped; .cfg DebugMode
+  0x34 uint mouseTipDelay         # CNST 13, ms
+  0x38 int depoRegeneration       # CNST 14: hp per second (Terrain_Regenerate)
+  0x3c int buildingRegeneration   # CNST 15
+  0x44 int mineLayTime            # CNST 17, ms
+  0x4c int balloonAmmo            # CNST 19: ammo given by Balloon_UpdateAttached
+  0x60 float crashSpeed           # CNST 24 / 1000: collisions and hard stops faster than this damage the cars
+  0x64 int messageTime            # CNST 25, ms: a queued state bar message waits this long before it is shown (MessageItem_Init)
+end
+
+struct Class7 0xc8                # spriteClass 7 (no VID in objects.res uses it); adds item 0x105
+  0x00 Unit base
+  0xa0 int[10] ammo              # ammo of every weapon slot (index = the weapon VID's nvid - 10), in the units Action 0x5c returns (i.e. /64); only the weapon in use lives in Unit.ammo (guards allow index 10 as well)
+end
+
+struct Rail 0x80                  # B_RAIL
+  0x00 GameObject base
+  0x70 int repairProgress         # Terrain field (guess)
+  0x74 int godMode                # Terrain field
+  0x78 RailDot* railNode0         # rail points at the two ends (ACT_CHANGE_DIRECTION puts them), released by the destructor
+  0x7c RailDot* railNode1
+end
+
+struct Cannon 0x74                # B_CANNON (shells, smoke, debris)
+  0x00 GameObject base
+  0x70 uint cannonFlags           # bit 0: ballistic phase (guess)
+end
+
+struct Linker 0x84                # B_LINKER: object attached to a parent at a fixed offset
+  0x00 GameObject base
+  0x70 float offsetX              # offset from the parent at creation
+  0x74 float offsetY
+  0x78 float offsetZ
+  0x7c int baseDirection          # direction at creation; the offset is rotated by direction - baseDirection
+  0x80 GameObject* parent
+end
+
+struct Text 0x80                  # B_TEXT (derives from Frame)
+  0x00 GameObject base
+  0x70 char* text                 # displayed text (String)
+  0x74 char* source               # text, strings.ini key, file or script variable name (ACT_SET_TEXT) (String)
+  0x78 int textLength
+  0x7c uint behave                # BEH_ text flags (alignment, BEH_LOAD_FROM)
+end
+
+struct Region 0xd0                # B_REGION
+  0x00 GameObject base
+  0x90 float width
+  0x94 float height
+end
+
+struct Cursor 0x108                # the mouse cursor sprite (g_cursor), vtable 0x475730
+  0x00 GameObject base            # animation = cursor type (CURSOR_...)
+  0x70 int systemCursors          # 1: Windows cursors from cursores\*.cur are used and the sprite is not drawn
+  0x74 void*[36] cursors          # HCURSOR per cursor type
+  0x104 int shown
+end
+
+vtable Object_vtbl 0x475a3c 8
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+end
+vtable Terrain_vtbl 0x475a74 8
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+end
+vtable Unit_vtbl 0x475a94 8
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+end
+vtable Avia_vtbl 0x475854 16
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+  0x20 NextCommand
+  0x24 AdjustAltitude
+  0x28 UpdateAttached
+  0x2c IsPathBlocked
+  0x30 TurnAside
+  0x34 TurnToGoal
+  0x38 AttackGoal
+  0x3c Wander
+end
+vtable Balloon_vtbl 0x475220 16
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+  0x20 NextCommand
+  0x24 AdjustAltitude
+  0x28 UpdateAttached
+  0x2c IsPathBlocked
+  0x30 TurnAside
+  0x34 TurnToGoal
+  0x38 AttackGoal
+  0x3c Wander
+end
+vtable Cannon_vtbl 0x4752bc 8
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+end
+vtable Primitive_vtbl 0x475558 8
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+end
+vtable Class7_vtbl 0x4754c0 8
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+end
+vtable Class8_vtbl 0x475538 8
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+end
+vtable ObjectList_vtbl 0x4753e0 1
+  0x00 Delete
+end
+vtable PtrArray_vtbl 0x4753e4 1
+  0x00 Delete
+end
+vtable ScriptValueList_vtbl 0x475520 1
+  0x00 Delete
+end
+vtable ScriptSymbolList_vtbl 0x4756ec 1
+  0x00 Delete
+end
+vtable ScriptDefineList_vtbl 0x4756f0 1
+  0x00 Delete
+end
+vtable Frame_vtbl 0x4753e8 8
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+end
+vtable Group_vtbl 0x4754b8 1
+  0x00 Delete
+end
+vtable Linker_vtbl 0x4755a0 8
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+end
+vtable Text_vtbl 0x475580 8
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+end
+vtable Region_vtbl 0x47598c 8
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+end
+vtable Building_vtbl 0x475274 8
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+end
+vtable CivRobot_vtbl 0x4759b0 8
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+end
+vtable Engine_vtbl 0x47536c 8
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+end
+vtable Rail_vtbl 0x475950 8
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+end
+vtable Depo_vtbl 0x47533c 8
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+end
+vtable Creature_vtbl 0x475318 8
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+end
+vtable Cursor_vtbl 0x475730 8
+  0x00 Delete
+  0x04 Action
+  0x08 Update
+  0x0c Move
+  0x10 OnObjectDeleted
+  0x14 Draw
+  0x18 DrawDebug
+  0x1c DrawDebugGoal
+end
+
+# --- GameObject: constructor, destructor, virtual methods
+func 0x4457e0 GameObject* __thiscall Object_Construct(GameObject* this, Vid* vid, float x, float y, float z, int direction, GameObject* parent)
+method 0x445cc0 GameObject
+func 0x445ca0 GameObject* __thiscall Object_Delete(GameObject* this, byte flags)
+func 0x446c20 int __thiscall Object_Action(GameObject* this, int act, int var1, int var2, int var3)
+func 0x446700 int __thiscall Object_Update(GameObject* this)
+func 0x445f80 void __thiscall Object_Move(GameObject* this)
+func 0x445ed0 void __thiscall Object_OnObjectDeleted(GameObject* this, GameObject* deleted)
+func 0x402fc0 void __thiscall Object_Draw(GameObject* this)
+func 0x4480d0 void __thiscall Object_DrawDebug(GameObject* this)
+func 0x4483a0 void __thiscall Object_DrawDebugGoal(GameObject* this)
+func 0x4233f0 GameObject* __thiscall Object_DeleteDerived(GameObject* this, byte flags)
+func 0x4457a0 ObjectExtra* __thiscall ObjectExtra_Construct(ObjectExtra* this, GameObject* object)
+# --- GameObject: other methods
+func 0x446640 void __thiscall Object_MoveTo(GameObject* this, float x, float y, float z)
+func 0x4462c0 void __thiscall Object_ComputeMove(GameObject* this, float* x, float* y, float* z)
+func 0x4461f0 int __thiscall Object_TurnAtMapEdge(GameObject* this, float x, float y)
+func 0x448480 void __thiscall Object_RemoveFromWorld(GameObject* this)
+func 0x4484a0 void __thiscall Object_AddToWorld(GameObject* this)
+func 0x4484c0 void __thiscall Object_WriteSpr(GameObject* this, ResFile* file)
+func 0x448550 void __thiscall Object_SetArmy(GameObject* this, int army)
+func 0x448660 void __thiscall Object_SetDirection(GameObject* this, int direction)
+func 0x4488c0 void __thiscall Object_SetAnimation(GameObject* this, int animation)
+func 0x448a20 void __thiscall Object_SetControlInput(GameObject* this, int* input)
+func 0x448a60 GameObject* __thiscall Object_FindObstacle(GameObject* this, float x, float y, float z)
+func 0x448e30 GameObject* __thiscall Object_FindObstacleOnMove(GameObject* this, float x, float y, float z)
+func 0x449210 GameObject* __thiscall Object_ResolveCollision(GameObject* this, float* x, float* y, float* z)
+func 0x449370 int __thiscall Object_AvoidObstacleDirection(GameObject* this, int direction)
+func 0x449800 int __thiscall Object_GetHp255(GameObject* this)
+func 0x449890 int __thiscall Object_StartMoving(GameObject* this)
+func 0x449a20 void __thiscall Object_StopMoving(GameObject* this)
+func 0x449a70 void __thiscall Object_TraceToPoint(GameObject* this, float* x, float* y, float* z)
+func 0x449aa0 void __thiscall Object_SetGoal(GameObject* this, GameObject* goal)
+func 0x449b10 int __thiscall Object_SetCommand(GameObject* this, int command, GameObject* goal)
+func 0x4197a0 void __thiscall Object_SetCommandToPoint(GameObject* this, int command, float x, float y, float z)
+func 0x449ba0 int __thiscall Object_SetOwnCommand(GameObject* this, int command, GameObject* goal)
+func 0x449c00 void __thiscall Object_MoveToGoal(GameObject* this, GameObject* goal)
+func 0x449c70 int __thiscall Object_RotateTowards(GameObject* this, int direction, int elapsed)
+func 0x449d90 int __thiscall Object_SetLink(GameObject* this, GameObject* child)
+func 0x449de0 int __thiscall Object_AppendLink(GameObject* this, GameObject* child)
+func 0x449e20 void __thiscall Object_Unlink(GameObject* this)
+func 0x449e50 int __thiscall Object_DeleteLinkedOfVid(GameObject* this, Vid* vid)
+func 0x449ea0 GameObject* __thiscall Object_FindTarget(GameObject* this)
+func 0x44a1a0 void __thiscall Object_SpawnChildren(GameObject* this)
+func 0x44a7e0 void __thiscall Object_PlaySfx(GameObject* this, int nsfx)
+func 0x44a840 void __thiscall Object_SetHp(GameObject* this, int hp)
+func 0x44a920 void __thiscall Object_DrawDebugBox(GameObject* this)
+func 0x44aaf0 void __thiscall Object_CreateLinked(GameObject* this)
+func 0x44abf0 void __thiscall Object_CopyCommandsTo(GameObject* this, GameObject* target)
+func 0x44ac70 char** __thiscall Object_GetCommandsString(GameObject* this, char** result)
+func 0x44ada0 void __thiscall Object_SetCommandsFromString(GameObject* this, char** text)
+func 0x44af50 void __thiscall AddCommand(GameObject* this, int act, int var1, int var2, int var3)
+func 0x44aff0 int __thiscall Object_HasCommand(GameObject* this, int act)
+func 0x44b020 void __thiscall Object_ClearCommands(GameObject* this)
+func 0x44b0b0 int __thiscall Object_IsBetterTarget(GameObject* this, float distance, float bestDistance, GameObject* candidate, GameObject* best)
+func 0x44b360 int __thiscall Object_CanAttack(GameObject* this, GameObject* target)
+func 0x44b3e0 int __thiscall Object_Attack(GameObject* this, GameObject* target)
+func 0x44b4b0 void __thiscall Object_AdvanceFrame(GameObject* this)
+func 0x44b4f0 int __thiscall Object_UpdateAttack(GameObject* this, int elapsed)
+func 0x44b940 void __thiscall Object_ShowChain(GameObject* this)
+func 0x432530 void __thiscall Object_HideChain(GameObject* this)
+func 0x42d930 void __thiscall Object_MoveToPoint(GameObject* this, float x, float y, float z)
+func 0x401b20 void __thiscall Object_AttackPoint(GameObject* this, float x, float y, float z)
+func 0x44bd00 GameObject* __thiscall Object_ProbeObstacle(GameObject* this, float x, float y)
+# --- lists
+func 0x4022b0 void __thiscall CommandList_Push(CommandList* this, int act, int var1, int var2, int var3)
+func 0x402300 void __thiscall CommandList_Reserve(CommandList* this, int capacity)
+func 0x438790 void __thiscall CommandList_PushBottom(CommandList* this, int act, int var1, int var2, int var3)
+func 0x44b800 int __fastcall ObjectList_TotalDamage(void* list)
+func 0x44b870 void __thiscall CommandList_Insert(CommandList* this, int index, int act, int var1, int var2, int var3)
+func 0x44bab0 int __thiscall ObjectList_RemoveAt(ObjectList* this, int index)
+func 0x44bc00 void __thiscall ObjectList_Clear(ObjectList* this)
+func 0x405c70 GameObject* __thiscall ObjectList_Last(ObjectList* this, int* index)
+func 0x405c90 GameObject* __thiscall ObjectList_Prev(ObjectList* this, int* index)
+func 0x44d8b0 int __thiscall ShortList_RemoveAt(ShortList* this, int index)
+func 0x419600 int __thiscall ShortList_Find(ShortList* this, short* value)
+func 0x419630 void __thiscall ShortList_Grow(ShortList* this)
+func 0x4196b0 void __thiscall ShortList_Reserve(ShortList* this, int capacity)
+# --- world layers, hash, level records
+# --- Terrain
+func 0x44bc80 Terrain* __thiscall Terrain_Construct(Terrain* this, Vid* vid, float x, float y, float z, int direction, GameObject* parent)
+func 0x44bdf0 int __thiscall Terrain_Action(Terrain* this, int act, int var1, int var2, int var3)
+func 0x44bcd0 void __thiscall Terrain_SetGodMode(Terrain* this, int on)
+func 0x44bcf0 int __thiscall Terrain_GetGodMode(Terrain* this)
+func 0x44bda0 void __thiscall Terrain_Regenerate(Terrain* this, int hp)
+func 0x44bf70 int __thiscall Terrain_Repair(Terrain* this, int rebuildLinked)
+# --- Unit
+func 0x44c0a0 Unit* __thiscall Unit_Construct(Unit* this, Vid* vid, float x, float y, float z, int direction, GameObject* parent)
+method 0x44c1b0 Unit
+func 0x44c190 Unit* __thiscall Unit_Delete(Unit* this, byte flags)
+func 0x42d3c0 Unit* __thiscall Unit_DeleteDerived(Unit* this, byte flags)
+func 0x44cbf0 int __thiscall Unit_Action(Unit* this, int act, int var1, int var2, int var3)
+func 0x44c640 void __thiscall Unit_Move(Unit* this)
+func 0x44c240 void __thiscall Unit_Draw(Unit* this)
+func 0x44d750 void __thiscall Unit_DrawDebug(Unit* this)
+func 0x44c840 char** __thiscall Unit_GetItemsString(Unit* this, char** result)
+func 0x44c980 void __thiscall Unit_SetItemsFromString(Unit* this, char** text)
+method 0x44cb60 Unit
+method 0x44cba0 Unit
+func 0x44d760 int __thiscall Unit_AddAmmo(Unit* this, int divisor)
+func 0x44d7e0 int __thiscall Unit_GetAmmo255(Unit* this)
+# --- Avia, Balloon
+func 0x42d340 Avia* __thiscall Avia_Construct(Avia* this, Vid* vid, float x, float y, float z, int direction, GameObject* parent)
+func 0x42d3e0 int __thiscall Avia_Action(Avia* this, int act, int var1, int var2, int var3)
+method 0x42d8d0 Avia
+method 0x42d760 Avia
+method 0x42d660 Avia
+method 0x42d7f0 Avia
+method 0x42d840 Avia
+method 0x42d6e0 Avia
+method 0x42d670 Avia
+method 0x42d5a0 Avia
+func 0x401000 Balloon* __thiscall Balloon_Construct(Balloon* this, Vid* vid, float x, float y, float z, int direction, GameObject* parent)
+method 0x401920 Balloon
+method 0x401250 Balloon
+method 0x401480 Balloon
+method 0x4017c0 Balloon
+method 0x401060 Balloon
+method 0x401180 Balloon
+method 0x401430 Balloon
+func 0x4018b0 void __thiscall Balloon_SetCommand(Balloon* this, int command, GameObject* target)
+# --- Building, Cannon, Creature, CivRobot, Depo, Engine, Class7
+func 0x401ba0 Building* __thiscall Building_Construct(Building* this, Vid* vid, float x, float y, float z, int direction, GameObject* parent)
+func 0x401c10 int __thiscall Building_Action(Building* this, int act, int var1, int var2, int var3)
+method 0x401bf0 Building
+func 0x4023b0 Cannon* __thiscall Cannon_Construct(Cannon* this, Vid* vid, float x, float y, float z, int direction, GameObject* parent)
+func 0x402ba0 int __thiscall Cannon_Action(Cannon* this, int act, int var1, int var2, int var3)
+method 0x4024d0 Cannon
+func 0x402f10 void __thiscall Cannon_OnObjectDeleted(Cannon* this, GameObject* deleted)
+func 0x403ca0 Creature* __thiscall Creature_Construct(Creature* this, Vid* vid, float x, float y, float z, int direction, GameObject* parent)
+func 0x404130 int __thiscall Creature_Action(Creature* this, int act, int var1, int var2, int var3)
+method 0x403d80 Creature
+func 0x403d50 void __thiscall Creature_OnObjectDeleted(Creature* this, GameObject* deleted)
+func 0x437180 CivRobot* __thiscall CivRobot_Construct(CivRobot* this, Vid* vid, float x, float y, float z, int direction, GameObject* parent)
+method 0x437270 CivRobot
+func 0x437250 CivRobot* __thiscall CivRobot_Delete(CivRobot* this, byte flags)
+func 0x437860 int __thiscall CivRobot_Action(CivRobot* this, int act, int var1, int var2, int var3)
+func 0x4372f0 int __thiscall GameObject_IsSpecialVid(GameObject* this)
+func 0x437320 GameObject* __thiscall CivRobot_FindNearestObject(CivRobot* this)
+func 0x4377d0 void __thiscall CivRobot_SetLinkedAnimation(CivRobot* this, int param_2)
+func 0x437810 void __thiscall CivRobot_RotateLinked(CivRobot* this, int param_2)
+method 0x437410 CivRobot
+func 0x437750 void __thiscall CivRobot_OnObjectDeleted(CivRobot* this, GameObject* deleted)
+func 0x404640 Depo* __thiscall Depo_Construct(Depo* this, Vid* vid, float x, float y, float z, int direction, GameObject* parent)
+method 0x4046e0 Depo
+func 0x4046c0 Depo* __thiscall Depo_Delete(Depo* this, byte flags)
+func 0x404720 int __thiscall Depo_Action(Depo* this, int act, int var1, int var2, int var3)
+method 0x4046f0 Depo
+func 0x404c00 int __thiscall Depo_GetProgress255(Depo* this, int index)
+method 0x404cb0 Depo
+func 0x404ce0 void __thiscall Depo_RemoveFromQueue(Depo* this, int index)
+func 0x404dd0 void __thiscall Depo_AddToQueue(Depo* this, int nvid)
+method 0x404ef0 Depo
+func 0x404fd0 void __thiscall Depo_ReplaceInQueue(Depo* this, int index, int nvid)
+func 0x4050e0 int __thiscall Depo_TogglePause(Depo* this, int index)
+func 0x405170 int __thiscall Depo_IsPaused(Depo* this, int index)
+func 0x4051a0 void __thiscall Depo_SwapQueue(Depo* this, int a, int b)
+func 0x405250 void __thiscall Depo_MoveDown(Depo* this, int index)
+func 0x405270 void __thiscall Depo_MoveUp(Depo* this, int index)
+method 0x405290 Depo
+method 0x401f50 Building
+func 0x405500 Minimap* __thiscall Minimap_PlaceOver(Minimap* this, GameObject* frame)
+func 0x4055a0 void __thiscall Minimap_PutPoint(Minimap* this, float x, float y, uint color)
+func 0x405630 void __thiscall Minimap_PutDot(Minimap* this, float x, float y, uint color)
+func 0x4056c0 void __thiscall Minimap_PutBigDot(Minimap* this, float x, float y, uint color)
+func 0x4057c0 void __thiscall Minimap_Click(Minimap* this, Mouse* mouse)
+method 0x405800 Minimap
+func 0x405cc0 void** __thiscall PtrArray_At(PtrArray* this, int index)
+func 0x422ca0 void __thiscall PtrArray_Construct(PtrArray* this)
+func 0x4061d0 Engine* __thiscall Engine_Construct(Engine* this, Vid* vid, float x, float y, float z, int direction, GameObject* parent)
+method 0x406320 Engine
+func 0x406300 Engine* __thiscall Engine_Delete(Engine* this, byte flags)
+func 0x406cb0 int __thiscall Engine_Action(Engine* this, int act, int var1, int var2, int var3)
+method 0x406570 Engine
+func 0x406660 void __thiscall Engine_OnObjectDeleted(Engine* this, GameObject* deleted)
+method 0x4066e0 Engine
+method 0x406a80 Engine
+# --- Engine: trains (one car is `this`; Train_ functions act on the whole chain)
+func 0x4078f0 void __thiscall Engine_SetTrainCommand(Engine* this, int command, GameObject* goal, RailDot* goalDot, RailDot* patrolFrom)
+method 0x407d10 Engine
+method 0x407d70 Engine
+method 0x407e00 Engine
+func 0x407e90 int __thiscall Engine_RepairCar(Engine* this, Engine* car)
+method 0x407f30 Engine
+func 0x407fa0 Engine* __thiscall Engine_FindLocomotive(Engine* this)
+func 0x407fe0 int __thiscall Train_HasArmy(Engine* this, uint army)
+method 0x408040 Engine
+func 0x408300 int __thiscall Engine_NeedsService(Engine* this)
+func 0x408410 int __thiscall Engine_GetDamagePercent(Engine* this)
+func 0x408510 int __thiscall Engine_GetMissingAmmoPercent(Engine* this)
+method 0x4085a0 Engine
+func 0x4086e0 int __thiscall Train_GetAttackRange(Engine* this)
+method 0x408880 Engine
+method 0x4088e0 Engine
+func 0x408970 int __thiscall Train_IsUnpowered(Engine* this)
+func 0x4089b0 void __thiscall Engine_MoveToPoint(Engine* this, float x, float y, float z, int unused, int screen)
+method 0x408a40 Engine
+method 0x408c00 Engine
+func 0x408fa0 void __thiscall BreakTrain(Engine* this, float x, float y)
+func 0x409120 void __thiscall Train_Detach(Engine* this, Engine* car)
+func 0x409270 int __thiscall Engine_AttachToTrain(Engine* this, Engine* other)
+func 0x409510 Engine* __thiscall Train_GetCar(Engine* this, int n)
+func 0x409540 Engine* __thiscall Train_FindRepairCar(Engine* this)
+func 0x409570 Engine* __thiscall Engine_GetFirst(Engine* this)
+func 0x409590 Engine* __thiscall Engine_GetLast(Engine* this)
+method 0x4095b0 Engine
+func 0x4098e0 int __thiscall Engine_IsInTrain(Engine* this, Engine* other)
+method 0x409930 Engine
+func 0x409a60 Engine* __thiscall Engine_FindAdjacentCar(Engine* this)
+func 0x409bc0 Engine* __thiscall Engine_FindCrossingCar(Engine* this)
+func 0x409d00 Engine* __thiscall Engine_FindTouchingCar(Engine* this, int* side)
+func 0x409dd0 int __thiscall Engine_Touches(Engine* this, Engine* other, int strict)
+method 0x40a1e0 Engine
+method 0x40a2d0 Engine
+func 0x40a310 void __thiscall Engine_UpdateRear(Engine* this, RailPos* previous)
+func 0x40a740 float __thiscall Train_Collide(Engine* this, Engine* other, int side)
+func 0x40a9d0 int __thiscall Train_GetLength(Engine* this)
+func 0x40aa10 void __thiscall Engine_Accelerate(Engine* this, float* speed)
+func 0x40ab30 int __thiscall Engine_CanCoupleWith(Engine* this, Engine* other)
+func 0x40abb0 int __thiscall Train_HandleContact(Engine* this, RailPos* previous, float* speed)
+func 0x40adf0 void __thiscall Train_MoveCars(Engine* this, RailPos* front, float speed, int direction)
+func 0x40b050 void __thiscall Object_CancelAttacksOn(GameObject* this)
+func 0x40b110 void __thiscall Train_ShowRoute(Engine* this, RailDot* start)
+func 0x40b190 void __thiscall Train_CreateRouteMarkers(Engine* this, RailDot* start, ObjectList* list, int nvid)
+func 0x40b250 int __thiscall Train_RouteReachesRear(Engine* this, RailDot* start)
+func 0x40b2c0 int __thiscall Train_GetGoalRangeState(Engine* this)
+method 0x40b4d0 Engine
+func 0x40bee0 TrainStats* __thiscall TrainStats_Compute(TrainStats* this, Engine* engine)
+func 0x40bfd0 void __thiscall TrainStats_AddCar(TrainStats* this, Engine* car)
+method 0x40c2d0 Engine
+func 0x40c400 float __thiscall RailDot_ScreenX(RailDot* this)
+func 0x40c410 float __thiscall RailDot_ScreenY(RailDot* this)
+func 0x40c490 float __thiscall Object_ScreenX(GameObject* this)
+func 0x40c4a0 float __thiscall Object_ScreenY(GameObject* this)
+func 0x40c4b0 GameObject* __thiscall Object_GetLink(GameObject* this)
+func 0x40c4c0 GameObject* __thiscall Object_GetGoal(GameObject* this)
+func 0x401b00 int __thiscall Object_HasOwnLink(GameObject* this)
+func 0x403ad0 Options* __thiscall Options_LoadConstants(Options* this, ResFile* file)
+func 0x4263d0 int __cdecl Math_ISqrt(int value)
+func 0x442e10 Engine* __thiscall Engine_GetNext(Engine* this)
+func 0x442e20 void __thiscall Engine_CommandToPoint(Engine* this, int command, int x, int y)
+func 0x418880 Class7* __thiscall Class7_Construct(Class7* this, Vid* vid, float x, float y, float z, int direction, GameObject* parent)
+method 0x4189f0 Class7
+func 0x4189d0 Class7* __thiscall Class7_Delete(Class7* this, byte flags)
+func 0x418b90 int __thiscall Class7_Action(Class7* this, int act, int var1, int var2, int var3)
+func 0x419510 int __thiscall Class7_SelectWeapon(Class7* this, int slot)
+method 0x418a00 Class7
+# --- Frame, Text, Linker, Primitive, Decal, Rail, Region, Cursor
+func 0x40c4d0 GameObject* __thiscall Frame_Construct(GameObject* this, Vid* vid, float x, float y, float z, int direction, GameObject* parent)
+method 0x40c580 GameObject
+func 0x40c560 GameObject* __thiscall Frame_Delete(GameObject* this, byte flags)
+func 0x40c5f0 int __thiscall Frame_Action(GameObject* this, int act, int var1, int var2, int var3)
+method 0x423320 Text
+func 0x423300 Text* __thiscall Text_Delete(Text* this, byte flags)
+func 0x40ca70 int __thiscall Text_Action(Text* this, int act, int var1, int var2, int var3)
+method 0x40c660 Text
+method 0x40d080 World
+method 0x4232b0 Linker
+func 0x423290 Linker* __thiscall Linker_Delete(Linker* this, byte flags)
+method 0x423280 GameObject
+method 0x423390 GameObject
+func 0x4325d0 Rail* __thiscall Rail_Construct(Rail* this, Vid* vid, float x, float y, float z, int direction, GameObject* parent)
+method 0x432680 Rail
+func 0x432650 Rail* __thiscall Rail_Delete(Rail* this, byte flags)
+func 0x432740 int __thiscall Rail_Action(Rail* this, int act, int var1, int var2, int var3)
+func 0x4326f0 void __thiscall Rail_RepairAt(Rail* this, RailDot* dot)
+# --- rail network
+method 0x432ad0 RailDot
+method 0x432b00 RailDot
+func 0x432ba0 void __thiscall RailSearch_Found(RailDot* this, uint depth, int cost, int range, int* result)
+func 0x432c00 int __thiscall RailDot_Search(RailDot* this, int fromLink, int direction)
+func 0x4333e0 int __thiscall RailDot_HasRoomToReverse(RailDot* this, int depth, RailDot* exclude1, RailDot* exclude2, Engine* engine, int direction)
+func 0x4334f0 int __thiscall RailPos_FindRoute(RailPos* this, RailDot* goalDot, GameObject* goal, Engine* engine)
+func 0x433780 int __thiscall RailDot_CanPass(RailDot* this, int link, Engine* engine)
+func 0x433880 void __thiscall RailDot_RemoveLink(RailDot* this, RailDot* other)
+func 0x4338f0 void __thiscall RailDot_Connect(RailDot* this, RailDot* other)
+func 0x433a50 void __thiscall RailDot_FindNearestPos(RailDot* this, int x, int y, int z, RailPos* result)
+func 0x433b40 int __thiscall RailDot_DistanceToLink(RailDot* this, int x, int y, int z, int link)
+func 0x433ce0 int __thiscall RailDot_Flood(RailDot* this)
+func 0x433f20 int __thiscall RailDot_FindLink(RailDot* this, RailDot* other)
+func 0x433f50 int __thiscall RailDot_LinkTowards(RailDot* this, int direction)
+func 0x433fe0 int __thiscall RailDot_ProjectOnLink(RailDot* this, int x, int y, int z, int link)
+func 0x434040 void __stdcall RailGrid_Add(int cellX, int cellY, int width, int height, int dot)
+method 0x4340d0 RailMap
+func 0x434390 void __stdcall RailMap_MarkCrossing(RailDot* a, RailDot* b, RailDot* c, RailDot* d)
+method 0x434680 RailMap
+func 0x4346b0 void __thiscall SetPushLine(RailMap* this, int begin_x, int begin_y, int end_x, int end_y, int push_flag)
+func 0x434840 void __stdcall SetSemaphore(int x, int y, int newsemaphore, int army)
+func 0x434940 double __cdecl Math_Square(double value)
+method 0x434950 RailMap
+method 0x434980 RailMap
+func 0x434e50 RailDot* __thiscall RailMap_AddDot(RailMap* this, float x, float y, float z)
+func 0x434fd0 RailDot* __thiscall RailMap_FindDot(RailMap* this, int x, int y, int z)
+func 0x435050 RailDot* __thiscall RailMap_FindNearestDot(RailMap* this, int x, int y)
+func 0x4350e0 RailDot* __thiscall RailMap_FindNearestDot3D(RailMap* this, int x, int y, int z)
+func 0x435180 void __thiscall RailMap_BeginSearch(RailMap* this, RailDot* goalDot, GameObject* goal, int command, Engine* engine)
+func 0x4352e0 int __thiscall RailPos_GetRouteLength(RailPos* this, RailDot* goalDot, GameObject* goal, int command, Engine* engine)
+func 0x435400 void __thiscall RailPos_Save(RailPos* this, ResFile* file)
+func 0x4354d0 void __thiscall RailPos_Load(RailPos* this, ResFile* file)
+func 0x4355f0 Region* __thiscall Region_Construct(Region* this, Vid* vid, float x, float y, float z, int direction, GameObject* parent)
+method 0x4356a0 Region
+func 0x435680 Region* __thiscall Region_Delete(Region* this, byte flags)
+func 0x435d70 int __thiscall Region_Action(Region* this, int act, int var1, int var2, int var3)
+func 0x435b30 Vid* __cdecl Vid_GetTerrainVariant(Vid* vid, float x, float y, float z)
+func 0x435c50 void __thiscall Region_InitFog(Region* this, int var1, int var2, int var3)
+func 0x436080 float __fastcall Graphics_GetViewRight(Graphics* this)
+func 0x436090 float __fastcall Graphics_GetViewTop(Graphics* this)
+func 0x4360a0 float __fastcall Graphics_GetViewBottom(Graphics* this)
+func 0x4360b0 float __fastcall Region_GetLeft(Region* this)
+func 0x4360d0 float __fastcall Region_GetTop(Region* this)
+func 0x4360f0 float __fastcall Region_GetRight(Region* this)
+func 0x436110 float __fastcall Region_GetBottom(Region* this)
+method 0x435770 Region
+method 0x435710 Region
+func 0x4253b0 Cursor* __thiscall Cursor_Construct(Cursor* this, Vid* vid, float x, float y, float z, int direction, GameObject* parent)
+method 0x425480 Mouse
+func 0x425460 Cursor* __thiscall Cursor_Delete(Cursor* this, byte flags)
+func 0x425710 int __thiscall Cursor_Action(Cursor* this, int act, int var1, int var2, int var3)
+method 0x4254e0 Mouse
+method 0x425660 Mouse
+func 0x4256b0 void __thiscall Cursor_SetCursor(Cursor* this, int type)
+func 0x443e40 uint* __thiscall Sound_Construct(uint* this, uint hwnd, undefined4* config, int flag)
+func 0x443f40 void __fastcall Sound_Destruct(int this)
+
+# ==== globals ===========================================================================
+global 0x47b470 char*[26] g_scriptEventNames
+global 0x47f810 int g_drawClipRight
+global 0x47f814 int g_drawClipBottom
+global 0x489918 Options* g_options
+global 0x489920 ObjectList g_routeMarkers
+global 0x4a9c28 int[64] g_scriptEvents
+global 0x4a9d38 World* g_world
+global 0x4a9d44 Cursor* g_cursor
+global 0x4a9d60 uint g_prevGameTime
+global 0x4a9d64 uint g_gameTime
+global 0x4a9d68 uint g_realTime
+global 0x5ced30 RailMap g_railMap
+global 0x5ced54 byte[0x9c4] g_searchPath
+global 0x5d1470 int[95] g_reverseRoomLinks
+global 0x5d3a60 Vid* g_emptyVid
+global 0x5d3a64 int g_drawClipLeft
+global 0x5d3a68 int g_drawClipTop
+global 0x5d3a6c int g_vidImageBytes
+
+# ==== local variables =====================================================================
+local 0x41cff0 -0x4c ResFile file

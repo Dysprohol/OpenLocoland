@@ -1,0 +1,14 @@
+# VID 938, the side tiles of the state bar, VID 939, the editor's icons, VIDs 940-941, the scroll
+# arrows of the custom maps page (one frame per direction), and VIDs 942-943, the editor's Help and
+# Menu buttons: two frames, dark (STAND) and lit (GO), as their models 498 and 499; VID 944, the
+# editor's palette icons: one frame, the others drawn by number
+nvid	anim	frames	sfx	childForward	childSide	childZ	childNvid	childCount
+938	STAND	1	0	0	0	0	0	1
+939	STAND	1	0	0	0	0	0	1
+940	STAND	1	0	0	0	0	0	1
+941	STAND	1	0	0	0	0	0	1
+942	STAND	1	0	0	0	0	0	1
+942	GO	1	0	0	0	0	0	1
+943	STAND	1	0	0	0	0	0	1
+943	GO	1	0	0	0	0	0	1
+944	STAND	1	0	0	0	0	0	1

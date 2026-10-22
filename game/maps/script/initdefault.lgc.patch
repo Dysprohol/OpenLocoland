@@ -1,0 +1,10 @@
+--- maps/script/initdefault.lgc
++++ maps/script/initdefault.lgc
+@@ -60,3 +60,7 @@
+ #endif
++#ifdef CUSTOM_MAP
++  SetReg("SOFTWARE\\Gromada\\steam\\Players","return","2");
++#else
+   SetReg("SOFTWARE\\Gromada\\steam\\Players","return","1");
++#endif
+   SetArmyGamma();

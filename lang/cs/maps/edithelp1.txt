@@ -1,0 +1,14 @@
+MYS
+
+VYBRAT OBJEKT           LTM NA NEJ
+PRESUNOUT HO            TAHNOUT LTM
+OTOCIT HO               KOLECKO
+UMISTIT Z LISTY         LTM NA MAPU
+ZPET K VYBERU           PTM NEBO ESC
+PANEL OBJEKTU           PTM NA NEJ
+POSUN POHLEDU           PROSTREDNI TLACITKO
+                        NEBO OKRAJ OBRAZOVKY
+SMAZAT CELY USEK        SHIFT+LTM
+TRATI                   (NASTROJ SMAZAT)
+
+LTM / PTM = LEVE / PRAVE TLACITKO MYSI

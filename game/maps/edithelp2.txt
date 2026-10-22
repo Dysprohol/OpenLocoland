@@ -1,0 +1,14 @@
+KEYS
+
+TOOLS OF THE BAR        1-9, 0
+TURN RIGHT / LEFT       R / E
+NEXT ARMY               A
+SEMAPHORE RED/GREEN     T
+PUSH LINE AT SEMAPHORE  L / SHIFT+L
+DELETE THE SELECTION    DEL
+UNDO / REDO             CTRL+Z / CTRL+Y
+DECAL / ITS SPACING     [ ] / < >
+GROUND BRUSH / RADIUS   M / + -
+GRAVEL BED OF TRACK     B
+RUN / HOLD THE LEVEL    CTRL+R
+HELP                    F1

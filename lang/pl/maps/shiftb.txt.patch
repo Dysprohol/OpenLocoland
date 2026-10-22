@@ -1,0 +1,63 @@
+--- maps/shiftb.txt
++++ maps/shiftb.txt
+@@ -1,31 +1,31 @@
+ ВГГГГГГГГГГГГГГГГГГГГГГГГГД
+-А—ќ«ƒј“№ ёЌ»“, ¬џ’ќƒ ESC: Б
++АNOWA JEDNOSTKA, ESC-WYJDZБ
+ А                         Б
+-А° РРХ ѕаровоз            Б
+-АҐ РСР ѕаровоз ƒвутрубный Б
+-А£ РТР ѕушка              Б
+-А§ РТХ ћортира            Б
+-А• РУР «енитное орудие    Б
+-А¶ РУХ ƒирижбан тележка   Б
+-АІ РФХ јрсенал            Б
+-А® РХР ¬агон пассажирский Б
+-А© РХХ ÷истерна           Б
+-А™ РЦР ѕлатформа          Б
+-АЂ РЦТ –акета Ѕольша€     Б
+-Ађ РЦХ ƒирижабль Ѕольшой  Б
+-А≠ РЧР –обот-—олдат       Б
+-АЃ РЧТ –обот-Ўахтер       Б
+-Аѓ РЧХ ћортира €дрена€    Б
+-А∞ РЧЧ –обот-ћеханик      Б
+-А± РШР –акетница          Б
+-А≤ РШТ ƒесантный вагон    Б
+-А≥ РШХ –емонтник          Б
+-Аі РШЦ ћина               Б
+-А† РШЦ ћина противника    Б
+-Аµ РЩР ќгнемет            Б
+-Аґ РЩХ “оварный вагон     Б
+-АЈ РЩЧ Ѕрандер            Б
+-АЄ УХС  амень             Б
+-Ає РФР ƒирижбан           Б
+-АЇ ХФХ “ыква              Б
++А° РРХ Lokomotywa         Б
++АҐ РСР Mocna lokomotywa   Б
++А£ РТР Dzialo             Б
++А§ РТХ Mozdzierz          Б
++А• РУР Dzialo p-lot       Б
++А¶ РУХ Woz Zeppelin       Б
++АІ РФХ Woz z amunicja     Б
++А® РХР Pojazd osobowy     Б
++А© РХХ Cysterna           Б
++А™ РЦР Beczulka           Б
++АЂ РЦТ Rakieta nuklearna  Б
++Ађ РЦХ Zeppelin osobowy   Б
++А≠ РЧР Robot piechociarz  Б
++АЃ РЧТ Robot gornik       Б
++Аѓ РЧХ Mozdzierz atomowy  Б
++А∞ РЧЧ Robot inzynier     Б
++А± РШР Wyrzutnia rakiet   Б
++А≤ РШТ Woz piechurow      Б
++А≥ РШХ Pojazd naprawczy   Б
++Аі РШЦ Mina               Б
++А† РШЦ Mina wroga         Б
++Аµ РЩР Miotacz ognia      Б
++Аґ РЩХ Woz zaopatrzenia   Б
++АЈ РЩЧ Kamikaze           Б
++АЄ УХС Wielki kamien      Б
++Ає РФР Zeppelin           Б
++АЇ ХФХ Dynia              Б
+ ЕЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЗ
+\ No newline at end of file

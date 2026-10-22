@@ -1,0 +1,14 @@
+KLAVESY
+
+NASTROJE LISTY          1-9, 0
+OTOCIT DOPRAVA / DOLEVA R / E
+DALSI ARMADA            A
+BARVA NAVESTIDLA        T
+JEDNOSMERNY USEK U NAVESTIDLA L / SHIFT+L
+SMAZAT VYBER            DEL
+ZPET / ZNOVU            CTRL+Z / CTRL+Y
+DEKORACE / ROZESTUP     [ ] / < >
+STETEC TERENU / POLOMER M / + -
+STRKOVE LOZE TRATI      B
+SPUSTIT / ZASTAVIT      CTRL+R
+NAPOVEDA                F1
