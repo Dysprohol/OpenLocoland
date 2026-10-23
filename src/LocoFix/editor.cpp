@@ -4,7 +4,8 @@
 // The mode is World.flags bit 0x1, which World_Construct copies from bit 0 of g_settings+0x220
 // (0x47b410) - 0 in the exe, and nothing sets it. Set before WinMain, it gives:
 //  - the window menu "AppMenu" (World_Construct registers the window class with it): File with
-//    Load, Save, About and Exit, and an Options item with no popup (id 0xFFFF),
+//    Load, Save, About and Exit, and an Options item with no popup (id 0xFFFF) - LocoFix leaves
+//    it out of the class (RegisterClassA_editor below); the Menu panel of the bar has its commands,
 //  - decals (spriteClass 8) loaded as ordinary sprites (Vid_Read), so they stay objects that
 //    can be saved and moved instead of being baked into the ground and removed,
 //  - objects with VID flag 8 (buildings) keep the authored ground height (Object_Construct
@@ -224,7 +225,6 @@ void set_running(HWND window, bool running) {
     uint8_t* w = world();
     if (w && running && g_held) hold_level(w, false);
     else if (w && !running && !g_held && current_format(level_file())) hold_level(w, true);
-    CheckMenuItem(GetMenu(window), ID_RUN, MF_BYCOMMAND | (running ? MF_CHECKED : MF_UNCHECKED));
     patch::log("editor: the level %s", running ? "runs" : "is held");
 }
 
@@ -632,43 +632,6 @@ void handle_command(HWND window, int id) {
     }
 }
 
-void label_menu(HMENU menu) {
-    if (!menu) return;
-    // the File menu of the exe's own menu resource (AppMenu), first on the bar
-    if (HMENU file = GetSubMenu(menu, 0))
-        ui_modify_menu(menu, 0, MF_BYPOSITION | MF_POPUP | MF_STRING, reinterpret_cast<UINT_PTR>(file),
-                    ui_text("MenuFile", "&File"));
-    ui_modify_menu(menu, ID_LOAD, MF_BYCOMMAND | MF_STRING, ID_LOAD, ui_text("MenuLoad", "&Load...\tAlt+F3"));
-    ui_insert_menu(menu, ID_LOAD, MF_BYCOMMAND | MF_STRING, ID_NEW, ui_text("MenuNew", "&New..."));
-    ui_modify_menu(menu, ID_SAVE, MF_BYCOMMAND | MF_STRING, ID_SAVE, ui_text("MenuSave", "&Save...\tAlt+F2"));
-    ui_modify_menu(menu, ID_ABOUT, MF_BYCOMMAND | MF_STRING, ID_ABOUT, ui_text("MenuAbout", "&About\tAlt+F10"));
-    ui_modify_menu(menu, ID_EXIT, MF_BYCOMMAND | MF_STRING, ID_EXIT, ui_text("MenuExit", "E&xit\tAlt+F4"));
-    ui_insert_menu(menu, ID_EXIT, MF_BYCOMMAND | MF_STRING, ID_MISSION, ui_text("MenuMission", "&Mission settings..."));
-    ui_insert_menu(menu, ID_EXIT, MF_BYCOMMAND | MF_STRING, ID_RESIZE, ui_text("MenuResize", "Map si&ze..."));
-    ui_insert_menu(menu, ID_EXIT, MF_BYCOMMAND | MF_SEPARATOR, 0, nullptr);
-    ui_insert_menu(menu, ID_EXIT, MF_BYCOMMAND | MF_STRING, ID_EXPORT, ui_text("MenuExport", "&Export map..."));
-    ui_insert_menu(menu, ID_EXIT, MF_BYCOMMAND | MF_STRING, ID_IMPORT, ui_text("MenuImport", "&Import map..."));
-    ui_insert_menu(menu, ID_EXIT, MF_BYCOMMAND | MF_SEPARATOR, 0, nullptr);
-    ui_insert_menu(menu, ID_EXIT, MF_BYCOMMAND | MF_STRING, ID_PLAY, ui_text("MenuPlay", "&Play the map"));
-    ui_insert_menu(menu, ID_EXIT, MF_BYCOMMAND | MF_STRING, ID_BACK, ui_text("MenuBack", "&Back to the menu"));
-    ui_insert_menu(menu, ID_EXIT, MF_BYCOMMAND | MF_SEPARATOR, 0, nullptr);
-    HMENU options = CreatePopupMenu();
-    ui_append_menu(options, MF_STRING, ID_RUN, ui_text("MenuRun", "&Run the level\tCtrl+R"));
-    ui_modify_menu(menu, OPTIONS_POSITION, MF_BYPOSITION | MF_POPUP | MF_STRING, reinterpret_cast<UINT_PTR>(options),
-                ui_text("MenuOptions", "&Options"));
-    HMENU edit = CreatePopupMenu();
-    ui_append_menu(edit, MF_STRING, ID_UNDO, ui_text("MenuUndo", "&Undo\tCtrl+Z"));
-    ui_append_menu(edit, MF_STRING, ID_REDO, ui_text("MenuRedo", "&Redo\tCtrl+Y"));
-    ui_append_menu(edit, MF_SEPARATOR, 0, nullptr);
-    ui_append_menu(edit, MF_STRING, ID_DELETE, ui_text("MenuDelete", "&Delete\tDel"));
-    ui_append_menu(edit, MF_STRING, ID_ROTATE_RIGHT, ui_text("MenuTurnRight", "Turn &right\tR"));
-    ui_append_menu(edit, MF_STRING, ID_ROTATE_LEFT, ui_text("MenuTurnLeft", "Turn &left\tE"));
-    ui_append_menu(edit, MF_STRING, ID_ARMY, ui_text("MenuArmy", "Next &army\tA"));
-    ui_append_menu(edit, MF_STRING, ID_SEMAPHORE, ui_text("MenuSemaphore", "&Semaphore red/green\tT"));
-    ui_insert_menu(menu, OPTIONS_POSITION, MF_BYPOSITION | MF_POPUP | MF_STRING, reinterpret_cast<UINT_PTR>(edit),
-                ui_text("MenuEdit", "&Edit"));
-}
-
 LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
     // Ctrl+R runs the level or holds it again: the editor's bar and its menu button are not there
     // while it runs (Options > Run the level does the same)
@@ -684,11 +647,6 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
     case WM_CLOSE:
         if (!g_in_dialog && !ask_save(window)) return 0;
         break;
-    case WM_CREATE: {
-        const LRESULT result = CallWindowProcA(g_game_wndproc, window, m, w, l);
-        label_menu(GetMenu(window));
-        return result;
-    }
     case WM_COMMAND:
         if (HIWORD(w) <= 1 && (LOWORD(w) == ID_LOAD || LOWORD(w) == ID_SAVE || LOWORD(w) == ID_ABOUT ||
                                (LOWORD(w) >= ID_RUN && LOWORD(w) <= ID_IMPORT) ||
@@ -765,10 +723,17 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
     return CallWindowProcA(g_game_wndproc, window, m, w, l);
 }
 
+// The window class without the exe's menu (AppMenu): the editor has no window menu. Its commands
+// are in the Menu panel of the bar (editor_panel.cpp), which posts the same WM_COMMAND ids, and the
+// game's accelerators (AppAccel: Alt+F2, Alt+F3, Alt+F10) post them too. The menu bar did not
+// open in a window bigger than the map, and in full screen it pushed the game area below the
+// picture, so every click landed under the cursor. Without it in the class the window is made
+// at its size (window.cpp counts a class menu in), so the game area stays the resolution.
 ATOM WINAPI RegisterClassA_editor(const WNDCLASSA* cls) {
     WNDCLASSA copy = *cls;
     g_game_wndproc = copy.lpfnWndProc;
     copy.lpfnWndProc = &editor_wndproc;
+    copy.lpszMenuName = nullptr;
     return g_register_class(&copy);
 }
 

@@ -1196,7 +1196,7 @@ What the mode changes in the engine:
 | `Object_Construct` 0x445b0b | no `World_SetGroundZ` for VIDs with flag 8 (buildings): the ground is not raised under them, GRID stays as the map file has it |
 | `Level_Load`, `World_CreateObject` | no `ANI_BIRTH` handlers of the loaded objects, no BIRTH script of new ones |
 | `Minimap_Draw` | the terrain objects are drawn on the minimap too |
-| `Graphics_Construct` | Graphics flag 0x400: in full screen the frame is presented with Blt like in a window, not flipped, so the menu bar stays visible (no effect in a window) |
+| `Graphics_Construct` | Graphics flag 0x400: in full screen the frame is presented with Blt like in a window, not flipped, so a menu bar would stay visible (no effect in a window; the editor has no window menu, "No window menu" below) |
 
 The other bits of the same byte: 1 is VSYNC, 2 shows the technical boxes of the launcher
 (Full-Screen, "Do'nt show this dialog at startup", Triple video buffer, Use Palette, Low detail,
@@ -1791,8 +1791,16 @@ Not there yet: moving train cars, placing new cars (only the reinforcement point
 groups 1 and 2), painting the ground's picture itself, crossings of new track with old
 (`RailMap_FindCrossings` runs when a level loads, so a crossing laid in the editor counts after
 the map is loaded again), more object types in the bar, picking patrol points with the mouse (the
-dialog takes their coordinates). Full screen is not tested (the menu bar and the dialogs rely on the Blt
-presentation and GDI mode above).
+dialog takes their coordinates).
+
+**No window menu.** The editor leaves the exe's menu (AppMenu) out of the window class
+(`RegisterClassA_editor` in `editor.cpp`), so its window has no menu bar: the Menu panel of the bar has every
+command, the panel posts the same `WM_COMMAND` ids, and the game's accelerators (Alt+F2, Alt+F3,
+Alt+F10) stay. Testers found the bar both broken and in the way: in a window bigger than the map it
+did not open (fix 6 below), and in full screen it pushed the game area down by its height while the
+picture stayed at the top, so every click landed below the cursor. The commands and menu sections
+above still name the File / Edit / Options items they were - the ids are the same. The dialogs (GDI
+mode above) are not tested in full screen.
 ## Changes from the original
 
 - Language packs with a choice in the launcher: `lang/pl`, `lang/en`, `lang/de`, `lang/hu`,
@@ -1875,7 +1883,9 @@ presentation and GDI mode above).
   6. logical screen (`screen_scaling.cpp`, see "Resolutions and widescreen"): on a map
      smaller than the window the game runs at min(window, map) and the picture is
      stretched to the window; menus made for 1024x768 (background VID 465 or 466) are
-     stretched the same way; the mouse is mapped back in `WM_NCHITTEST`,
+     stretched the same way; the mouse is mapped back in `WM_NCHITTEST` - only a point in the
+     game area: mapped, a point over the editor's menu bar landed outside the window, the hit test
+     said HTNOWHERE and File / Edit / Options never opened in a window bigger than the map,
   7. log clean-up at startup (see "Logs" above),
   8. languages (`language.cpp`): the game reads files from `lang\<code>\` of the chosen pack
      first (`CreateFileA` and `GetPrivateProfileStringA/IntA` imports replaced) - every open of

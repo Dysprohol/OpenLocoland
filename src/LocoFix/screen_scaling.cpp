@@ -429,9 +429,13 @@ bool to_logical(POINT& p) {
 
 LRESULT CALLBACK scaling_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
     if (m == WM_NCHITTEST) {
+        // only a point in the game area: one over the menu bar or the frame, mapped, would land
+        // outside the window and the hit test would say HTNOWHERE - the menu bar would not open
         POINT p = {GET_X_LPARAM(l), GET_Y_LPARAM(l)};
         ScreenToClient(window, &p);
-        if (to_logical(p)) {
+        RECT client;
+        GetClientRect(window, &client);
+        if (PtInRect(&client, p) && to_logical(p)) {
             ClientToScreen(window, &p);
             l = MAKELPARAM(p.x, p.y);
         }

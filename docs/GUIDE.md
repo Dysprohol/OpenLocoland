@@ -140,9 +140,6 @@ What you see:
 
   ![The editor's menu](img/editor-menu-en.jpg)
 
-- **The Windows menu bar** (File, Edit, Options) has the same commands. If it does not open, use
-  the menu button.
-
 **Moving around:** the screen edge, the arrow keys, or drag with the middle mouse button.
 
 **The basic editing** (the Select tool, key 1):
@@ -171,7 +168,7 @@ The mission is won when the enemy has no units left.
 
 ### 1. A new map
 
-Menu button → **NEW MAP** (or File > New...):
+Menu button → **NEW MAP**:
 
 ![The New map dialog](img/new-map-en.jpg)
 
@@ -184,7 +181,7 @@ Menu button → **NEW MAP** (or File > New...):
   (big). Take 2048 x 1536 for a start.
 
 OK - the editor opens the new map. It already has a mission script and texts made from the
-template; you will fill them in at step 10. (File > Map size... changes the size later.)
+template; you will fill them in at step 10. (**MAP SIZE** in the menu changes the size later.)
 
 ### 2. Paint the ground
 
@@ -331,15 +328,15 @@ menu), the game comes back to the editor on your map. Unsaved changes are asked 
 
 ### 12. Save
 
-Menu → **SAVE MAP** (File > Save, Alt+F2). A map saved as `maps\<name>\<name>.map` - a new map is
+Menu → **SAVE MAP** (Alt+F2). A map saved as `maps\<name>\<name>.map` - a new map is
 already there - is written with its script and texts and appears on the **custom maps** page under
-its title. Open it again with **LOAD MAP** (File > Load, Alt+F3).
+its title. Open it again with **LOAD MAP** (Alt+F3).
 
 ### 13. Save, export and share
 
-**Export:** Menu -> **EXPORT MAP** (File > Export map) packs the current map - the map, its painted ground, its script, texts and briefing - into one `.zip` file; the save dialog starts on the Desktop. Save your edits first (the editor offers it). Campaign maps and the empty template cannot be exported.
+**Export:** Menu -> **EXPORT MAP** packs the current map - the map, its painted ground, its script, texts and briefing - into one `.zip` file; the save dialog starts on the Desktop. Save your edits first (the editor offers it). Campaign maps and the empty template cannot be exported.
 
-**Import:** Menu -> **IMPORT MAP** (File > Import map) takes such a `.zip` (also one packed again by Windows) and puts the map on the **CUSTOM MAPS** page. When you already have a map of that name, the editor asks: **Yes** overwrites yours, **No** keeps both (the new one comes as `<name>_2`), **Cancel** stops. Then it offers to open the map in the editor.
+**Import:** Menu -> **IMPORT MAP** takes such a `.zip` (also one packed again by Windows) and puts the map on the **CUSTOM MAPS** page. When you already have a map of that name, the editor asks: **Yes** overwrites yours, **No** keeps both (the new one comes as `<name>_2`), **Cancel** stops. Then it offers to open the map in the editor.
 
 A map is its folder: `maps\<name>\` in the game folder holds the map (`<name>.map`), its painted
 ground (`<name>.vid`), its script (`<name>.lgc`) and its texts. To give it to a friend by hand:
@@ -402,8 +399,6 @@ Mission settings, Ground height, Money crate, Vehicles, Paint the ground, Water 
   Steam (any language).
 - **Where are my maps?** In `maps\` of the game folder (C:\Users\<you>\Games\OpenLocoland), one folder each; the
   list of the custom maps page is `maps\custom.lst`.
-- **The Windows menu of the editor does not open.** Use the menu button at the left end of the
-  bar - it has every command.
 - **Something went wrong.** The game writes `error.log` and `LocoFix.log` into its folder; send them
   with a description of what happened.
 - **Full screen.** It works, but windowed mode is the tested one; if the screen stays black, untick

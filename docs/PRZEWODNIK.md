@@ -138,9 +138,6 @@ Co widać:
 
   ![Menu edytora](img/editor-menu-pl.jpg)
 
-- **Menu okna Windows** (Plik, Edycja, Opcje) ma te same polecenia. Jeśli się nie otwiera, użyj
-  przycisku menu.
-
 **Poruszanie się:** krawędź ekranu, klawisze strzałek albo przeciąganie środkowym przyciskiem myszy.
 
 **Podstawy edycji** (narzędzie Zaznacz, klawisz 1):
@@ -169,7 +166,7 @@ gdy wrogowi nie zostanie żadna jednostka.
 
 ### 1. Nowa mapa
 
-Przycisk menu → **NOWA MAPA** (albo Plik > Nowa...):
+Przycisk menu → **NOWA MAPA**:
 
 ![Okno Nowa mapa](img/new-map-pl.jpg)
 
@@ -181,7 +178,7 @@ Przycisk menu → **NOWA MAPA** (albo Plik > Nowa...):
   początek weź 2048 x 1536.
 
 OK - edytor otwiera nową mapę. Ma już skrypt misji i teksty zrobione z szablonu; uzupełnisz je w
-kroku 10. (Plik > Rozmiar mapy... zmienia rozmiar później.)
+kroku 10. (**ROZMIAR MAPY** w menu zmienia rozmiar później.)
 
 ### 2. Pomaluj teren
 
@@ -328,15 +325,15 @@ do edytora na twoją mapę. O niezapisane zmiany najpierw pyta.
 
 ### 12. Zapisz
 
-Menu → **ZAPISZ MAPE** (Plik > Zapisz, Alt+F2). Mapa zapisana jako `maps\<nazwa>\<nazwa>.map` -
+Menu → **ZAPISZ MAPE** (Alt+F2). Mapa zapisana jako `maps\<nazwa>\<nazwa>.map` -
 nowa mapa już tam jest - zapisuje się ze skryptem i tekstami i pojawia na stronie **WLASNE MAPY**
-pod swoim tytułem. Otworzysz ją znowu przez **WCZYTAJ MAPE** (Plik > Wczytaj, Alt+F3).
+pod swoim tytułem. Otworzysz ją znowu przez **WCZYTAJ MAPE** (Alt+F3).
 
 ### 13. Zapis, eksport i udostępnianie
 
-**Eksport:** Menu → **EKSPORT MAPY** (Plik > Eksportuj mape) pakuje bieżącą mapę - mapę, jej pomalowany teren, skrypt, teksty i odprawę - do jednego pliku `.zip`; okno zapisu otwiera się na Pulpicie. Najpierw zapisz zmiany (edytor to proponuje). Map kampanii i pustego szablonu nie da się eksportować.
+**Eksport:** Menu → **EKSPORT MAPY** pakuje bieżącą mapę - mapę, jej pomalowany teren, skrypt, teksty i odprawę - do jednego pliku `.zip`; okno zapisu otwiera się na Pulpicie. Najpierw zapisz zmiany (edytor to proponuje). Map kampanii i pustego szablonu nie da się eksportować.
 
-**Import:** Menu → **IMPORT MAPY** (Plik > Importuj mape) bierze taki `.zip` (także spakowany ponownie przez Windows) i dodaje mapę na stronę **WLASNE MAPY**. Gdy masz już mapę o tej nazwie, edytor pyta: **Tak** nadpisuje twoją, **Nie** zostawia obie (nowa dostaje nazwę `<nazwa>_2`), **Anuluj** przerywa. Potem proponuje otworzyć mapę w edytorze.
+**Import:** Menu → **IMPORT MAPY** bierze taki `.zip` (także spakowany ponownie przez Windows) i dodaje mapę na stronę **WLASNE MAPY**. Gdy masz już mapę o tej nazwie, edytor pyta: **Tak** nadpisuje twoją, **Nie** zostawia obie (nowa dostaje nazwę `<nazwa>_2`), **Anuluj** przerywa. Potem proponuje otworzyć mapę w edytorze.
 
 Mapa to jej folder: `maps\<nazwa>\` w folderze gry zawiera mapę (`<nazwa>.map`), jej pomalowany teren
 (`<nazwa>.vid`), skrypt (`<nazwa>.lgc`) i teksty. Żeby dać ją znajomemu ręcznie: wyślij cały folder;
@@ -399,8 +396,6 @@ misji, Wysokosc terenu, Skrzynka z pieniedzmi, Pojazdy, Malowanie terenu, Woda i
   przez Steam (w dowolnym języku).
 - **Gdzie są moje mapy?** W `maps\` folderu gry (C:\Users\<ty>\Games\OpenLocoland), każda w swoim folderze; lista
   strony własnych map to `maps\custom.lst`.
-- **Menu Windows w edytorze się nie otwiera.** Użyj przycisku menu na lewym końcu paska - ma
-  wszystkie polecenia.
 - **Coś poszło nie tak.** Gra zapisuje w swoim folderze `error.log` i `LocoFix.log`; wyślij je z
   opisem tego, co się stało.
 - **Pełny ekran.** Działa, ale sprawdzony jest tryb okna; jeśli ekran zostaje czarny, odznacz „pełny
