@@ -5,8 +5,7 @@
 **Locoland** (Gromada, 2003) is a little-known strategy game about armed trains: you lay track,
 send out locomotives with cannons and rocket launchers, and drive the invaders out of a land of
 living trains. **OpenLocoland** brings it back to today's Windows: it runs in a window or on full
-screen in any resolution, plays well on a wide screen, keeps your progress, fixes some of the old crashes and bugs - and it
-has a **map editor inside the game** (work in progress), so you can make your own missions and share
+screen in any resolution, plays well on a wide screen, fixes some of the old crashes and bugs - and it has a **map editor inside the game** (work in progress), so you can make your own missions and share
 them with friends.
 
 It is a fan project, not affiliated with the makers of Locoland. It does not contain the game: you
@@ -18,10 +17,7 @@ and OpenLocoland is put together from it on your computer. Your Steam game stays
 - **The game as it was, on current Windows.** A window or full screen, every resolution up to 4K,
   more of the map on a wide screen, a steady 60 frames a second, the mouse right on any monitor.
 - **Some of the old bugs fixed.** Crashes in some missions and in the repair point, sounds that
-  were missing, a car the factory could never build, the profile that was never saved - others are
-  still open ([BUGS.md](BUGS.md)).
-- **Your progress is kept.** Missions won, scores and settings stay, and the ones from the original
-  game are carried over.
+  were missing, a car the factory could never build - others are still open ([BUGS.md](BUGS.md)).
 - **Custom maps.** A second page on the strategic map, with **POLIGON** - a ready mission to try -
   and every map you make or get from a friend.
 - **A map editor (work in progress).** The authors' own editor mode, left inside the game and never

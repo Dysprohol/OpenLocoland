@@ -80,9 +80,8 @@ The missions play as they always did. What changed:
   first, and a click on them works.
 - **The middle mouse button** drags the map, in the missions too.
 - **A steady frame rate** (60 by default) instead of the game using a whole processor core.
-- **Your progress is saved.** On current Windows the original did not save the player's profile
-  (missions won, scores, settings); OpenLocoland keeps it in your user's registry. The progress
-  you had in the original is carried over the first time.
+- **Your progress carries over.** The profile you had in the original (missions won, scores,
+  settings) is taken over the first time you start OpenLocoland.
 - **Fixes** of crashes and mistakes of the original: a crash when the repair point took over an
   enemy car, crashes of some mission scripts, a car kind the factory could never build, the mouse
   stuck at the bottom of the screen on a second monitor left of or above the main one, sounds that

@@ -78,9 +78,8 @@ Misje grają się tak jak zawsze. Co się zmieniło:
   pierwszym i można je klikać.
 - **Środkowy przycisk myszy** przeciąga mapę, także w misjach.
 - **Stała liczba klatek** (domyślnie 60) zamiast zajmowania przez grę całego rdzenia procesora.
-- **Twoje postępy się zapisują.** Na dzisiejszym Windowsie oryginał nie zapisywał profilu gracza
-  (wygranych misji, wyników, ustawień); OpenLocoland trzyma go w rejestrze twojego użytkownika.
-  Postępy z oryginału są przenoszone przy pierwszym uruchomieniu.
+- **Postępy przechodzą z oryginału.** Profil z oryginału (wygrane misje, wyniki, ustawienia) jest
+  przejmowany przy pierwszym uruchomieniu OpenLocoland.
 - **Poprawki** awarii i błędów oryginału: awaria, gdy punkt naprawczy przejmował wagon wroga,
   awarie niektórych skryptów misji, rodzaj wagonu, którego fabryka nigdy nie mogła zbudować, mysz
   utykająca na dole ekranu na drugim monitorze po lewej lub nad głównym, brakujące dźwięki, działo
