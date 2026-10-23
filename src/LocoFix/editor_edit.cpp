@@ -39,7 +39,8 @@
 // couple and uncouple with their train ("trains", below).
 //
 // Keys: click selects (the bar picks a tool), drag moves, R / E or the wheel turn, A changes
-// the army (0-3), T switches a semaphore red / green, Del deletes, Ctrl+Z / Ctrl+Y undo / redo,
+// the army (0-3), T switches a semaphore red / green, PgUp / PgDn / Home (Shift+wheel) set the
+// object's height above the ground, H shows the ground's heights everywhere, Del deletes, Ctrl+Z / Ctrl+Y undo / redo,
 // 1-0 pick the entries of the bar, [ and ] the decal to place, Esc or the right button go back
 // to selecting; the Delete section entry of the strip deletes a rail's section with a click.
 // The Push line tool of the strip (below, "push lines") picks two rail points for a line and
@@ -73,6 +74,7 @@ bool palette_state(int nvid, int& behave, std::vector<short>& items);   // edito
 int palette_icon(int nvid);                                             // editor_panel.cpp
 void panel_open_palette(bool vehicles);   // editor_panel.cpp: All objects, or the vehicles
 bool editor_level_held();           // editor.cpp
+std::string map_ground_image(const std::string& map);   // editor_newmap.cpp: the image file of a map's ground
 void editor_mission_settings();     // editor.cpp: File > Mission settings...
 // editor_panel.cpp: the Help and Menu buttons of the bar and their panels
 void panel_draw(POINT mouse);
@@ -1035,25 +1037,50 @@ POINT logical(LPARAM l) {
     return p;
 }
 
-// The map point under a logical point: x and y on the map, z the ground there.
+// The map point under a logical point: x and y on the map, z the ground there. The ground drawn at
+// a screen point (x, y - z) is the one nearest to the viewer (the largest y) whose y - z reaches up
+// to it - raised ground hides what is behind it -, so it is searched from below the point up, as
+// far as the highest ground of the column allows.
 void map_point(POINT p, uint8_t* vid, float& x, float& y, float& z) {
     uint8_t* w = world();
     x = at<float>(w, W_CAMERA_X) + p.x;
     const float screen_y = at<float>(w, W_CAMERA_Y) + p.y;
     z = vid ? ground_z(vid, x, screen_y) : 0;
     y = screen_y + z;
-    if (vid) {
-        z = ground_z(vid, x, y);
-        y = screen_y + z;
+    if (!vid) return;
+    const int cx = static_cast<int>(std::floor(x / 8));
+    if (grid() && cx >= 0 && cx < grid_width()) {
+        int highest = 0;   // of the cells whose ground could show here (the ground is 0-400)
+        const int last = (std::min)(grid_height() - 1, static_cast<int>((screen_y + 400) / 8) + 1);
+        for (int cy = (std::max)(0, static_cast<int>(screen_y / 8)); cy <= last; ++cy)
+            highest = (std::max)(highest, static_cast<int>(ground_cell(cx, cy)));
+        for (float wy = screen_y + highest + 8; wy >= screen_y - 8; wy -= 1) {
+            const float gz = ground_z(vid, x, wy);
+            if (wy - gz <= screen_y) {
+                z = gz;
+                y = screen_y + z;
+                return;
+            }
+        }
     }
+    z = ground_z(vid, x, y);
+    y = screen_y + z;
 }
+
+bool liftable(uint8_t* o);   // the height of an object, below
+float lift_of(uint8_t* o);
 
 void select(uint8_t* o) {
     g_selection = o ? group_of(o) : std::vector<uint8_t*>();
     if (o)
-        MESSAGE("MsgSelected", "selected VID %d at %.0f,%.0f direction %d army %d (%s)%s", nvid_of(o), at<float>(o, O_X),
-                at<float>(o, O_Y), at<int>(o, O_DIRECTION), army_of(o), army_name(army_of(o)),
-                red(o) ? ui_text("WordRedSuffix", " red") : "");
+        message_by([&] {
+            std::string text = ui_printf(ui_format("MsgSelected", "selected VID %d at %.0f,%.0f direction %d army %d (%s)%s"), nvid_of(o),
+                                         at<float>(o, O_X), at<float>(o, O_Y), at<int>(o, O_DIRECTION), army_of(o),
+                                         army_name(army_of(o)), red(o) ? ui_text("WordRedSuffix", " red") : "");
+            if (liftable(o))
+                text += ui_printf(ui_format("MsgAboveGround", ", %d above the ground"), static_cast<int>(std::lround(lift_of(o))));
+            return text;
+        });
 }
 
 // ---- trains ----
@@ -1556,6 +1583,50 @@ void toggle_semaphore() {
     MESSAGE("MsgSemaphore", "semaphore %s", red(g_selection[0]) ? ui_text("WordRed", "red") : ui_text("WordGreen", "green"));
 }
 
+// ---- the height of an object ----
+//
+// An object stands at its own height above the ground (its z less the ground's under it), kept when
+// it is dragged or the ground under it changes, and saved as its z (SPR). PgUp / PgDn raise and lower
+// the selected object by 4 (Shift: 16; Shift+wheel by 4), Home puts it back on the ground; a fort's
+// or a mining plant's guns go with it. Not for train cars (they stand on their rails), rails (the
+// Track tool's ramps), regions (their height is the level of their water or fog) and the VIDs whose
+// flag 0x200 makes Object_Construct put them on the ground whatever their z (some units and guns:
+// 70, 72, 74, 77, 79, 401 ...) - the game would put them back when the map is loaded.
+constexpr int LIFT_STEP = 4, LIFT_BIG_STEP = 16, MIN_LIFT = -32, MAX_LIFT = 400;
+constexpr uint32_t VID_FLAG_ON_GROUND = 0x200;
+
+UiText why_not_liftable(uint8_t* o) {
+    if (class_of(o) == B_RAIL) return {"MsgLiftRail", "a rail's height comes from the track (Track tool: PgUp / PgDn lay ramps)"};
+    if (is_car(o)) return {"MsgLiftCar", "a train car stands on its rails"};
+    if (is_region(o)) return {"MsgLiftRegion", "a region's height is the level of its water or fog"};
+    if (at<uint32_t>(vid_of(o), V_FLAGS) & VID_FLAG_ON_GROUND) return {"MsgLiftOnGround", "the game always puts this object on the ground"};
+    return {};
+}
+
+bool liftable(uint8_t* o) { return o && !removed(o) && !why_not_liftable(o).english[0]; }
+float lift_of(uint8_t* o) { return at<float>(o, O_Z) - ground_z(vid_of(o), at<float>(o, O_X), at<float>(o, O_Y)); }
+
+// The selected object `by` higher (lower when negative), or back on the ground.
+void lift(int by, bool to_ground) {
+    if (g_selection.empty()) return;
+    uint8_t* o = g_selection[0];
+    const UiText why = why_not_liftable(o);
+    if (why.english[0]) {
+        MESSAGE("MsgLiftNot", "VID %d: %s", nvid_of(o), why.get());
+        return;
+    }
+    const float now = lift_of(o);
+    const float want = to_ground ? 0.0f : static_cast<float>((std::max)(MIN_LIFT, (std::min)(MAX_LIFT, static_cast<int>(std::lround(now)) + by)));
+    if (std::fabs(want - now) >= 0.5f) {
+        const std::vector<State> before = states(g_selection);
+        const float dz = want - now;
+        for (uint8_t* s : g_selection)
+            reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(s, nullptr, at<float>(s, O_X), at<float>(s, O_Y), at<float>(s, O_Z) + dz);
+        commit({"OpLift", "object height"}, g_selection, before);
+    }
+    MESSAGE("MsgLift", "VID %d: %d above the ground", nvid_of(o), static_cast<int>(std::lround(lift_of(o))));
+}
+
 void delete_objects(const std::vector<uint8_t*>& chosen) {
     if (chosen.empty()) return;
     std::vector<uint8_t*> objects = chosen;   // with the beds of the rails
@@ -1657,6 +1728,7 @@ uint8_t* fit_gun(uint8_t* host, const Socket& s, int nvid) {
 }
 
 std::vector<GridChange> flatten_under(uint8_t* o);   // the ground, below
+std::shared_ptr<PaintPatch> relief_for(const std::vector<GridChange>& changes);   // the ground's picture, below
 std::string g_place_status;   // why the object to place cannot go where the cursor is
 
 void place(POINT p) {
@@ -1715,7 +1787,10 @@ void place(POINT p) {
     commit({"OpPlace", "place"}, objects, before);
     g_selection = group_of(o);   // the new one is selected (L on a post, A, Del)
     // a building: the ground under it at its height, the ring around half way (map_tool.py place)
-    if (class_of(o) == B_BUILDING || class_of(o) == B_DEPO) g_undo.back().grid = flatten_under(o);
+    if (class_of(o) == B_BUILDING || class_of(o) == B_DEPO) {
+        g_undo.back().grid = flatten_under(o);
+        g_undo.back().paint = relief_for(g_undo.back().grid);
+    }
     if (nvid == VID_DEPOT || nvid == VID_WORKSHOP) {   // its push line and posts
         give_building_line(o);
         return;
@@ -2024,6 +2099,7 @@ void lay_step() {
     for (State& b : before) b.present = false;
     commit({"OpTrack", "track"}, made, before);
     g_undo.back().grid = changes;
+    g_undo.back().paint = relief_for(changes);
     g_line.push_back(s.to);
     g_line_level += ramp * rail::RAMP;
     g_ramp = 0;
@@ -2058,11 +2134,16 @@ std::vector<uint8_t*> section_of(uint8_t* start) {
 }
 // ---- the ground ----
 //
-// The heights of the ground are a short per 8 x 8 px cell (World.grid, saved as GRID). The ground's
-// picture is drawn as it is - the heights are what objects stand on and what the trains climb - so
-// they are edited to match the picture: the Ground height tool raises (2 a step), lowers,
-// flattens (to the height where the stroke began) or smooths (the mean of the 3 x 3 cells) the
-// cells in a circle around the cursor, while the button is held. The cells of the track and the
+// The heights of the ground are a short per 8 x 8 px cell (World.grid, saved as GRID): what objects
+// stand on and what the trains climb. The ground's picture is drawn again for them as they change
+// (the relief, editor_ground.h: raised ground shows higher, shaded by its slope, its height texture
+// with it) - always for the Ground height tool, for the track's and the buildings' flattening when
+// the picture is the map's own (not a campaign terrain's lNN.vid as it came). The Ground height tool
+// raises (2 a step in the middle of the brush, less and less out to its edge), lowers, flattens (to
+// the level where the stroke began - begun on the track, to the track's level -, softly at the edge)
+// or smooths (the mean of the 3 x 3 cells) the cells in a circle around the cursor while the button
+// is held; held still it goes on every 150 ms. The contours (H, and always with the tool) show the
+// heights over the whole view. The cells of the track and the
 // ring around them are left as the Track tool made them (MAP_RULES.md 3: flat at the track's
 // height, a half ramp around). When the button is let go the objects stand on the new ground
 // again (their height above it is kept: a fort's guns on its wall) and the stroke is one step
@@ -2075,6 +2156,8 @@ Brush g_brush = Brush::Raise;
 const char* brush_name() { return ui_text(BRUSH_KEYS[static_cast<int>(g_brush)], BRUSH_NAMES[static_cast<int>(g_brush)]); }
 int g_radius = 2;   // cells of the brush (the Height tool) / 8 px of the scatter (Decals)
 constexpr int MAX_RADIUS = 12, MIN_Z = 0, MAX_Z = 400, BRUSH_STEP = 2;
+constexpr DWORD HEIGHT_REPEAT = 150;        // ms: the brush held still works again (a window timer)
+constexpr UINT_PTR HEIGHT_TIMER = 0x4c48;
 int g_spacing = 16;   // Decals: the least distance between two decals, px (< and >)
 constexpr int MIN_SPACING = 4, MAX_SPACING = 64, SPACING_STEP = 4;
 
@@ -2083,6 +2166,7 @@ struct Stroke {
     int level = 0;                         // Flatten: the height where it began
     rail::Cell last = {-1, -1};            // the cell of the last step (one step a cell)
     std::map<rail::Cell, short> before;    // the cells changed, as they were
+    std::map<rail::Cell, float> parts;     // Height: the parts of a level each cell has had so far
     std::set<rail::Cell> track;            // the track's cells and their ring: not touched
     std::vector<uint8_t*> objects;         // the objects that may stand on changed ground
     std::vector<float> lift;               // their height above the ground at the start
@@ -2091,7 +2175,46 @@ struct Stroke {
     std::vector<uint8_t*> erased;          // Decals: the ones taken away
     std::vector<State> erased_before;
     float last_x = -1e9f, last_y = -1e9f;  // Decals: where the last ones went
+    DWORD time = 0;                        // Height: the last step (held still, the brush goes on: HEIGHT_TIMER)
+    bool relief = false;                   // the picture follows (editor_ground.h)
+    std::vector<short> grid_from;          // the GRID when it began
 } g_stroke;
+
+bool ground_paintable(bool quiet);   // the ground's picture, below
+
+// Whether the ground's picture follows a change of the heights: always for the Ground height tool (a
+// campaign terrain's picture then becomes the map's own, saved with it as a painted one is), for the
+// track's and the buildings' flattening only when the picture is the map's own already.
+bool relief_on(bool height_tool) {
+    if (!height_tool) {
+        if (ground_ready()) {
+            if (!ground_own()) return false;
+        } else {
+            const char* map = at<const char*>(world(), W_LEVEL_FILE);
+            if (!map || campaign_ground_image(map_ground_image(map))) return false;
+        }
+    }
+    return ground_paintable(true);
+}
+
+// The picture drawn again for changes of the GRID already made (the track's, a building's
+// footprint): the patch for the step's history, or null.
+std::shared_ptr<PaintPatch> relief_for(const std::vector<GridChange>& changes) {
+    if (changes.empty() || !grid() || !relief_on(false)) return nullptr;
+    const int w = grid_width(), h = grid_height();
+    std::vector<short> to(grid(), grid() + w * h), from = to;
+    int cx0 = w, cy0 = h, cx1 = -1, cy1 = -1;
+    for (const GridChange& c : changes) {
+        from[c.cy * w + c.cx] = c.before;
+        cx0 = (std::min)(cx0, c.cx);
+        cy0 = (std::min)(cy0, c.cy);
+        cx1 = (std::max)(cx1, c.cx);
+        cy1 = (std::max)(cy1, c.cy);
+    }
+    ground_stroke_begin();
+    ground_relief(from.data(), to.data(), w, h, cx0, cy0, cx1, cy1, 1 << 20, -(1 << 20));
+    return ground_stroke_end();
+}
 
 // The cell under the cursor (on the ground) and its world point.
 rail::Cell cursor_cell(float& x, float& y) {
@@ -2124,6 +2247,12 @@ void start_height_stroke() {
     const rail::Cell c = cursor_cell(x, y);
     if (c.first >= 0 && c.first < grid_width() && c.second >= 0 && c.second < grid_height())
         g_stroke.level = ground_cell(c.first, c.second);
+    if (g_brush == Brush::Flatten) MESSAGE("MsgFlattenTo", "ground: flatten to level %d (where the stroke began)", g_stroke.level);
+    if (grid() && relief_on(true)) {
+        g_stroke.relief = true;
+        g_stroke.grid_from.assign(grid(), grid() + grid_width() * grid_height());
+        ground_stroke_begin();
+    }
     for_each_object([&](uint8_t* o) {
         if (!follows_ground(o)) return;
         g_stroke.objects.push_back(o);
@@ -2132,11 +2261,12 @@ void start_height_stroke() {
     });
 }
 
-void height_step() {
+void height_step(bool again = false) {
     float x, y;
     const rail::Cell centre = cursor_cell(x, y);
-    if (centre == g_stroke.last) return;
+    if (centre == g_stroke.last && !again) return;
     g_stroke.last = centre;
+    g_stroke.time = GetTickCount();
     const int w = grid_width(), h = grid_height();
     std::vector<std::pair<rail::Cell, short>> heights;
     for (int dy = -g_radius; dy <= g_radius; ++dy)
@@ -2146,9 +2276,18 @@ void height_step() {
             if (c.first < 0 || c.first >= w || c.second < 0 || c.second >= h || g_stroke.track.count(c)) continue;
             const int z = ground_cell(c.first, c.second);
             int to = z;
-            if (g_brush == Brush::Raise) to = z + BRUSH_STEP;
-            else if (g_brush == Brush::Lower) to = z - BRUSH_STEP;
-            else if (g_brush == Brush::Flatten) to = g_stroke.level;
+            // a soft brush: full in the middle, less and less out to its edge (smoothstep)
+            const float d = std::sqrt(static_cast<float>(dx * dx + dy * dy)) / (g_radius + 0.5f), t = 1 - d;
+            const float soft = t * t * (3 - 2 * t);
+            if (g_brush == Brush::Raise || g_brush == Brush::Lower) {
+                // the step's parts of a level kept for the cell's next step - so hills come out round
+                float& part = g_stroke.parts[c];
+                part += BRUSH_STEP * soft;
+                const int n = static_cast<int>(part);
+                part -= n;
+                to = g_brush == Brush::Raise ? z + n : z - n;
+            }
+            else if (g_brush == Brush::Flatten) to = static_cast<int>(std::lround(z + (g_stroke.level - z) * (std::min)(1.0f, 2 * soft)));
             else {
                 int sum = 0, n = 0;
                 for (int ny = -1; ny <= 1; ++ny)
@@ -2163,10 +2302,21 @@ void height_step() {
             to = (std::max)(MIN_Z, (std::min)(MAX_Z, to));
             if (to != z) heights.push_back({c, static_cast<short>(to)});
         }
+    int cx0 = w, cy0 = h, cx1 = -1, cy1 = -1, z_lo = 1 << 20, z_hi = -(1 << 20);
     for (const auto& ch : heights) {   // all from the heights before this step (the smoothing)
-        g_stroke.before.emplace(ch.first, ground_cell(ch.first.first, ch.first.second));
+        const short was = ground_cell(ch.first.first, ch.first.second);
+        g_stroke.before.emplace(ch.first, was);
         set_ground_cell(ch.first.first, ch.first.second, ch.second);
+        cx0 = (std::min)(cx0, ch.first.first);
+        cy0 = (std::min)(cy0, ch.first.second);
+        cx1 = (std::max)(cx1, ch.first.first);
+        cy1 = (std::max)(cy1, ch.first.second);
+        z_lo = (std::min)(z_lo, static_cast<int>(was));
+        z_hi = (std::max)(z_hi, static_cast<int>(was));
     }
+    // the picture as it shows the new heights, from the stroke's start (no loss step by step)
+    if (g_stroke.relief && !heights.empty())
+        ground_relief(g_stroke.grid_from.data(), grid(), w, h, cx0, cy0, cx1, cy1, z_lo, z_hi);
 }
 
 void end_height_stroke() {
@@ -2177,7 +2327,11 @@ void end_height_stroke() {
         const short now = ground_cell(c.first.first, c.first.second);
         if (now != c.second) changes.push_back({c.first.first, c.first.second, c.second, now});
     }
-    if (changes.empty()) return;
+    const std::shared_ptr<PaintPatch> relief = g_stroke.relief ? ground_stroke_end() : nullptr;
+    if (changes.empty()) {
+        if (relief) ground_apply(*relief, false);   // back as it was (a stroke that changed nothing in the end)
+        return;
+    }
     std::vector<uint8_t*> moved;
     std::vector<State> moved_before;
     for (size_t i = 0; i < g_stroke.objects.size(); ++i) {
@@ -2190,6 +2344,7 @@ void end_height_stroke() {
     }
     commit({"OpHeight", "ground height"}, moved, moved_before);
     g_undo.back().grid = changes;
+    g_undo.back().paint = relief;
     MESSAGE("MsgGround", "ground: %s - %u cells, %u objects on them", brush_name(),
             static_cast<unsigned>(changes.size()), static_cast<unsigned>(moved.size()));
 }
@@ -2360,7 +2515,7 @@ struct GroundStroke {
 } g_gstroke;
 std::set<rail::Cell> track_cells();   // the ground, above
 
-bool ground_paintable() {
+bool ground_paintable(bool quiet) {
     if (ground_ready()) return true;
     uint8_t* ground = nullptr;
     for_each_object([&](uint8_t* o) {
@@ -2369,6 +2524,10 @@ bool ground_paintable() {
     const char* map = at<const char*>(world(), W_LEVEL_FILE);
     std::string why;
     if (!ground || !map || !ground_prepare(map, at<float>(ground, O_X), at<float>(ground, O_Y), vid_of(ground), why)) {
+        if (quiet) {
+            patch::log("edit: the ground's picture cannot be read (%s) - no relief", why.empty() ? "no ground object" : why.c_str());
+            return false;
+        }
         MESSAGE("MsgGroundNot", "the ground's picture cannot be read (%s)", why.empty() ? "no ground object" : why.c_str());
         return false;
     }
@@ -2389,7 +2548,7 @@ std::pair<int, int> tile_square(float sx, float sy, int level) {   // the tile o
 }
 
 void start_ground_stroke(bool water) {
-    if (!ground_paintable()) return;
+    if (!ground_paintable(false)) return;
     g_gstroke = GroundStroke();
     g_gstroke.active = true;
     g_gstroke.water = water;
@@ -3432,10 +3591,55 @@ void draw_push_lines(bool tool) {
     g_push_status = text;
 }
 
-// The Ground height tool: the cells around the cursor as squares at their height, coloured by it
-// (blue low, green 60-80, red high; the track's cells grey), those of the brush brighter. The
+// The Ground height tool: the brush's cells as squares at their height, coloured by it (blue low,
+// green 60-80, red high; the track's cells, which it leaves alone, grey). The
 // Decals tool: the circle it scatters in, and the decal to place at the cursor.
 std::string g_ground_status;
+
+// The colour of a ground level: blue below 65, green about 70 (the new maps' level), red above 75.
+uint32_t level_colour(int z) {
+    const int r = (std::max)(0, (std::min)(255, (z - 75) * 6)), b = (std::max)(0, (std::min)(255, (65 - z) * 6));
+    const int g = (std::max)(60, 255 - (std::max)(r, b));
+    return (static_cast<uint32_t>(r) << 16) | (static_cast<uint32_t>(g) << 8) | static_cast<uint32_t>(b);
+}
+
+// The heights over the whole view (H, and always with the Ground height tool): contour lines every
+// 4 levels where the ground crosses one between two cells, drawn at their height in the level's
+// colour, every 20 levels brighter and thicker - a hill shows as rings, a slope as close lines.
+bool g_show_heights = false;
+constexpr int CONTOUR = 4, CONTOUR_MAJOR = 20;
+
+void draw_contours() {
+    uint8_t* w = world();
+    if (!grid()) return;
+    const Box v = view();
+    const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
+    const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
+    const int gw = grid_width(), gh = grid_height();
+    // the cells below the view may show in it raised: up to the highest ground
+    const int cx0 = (std::max)(0, static_cast<int>(std::floor((v.l + cam_x) / 8)) - 1);
+    const int cx1 = (std::min)(gw - 2, static_cast<int>((v.r + cam_x) / 8) + 1);
+    const int cy0 = (std::max)(0, static_cast<int>(std::floor((v.t + cam_y) / 8)) - 1);
+    const int cy1 = (std::min)(gh - 2, static_cast<int>((v.b + cam_y + MAX_Z) / 8) + 1);
+    auto band = [](int z) { return z >= 0 ? z / CONTOUR : -((-z + CONTOUR - 1) / CONTOUR); };
+    auto line = [&](int a, int b, float sx, float sy, bool vertical) {
+        if (band(a) == band(b)) return;
+        if (sx < v.l || sx > v.r || sy < v.t || sy > v.b) return;
+        const int top = (std::max)(a, b);
+        const bool major = band(top) * CONTOUR % CONTOUR_MAJOR == 0;
+        const float along = 4.5f, across = major ? 1.0f : 0.75f;
+        const uint32_t argb = (major ? 0xd0000000u : 0x90000000u) | (major ? 0xfff0c0 : level_colour(top));
+        if (vertical) fill(graphics(), nullptr, sx - across, sy - along, sx + across, sy + along, argb);
+        else fill(graphics(), nullptr, sx - along, sy - across, sx + along, sy + across, argb);
+    };
+    for (int cy = cy0; cy <= cy1; ++cy)
+        for (int cx = cx0; cx <= cx1; ++cx) {
+            const int z = ground_cell(cx, cy), zr = ground_cell(cx + 1, cy), zd = ground_cell(cx, cy + 1);
+            // between this cell and the one to the right: a line across x; below: a line across y
+            line(z, zr, cx * 8 + 8 - cam_x, cy * 8 + 4 - (z + zr) / 2.0f - cam_y, true);
+            line(z, zd, cx * 8 + 4 - cam_x, cy * 8 + 8 - (z + zd) / 2.0f - cam_y, false);
+        }
+}
 
 void draw_ground_tool(bool heights) {
     uint8_t* w = world();
@@ -3446,26 +3650,21 @@ void draw_ground_tool(bool heights) {
     char text[160];
     if (heights) {
         const std::set<rail::Cell> track = g_stroke.active ? g_stroke.track : track_cells();
-        const int reach = g_radius + 3;
+        const int reach = g_radius;   // the brush's cells (the contours show the rest)
         for (int dy = -reach; dy <= reach; ++dy)
             for (int dx = -reach; dx <= reach; ++dx) {
                 const int cx = c.first + dx, cy = c.second + dy;
                 if (cx < 0 || cx >= grid_width() || cy < 0 || cy >= grid_height()) continue;
                 const int z = ground_cell(cx, cy);
                 const bool in = dx * dx + dy * dy <= g_radius * g_radius;
-                uint32_t rgb;
-                if (track.count({cx, cy})) {
-                    rgb = 0x808080;
-                } else {
-                    const int r = (std::max)(0, (std::min)(255, (z - 75) * 6)), b = (std::max)(0, (std::min)(255, (65 - z) * 6));
-                    const int g = (std::max)(60, 255 - (std::max)(r, b));
-                    rgb = (static_cast<uint32_t>(r) << 16) | (static_cast<uint32_t>(g) << 8) | static_cast<uint32_t>(b);
-                }
-                const float sx = cx * 8 + 4 - cam_x, sy = cy * 8 + 4 - z - cam_y, half = in ? 3.0f : 2.0f;
-                fill(graphics(), nullptr, sx - half, sy - half, sx + half, sy + half, (in ? 0xe0000000u : 0x70000000u) | rgb);
+                const uint32_t rgb = track.count({cx, cy}) ? 0x808080 : level_colour(z);
+                if (!in) continue;
+                const float sx = cx * 8 + 4 - cam_x, sy = cy * 8 + 4 - z - cam_y;
+                fill(graphics(), nullptr, sx - 2, sy - 2, sx + 2, sy + 2, 0xc0000000u | rgb);
             }
         const bool inside = c.first >= 0 && c.first < grid_width() && c.second >= 0 && c.second < grid_height();
-        std::snprintf(text, sizeof text, ui_format("StatusHeight", "Ground height: %s (M), radius %d cells (+ -), the ground here %d"),
+        std::snprintf(text, sizeof text,
+                      ui_format("StatusHeight", "Ground height: %s (M), radius %d cells (+ -), the ground here %d - lines every 4 levels"),
                       brush_name(), g_radius, inside ? ground_cell(c.first, c.second) : 0);
     } else {
         const float r = (std::max)(8.0f * g_radius, 12.0f);
@@ -3746,6 +3945,11 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
         rows.push_back({{"CtxTurn", "TURN:"},
                         {{{"CtxTurnLeft", "LEFT (E)"}, false, [] { turn(-1); }},
                          {{"CtxTurnRight", "RIGHT (R)"}, false, [] { turn(1); }}}});
+    if (liftable(o))
+        rows.push_back({{"CtxHeight", "HEIGHT:"},
+                        {{{"CtxLiftDown", "LOWER"}, false, [] { lift(-LIFT_STEP, false); }},
+                         {{"CtxLiftUp", "RAISE"}, false, [] { lift(LIFT_STEP, false); }},
+                         {{"CtxOnGround", "ON THE GROUND"}, std::lround(lift_of(o)) == 0, [] { lift(0, true); }}}});
     if (nvid == VID_SEMAPHORE) {
         const bool is_red = red(o);
         rows.push_back({{"CtxColour", "COLOUR (T):"},
@@ -3873,6 +4077,7 @@ void draw_overlay() {
     const bool over_bar = on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y));
     const float mx = cam_x + g_mouse.x, my = cam_y + g_mouse.y;
 
+    if (g_show_heights || entry().tool == Tool::Height) draw_contours();
     for (uint8_t* o : g_selection) circle(o, 1);
     // a selected train's patrol: its far point, marked like the route markers' squares
     int px = 0, py = 0;
@@ -3984,6 +4189,10 @@ void draw_overlay() {
                     ui_text("StatusRegion", "Region: drag its rectangle on the map; the right button on its frame opens its panel"));
     if (entry().tool == Tool::Place && !g_place_status.empty())
         status_line(v.l, v.t + LINE_HEIGHT, g_place_status.c_str());
+    if (entry().tool == Tool::Select && !g_selection.empty() && liftable(g_selection[0]))   // the selected object's height
+        status_line(v.l, v.t + LINE_HEIGHT,
+                    ui_printf(ui_format("StatusLift", "height above the ground: %d (PgUp / PgDn, Shift by 16; Home: on the ground)"),
+                              static_cast<int>(std::lround(lift_of(g_selection[0])))).c_str());
     if (entry().tool == Tool::Track) {
         char bed[200];
         std::snprintf(bed, sizeof bed, ui_format("StatusRail", "rail (V): %s, next %s (PgUp / PgDn), gravel bed (B): %s"),
@@ -4072,6 +4281,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         } else if (entry().tool == Tool::Height) {
             start_height_stroke();
             height_step();
+            SetTimer(window, HEIGHT_TIMER, HEIGHT_REPEAT, nullptr);
             if (!g_test) SetCapture(window);
         } else if (entry().tool == Tool::Decals) {
             g_stroke = Stroke();
@@ -4111,8 +4321,14 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         }
         return true;
     }
+    case WM_TIMER:
+        if (w != HEIGHT_TIMER) return false;
+        if (g_stroke.active && entry().tool == Tool::Height && GetTickCount() - g_stroke.time >= HEIGHT_REPEAT) height_step(true);
+        else if (!g_stroke.active) KillTimer(window, HEIGHT_TIMER);
+        return true;
     case WM_LBUTTONUP:
         end_drag();
+        KillTimer(window, HEIGHT_TIMER);
         if (entry().tool == Tool::Height) end_height_stroke();
         if (entry().tool == Tool::Decals) end_decal_stroke();
         end_ground_stroke();
@@ -4151,7 +4367,10 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
     case WM_RBUTTONUP:
         return true;
     case WM_MOUSEWHEEL:
-        turn(GET_WHEEL_DELTA_WPARAM(w) > 0 ? 1 : -1);
+        if (shift_down() && !g_selection.empty() && entry().tool != Tool::Place && entry().tool != Tool::Track)
+            lift(GET_WHEEL_DELTA_WPARAM(w) > 0 ? LIFT_STEP : -LIFT_STEP, false);   // Shift: the object's height
+        else
+            turn(GET_WHEEL_DELTA_WPARAM(w) > 0 ? 1 : -1);
         return true;
     case WM_KEYDOWN:
     case WM_KEYUP: {
@@ -4194,6 +4413,13 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             MESSAGE("MsgRamp", "track: the next rail %s", g_ramp > 0 ? ui_text("WordClimbs", "climbs")
                                                           : g_ramp < 0 ? ui_text("WordDescends", "descends")
                                                                        : ui_text("WordFlat", "flat"));
+        } else if (entry().tool != Tool::Track && entry().tool != Tool::PushLine && !g_selection.empty() &&
+                   (w == VK_PRIOR || w == VK_NEXT || w == VK_HOME)) {   // the selected object's height
+            const int step = shift_down() ? LIFT_BIG_STEP : LIFT_STEP;
+            lift(w == VK_PRIOR ? step : -step, w == VK_HOME);
+        } else if (w == 'H' && !ctrl) {
+            g_show_heights = !g_show_heights;
+            MESSAGE("MsgHeights", "ground heights everywhere (H): %s", g_show_heights ? ui_text("WordOn", "on") : ui_text("WordOff", "off"));
         } else if (entry().tool == Tool::Track && w == 'B') {
             const int* at_bed = std::find(std::begin(BEDS), std::end(BEDS), g_bed);
             g_bed = g_bed == 0 ? BEDS[0] : (at_bed + 1 == std::end(BEDS) ? 0 : *(at_bed + 1));
@@ -4238,7 +4464,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         return true;
     }
     case WM_CHAR:   // the debug keys of the game are characters (DebugMode): ours are not for it
-        return std::strchr("rReEaAtTlLuUcC[]0123456789\x1b\x1a\x19", static_cast<int>(w)) != nullptr ||
+        return std::strchr("rReEaAtTlLuUcChH[]0123456789\x1b\x1a\x19", static_cast<int>(w)) != nullptr ||
                (entry().tool == Tool::PushLine && (w == 's' || w == 'S')) ||
                ((entry().tool == Tool::Height || entry().tool == Tool::Decals) && std::strchr("+-=mM", static_cast<int>(w))) ||
                (entry().tool == Tool::Decals && std::strchr(",.<>", static_cast<int>(w))) ||

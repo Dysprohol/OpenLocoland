@@ -130,7 +130,7 @@ Co widać:
 - **Wiersz stanu** u góry: narzędzie (albo to pod myszą), liczba kroków do cofnięcia i ponowienia,
   „nie zapisano” i ostatni komunikat - dlaczego czegoś nie da się zrobić, zawsze jest napisane tutaj.
 - **Przyciski ? i menu** na lewym końcu paska (tam, gdzie gra ma przycisk pauzy). **?** (albo F1)
-  otwiera pomoc: dziesięć stron z tym, co jest w tym rozdziale, w skrócie. **Przycisk menu**
+  otwiera pomoc: jedenaście stron z tym, co jest w tym rozdziale, w skrócie. **Przycisk menu**
   otwiera menu edytora ze wszystkimi poleceniami - nowa mapa, wczytaj, zapisz, ustawienia misji,
   rozmiar mapy, zagraj na mapie, cofnij, ponów, uruchom poziom, powrót do menu, wyjdź z gry.
 
@@ -147,12 +147,13 @@ Co widać:
 | zaznaczenie | kliknij obiekt (najmniejszy pod kursorem); oznacza go kółko |
 | przesunięcie | przeciągnij go |
 | obrót | R / E albo kółko myszy |
+| wyżej / niżej | PgUp / PgDn o 4 (z Shift o 16) albo Shift+kółko; Home stawia z powrotem na ziemi - wiersz stanu pokazuje wysokość nad ziemią |
 | zmiana armii | A: nasi, wróg, neutralni, piraci - flagi zmieniają kolor |
 | usunięcie | Del (Shift+Del: cały pociąg; Shift+klik narzędziem Usun: cały odcinek toru) |
 | cofnij / ponów | Ctrl+Z / Ctrl+Y - każdą zmianę, ile kroków chcesz |
 | panel obiektu | prawy przycisk myszy na nim |
 
-**Panel obiektu** (prawy przycisk) ma jego armię, obrót i usuwanie, kolor semafora i linię przy
+**Panel obiektu** (prawy przycisk) ma jego armię, obrót, wysokość (niżej, wyżej, na ziemi) i usuwanie, kolor semafora i linię przy
 nim, a dla fortyfikacji, kopalni i cytadeli - działo w każdym gnieździe (puste, działo albo
 rakiety). Prawy przycisk gdzie indziej go zamyka.
 
@@ -195,8 +196,18 @@ w nieckę z brzegiem, kładzie powierzchnię wody i dodaje jej efekty (kręgi na
 lawy) oraz region, w którym wybuchy rozpryskują wodę. Shift+przeciąganie ją usuwa. Jeden rodzaj
 wody ma na mapie jeden poziom, tak jak w misjach.
 
-Narzędzie **Wysokosc terenu** podnosi (2 na krok), obniża, wyrównuje albo wygładza teren pod
-przeciąganiem (`M` pędzel, `+`/`-` promień): na tych wysokościach stoją obiekty. Torów nie rusza.
+Narzędzie **Wysokosc terenu** kształtuje teren: trzymaj lewy przycisk i przeciągaj (`M` wybiera
+podnoszenie, obniżanie, wyrównywanie albo wygładzanie, `+`/`-` promień). Pędzel jest miękki - pełny
+w środku, słabszy ku brzegowi - i działa dalej, gdy trzymasz go w miejscu. Obraz terenu idzie za
+wysokościami: wzgórze widać jako wzgórze z cieniem i zasłania to, co stoi za nim, w edytorze i w grze
+(obraz zapisuje się z mapą; na terenie misji kampanii staje się własnym obrazem mapy). Poziomice co
+4 poziomy pokazują wysokości, gdy narzędzie jest wybrane; `H` pokazuje je przy każdym narzędziu.
+**Wyrównywanie** bierze poziom miejsca, w którym zaczynasz: zacznij na torze, żeby zrobić płaskowyż
+na wysokości toru. Obiekty zostają na ziemi; torów i terenu tuż przy nich narzędzie nie rusza.
+
+Obiekt może też stać wyżej albo niżej sam: zaznacz go i naciśnij `PgUp` / `PgDn` (albo Shift+kółko,
+albo WYSOKOSC w jego panelu); `Home` stawia go z powrotem na ziemi. Wagony i szyny zostają na torach.
+Kilka jednostek i dział gra zawsze sama stawia na ziemi; wiersz stanu to mówi.
 
 ### 4. Główna linia
 
@@ -217,7 +228,8 @@ od linii przez Y, prosty odcinek kończący się **ślepym końcem**.
 
 `V` zmienia rodzaj następnych szyn: zwykłe, bagienne (na nasypie), zniszczone albo zniszczone
 bagienne. `PgUp` / `PgDn` sprawiają, że następna szyna wznosi się albo opada (rampa na wyższy
-teren). `B` wybiera podsypkę pod nowe szyny. Del albo narzędzie **Usun odcinek toru** usuwa szyny.
+teren: każda rampa to 11 poziomów). Linię na wzgórze najpierw wprowadź po rampach, potem podnieś teren
+wokół jej końca i wyrównaj go, zaczynając na torze. `B` wybiera podsypkę pod nowe szyny. Del albo narzędzie **Usun odcinek toru** usuwa szyny.
 
 ### 5. Punkt przybycia posiłków
 
@@ -379,9 +391,11 @@ misji, Wysokosc terenu, Skrzynka z pieniedzmi, Pojazdy, Malowanie terenu, Woda i
 | `<` `>` | odstęp dekoracji |
 | `+` `-` | promień pędzla |
 | M | pędzel terenu: podnieś, obniż, wyrównaj, wygładź |
+| H | wysokości terenu (poziomice) przy każdym narzędziu |
 | B | podsypka nowych torów |
 | V | rodzaj nowych szyn |
-| PgUp / PgDn | następna szyna wznosi się / opada |
+| PgUp / PgDn | zaznaczony obiekt wyżej / niżej o 4 (Shift: o 16); narzędzie Tory: następna szyna wznosi się / opada |
+| Home | zaznaczony obiekt z powrotem na ziemi |
 | W | woda, bagno albo lawa |
 | S | semafory zaznaczonej linii (narzędzie Linia jednokierunkowa) |
 | Shift (z pędzlem) | usuwanie |

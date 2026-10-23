@@ -16,6 +16,11 @@
 // of the pictures is in the repository. A stroke keeps the rectangle it changed before and after
 // (PaintPatch, one step of the history). A map made on a campaign terrain keeps pointing at the
 // player's lNN.vid until it is painted; then it gets <name>.vid of its own when saved.
+//
+// The relief: when the ground's heights (GRID) change, the picture is drawn again there for them
+// (ground_relief) - raised ground shows higher on the screen, shaded by its slope, and its height
+// texture goes up with it, so the objects on it stand on what is seen and what stands behind a hill
+// is hidden by it.
 #include "patch.h"
 #include "editor_ground.h"
 
@@ -61,6 +66,7 @@ bool g_textures_read = false;
 
 // the picture
 bool g_ready = false, g_painted = false;
+std::string g_image;   // the image file it was read from
 int g_w = 0, g_h = 0;
 float g_left = 0, g_top = 0;   // where its top left corner is (screen coordinates of the map)
 uint8_t* g_vid = nullptr;
@@ -288,6 +294,48 @@ template <typename F> void each_pixel(float x, float y, float radius, F f) {
     upload(x0, y0, x1, y1);
 }
 
+// ---- the relief ----
+//
+// A pixel of the picture is a point of the screen (x, y - z): ground raised by dz shows dz px higher
+// and hides the ground behind it, ground lowered shows lower and may be hidden by the ground in front.
+// So a column of the picture is drawn front to back - the ground's world y from the bottom of the
+// screen up -, each pixel getting the first ground point that reaches it, and that point's texel is
+// where the old heights showed it. Between the cells' middles the heights are interpolated (the
+// engine stands an object on its cell's height, which is the value at the middle).
+
+struct Grid {
+    const short* z;
+    int w, h;
+    float at(float x, float y) const {
+        const float fx = x / 8 - 0.5f, fy = y / 8 - 0.5f;
+        const int x0 = static_cast<int>(std::floor(fx)), y0 = static_cast<int>(std::floor(fy));
+        const float tx = fx - x0, ty = fy - y0;
+        auto cell = [&](int cx, int cy) {
+            cx = (std::max)(0, (std::min)(w - 1, cx));
+            cy = (std::max)(0, (std::min)(h - 1, cy));
+            return static_cast<float>(z[cy * w + cx]);
+        };
+        const float top = cell(x0, y0) + (cell(x0 + 1, y0) - cell(x0, y0)) * tx;
+        const float bottom = cell(x0, y0 + 1) + (cell(x0 + 1, y0 + 1) - cell(x0, y0 + 1)) * tx;
+        return top + (bottom - top) * ty;
+    }
+    // the light on the ground at a point: from the upper left of the screen and high, half of it
+    // ambient (a steep face toward the viewer stays readable), 1 on flat ground
+    float light(float x, float y) const {
+        const float dx = (at(x + 4, y) - at(x - 4, y)) / 8, dy = (at(x, y + 4) - at(x, y - 4)) / 8;
+        const float lx = -0.42f, ly = -0.50f, lz = 0.76f;
+        const float n = std::sqrt(dx * dx + dy * dy + 1);
+        return 0.5f + 0.5f * (std::max)(0.0f, (-dx * lx - dy * ly + lz) / n) / lz;
+    }
+};
+
+uint16_t lit(uint16_t c, float f) {
+    if (f > 0.995f && f < 1.005f) return c;
+    const int r = (std::min)(31, static_cast<int>((c >> 11) * f + 0.5f)), g = (std::min)(63, static_cast<int>(((c >> 5) & 63) * f + 0.5f)),
+              b = (std::min)(31, static_cast<int>((c & 31) * f + 0.5f));
+    return static_cast<uint16_t>((r << 11) | (g << 5) | b);
+}
+
 }  // namespace
 
 bool ground_prepare(const std::string& map, float x, float y, void* vid, std::string& why) {
@@ -297,6 +345,7 @@ bool ground_prepare(const std::string& map, float x, float y, void* vid, std::st
         why = image.empty() ? map : image;
         return false;
     }
+    g_image = image;
     g_original_pixels = g_pixels;
     g_original_heights = g_heights;
     g_left = x - g_w / 2.0f;
@@ -312,6 +361,7 @@ bool ground_ready() { return g_ready; }
 void ground_reset() {
     g_ready = g_painted = g_stroke = false;
     g_vid = nullptr;
+    g_image.clear();
     g_pixels.clear();
     g_heights.clear();
     g_original_pixels.clear();
@@ -367,6 +417,76 @@ void ground_lower(float x, float y, float radius, int bed, int texture, bool res
         if (tex) g_pixels[i] = blend(g_pixels[i], sample(g_textures[texture], px, py), w * 0.85f);
     });
 }
+
+void ground_relief(const short* from, const short* to, int gw, int gh, int cx0, int cy0, int cx1, int cy1, int z_lo,
+                   int z_hi) {
+    if (!g_ready || !g_stroke || g_stroke_pixels.size() != g_pixels.size() || !from || !to) return;
+    const Grid f{from, gw, gh}, t{to, gw, gh};
+    // the cells around the changed ones too: the heights between the middles and the light use them
+    cx0 = (std::max)(0, cx0 - 2);
+    cy0 = (std::max)(0, cy0 - 2);
+    cx1 = (std::min)(gw - 1, cx1 + 2);
+    cy1 = (std::min)(gh - 1, cy1 + 2);
+    int z_min = z_lo, z_max = z_hi, column_min = 1 << 20, column_max = -(1 << 20);
+    for (int cy = 0; cy < gh; ++cy)
+        for (int cx = cx0; cx <= cx1; ++cx) {
+            const int a = from[cy * gw + cx], b = to[cy * gw + cx];
+            column_min = (std::min)({column_min, a, b});
+            column_max = (std::max)({column_max, a, b});
+            if (cy >= cy0 && cy <= cy1) {
+                z_min = (std::min)({z_min, a, b});
+                z_max = (std::max)({z_max, a, b});
+            }
+        }
+    // the screen rows where the changed ground showed or shows now
+    const int s_lo = cy0 * 8 - z_max - 1, s_hi = (cy1 + 1) * 8 - z_min + 1;
+    const float y_start = static_cast<float>(s_hi + column_max + 1), y_end = static_cast<float>(s_lo + column_min - 1);
+    int px0 = g_w, px1 = -1, py0 = g_h, py1 = -1;
+    for (int x = cx0 * 8; x < (cx1 + 1) * 8; ++x) {
+        const int px = static_cast<int>(std::floor(x - g_left));
+        if (px < 0 || px >= g_w) continue;
+        int top = s_hi + 1;   // the rows from here down are drawn
+        for (float y = y_start; y >= y_end && top > s_lo; y -= 0.25f) {
+            const float zt = t.at(x + 0.5f, y), sy = y - zt;
+            const int row = (std::max)(s_lo, static_cast<int>(std::ceil(sy)));
+            if (row >= top) continue;
+            const float zf = f.at(x + 0.5f, y);
+            const int src_row = static_cast<int>(std::floor(y - zf + 0.5f - g_top));
+            const size_t src = static_cast<size_t>((std::max)(0, (std::min)(g_h - 1, src_row))) * g_w + px;
+            const float light = std::fabs(zt - zf) < 0.01f ? 1.0f : t.light(x + 0.5f, y) / f.light(x + 0.5f, y);
+            const uint16_t colour = lit(g_stroke_pixels[src], (std::max)(0.55f, (std::min)(1.4f, light)));
+            const int height = static_cast<int>(std::lround(g_stroke_heights[src] + 8 * (zt - zf)));
+            const uint16_t h16 = static_cast<uint16_t>((std::max)(0, (std::min)(65535, height)));
+            for (int r = row; r < top; ++r) {
+                const int py = static_cast<int>(std::floor(r - g_top));
+                if (py < 0 || py >= g_h) continue;
+                const size_t i = static_cast<size_t>(py) * g_w + px;
+                g_pixels[i] = colour;
+                g_heights[i] = h16;
+                py0 = (std::min)(py0, py);
+                py1 = (std::max)(py1, py);
+            }
+            top = row;
+        }
+        px0 = (std::min)(px0, px);
+        px1 = (std::max)(px1, px);
+    }
+    if (px1 < px0 || py1 < py0) return;
+    touch(px0, py0);
+    touch(px1, py1);
+    upload(px0, py0, px1 + 1, py1 + 1);
+}
+
+bool campaign_ground_image(const std::string& image) {
+    // maps\lNN\lNN.vid
+    std::string s = image;
+    for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    if (s.size() != 16 || s.compare(0, 5, "maps\\") != 0 || s[8] != '\\' || s.compare(12, 4, ".vid") != 0) return false;
+    return s[5] == 'l' && std::isdigit(static_cast<unsigned char>(s[6])) && std::isdigit(static_cast<unsigned char>(s[7])) &&
+           s.compare(5, 3, s, 9, 3) == 0;
+}
+
+bool ground_own() { return g_ready && (g_painted || !campaign_ground_image(g_image)); }
 
 std::shared_ptr<PaintPatch> ground_stroke_end() {
     if (!g_stroke) return nullptr;

@@ -33,7 +33,11 @@ the editor of the game (DEVELOPERS.md "Editor mode", `editor_edit.cpp`) applies 
 - Rails sit 4 px below the ground (rail z = ground - 4). The track flattens the cells under it.
   **[tool]** `track`
 - **[editor]** The Ground height tool changes the cells (raise, lower, flatten, smooth) but never
-  those of the track and the ring around them; objects stay on the ground. A building placed in the
+  those of the track and the ring around them; objects stay on the ground (each keeps its own height
+  above it, which PgUp / PgDn / Home set - its z in SPR). The picture is drawn again for the new
+  heights (the relief: raised ground shows higher and hides what is behind it, its height texture
+  8 a level higher), so the picture becomes the map's own `<name>.vid`; the track's and buildings'
+  flattening is drawn the same way once the picture is the map's own. A building placed in the
   editor gets its footprint at the height under its middle and the ring half way, as `place` does
   (script `ReCalcGridZ(unit)`, function 81, does the same in the game).
 - The gravel bed: the missions that have one put a decal under every rail - VID 612 (l02, l09,

@@ -43,6 +43,17 @@ void ground_paint(float x, float y, float radius, int texture, bool restore);
 // with a texture (-1: none); `restore` puts the original heights and colours back.
 void ground_lower(float x, float y, float radius, int bed, int texture, bool restore);
 std::shared_ptr<PaintPatch> ground_stroke_end();
+// The relief (inside a stroke): the picture redrawn where the ground's heights went from `from` to
+// `to` (GRID, gw x gh cells; the cells cx0..cx1, cy0..cy1 changed, having been between z_lo and z_hi
+// in between) - the ground drawn where it now shows (raised ground higher on the screen, hiding
+// what stands behind it), its texels taken from the stroke's start picture, shaded by the new slope
+// against the old one, and its height texture raised or lowered with it (8 a level).
+void ground_relief(const short* from, const short* to, int gw, int gh, int cx0, int cy0, int cx1, int cy1, int z_lo,
+                   int z_hi);
+// The picture is the map's own (not a campaign map's maps\lNN\lNN.vid as it came), or was changed.
+bool ground_own();
+// The image file of a map file's ground is a campaign map's own maps\lNN\lNN.vid.
+bool campaign_ground_image(const std::string& image);
 // Undo / redo of a stroke.
 void ground_apply(const PaintPatch& patch, bool after);
 // The picture's height at a screen point of the map (0 outside).

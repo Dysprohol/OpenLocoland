@@ -131,7 +131,7 @@ What you see:
 - **The status line** at the top: the tool (or the one under the mouse), the undo and redo counts,
   "not saved" and the last message - why something could not be done is always written there.
 - **The ? and menu buttons** at the left end of the bar (where the game has its pause button).
-  **?** (or F1) opens the help: ten pages with everything of this chapter in short.
+  **?** (or F1) opens the help: eleven pages with everything of this chapter in short.
 
   ![The help](img/editor-help-en.jpg)
 
@@ -149,12 +149,13 @@ What you see:
 | select | click an object (the smallest under the cursor); the circle marks it |
 | move | drag it |
 | turn | R / E or the mouse wheel |
+| raise / lower it | PgUp / PgDn by 4 (with Shift by 16), or Shift+wheel; Home puts it back on the ground - the status line shows its height above the ground |
 | change its army | A: ours, enemy, neutral, pirates - the flags change colour |
 | delete | Del (Shift+Del: a whole train; Shift+click with the Delete tool: a whole section of track) |
 | undo / redo | Ctrl+Z / Ctrl+Y - every change, as many steps as you like |
 | its panel | the right mouse button on it |
 
-The **object's panel** (right button) has its army, turning and delete, a semaphore's colour and
+The **object's panel** (right button) has its army, turning, its height (lower, raise, on the ground) and delete, a semaphore's colour and
 its line, and - for a fort, a mining plant or a citadel - the gun in each of its sockets (empty, a
 cannon or missiles). The right button elsewhere closes it.
 
@@ -198,8 +199,18 @@ ground into a basin with a shore, lays the water's surface and adds its effects 
 water, bubbles, lava eruptions) and a region where explosions splash. Shift+drag takes it away.
 One kind of water has one level on a map, as in the missions.
 
-The **Ground height** tool raises (2 a step), lowers, flattens or smooths the ground where you drag
-(`M` the brush, `+`/`-` the radius): objects stand on these heights. It does not touch the track.
+The **Ground height** tool shapes the ground: hold the left button and drag (`M` picks raise,
+lower, flatten or smooth, `+`/`-` the radius). The brush is soft - full in the middle, less toward
+its edge - and goes on while you hold it still. The ground's picture follows: a hill shows as a
+shaded hill and hides what stands behind it, in the editor and in the game (the picture is saved
+with the map; on a campaign terrain it becomes the map's own). Contour lines every 4 levels show
+the heights while the tool is chosen; `H` shows them with any tool. **Flatten** takes the level
+where the stroke begins: begin it on the track to make a plateau at the track's level. Objects
+stay on the ground; the tool leaves the track and the ground beside it alone.
+
+An object can stand higher or lower on its own: select it and press `PgUp` / `PgDn` (or Shift+wheel,
+or HEIGHT in its panel); `Home` puts it back on the ground. Train cars and rails stay on the track.
+A few units and guns are always put on the ground by the game itself; the status line says so.
 
 ### 4. The main line
 
@@ -219,8 +230,9 @@ along the map, so the trains come and go out of sight. Then a spur for the facto
 the line through a Y, a straight piece ending in a **dead end**.
 
 `V` switches the kind of the next rails: plain, swamp (on its embankment), destroyed or destroyed
-swamp. `PgUp` / `PgDn` make the next rail climb or descend (a ramp onto higher ground). `B` picks
-the gravel bed under new rails. Del or the **Delete a section of track** tool removes rails.
+swamp. `PgUp` / `PgDn` make the next rail climb or descend (a ramp onto higher ground: each ramp
+11 levels). For a line on a hill, lay it up its ramps first, then raise the ground around the top and
+flatten it starting on the track. `B` picks the gravel bed under new rails. Del or the **Delete a section of track** tool removes rails.
 
 ### 5. The reinforcement point
 
@@ -382,9 +394,11 @@ Mission settings, Ground height, Money crate, Vehicles, Paint the ground, Water 
 | `<` `>` | the decals' spacing |
 | `+` `-` | the brush's radius |
 | M | the ground brush: raise, lower, flatten, smooth |
+| H | the ground's heights (contour lines) with any tool |
 | B | the gravel bed of new track |
 | V | the kind of new rails |
-| PgUp / PgDn | the next rail climbs / descends |
+| PgUp / PgDn | the selected object up / down by 4 (Shift: 16); Track tool: the next rail climbs / descends |
+| Home | the selected object back on the ground |
 | W | water, swamp or lava |
 | S | the selected line's semaphores (Push line tool) |
 | Shift (with a brush) | take away |

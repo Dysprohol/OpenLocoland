@@ -3,6 +3,7 @@ MOUSE
 SELECT AN OBJECT        LMB ON IT
 MOVE IT                 DRAG WITH LMB
 TURN IT                 WHEEL
+RAISE / LOWER IT        SHIFT+WHEEL
 PLACE FROM THE BAR      LMB ON THE MAP
 BACK TO SELECTING       RMB OR ESC
 THE OBJECT'S PANEL      RMB ON IT

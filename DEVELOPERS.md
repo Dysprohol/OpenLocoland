@@ -1193,7 +1193,7 @@ What the mode changes in the engine:
 |---|---|
 | `World_Construct` 0x41a658 | the window class gets the menu `AppMenu`: File (Load, Save, About, Exit) and Options |
 | `Vid_Read` 0x44e35d | decals (spriteClass 8, 61 VIDs: grass, bushes, flowers, reeds, stones, paving, the gravel bed of the tracks, road posts, wreckage) are loaded as class 0, ordinary objects drawn as sprites - so they can be moved and are saved with the map. Outside editor mode a decal is painted into the ground (`GroundVid_BakeObject`) and removed as it is created |
-| `Object_Construct` 0x445b0b | no `World_SetGroundZ` for VIDs with flag 8 (buildings): the ground is not raised under them, GRID stays as the map file has it |
+| `Object_Construct` 0x445b0b | no `World_SetGroundZ` for VIDs with flag 8 - seven decals: the gun and unit wreckage 96 / 98, the curb stones 817 / 853, the desert fence 849, the road posts 869 / 871 (outside editor mode the cells under them go up to their top, z + sizeZ): the ground is not raised under them, GRID stays as the map file has it |
 | `Level_Load`, `World_CreateObject` | no `ANI_BIRTH` handlers of the loaded objects, no BIRTH script of new ones |
 | `Minimap_Draw` | the terrain objects are drawn on the minimap too |
 | `Graphics_Construct` | Graphics flag 0x400: in full screen the frame is presented with Blt like in a window, not flipped, so a menu bar would stay visible (no effect in a window; the editor has no window menu, "No window menu" below) |
@@ -1294,6 +1294,7 @@ with the engine's own pieces (scripts and object updates are off, so nothing els
 | select | a click on an object (the smallest one under the cursor; rails only when nothing else is there) | the selection circle VID 460 ("Select Unit Circle", its outline frame) is drawn under it and the guns in its sockets |
 | its panel | the right button on an object (Select tool) | the object's panel (below): army, turn, delete, a semaphore's colour and line, the gun in each socket |
 | move | drag a selected object | `Object_MoveTo` (what `ACT_CHANGE_COOR` 63 calls); the height follows the ground (`World_GetGroundZForVid`), keeping the object's own height above it |
+| height | PgUp / PgDn by 4 (Shift: 16) or Shift+wheel, Home back on the ground; HEIGHT: LOWER / RAISE / ON THE GROUND in its panel | the object and its guns `Object_MoveTo` by the change of its height above the ground (z less `World_GetGroundZForVid` under it), -32 to 400; shown in the status line ("height above the ground: N") and after "selected"; saved as its SPR z ("The relief and the heights of objects" below) |
 | turn | R / E or the mouse wheel | `Object_SetDirection` by one of the VID's `nDir` directions; the guns in its sockets go to their new places |
 | army | A (0 -> 1 -> 2 -> 3: ours, enemy, neutral, pirates) | `ACT_SET_ARMY` 97; the armies' colours as in play (below) |
 | semaphore red / green | T | red is the command `10,0,0,0` (MAP_RULES.md 7), shown with that animation - also the red posts of a loaded map, whose first command never runs on a held level (the command stays as it is) |
@@ -1392,7 +1393,8 @@ through the first junction onto the loop, round to the second junction and back 
 without `R_DOT`, `R_MAP` or `RAIL` lines.
 **Debug keys.** With `DebugMode=1` in `Locoland.cfg` the game has its keys (`GameWorld_Run`).
 While the level is held only O (ground height grid and object debug, World flags 0x8800) gets
-the debug drawing called at all (flag 0x8000), after which H (object numbers, GameWorld flag 4)
+the debug drawing called at all (flag 0x8000), after which H (object numbers, GameWorld flag 4; but
+the editor takes H for the ground's heights while the level is held)
 and G (the object map, 8) show as well; I is the flagman debug; P freezes the game entirely (no
 drawing either) and ~ reloads the VIDs. R and E are the editor's keys while the level is held
 (the rail debug view R works when it runs), and E (select units of any army) is player input,
@@ -1473,11 +1475,11 @@ back to the editor after the end screen. A variant with two trains of the factor
 patrolling), night and rain plays without errors too.
 
 **Ground, gravel bed, decals** (`editor_edit.cpp`, `ground.h`, `ground.cpp`). The strip's Ground height
-tool raises (2 a step), lowers, flattens or smooths the GRID cells (8 x 8 px) in a circle around the
-cursor while the button is held (M the brush, + and - the radius), shows them at their height
-coloured by it, leaves the track's cells and their ramp as they are, puts the objects back on the
-new ground and makes the stroke one undo step (World_SetGroundZ). The ground's picture does not
-change: the heights are what objects stand on. New track gets the gravel bed decal the missions use
+tool raises, lowers, flattens or smooths the GRID cells (8 x 8 px) in a circle around the cursor while
+the button is held (M the brush, + and - the radius; the brush and the picture: "The relief and the
+heights of objects" below), shows the brush's cells at their height coloured by it, leaves the track's
+cells and their ramp as they are, puts the objects back on the new ground and makes the stroke one
+undo step (World_SetGroundZ). New track gets the gravel bed decal the missions use
 (VID 612, 615 ice, 616 volcanic, 617 desert: the rail's place and direction, 18 below it; B cycles it,
 the map's most common one by default), deleted and undone with its rail. In the editor a bed is an
 object drawn 18 px under its rail: an embankment whose slope the ground's picture hides, as the
@@ -1503,6 +1505,72 @@ with its bed deleted and undone (rail points logged), the bed seen under new rai
 painted into the ground in play; 15 decals scattered, taken away with Shift and brought back by undo;
 a test script calling `ReCalcGridZ` for every factory ("ReCalcGridZ: 192 cells ..." in
 `LocoFix.log`, no "Unknown extern").
+
+**The relief and the heights of objects** (`editor_ground.cpp` `ground_relief`, `editor_edit.cpp`
+the sections "the ground" and "the height of an object"). The ground's picture is in screen
+coordinates (a pixel is the screen point x, y - z; MAP_RULES.md 1) and its D16 height texture holds
+1026 + 8 a GRID level, the "depth" every sprite is drawn against (a sprite pixel shows where its
+height - 1024 + 8 z and its own depth - is not below the buffer's: `Vid_BlitSpanDepth`). So raising
+the GRID alone made the objects stand dz px higher than the ground they were drawn on - they floated,
+and the tester's "how do I change an object's height" had no answer either. Now:
+
+- *The relief.* When the GRID changes, the picture is drawn again there: a column at a time, front to
+  back (the ground's world y from the bottom of the screen up, in quarter-pixel steps), every pixel
+  gets the first ground point that reaches it - raised ground shows higher and hides what is behind
+  it, lowered ground may be hidden by the ground in front -, that point's texel from where the old
+  heights showed it, lightened or darkened by the new slope against the old one (light from the upper
+  left, half of it ambient: a steep face toward the viewer stays readable), and its height texel
+  raised by 8 a level. The heights between the cells' middles are interpolated (the engine stands an
+  object on its cell's value, the value at the middle). Within a Ground height stroke every step is
+  drawn from the stroke's start picture, so nothing is lost step by step; the stroke keeps the
+  rectangle it changed (`PaintPatch`) and undo puts the picture back exactly. The track's and a
+  placed building's flattening are drawn the same way, one step each. Always for the Ground height
+  tool; for the track and buildings only when the picture is the map's own (an empty map, a meadow, a
+  grown map, a painted one, or one the tool already redrew): a campaign terrain's `lNN.vid` is left
+  as it came until the tool is used there, and then the map gets `<name>.vid` when saved, as a painted
+  one does (`ground_save`: never over `lNN.vid`). The Water tool keeps its own way (it lowers the
+  picture's heights where it paints, MAP_RULES.md 2). Chosen over an overlay alone because it shows
+  in the game too: the hill is in the saved picture, the objects stand on what is seen, the depth hides
+  what is behind it; the cost is a picture of the map's own (a few MB) once the ground is shaped.
+- *The brush.* Soft: raise and lower add 2 a step times a smoothstep of the distance (full in the
+  middle, 0 at the edge), the parts of a level kept per cell for its next step, so hills come out
+  round instead of as flat-topped discs; flatten pulls toward its level the same way (fully in the
+  middle half). Held still the brush goes on every 150 ms (a window timer, `HEIGHT_TIMER`) - before,
+  it worked only when the cursor entered a new cell. Flatten's level is the cell where the stroke
+  begins, now named in the status line ("flatten to level 92"): begun on the track it gives a plateau
+  at the track's level - the way to put a line and its factory on a hill: lay the line up its ramps
+  (Track tool PgUp, 11 levels each), raise the ground around the top, flatten it starting on the track.
+- *Reading the heights.* Contour lines every 4 levels over the whole view (a dash where two
+  neighbouring cells are on two sides of a level, at their height, coloured blue - green - red by it,
+  every 20 levels brighter), always with the Ground height tool and with any tool after H.
+- *The ground under the cursor* (`map_point`, used by the brush, placing, the Track tool's start and
+  the decals) is the ground point nearest to the viewer whose y - z reaches the cursor, searched down
+  the column as far as its highest cell allows; it was two guesses from the flat ground, which on a
+  hill or a plateau took the wrong cell (a flatten begun on the track's top took the ground below).
+- *An object's own height.* The object's height above the ground is its z less the ground under it
+  (`World_GetGroundZForVid`); a drag and a Ground height stroke keep it. PgUp / PgDn (Shift: 16; Track
+  and Push line tools aside, where PgUp / PgDn are the ramps), Shift+wheel and Home set it for the
+  selection (a fort's or mining plant's guns go with it), -32 to 400, each change one step of the
+  history; the status line shows it. Saved as the SPR z and kept when the map is loaded:
+  `Object_Construct` takes the z it is given, except for the 17 VIDs with flag 0x200, which it puts
+  on the ground (units 70 and 517-519, the civil robots 72 and 77, the objects 74, 79 and 414, the
+  creature 421 and the generators and guns 401, 403, 404, 427, 556, 573, 706) - the editor refuses
+  those with the reason, as it refuses train cars (they stand on their rails: the Track tool's ramps
+  raise them) and regions (their z is their water's or fog's level). In play a unit or a creature
+  that moves takes the ground's height again (`Object_Move`, `Cannon_Move`, `Creature_Move`,
+  `CivRobot_Move` read it; read from the code), so a lifted unit stays lifted only while it stands; a
+  lifted decal is painted into the ground picture where it is drawn.
+
+Checked in the game (English and Polish): an empty 2048 x 1536 map; a line with two ramps up to level
+92, a hill raised around its top end and flattened from the track (the log: "flatten to level 92"),
+a factory at the line's dead end on the plateau, a fort beside it lifted by 12 ("12 above the ground";
+after saving and loading the map: "selected VID 162 ... 12 above the ground"), the fort's panel with
+WYSOKOSC: NIZEJ / WYZEJ / NA ZIEMI, a hill raised, undone (the picture flat again) and redone, the
+contours with H in the Select tool; played: the hills and the plateau in the saved picture, the
+objects standing on it, a locomotive placed in the editor patrolling up both ramps onto the plateau
+and back, `error.log` without rail or logic errors; mission 1's terrain: a hill raised and the map
+saved as `maps\camptest\camptest.map` with `camptest.vid` (`l01.vid` unchanged), loaded back with the
+hill; `test_missions.ps1` all 20, `test_rail_rules.py` 3000 of 3000.
 
 **A new map** (File > New..., `src/LocoFix/editor_newmap.cpp`). The dialog takes the map's folder in
 `maps\` and its ground: an empty map - a plain ground of one of the painting's textures (grass,
@@ -1738,7 +1806,7 @@ there - read through it the lookups found nothing), and keeps each text (the lan
 change in a run); a key not found is logged once. The status line's messages are made twice: in
 the pack's language for the screen and in English for `LocoFix.log` (`ui_english`), so tests read
 the same log lines in any language; the test commands (`WM_COPYDATA`) run in English as well. The
-627 keys are in `[Editor]` of `lang/en/strings.override.ini` (the English texts),
+644 keys are in `[Editor]` of `lang/en/strings.override.ini` (the English texts),
 `lang/pl/strings.override.ini` (Polish without diacritics, the Polish game's names: Fabryka, Punkt
 naprawczy, Fortyfikacja, Wieza rakietowa) and the German, Hungarian and Russian ones (with the
 names of each pack's own `strings.ini`: Fabrik / Gyáregység / Депо, Werkstatt / Szervízdepó /
@@ -1766,9 +1834,9 @@ pictures (22 px right of the device's middle, 18 up), the title in the menu titl
 the text in the menu font (VID 2), the page arrows (VIDs 475/476) and the start button (VID 477)
 with "back to the map". **Help** (the ? button or F1) shows the editor's help pages the way the
 game shows its own (`maps\menu4.lst` -> `menu41.txt` ...): `maps\edithelp.lst` lists
-`maps\edithelp1.txt` ... `edithelp10.txt` - the mouse, the keys, the bar, laying track, the mission,
+`maps\edithelp1.txt` ... `edithelp11.txt` - the mouse, the keys, the bar, laying track, the mission,
 the buttons, the object's panel, all objects and decals, trains and rails, water, painting and
-regions - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
+regions, heights - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
 44 characters a line and 14 lines, ESC 7 / ESC 2 switch to the lit font VID 7 and back to VID 2):
 English in `game/maps/` (the fallback of every pack) and the others in `lang/<code>/maps/`; the files are
 opened through the game's own `CreateFileA` import, so the chosen pack's copies are read. **Menu**
