@@ -2244,6 +2244,32 @@ int g_flatten_level = -1;    // the level taken with Alt+click for Flatten (-1: 
 constexpr int MIN_STRENGTH = 1, MAX_STRENGTH = 5;
 constexpr DWORD HEIGHT_REPEAT = 150;        // ms: the brush held still works again (a window timer)
 constexpr UINT_PTR HEIGHT_TIMER = 0x4c48;
+
+// The frames since a stroke began and what they spent (ms): the game's own scene, and of the
+// overlay the contours, the brush, the bar and the rows - for the stroke's log line.
+struct FrameTimes {
+    int frames = 0;
+    double began = 0, scene = 0, contours = 0, tool = 0, bar = 0, options = 0;
+} g_frame_times;
+
+void stroke_timing_begin() {
+    g_frame_times = FrameTimes();
+    g_frame_times.began = ground_clock();
+    ground_times(true);
+}
+
+// A stroke's log line (a test, or a stroke whose frames were slow - over 20 ms a frame).
+void stroke_timing_end(const char* what, int steps) {
+    const double ms = ground_clock() - g_frame_times.began;
+    const FrameTimes& f = g_frame_times;
+    const GroundTimes t = ground_times(true);
+    if (!g_test && (f.frames == 0 || ms / f.frames <= 20)) return;
+    const double per = f.frames ? 1.0 / f.frames : 0;
+    patch::log("editor: %s stroke: %d steps, %d frames in %.0f ms (%.0f fps); relief %.0f ms (%d), textures %.0f ms (%d writes, %d locks), "
+               "brush %.0f ms (%d); a frame: scene %.1f, contours %.1f, tool %.1f, bar %.1f, rows %.1f ms",
+               what, steps, f.frames, ms, f.frames * 1000 / (std::max)(1.0, ms), t.relief, t.reliefs, t.upload, t.uploads, t.locks,
+               t.paint, t.paints, f.scene * per, f.contours * per, f.tool * per, f.bar * per, f.options * per);
+}
 int g_spacing = 16;   // Decals: the least distance between two decals, px (< and >)
 constexpr int MIN_SPACING = 4, MAX_SPACING = 64, SPACING_STEP = 4;
 
@@ -2270,6 +2296,9 @@ struct Stroke {
     int ramp_level = 0;
     uint32_t seed = 0;                     // Rough: its randomness
     int steps = 0;
+    // Height: the cells changed since the picture last followed (drawn once a frame, relief_flush)
+    bool dirty = false;
+    int dx0 = 0, dy0 = 0, dx1 = -1, dy1 = -1, dz_lo = 1 << 20, dz_hi = -(1 << 20);
 } g_stroke;
 
 bool ground_paintable(bool quiet);   // the ground's picture, below
@@ -2336,6 +2365,7 @@ bool in_grid(const rail::Cell& c) { return c.first >= 0 && c.first < grid_width(
 void start_height_stroke(bool right) {
     g_stroke = Stroke();
     g_stroke.active = true;
+    stroke_timing_begin();
     g_stroke.right = right;
     g_stroke.brush = right ? Brush::Lower : g_brush;
     if (shift_down()) g_stroke.brush = Brush::Flatten;   // for the stroke, the mode stays
@@ -2391,9 +2421,33 @@ void apply_heights(const std::vector<std::pair<rail::Cell, short>>& heights) {
         z_lo = (std::min)(z_lo, static_cast<int>(was));
         z_hi = (std::max)(z_hi, static_cast<int>(was));
     }
-    // the picture as it shows the new heights, from the stroke's start (no loss step by step)
-    if (g_stroke.relief && !heights.empty())
-        ground_relief(g_stroke.grid_from.data(), grid(), w, h, cx0, cy0, cx1, cy1, z_lo, z_hi);
+    // the picture as it shows the new heights, from the stroke's start (no loss step by step), drawn
+    // once a frame for all the steps since the last one (a quick drag has several steps a frame)
+    if (g_stroke.relief && !heights.empty()) {
+        if (g_stroke.dirty) {
+            cx0 = (std::min)(cx0, g_stroke.dx0);
+            cy0 = (std::min)(cy0, g_stroke.dy0);
+            cx1 = (std::max)(cx1, g_stroke.dx1);
+            cy1 = (std::max)(cy1, g_stroke.dy1);
+            z_lo = (std::min)(z_lo, g_stroke.dz_lo);
+            z_hi = (std::max)(z_hi, g_stroke.dz_hi);
+        }
+        g_stroke.dx0 = cx0;
+        g_stroke.dy0 = cy0;
+        g_stroke.dx1 = cx1;
+        g_stroke.dy1 = cy1;
+        g_stroke.dz_lo = z_lo;
+        g_stroke.dz_hi = z_hi;
+        g_stroke.dirty = true;
+    }
+}
+
+// The picture drawn for the steps since the last frame (before the frame, and when the stroke ends).
+void relief_flush() {
+    if (!g_stroke.active || !g_stroke.relief || !g_stroke.dirty || !grid()) return;
+    g_stroke.dirty = false;
+    ground_relief(g_stroke.grid_from.data(), grid(), grid_width(), grid_height(), g_stroke.dx0, g_stroke.dy0, g_stroke.dx1,
+                  g_stroke.dy1, g_stroke.dz_lo, g_stroke.dz_hi);
 }
 
 // The weight of the brush at a distance d (0 in the middle, 1 at its edge).
@@ -2483,6 +2537,7 @@ void height_step(bool again = false) {
 
 void end_height_stroke() {
     if (!g_stroke.active) return;
+    relief_flush();
     g_stroke.active = false;
     std::vector<GridChange> changes;
     for (const auto& c : g_stroke.before) {
@@ -2490,6 +2545,7 @@ void end_height_stroke() {
         if (now != c.second) changes.push_back({c.first.first, c.first.second, c.second, now});
     }
     const std::shared_ptr<PaintPatch> relief = g_stroke.relief ? ground_stroke_end() : nullptr;
+    stroke_timing_end("height", g_stroke.steps);
     if (changes.empty()) {
         if (relief) ground_apply(*relief, false);   // back as it was (a stroke that changed nothing in the end)
         return;
@@ -2715,6 +2771,7 @@ void start_ground_stroke(bool water, bool erase = false) {
     if (!ground_paintable(false)) return;
     g_gstroke = GroundStroke();
     g_gstroke.active = true;
+    stroke_timing_begin();
     g_gstroke.water = water;
     g_gstroke.erase = erase || shift_down();
     if (water) {
@@ -2829,6 +2886,7 @@ void end_ground_stroke() {
     if (!g_gstroke.active) return;
     g_gstroke.active = false;
     const std::shared_ptr<PaintPatch> paint = ground_stroke_end();
+    stroke_timing_end(g_gstroke.water ? "water" : "paint", static_cast<int>(g_gstroke.dabs.size()));
     std::vector<uint8_t*> objects;
     std::vector<State> before;
     for (uint8_t* o : g_gstroke.made) {   // the tiles made: there was none
@@ -3985,9 +4043,69 @@ void status_line(float x, float y, const char* text) {
     else reinterpret_cast<Printf_t>(PRINTF)(graphics(), x + 6, y + 2, "%s", text);
 }
 
+// Graphics_DrawVid locks the back and the depth buffer around every layer 2-4 picture (the
+// software sprites) and unlocks them right after it - unless they were already locked when it
+// was called, in which case it leaves them locked for the caller. A lock of those surfaces costs
+// about a third of a millisecond at 2560x1440, so the bar - some seventy small pictures: the
+// icons, the keys' characters - spends most of its frame in locks (19.8 ms of its 28 ms). Locked
+// once around the whole bar, they stay locked and every picture after the first costs its pixels
+// only. The unlock is the engine's own (EndScene does it the same way before presenting).
+constexpr uintptr_t SURFACE_LOCK = 0x4123c0;
+// Graphics: the software buffers and their pitches (backBufferBits, depthBits, types.txt)
+constexpr size_t G_BACK_BUFFER = 0xc04, G_DEPTH_BUFFER = 0xbf8;
+constexpr size_t G_BACK_BITS = 0x208, G_BACK_PITCH = 0x214, G_DEPTH_BITS = 0x218, G_DEPTH_PITCH = 0x21c;
+
+using SurfaceLock_t = void*(__stdcall*)(void* surface, int* pitch, unsigned flags);
+
+void unlock_surface(void* s) {   // IDirectDrawSurface7::Unlock, vtable slot 0x80
+    if (s) reinterpret_cast<HRESULT(__stdcall*)(void*, void*)>((*reinterpret_cast<void***>(s))[0x80 / 4])(s, nullptr);
+}
+
+struct SoftwareLock {
+    uint8_t* g = static_cast<uint8_t*>(graphics());
+    bool back = false, depth = false;
+    SoftwareLock() {
+        if (!g) return;
+        back = *reinterpret_cast<void**>(g + G_BACK_BITS) == nullptr;
+        depth = *reinterpret_cast<void**>(g + G_DEPTH_BITS) == nullptr;
+        lock();
+    }
+    void lock() {
+        if (!g) return;
+        const bool color32 = (*reinterpret_cast<uint32_t*>(g) & 2) != 0;   // Graphics.flags COLOR32
+        if (back && *reinterpret_cast<void**>(g + G_BACK_BITS) == nullptr) {
+            int pitch = 0;
+            void* bits = reinterpret_cast<SurfaceLock_t>(SURFACE_LOCK)(
+                *reinterpret_cast<void**>(g + G_BACK_BUFFER), &pitch, 0);
+            *reinterpret_cast<void**>(g + G_BACK_BITS) = bits;
+            *reinterpret_cast<int*>(g + G_BACK_PITCH) = pitch / (color32 ? 4 : 2);
+        }
+        if (depth && *reinterpret_cast<void**>(g + G_DEPTH_BITS) == nullptr) {
+            int pitch = 0;
+            void* bits = reinterpret_cast<SurfaceLock_t>(SURFACE_LOCK)(
+                *reinterpret_cast<void**>(g + G_DEPTH_BUFFER), &pitch, 0);
+            *reinterpret_cast<void**>(g + G_DEPTH_BITS) = bits;
+            *reinterpret_cast<int*>(g + G_DEPTH_PITCH) = pitch / 2;
+        }
+    }
+    void unlock() {
+        if (!g) return;
+        if (back && *reinterpret_cast<void**>(g + G_BACK_BITS)) {
+            unlock_surface(*reinterpret_cast<void**>(g + G_BACK_BUFFER));
+            *reinterpret_cast<void**>(g + G_BACK_BITS) = nullptr;
+        }
+        if (depth && *reinterpret_cast<void**>(g + G_DEPTH_BITS)) {
+            unlock_surface(*reinterpret_cast<void**>(g + G_DEPTH_BUFFER));
+            *reinterpret_cast<void**>(g + G_DEPTH_BITS) = nullptr;
+        }
+    }
+    ~SoftwareLock() { unlock(); }
+};
+
 void draw_bar() {
     const Box v = view(), b = bar();
     const float y = (b.t + b.b) / 2;
+    SoftwareLock locked;   // one lock for every picture of the bar (see above)
     // the base, and its side tiles out to the edges of the view (status_bar.cpp lines them up
     // the same way): the ones next to the base (frames 1 and 2), then the repeated ones (0, 3)
     draw_screen(VID_BAR, 0, (b.l + b.r) / 2, y, 0);
@@ -4001,7 +4119,21 @@ void draw_bar() {
     float sx, sy;
     entry_cell(SLOTS, sx, sy);
     draw_screen(VID_STRIP, 0, sx - SLOT / 2 + STRIP_WIDTH / 2, sy, 1);
-    // the icons, their keys, the chosen one framed
+    // the keys and the chosen one framed, in the plates' lock (text is a software picture per
+    // character: 60 locks a frame without it)
+    for (int i = 0; i < ENTRY_COUNT; ++i) {
+        const Entry& e = ENTRIES[i];
+        float x, ey;
+        entry_cell(i, x, ey);
+        draw_text(FONT_KEYS, x + 18, ey + 9, e.key, true, 4);
+    }
+    float cx, cy;
+    entry_cell(g_entry, cx, cy);
+    draw_screen(VID_SLOT_FRAME, 0, cx, cy, 3);
+    // the icons last: they are hardware pictures (the atlases are layer 5) and Graphics_DrawVid
+    // unlocks the software pair for anything above layer 4 - drawing them between the plates and
+    // the keys would unlock the pair that the keys then have to lock again, 60 times over
+    locked.unlock();
     for (int i = 0; i < ENTRY_COUNT; ++i) {
         const Entry& e = ENTRIES[i];
         float x, ey;
@@ -4016,11 +4148,7 @@ void draw_bar() {
             std::snprintf(label, sizeof label, "%.4s", label_of(e));
             draw_text(FONT_TIPS, x - 18, ey - 6, label, false, 3);
         }
-        draw_text(FONT_KEYS, x + 18, ey + 9, e.key, true, 4);
     }
-    float cx, cy;
-    entry_cell(g_entry, cx, cy);
-    draw_screen(VID_SLOT_FRAME, 0, cx, cy, 3);
 }
 
 // ---- the rows of the ground's tools ----
@@ -4526,7 +4654,9 @@ void draw_overlay() {
                           on_options(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y));
     const float mx = cam_x + g_mouse.x, my = cam_y + g_mouse.y;
 
+    double began = ground_clock();
     if (g_show_heights || entry().tool == Tool::Height) draw_contours();
+    g_frame_times.contours += ground_clock() - began;
     for (uint8_t* o : g_selection) circle(o, 1);
     // a selected train's patrol: its far point, marked like the route markers' squares
     int px = 0, py = 0;
@@ -4600,9 +4730,13 @@ void draw_overlay() {
         } else if (entry().tool == Tool::PushLine) {
             // drawn below with the lines
         } else if (entry().tool == Tool::Height || entry().tool == Tool::Decals) {
+            began = ground_clock();
             draw_ground_tool(entry().tool == Tool::Height);
+            g_frame_times.tool += ground_clock() - began;
         } else if (entry().tool == Tool::Paint || entry().tool == Tool::Water) {
+            began = ground_clock();
             draw_paint_tool();
+            g_frame_times.tool += ground_clock() - began;
         } else if (g_drag.active && g_drag.moved) {
             cursor = CURSOR_MOVE;
         } else if (pick(mx, my)) {
@@ -4613,8 +4747,12 @@ void draw_overlay() {
     draw_regions();
     draw_push_lines(entry().tool == Tool::PushLine);
 
+    began = ground_clock();
     draw_bar();
+    g_frame_times.bar += ground_clock() - began;
+    began = ground_clock();
     draw_options();
+    g_frame_times.options += ground_clock() - began;
 
     // the status line, in the mouse tips' font on a dark band: the tool (or the entry under
     // the cursor), the undo and redo counts, "not saved" and the last message
@@ -4694,8 +4832,13 @@ void draw_map_frame() {
 
 void __fastcall DrawScene_editor(void* g, void* edx, int draw) {
     const bool held = editor_level_held() && draw;
+    relief_flush();   // the strokes' changes since the last frame: into the picture and its textures
+    ground_flush();
+    const double began = ground_clock();
     g_draw_scene(g, edx, draw);
+    g_frame_times.scene += ground_clock() - began;
     if (held) {
+        ++g_frame_times.frames;
         draw_map_frame();
         draw_overlay();
     }

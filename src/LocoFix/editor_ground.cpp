@@ -76,6 +76,9 @@ std::vector<uint16_t> g_stroke_pixels, g_stroke_heights;
 std::vector<uint8_t> g_textures_of, g_stroke_textures;   // the texture painted on each pixel (NO_TEXTURE: the original)
 bool g_stroke = false;
 int g_x0 = 0, g_y0 = 0, g_x1 = -1, g_y1 = -1;
+// the rectangle changed since the last frame, to be written into the textures (ground_flush)
+int g_pending_x0 = 0, g_pending_y0 = 0, g_pending_x1 = -1, g_pending_y1 = -1;
+GroundTimes g_times;
 
 std::vector<std::string> fields(const std::string& line) {
     std::vector<std::string> out;
@@ -227,6 +230,7 @@ bool upload_texture(uint8_t* texture, const MemoryTile& t, int x0, int y0, int x
     DDSURFACEDESC2 d = {};
     d.dwSize = sizeof d;
     if (surface->Lock(nullptr, &d, DDLOCK_WAIT | DDLOCK_WRITEONLY | DDLOCK_NOSYSLOCK, nullptr) != DD_OK) return false;
+    ++g_times.locks;
     Format f;
     f.z = (d.ddpfPixelFormat.dwFlags & DDPF_ZBUFFER) != 0;
     f.bits = f.z ? static_cast<int>(d.ddpfPixelFormat.dwZBufferBitDepth) : static_cast<int>(d.ddpfPixelFormat.dwRGBBitCount);
@@ -248,8 +252,10 @@ bool upload_texture(uint8_t* texture, const MemoryTile& t, int x0, int y0, int x
 }
 
 // The rectangle (x0, y0) - (x1, y1) of the picture into the live image's textures.
-void upload(int x0, int y0, int x1, int y1) {
+void write_textures(int x0, int y0, int x1, int y1) {
     if (!g_vid) return;
+    const double began = ground_clock();
+    ++g_times.uploads;
     const auto* tiles = *reinterpret_cast<MemoryTile**>(g_vid + GV_TILES);
     auto** textures = *reinterpret_cast<uint8_t***>(g_vid + GV_TEXTURES);
     const int count = *reinterpret_cast<short*>(g_vid + GV_TEXTURE_COUNT);
@@ -271,6 +277,23 @@ void upload(int x0, int y0, int x1, int y1) {
         if (t.next <= 0) break;
         i = t.next;
     }
+    g_times.upload += ground_clock() - began;
+}
+
+// A change of the rectangle (x0, y0) - (x1, y1) of the picture: written into the textures by the
+// next frame (several dabs or steps a frame, one lock of each texture).
+void upload(int x0, int y0, int x1, int y1) {
+    if (g_pending_x1 < g_pending_x0) {
+        g_pending_x0 = x0;
+        g_pending_y0 = y0;
+        g_pending_x1 = x1;
+        g_pending_y1 = y1;
+        return;
+    }
+    g_pending_x0 = (std::min)(g_pending_x0, x0);
+    g_pending_y0 = (std::min)(g_pending_y0, y0);
+    g_pending_x1 = (std::max)(g_pending_x1, x1);
+    g_pending_y1 = (std::max)(g_pending_y1, y1);
 }
 
 bool to_picture(float x, float y, int& px, int& py) {
@@ -286,11 +309,14 @@ template <typename F> void each_pixel(float x, float y, float radius, F f, bool 
     const int x0 = (std::max)(0, cx - r), y0 = (std::max)(0, cy - r), x1 = (std::min)(g_w, cx + r + 1),
               y1 = (std::min)(g_h, cy + r + 1);
     if (x0 >= x1 || y0 >= y1) return;
+    const double began = ground_clock();
     for (int py = y0; py < y1; ++py)
         for (int px = x0; px < x1; ++px) {
             const float w = weight(std::hypot(static_cast<float>(px - cx), static_cast<float>(py - cy)), radius, px, py, hard);
             if (w > 0) f(px, py, static_cast<size_t>(py) * g_w + px, w);
         }
+    g_times.paint += ground_clock() - began;
+    ++g_times.paints;
     touch(x0, y0);
     touch(x1 - 1, y1 - 1);
     upload(x0, y0, x1, y1);
@@ -361,9 +387,19 @@ bool ground_prepare(const std::string& map, float x, float y, void* vid, std::st
 
 bool ground_ready() { return g_ready; }
 
+void ground_flush() {
+    if (g_pending_x1 < g_pending_x0) return;
+    const int x0 = g_pending_x0, y0 = g_pending_y0, x1 = g_pending_x1, y1 = g_pending_y1;
+    g_pending_x0 = 0;
+    g_pending_x1 = -1;
+    if (g_ready) write_textures(x0, y0, x1, y1);
+}
+
 void ground_reset() {
     g_ready = g_painted = g_stroke = false;
     g_vid = nullptr;
+    g_pending_x0 = 0;
+    g_pending_x1 = -1;
     g_image.clear();
     g_pixels.clear();
     g_heights.clear();
@@ -438,6 +474,7 @@ void ground_lower(float x, float y, float radius, int bed, int texture, bool res
 void ground_relief(const short* from, const short* to, int gw, int gh, int cx0, int cy0, int cx1, int cy1, int z_lo,
                    int z_hi) {
     if (!g_ready || !g_stroke || g_stroke_pixels.size() != g_pixels.size() || !from || !to) return;
+    const double began = ground_clock();
     const Grid f{from, gw, gh}, t{to, gw, gh};
     // the cells around the changed ones too: the heights between the middles and the light use them
     cx0 = (std::max)(0, cx0 - 2);
@@ -462,33 +499,45 @@ void ground_relief(const short* from, const short* to, int gw, int gh, int cx0, 
     for (int x = cx0 * 8; x < (cx1 + 1) * 8; ++x) {
         const int px = static_cast<int>(std::floor(x - g_left));
         if (px < 0 || px >= g_w) continue;
+        const float fx = x + 0.5f;
         int top = s_hi + 1;   // the rows from here down are drawn
-        for (float y = y_start; y >= y_end && top > s_lo; y -= 0.25f) {
-            const float zt = t.at(x + 0.5f, y), sy = y - zt;
-            const int row = (std::max)(s_lo, static_cast<int>(std::ceil(sy)));
-            if (row >= top) continue;
-            const float zf = f.at(x + 0.5f, y);
-            const int src_row = static_cast<int>(std::floor(y - zf + 0.5f - g_top));
-            const size_t src = static_cast<size_t>((std::max)(0, (std::min)(g_h - 1, src_row))) * g_w + px;
-            const float light = std::fabs(zt - zf) < 0.01f ? 1.0f : t.light(x + 0.5f, y) / f.light(x + 0.5f, y);
-            const uint16_t colour = lit(g_stroke_pixels[src], (std::max)(0.55f, (std::min)(1.4f, light)));
-            const int height = static_cast<int>(std::lround(g_stroke_heights[src] + 8 * (zt - zf)));
-            const uint16_t h16 = static_cast<uint16_t>((std::max)(0, (std::min)(65535, height)));
-            for (int r = row; r < top; ++r) {
-                const int py = static_cast<int>(std::floor(r - g_top));
-                if (py < 0 || py >= g_h) continue;
-                const size_t i = static_cast<size_t>(py) * g_w + px;
-                g_pixels[i] = colour;
-                g_heights[i] = h16;
-                if (g_stroke_textures.size() == g_textures_of.size()) g_textures_of[i] = g_stroke_textures[src];
-                py0 = (std::min)(py0, py);
-                py1 = (std::max)(py1, py);
+        // front to back by the stretches between the cells' middles (8 px, the height linear along
+        // each): a stretch coming up the screen gives each row it reaches the ground point that
+        // reaches it - a sample a row; one going down the screen (rising steeper than 1:1) is hidden
+        float ya = y_start, za = t.at(fx, ya);
+        while (ya > y_end && top > s_lo) {
+            const float yb = (std::max)(y_end, 8 * std::floor((ya - 4.0001f) / 8) + 4), zb = t.at(fx, yb);
+            const float sa = ya - za, sb = yb - zb;
+            if (sb < sa) {
+                const float k = (sa - sb) / (ya - yb);
+                const int first = (std::min)(top - 1, static_cast<int>(std::ceil(sa)) - 1);
+                const int last = (std::max)(s_lo, static_cast<int>(std::ceil(sb)));
+                for (int r = first; r >= last; --r) {
+                    const float y = ya - (sa - r) / k;
+                    const float zt = za + (zb - za) * (ya - y) / (ya - yb), zf = f.at(fx, y);
+                    const int src_row = static_cast<int>(std::floor(y - zf + 0.5f - g_top));
+                    const size_t src = static_cast<size_t>((std::max)(0, (std::min)(g_h - 1, src_row))) * g_w + px;
+                    const float light = std::fabs(zt - zf) < 0.01f ? 1.0f : t.light(fx, y) / f.light(fx, y);
+                    const int height = static_cast<int>(std::lround(g_stroke_heights[src] + 8 * (zt - zf)));
+                    const int py = static_cast<int>(std::floor(r - g_top));
+                    top = r;
+                    if (py < 0 || py >= g_h) continue;
+                    const size_t i = static_cast<size_t>(py) * g_w + px;
+                    g_pixels[i] = lit(g_stroke_pixels[src], (std::max)(0.55f, (std::min)(1.4f, light)));
+                    g_heights[i] = static_cast<uint16_t>((std::max)(0, (std::min)(65535, height)));
+                    if (g_stroke_textures.size() == g_textures_of.size()) g_textures_of[i] = g_stroke_textures[src];
+                    py0 = (std::min)(py0, py);
+                    py1 = (std::max)(py1, py);
+                }
             }
-            top = row;
+            ya = yb;
+            za = zb;
         }
         px0 = (std::min)(px0, px);
         px1 = (std::max)(px1, px);
     }
+    g_times.relief += ground_clock() - began;
+    ++g_times.reliefs;
     if (px1 < px0 || py1 < py0) return;
     touch(px0, py0);
     touch(px1, py1);
@@ -551,6 +600,20 @@ int ground_level_at(float x, float y) {
     int px, py;
     if (!g_ready || !to_picture(x, y, px, py)) return 0;
     return (g_heights[static_cast<size_t>(py) * g_w + px] - 1026) / 8;
+}
+
+double ground_clock() {
+    static LARGE_INTEGER frequency = {};
+    if (!frequency.QuadPart) QueryPerformanceFrequency(&frequency);
+    LARGE_INTEGER t;
+    QueryPerformanceCounter(&t);
+    return t.QuadPart * 1000.0 / frequency.QuadPart;
+}
+
+GroundTimes ground_times(bool reset) {
+    const GroundTimes t = g_times;
+    if (reset) g_times = GroundTimes();
+    return t;
 }
 
 bool ground_save(const std::string& map) {

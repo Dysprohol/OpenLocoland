@@ -48,6 +48,9 @@ int ground_texture_at(float x, float y);
 // with a texture (-1: none); `restore` puts the original heights and colours back.
 void ground_lower(float x, float y, float radius, int bed, int texture, bool restore);
 std::shared_ptr<PaintPatch> ground_stroke_end();
+// The picture's changes into the live image's textures: the brushes and the relief only note the
+// rectangle they changed, and a frame writes it once (a texture locked once a frame, not once a dab).
+void ground_flush();
 // The relief (inside a stroke): the picture redrawn where the ground's heights went from `from` to
 // `to` (GRID, gw x gh cells; the cells cx0..cx1, cy0..cy1 changed, having been between z_lo and z_hi
 // in between) - the ground drawn where it now shows (raised ground higher on the screen, hiding
@@ -66,3 +69,13 @@ int ground_level_at(float x, float y);
 // After the map was saved as `map` (a game path): when the picture was painted, it is written as
 // <map's folder>\<name>.vid and the map points at it. False when that failed.
 bool ground_save(const std::string& map);
+
+// The clock for the editor's timings (ms, QueryPerformanceCounter).
+double ground_clock();
+// The time the strokes spent (ms) since the last reset: the relief's drawing, the writes into the
+// live image's textures (and how many textures they locked), the brushes' pixels; `reset` zeroes it.
+struct GroundTimes {
+    double relief = 0, upload = 0, paint = 0;
+    int reliefs = 0, uploads = 0, locks = 0, paints = 0;
+};
+GroundTimes ground_times(bool reset);
