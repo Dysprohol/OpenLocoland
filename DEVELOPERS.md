@@ -56,8 +56,8 @@ in the same window removes it. The player's guide is `docs/PRZEWODNIK.md` / `doc
 under the frame limit - the launcher's choice counts from that start on, nothing is reinstalled):
 
 - **Cheats** ("Kody twórców" / "Cheat keys"): the developer keys of the original game -
-  h repair, W win, B create units, A change army, K destroy the enemy, M money, # a big train,
-  x an explosion, D the AI's debug view (`maps\script\dokeys.lgc`; see "Developer mode").
+  h repair, W win, B create units, A change army, K destroy the enemy, M money, # a big train
+  (wagons on the track nearest to the pointer), x an explosion, D the AI's debug view (`maps\script\dokeys.lgc`; see "Developer mode").
 - **All missions** ("Wszystkie misje"): every mission of the strategic map can be played. The
   player's progress is not written: the later missions show as playable while the stored progress
   stays as it was, and a win advances it only when the mission won is the next one in line (as
@@ -195,6 +195,10 @@ the menu's headers) has capitals only.
 **Developer mode.** `#define KEYS_ENABLE 1` (in `maps\script\constants.lgc`, off in the
 original game) enables the keys from `dokeys.lgc`: h - repair, W - victory, B - create units (menu `maps\shiftb.txt`),
 A - change army, K - destroy the enemy, D - AI debug view, M - money, # - big train.
+(`#` creates 16 wagons of army 0 - the nuclear mortar, the arsenal, mortars, the repairer and
+rocket carts, no locomotive - at the pointer, and the engine puts them on the track point
+nearest to it, `Engine_PutOnRails`: with the pointer away from the track they appear on the
+nearest one, possibly outside the view).
 The exe also kept the editor mode of the authors' map editor - a File menu with Load and Save
 and a map saving function (`Level_Save`, script `Save()`) that writes the same `.map` format
 the game loads; LocoFix brings it back (`--editor`, see "Editor mode").

@@ -179,6 +179,13 @@ Harmless log errors:
 
 ## Checked, not bugs
 
+- The developer key `#` (big train, launcher option Cheats) works: it creates 16 wagons of
+  army 0 with no locomotive (`maps\script\dokeys.lgc`, `KEY_CREATE_BIG_TRAIN`) at the pointer,
+  and `Engine_PutOnRails` moves them to the nearest track point. A report that it did nothing
+  came from a test that sent the key without moving its mouse onto the map, so the wagons
+  appeared on a track outside the view; with the pointer over the map they appear there
+  (checked in the sandbox and mission 13).
+
 - `Level_Save` writes the current game time into HEAD, which looks like it should be 0: the
   shipped maps all carry the time of the authors' editor session (93368 ms in l01, 1911886 in
   l18) and `Level_Load` ignores it for a version 10 map. LocoFix writes 0 all the same, so a map
