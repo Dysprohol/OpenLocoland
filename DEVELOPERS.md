@@ -1733,6 +1733,21 @@ dragged (a band of bushes 16 px apart, none stacked), the map saved, loaded and 
 train, the enemy's train shoots the guns of the player's fort and its missile tower fires at an
 enemy robot.
 
+**Wrecks on the track** (`editor_edit.cpp`, the section of the same name). The palette's Wrecks group
+has five objects - the burnt carts and cars 13, 94, 57, 22 and 92 (class OBJECT, flags 0x4040,
+moveMask 0x17, 5-7 hp) - and three decals (93, 96, 98: painted into the ground in play). The missions
+stand 42 of the objects' 45 on the track: 0-40 px from a rail's middle, 6-8 above the rail (3 below
+its points), turned along it (a rail of direction 6 has them at 64 or 192, 13 at 32 or 160, 20 at 96
+or 224, 0 at 0 or 128); the decals they keep off it. So a wreck object placed or dragged within 40 px
+of a rail link on the screen (`track_spot`, the cars' reach) goes onto the link nearest to the
+cursor, 3 below its points, turned along it the way nearer to the direction chosen (R turns it
+round there, also a selected wreck on the track), the preview and the status line showing it;
+elsewhere it stays where it is put. The decals are not snapped. In play a wreck on the track does
+not stop a train - the cars' moveMask (0x8) has no bit of its - but is run over: `Train_MoveCars`
+gives 5 damage to what has VID flag 0x4000 ("run over") in the first car's box, so the first train
+that passes crushes it (seen: a wreck put on the track of a patrolling locomotive was gone after its
+first pass).
+
 **Trains, the vehicles' palette, patrols** (`editor_edit.cpp`, the section "trains"). The strip's
 Vehicles entry opens the palette with the 23 ENGINE VIDs of `objects.res` in their own groups -
 locomotives (5, 10), combat cars (20, 25, 27, 30, 80, 62, 75, 90, 82, the zeppelin car 35, the

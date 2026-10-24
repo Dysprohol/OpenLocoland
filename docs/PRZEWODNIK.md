@@ -278,7 +278,10 @@ linię, która wpuszcza pociągi, na które patrzy (zielony), a `Shift+L` taką,
 - **Wszystkie obiekty** (klawisz 7) otwiera paletę ze wszystkimi obiektami z misji, według tematów
   (łąka, las, pustynia, lód, wulkan, bagno, park, piraci, miasto, przemysł, kolej, flagi i skrzynie,
   wraki, jednostki i stworzenia, efekty): kliknij jeden, potem postaw go na mapie. Są tu **kopalnia**
-  (dwa gniazda na działa, jak fortyfikacja), cytadela, mury, budynki, roboty.
+  (dwa gniazda na działa, jak fortyfikacja), cytadela, mury, budynki, roboty. **Wrak** (spalony wóz
+  albo wagon) postawiony albo przeciągnięty przy szynie staje na torze, wzdłuż niego (`R` go
+  odwraca), tak jak w misjach; gdzie indziej zostaje tam, gdzie go postawisz. W grze pociąg najeżdża
+  na niego i go miażdży - wrak pociągu nie zatrzymuje.
 
   ![Wszystkie obiekty](img/editor-palette-pl.jpg)
 

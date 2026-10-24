@@ -280,7 +280,10 @@ lets in the trains it faces (green), `Shift+L` one that keeps them out (red).
 - **All objects** (key 7) opens the palette with every object the missions use, by theme (meadow,
   forest, desert, ice, volcanic, swamp, park, pirates, city, industry, railway, flags and crates,
   wrecks, units and creatures, effects): click one, then place it. Here are the **mining plant**
-  (two gun sockets, like the fort), the citadel, walls, buildings, robots.
+  (two gun sockets, like the fort), the citadel, walls, buildings, robots. A **wreck** (a burnt
+  cart or car) put or dragged near a rail goes onto the track, along it (`R` turns it round), as the
+  missions have them; elsewhere it stays where you put it. In the game a train runs it over and
+  crushes it - it does not stop the train.
 
   ![All objects](img/editor-palette-en.jpg)
 

@@ -1034,6 +1034,8 @@ struct Drag {
     bool moved = false;
 } g_drag;
 
+void mouse_on_map(float& x, float& y);   // the track, below
+
 POINT logical(LPARAM l) {
     POINT p = {GET_X_LPARAM(l), GET_Y_LPARAM(l)};
     window_to_logical(p);
@@ -1230,6 +1232,46 @@ CarPlan plan_car(POINT mouse) {
     }
     p.ok = true;
     return p;
+}
+
+// ---- wrecks on the track ----
+//
+// The wrecks of the palette's Wrecks group that are objects - the burnt carts and cars 13, 94, 57, 22
+// and 92 - stand on the track in the missions (42 of their 45: 0-40 px from a rail's middle, 6-8
+// above the rail - 3 below its points -, turned along it). So one placed or dragged within CAR_REACH
+// of a rail link on the screen goes onto the link nearest to the cursor, along it (R turns it round),
+// and elsewhere it stays where it is put, as before. The decal wrecks (93, 96, 98) are painted into
+// the ground in play and the missions keep them off the track: they are not snapped. In play a
+// wreck does not stop a train - its moveMask (0x17) has no bit of the cars' (0x8) -, the train runs
+// it over: Train_MoveCars gives 5 damage to what has VID flag 0x4000 in its first car's box, and the
+// wrecks have it (flags 0x4040) and 5-7 hp, so the first train that passes crushes it.
+constexpr int WRECKS[] = {13, 94, 57, 22, 92};
+constexpr float WRECK_BELOW_POINTS = 3;
+
+bool wreck_vid(int nvid) { return std::find(std::begin(WRECKS), std::end(WRECKS), nvid) != std::end(WRECKS); }
+
+// The place of a wreck of `nvid` on the track near the screen point (sx, sy), facing the way of the
+// link nearer to `toward` (its direction or the opposite one); false when it is not near a rail.
+bool wreck_spot(int nvid, float sx, float sy, int toward, float& x, float& y, float& z, int& direction) {
+    if (!wreck_vid(nvid)) return false;
+    const TrackSpot spot = track_spot(sx, sy, CAR_REACH);
+    if (!spot.found) return false;
+    uint8_t* v = vid_by_number(nvid);
+    const int step = 256 / (std::max)(1, v ? at<int>(v, V_ND_DIR) : 32);
+    x = spot.x;
+    y = spot.y;
+    z = spot.z - WRECK_BELOW_POINTS;
+    direction = ((turn_toward(spot.direction, toward) + step / 2) / step * step) & 255;
+    return true;
+}
+
+// A wreck standing on the track (where wreck_spot puts it, give or take a pixel).
+bool wreck_on_track(uint8_t* o) {
+    float x, y, z;
+    int direction;
+    return wreck_spot(nvid_of(o), at<float>(o, O_X), at<float>(o, O_Y) - at<float>(o, O_Z), at<int>(o, O_DIRECTION), x, y, z,
+                      direction) &&
+           std::hypot(x - at<float>(o, O_X), y - at<float>(o, O_Y)) < 2 && std::fabs(z - at<float>(o, O_Z)) < 2;
 }
 
 // Takes a car out of its train (its neighbours' couplings too).
@@ -1455,6 +1497,19 @@ void continue_drag(POINT p) {
         uint8_t* o = g_drag.objects[i];
         const State& s = g_drag.before[i];
         const float x = s.x + dx, y = s.y + dy;
+        if (wreck_vid(nvid_of(o)) && g_drag.objects.size() == 1) {   // a wreck: onto the track near it, else on the ground
+            float sx, sy, wx, wy, wz;
+            int direction;
+            mouse_on_map(sx, sy);
+            if (wreck_spot(nvid_of(o), sx, sy, s.direction, wx, wy, wz, direction)) {
+                reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, wx, wy, wz);
+                reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(o, nullptr, direction);
+            } else {
+                reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, x, y, ground_z(vid_of(o), x, y));
+                reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(o, nullptr, s.direction);
+            }
+            continue;
+        }
         reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, x, y, ground_z(vid_of(o), x, y) + g_drag.lift[i]);
     }
 }
@@ -1526,6 +1581,14 @@ void end_drag() {
 
 void turn(int steps) {
     if (entry().tool == Tool::Place) {
+        float sx, sy, wx, wy, wz;
+        int wd;
+        mouse_on_map(sx, sy);
+        if (wreck_spot(place_nvid(), sx, sy, g_place_direction, wx, wy, wz, wd)) {   // on the track: round
+            g_place_direction = (g_place_direction + 128) & 255;
+            MESSAGE("MsgDirection", "direction %d", g_place_direction);
+            return;
+        }
         uint8_t* v = vid_by_number(place_nvid());
         const int dirs = v ? (std::max)(1, at<int>(v, V_ND_DIR)) : 8;
         g_place_direction = (g_place_direction + steps * (256 / dirs) + 256) & 255;
@@ -1543,6 +1606,7 @@ void turn(int steps) {
         return;
     }
     if (nvid_of(o) == VID_SEMAPHORE) steps *= 4;   // a post faces one way or the other along the track
+    if (wreck_on_track(o)) steps = (std::max)(1, at<int>(vid_of(o), V_ND_DIR)) / 2;   // a wreck on the track: round
     const int dirs = (std::max)(1, at<int>(vid_of(o), V_ND_DIR));
     if (dirs <= 1) return;
     const std::vector<State> before = states(g_selection);
@@ -1753,6 +1817,9 @@ void place(POINT p) {
     map_point(p, v, x, y, z);
     const int dirs = (std::max)(1, at<int>(v, V_ND_DIR));
     int direction = dirs > 1 ? g_place_direction : 0;
+    float wsx, wsy;
+    mouse_on_map(wsx, wsy);
+    const bool wreck_on_rails = wreck_spot(nvid, wsx, wsy, g_place_direction, x, y, z, direction);   // near a rail: on it
     if (on_track_vid(nvid)) {   // the authors' places on the track
         UiText why;
         if (!snap(nvid, x, y, direction, why)) {
@@ -1802,7 +1869,9 @@ void place(POINT p) {
     const float limit = nvid == VID_DEPOT ? 100.0f : nvid == VID_WORKSHOP || nvid == VID_FORT ? 40.0f : 0.0f;
     MESSAGE("MsgPlaced", "placed VID %d at %.0f,%.0f,%.0f direction %d army %d%s%s", nvid, at<float>(o, O_X),
             at<float>(o, O_Y), at<float>(o, O_Z), direction, army_of(o), entry().red ? ui_text("WordRedSuffix", " red") : "",
-            limit > 0 && track > limit ? ui_text("MsgNoTrackNear", " - no track near it (MAP_RULES.md 6)") : "");
+            limit > 0 && track > limit ? ui_text("MsgNoTrackNear", " - no track near it (MAP_RULES.md 6)")
+            : wreck_on_rails           ? ui_text("MsgOnTrack", " - on the track")
+                                       : "");
 }
 
 // ---- the track ----
@@ -4167,6 +4236,13 @@ void draw_overlay() {
                 map_point(g_mouse, v, x, y, z);
                 int direction = at<int>(v, V_ND_DIR) > 1 ? g_place_direction : 0;
                 bool shown = true;
+                if (wreck_vid(place_nvid())) {   // near a rail: on it
+                    float sx, sy;
+                    mouse_on_map(sx, sy);
+                    g_place_status = wreck_spot(place_nvid(), sx, sy, g_place_direction, x, y, z, direction)
+                                         ? ui_printf(ui_format("StatusWreckTrack", "%s: on the track (R turns it round)"), place_label())
+                                         : ui_printf(ui_format("StatusWreck", "%s: near a rail it goes onto the track"), place_label());
+                }
                 if (on_track_vid(place_nvid())) {
                     UiText why;
                     shown = snap(place_nvid(), x, y, direction, why);
