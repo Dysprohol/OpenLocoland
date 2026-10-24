@@ -2257,6 +2257,14 @@ mode above) are not tested in full screen.
       edx:eax for every value (out of range and NaN give the same integer indefinite), st0
       popped as before. In a sampling profile of mission 13 at 2560x1440 `crt_ftol` was 8% of the
       main thread, after it 1.4%,
+  32. no second lock for an empty layer 10 (`layer10_lock.cpp`): `Graphics_DrawScene` locks the
+      back buffer and the depth buffer once for the software sprites of layers 2-4 and again, after
+      the Direct3D layers 5-9, for layer 10 - which holds only the on-screen messages (VID 14) and
+      is empty most of the time. Each lock of a surface the GPU drew on makes dgVoodoo wait for the
+      GPU and copy the whole surface to the CPU (and back at the unlock); at 2560x1440 the locks
+      were about a quarter of the main thread. With nothing in layer 10 (no object, and no member
+      of the cursor chain drawn there) the block is skipped; with a message on the screen the
+      original code runs. 5 locks per frame became 3,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
@@ -2450,6 +2458,30 @@ The result: at 1920x1080 mission 1 and the menus are 1024x768 stretched to 1440x
 other missions use the whole 1920x1080 with the interface at the window edges (the map
 fills it). In full screen dgVoodoo scales the chosen mode to the monitor
 (`ScalingMode = stretched_ar`).
+
+**Frame rate at high resolutions.** The game draws on one thread, and the cost of a frame grows
+with the screen: the engine draws the ground with Direct3D, then locks the back buffer and the
+depth buffer whole for the software sprites (dgVoodoo waits for the GPU and copies both to the
+CPU and back), and every light of a colour-box VID (`Graphics_DrawLight`) fills a texture on the
+CPU and draws it. Measured in mission 13 (a big map, many lights; Ryzen 9 7900X, RTX 4070 Ti
+SUPER; `LocoFix.log`'s frame rate of the level, about 30 s each; the numbers vary by a few fps
+between runs):
+
+| | 1024x768 | 1920x1080 | 2560x1440 |
+|---|---|---|---|
+| window, limit 60 | 60 / 60 | 60 / 60 | 39 / 45 |
+| window, no limit | 201 / 200 | 67 / 81 | 37 / 45 |
+| full screen, limit 60 | 60 / 60 | 58 / 60 | 36.5 / 42 |
+
+(before / after LocoFix fixes 31 and 32). The limit itself keeps its rate whenever a frame takes
+less than its period. What remains at 2560x1440 (a sampling profile of the main thread): the
+lights - `Texture_DrawZ` and the driver under it about a third, `Graphics_DrawLight` a fifth -,
+the three surface locks and the software sprites (`SpriteVid_Draw`). The editor draws the
+decals and every light of the map and is slower (mission 13 at 2560x1440: about 18 fps, 20
+after the fixes). Less than that needs a renderer of our own instead of the engine's mix of
+software drawing and Direct3D 7 through dgVoodoo. dgVoodoo's `FastVideoMemoryAccess` breaks
+the ground (`Load Can't decode` and an exception when a map loads), and
+`DDLOCK_DISCARDCONTENTS` on the light textures made no difference.
 
 Before drawing, the engine skips objects far from the screen centre, with a box sized for
 1024x768: objects (`World_DrawLayer`) within x +-1024 and y +-512, their shadows (the shadow

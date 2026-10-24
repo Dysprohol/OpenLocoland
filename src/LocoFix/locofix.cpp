@@ -21,6 +21,7 @@ void install_adopt_command();
 void install_shadow_leak();
 void install_unit_limit();
 void install_fast_ftol();
+void install_layer10_lock();
 void install_mouse_coords();
 void install_depot_rows();
 void install_status_bar();
@@ -113,6 +114,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         install_shadow_leak();
         install_unit_limit();
         install_fast_ftol();
+        install_layer10_lock();
         install_mouse_coords();
         install_depot_rows();
         install_status_bar();

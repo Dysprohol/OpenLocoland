@@ -227,6 +227,13 @@ Harmless log errors:
 - Objects skipped outside a box sized for 1024x768: shadows cut off at the sides above
   1024x768, whole objects missing above 2048x1024 (`view_culling.cpp`).
 - No frame limit: 180-600 fps and a whole CPU core busy (`frame_limit.cpp`).
+- Low frame rate at high resolutions (reported: 50-55 fps in missions on a Ryzen 9800X3D with
+  an RTX 5080): the engine draws on one thread, locks the whole back buffer and depth buffer
+  every frame for its software sprites (through dgVoodoo a copy from the GPU and back) and
+  fills a texture on the CPU for every light. LocoFix fixes 31 (`fast_ftol.cpp`) and 32
+  (`layer10_lock.cpp`) take about a sixth off a frame at 2560x1440 (mission 13: 37-39 fps
+  -> 45); the rest belongs to the renderer's design (DEVELOPERS.md "Frame rate at high
+  resolutions").
 - Dated logs left behind after every crash pile up (LocoFix keeps the 3 newest).
 - A player who had put dgVoodoo2 into the Steam folder of the game (for its resolutions) built
   with Setup from it, and the game crashed at the start; after verifying the game files in Steam
