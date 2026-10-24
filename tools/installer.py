@@ -450,7 +450,7 @@ def libraries(steam):
     import re
     for m in re.finditer(r'"path"\s+"([^"]+)"', text):
         path = os.path.normpath(m.group(1).replace("\\\\", "\\"))
-        if path.lower() not in (f.lower() for f in found):
+        if path.lower() not in (f.lower() for f in found) and os.path.isdir(path):
             found.append(path)
     return found
 
