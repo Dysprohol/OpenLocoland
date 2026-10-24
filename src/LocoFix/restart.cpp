@@ -23,8 +23,10 @@
 // on that map instead (restart_level_loading, from frame_limit.cpp's Level_Load wrapper); the Esc
 // menu's exit page also has BACK TO THE EDITOR (menutact.lgc.patch), which does it at once:
 //
-//   extern PlayedFromEditor() 202;   // 1 in a map played from the editor
-//   extern BackToEditor() 203;       // the game starts again in editor mode on it
+//   extern PlayedFromEditor() 202;   // 1 in a map played from the editor, 2 while the level runs
+//                                    // inside the editor's own game (Run the level)
+//   extern BackToEditor() 203;       // the game starts again in editor mode on it (2: the editor
+//                                    // holds the level again)
 //
 // Either way the menu's `return` flag (Players key: 2 after a custom map, so the main menu opens on
 // the custom maps page; the menu sets it back to 1 when it starts) gets the value it had before the
@@ -39,6 +41,8 @@
 void editor_load_map(const std::string& map);   // editor.cpp
 std::string editor_start_map(const std::string& map);   // editor.cpp: the template -> a new empty map
 bool editor_mode_on();                            // editor.cpp
+bool editor_level_running();                      // editor.cpp: Run the level is on in the editor's game
+void editor_hold_level();                         // editor.cpp: ... and the level is held again
 int recalc_grid_z_extern(uint8_t* world);         // ground.cpp
 int mouse_wheel_extern(uint8_t* world);           // menu_input.cpp
 bool restart_game(bool editor, const std::string& map, bool back_to_editor = false);
@@ -118,11 +122,13 @@ int __fastcall CallExtern_restart(uint8_t* world, void* edx, int function) {
     if (function == EXTERN_RECALC_GRID_Z) return recalc_grid_z_extern(world);
     if (function == EXTERN_MOUSE_WHEEL) return mouse_wheel_extern(world);
     if (function == EXTERN_PLAYED_FROM_EDITOR) {
-        reinterpret_cast<PushInt_t>(SCRIPT_PUSH_INT)(world + WORLD_SCRIPT, nullptr, g_return_editor && !g_played.empty() ? 1 : 0);
+        const int how = g_return_editor && !g_played.empty() ? 1 : editor_level_running() ? 2 : 0;
+        reinterpret_cast<PushInt_t>(SCRIPT_PUSH_INT)(world + WORLD_SCRIPT, nullptr, how);
         return 0;
     }
     if (function == EXTERN_BACK_TO_EDITOR) {
-        back_to_editor();
+        if (editor_level_running()) editor_hold_level();   // the menu has gone (MenuUnloading)
+        else back_to_editor();
         return 0;
     }
     if (function != EXTERN_START_EDITOR_MODE) return g_call_extern(world, edx, function);

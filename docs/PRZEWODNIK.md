@@ -318,7 +318,8 @@ opar, poświata) i rozpryski.
 ### 9. Zobacz, jak działa
 
 Menu → **URUCHOM POZIOM** (albo `Ctrl+R`): poziom ożywa w edytorze - pociągi jeżdżą, działa
-strzelają. `Ctrl+R` znowu go wstrzymuje. (Poziom, który działał, nie jest już taki, jak go
+strzelają. `Ctrl+R` znowu go wstrzymuje, tak samo menu gry pod `Esc`: WYJDŹ Z GRY → WRÓĆ DO
+EDYTORA. (Poziom, który działał, nie jest już taki, jak go
 postawiłeś: jeśli coś zmieniało się w czasie działania, wczytaj go od nowa przed zapisem.)
 
 ### 10. Ustawienia misji i teksty

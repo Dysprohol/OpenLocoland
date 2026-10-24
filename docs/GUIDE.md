@@ -320,8 +320,9 @@ A **Region** (strip): drag its rectangle; its panel sets fog (mist, dust, haze, 
 ### 9. Look at it working
 
 Menu → **RUN THE LEVEL** (or `Ctrl+R`): the level comes to life in the editor - the trains drive,
-the guns shoot. `Ctrl+R` holds it again. (A level that has run is not as you placed it: load it
-again before saving if you changed things while it ran.)
+the guns shoot. `Ctrl+R` holds it again, and so does the game's own `Esc` menu: ABORT GAME → BACK TO
+THE EDITOR. (A level that has run is not as you placed it: load it again before saving if you
+changed things while it ran.)
 
 ### 10. Mission settings and texts
 

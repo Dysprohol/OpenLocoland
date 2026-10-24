@@ -898,6 +898,15 @@ void editor_mission_settings() {
 // mouse_pan.cpp pans a held level although it is paused.
 bool editor_level_held() { return g_held; }
 
+// restart.cpp: the Esc menu's BACK TO THE EDITOR while the level runs inside the editor's own game
+// (Run the level) holds the level again, as Ctrl+R does.
+bool editor_level_running() { return g_enabled && g_running; }
+void editor_hold_level() {
+    uint8_t* w = world();
+    if (!editor_level_running() || !w) return;
+    set_running(*reinterpret_cast<HWND*>(w + WORLD_HWND), false);
+}
+
 // Install after screen scaling: the RegisterClassA chain is editor -> screen scaling -> test
 // mode -> the game, so the menu commands are seen first.
 void install_editor() {

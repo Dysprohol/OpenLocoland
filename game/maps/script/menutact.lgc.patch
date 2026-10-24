@@ -1,89 +1,51 @@
 --- maps/script/menutact.lgc
 +++ maps/script/menutact.lgc
-@@ -75,2 +75,10 @@
+@@ -75,10 +75,12 @@ string load_list;
  int mouse_swap=0;
-+// The Esc menu of a map played from the editor (LocoFix's File > Play the map; src/LocoFix/restart.cpp,
-+// the numbers are free in export.lgc): its exit page has BACK TO THE EDITOR, a row like the custom
-+// maps page's - the lamp and the text -, which starts the game again in the editor on the map.
-+extern PlayedFromEditor() 202;
-+extern BackToEditor() 203;
-+int menu_editor_lamp=0,menu_editor_text=0;
-+#define EDITOR_ROW_X -150
-+#define EDITOR_ROW_Y 80
+ // The Esc menu of a map played from the editor (LocoFix's File > Play the map; src/LocoFix/restart.cpp,
+ // the numbers are free in export.lgc): its exit page has BACK TO THE EDITOR, a row like the custom
+-// maps page's - the lamp and the text -, which starts the game again in the editor on the map.
++// maps page's - the lamp and the text -, which starts the game again in the editor on the map. While
++// the level runs inside the editor's own game (Run the level, PlayedFromEditor() 2) the row closes the
++// menu and the editor holds the level again.
+ extern PlayedFromEditor() 202;
+ extern BackToEditor() 203;
+-int menu_editor_lamp=0,menu_editor_text=0;
++int menu_editor_lamp=0,menu_editor_text=0,menu_editor_how=0,menu_editor_hold=0;
+ #define EDITOR_ROW_X -150
+ #define EDITOR_ROW_Y 80
  
-@@ -81,2 +89,17 @@
-   Y=yyy-(SCR_DEF_Y-SCRY)/2;
-+}
-+KillEditorRow()
-+{
-+  if(menu_editor_lamp){ Destroy(menu_editor_lamp); menu_editor_lamp=0;}
-+  if(menu_editor_text){ Destroy(menu_editor_text); menu_editor_text=0;}
-+}
-+// a click on the row (the lamp or its text) of the exit page
-+EditorRowClicked()
-+{
-+  int x,y;
-+  if(!menu_editor_lamp || mclick!=1) return 0;
-+  GetRCX(MAIN_X);GetRCY(MAIN_Y);
-+  x=GetScreenInputX();
-+  y=GetScreenInputY();
-+  return x>=X+EDITOR_ROW_X-12 && x<X+EDITOR_ROW_X+240 && y>=Y+EDITOR_ROW_Y-12 && y<Y+EDITOR_ROW_Y+12;
- }
-@@ -117,2 +140,4 @@
- SetMenuState(int num){
-+  string back;
-+  KillEditorRow();
-   if (menu_brief_text){ Destroy(menu_brief_text); menu_brief_text=0;}
-@@ -129,7 +154,19 @@
-       menu_prev=MenuCreate(475,0,X-151,Y+131,2230);
-+#ifdef BRIEF_LIST
-+    if(GetCountFromList(BRIEF_LIST)-1>curr_page)
-+#else
-     if(GetCountFromList("maps\\l"+sprintf("%02i",LEVEL+1)+"\\brief.lst")-1>curr_page)
-+#endif
-       menu_next=MenuCreate(476,0,X+152,Y+131,2230);
-     menu_pict=MenuCreate(501,0,X,Y,2210);
-+#ifdef BRIEF_LIST
-+    menu_brief_text=PrintFile(X-175,Y-70+2300,2300,GetFileFromList(BRIEF_LIST),2);
-+#else
-     menu_brief_text=PrintFile(X-175,Y-70+2300,2300,GetFileFromList("maps\\l"+sprintf("%02i",LEVEL+1)+"\\brief.lst"),2);    
-+#endif
-+#ifdef BRIEF_HEADER
-+    menu_brief_head=PrintText(X+BREIF_HEAD_X,Y+BREIF_HEAD_Y,BREIF_HEAD_Z,BRIEF_HEADER,3);
-+#else
-     menu_brief_head=PrintText(X+BREIF_HEAD_X,Y+BREIF_HEAD_Y,BREIF_HEAD_Z,GetString("strings","MapHeader"+itoa(LEVEL+1)),3);
-+#endif
-     menu_start=MenuCreate(477,0,X,Y+131,2230);
-@@ -177,2 +214,10 @@
+@@ -212,7 +214,8 @@ SetMenuState(int num){
+      menu_start=MenuCreate(477,0,X,Y+131,2230);
+      menu_brief_text=PrintFile(X-175,Y-70+2300,2300,GetFileFromList("maps\\menu7.lst"),2);
       menu_start_text=PrintTextAtCenter(X,Y+131+2300,2300,GetString("strings","MenuGame2Go"),2);
-+     if(PlayedFromEditor())
-+     {
-+        back=GetString("strings","MenuBackToEditor");
-+        if(back=="") back="BACK TO THE EDITOR";
-+        menu_editor_lamp=MenuCreate(472,0,X+EDITOR_ROW_X,Y+EDITOR_ROW_Y,2230);
-+        Action(menu_editor_lamp,act_menustandup,0,0);
-+        menu_editor_text=PrintText(X+EDITOR_ROW_X+16,Y+EDITOR_ROW_Y-6+2300,2300,back,2);
-+     }
-   }
-@@ -480,2 +525,9 @@
+-     if(PlayedFromEditor())
++     menu_editor_how=PlayedFromEditor();
++     if(menu_editor_how)
+      {
+         back=GetString("strings","MenuBackToEditor");
+         if(back=="") back="BACK TO THE EDITOR";
+@@ -525,6 +528,15 @@ MenuWorking()
       }
-+     if(menu_state==5 && EditorRowClicked())
-+     {
-+        PlaySFX(24);
-+        Effect(eff_fade,0);
-+        BackToEditor();
-+        return;
-+     }
-      if((mvid==477 || GetKey()==VK_SPACE || GetKey()==VK_RETURN) && GetVid(477,VID_COUNT)>0) 
-@@ -492,3 +544,7 @@
-            Effect(eff_fade,0);
-+#ifdef CUSTOM_MAP
-+           Load(GetString("strings","MapsPath")+CUSTOM_MAP);
-+#else
-            Load(GetString("strings","MapsPath")+"maps\\l"+sprintf("%02i",LEVEL+1)+"\\l"+sprintf("%02i",LEVEL+1)+".map");
-+#endif
-            return;
-@@ -616,2 +672,3 @@
-    if(menu_start_text){Destroy(menu_start_text);menu_start_text=0;}
-+   KillEditorRow();
-    KillLevelMenu();
+      if(menu_state==5 && EditorRowClicked())
+      {
++        if(menu_editor_how==2)
++        {
++           // the level runs in the editor's game: the menu goes as with NO, then the editor holds the level (MenuUnloading)
++           menu_editor_hold=1;
++           ScrollLock(0);
++           MENU_STATE=MENU_UNLOADING;
++           Pause(0);
++           return;
++        }
+         PlaySFX(24);
+         Effect(eff_fade,0);
+         BackToEditor();
+@@ -681,6 +693,7 @@ MenuUnloading()
+    if(GetRegStateBar()) SetStateBar(1);
+    Pause(0);
+    ScrollLock(0);
++   if(menu_editor_hold){ menu_editor_hold=0; BackToEditor(); }
+ }
+ 
+ //ÔţšÔ­Ó¨Óň˛ 1 ň˝ŰŔ ˇ´­ÓÔŰňÝŔň ´ň­ň§ÔÓ˛űÔÓň˛˝  ńÓÝÝţÚ ýňÝ■°ŕţÚ
