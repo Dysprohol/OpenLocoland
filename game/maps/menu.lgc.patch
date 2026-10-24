@@ -195,7 +195,7 @@
 +}
 +// The map editor entry of the custom maps page - the one place the menu starts it from.
 +// LocoFix's StartEditorMode (src/LocoFix/restart.cpp, extern number 200, free in export.lgc)
-+// starts the game again in its editor mode on the empty template map (game/maps.new/template);
++// starts the game again in its editor mode, where the template opens as a new empty map;
 +// File > Load of the editor opens the others.
 +extern StartEditorMode(string map) 200;
 +// LocoFix's GetMouseWheel (src/LocoFix/menu_input.cpp, extern number 201): the turn of the mouse

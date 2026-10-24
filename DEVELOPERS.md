@@ -1287,6 +1287,37 @@ in the editor; File > Back to the menu -> the main menu) and from a script (a mi
 `StartEditorMode` -> the editor on the sandbox; edits, File > Save, File > Play the map -> the
 saved map playing with its interface).
 
+**Back to the editor** (`restart.cpp`, `game/maps/script/menutact.lgc.patch`). A map played from
+the editor (Play the map: `--return-editor`) also has a way straight back: the Esc menu's exit page
+(ABORT GAME, `SetMenuState(5)`) gets a row like the custom maps page's - the lamp VID 472 and BACK TO
+THE EDITOR (`[strings]` `MenuBackToEditor`: WROC DO EDYTORA, ZURUCK ZUM EDITOR ...) - under the
+question, next to YES, EXIT TO MAIN MENU; a click on the row (the lamp or the text, tested by the
+screen point on the click's frame, as the custom page does) starts the game again in editor mode on
+the map. The script asks LocoFix two new externs (free in `export.lgc`, handled by the hook of
+`Script_CallExtern`): `PlayedFromEditor() 202` (1 in such a map, so a mission played from the menu
+shows no row) and `BackToEditor() 203`. Tried first the way back as it was - a map played from the
+editor, won (the template's `MAP_WIN_TEST`, VICTORY, CONTINUE), lost, and left through Esc - ABORT
+GAME - YES: each came back to the editor on the same map, held, nothing of the map lost (the map file
+is the one played; the game writes the map's `hiscores` and `hiscores.txt` next to it, which export
+leaves out). What was wrong: the way back first loads the main menu (`menu.map`; the restart starts at
+its `Level_Load`) and the menu never starts, so the menu's `return` flag of the Players key, which
+every custom map's `InitDefault` sets to 2 (the menu opens on the custom maps page after it) and the
+menu sets back to 1 when it starts, stayed 2 - the next start of the game opened on the custom maps
+page. Now the value it had before the map was played (read when the game starts with
+`--return-editor`, before the map's script runs) is put back on the way to the editor, by either way.
+Checked in English and Polish: the row on the exit page of a map played from the editor and not on a
+mission played normally, a click on it -> the editor on the same map, `return` 1 as before; YES, EXIT
+TO MAIN MENU -> the editor, `return` 1 too.
+
+A tester's way into a running map: Run the level (Ctrl+R) lets the level run inside the editor's own
+game, with the game's interface and its Esc menu; ABORT GAME -> YES there loads the main menu in that
+same game (the old-format menu runs as usual in editor mode), and its MAP EDITOR loads the map -
+which started running, because Run the level (`g_running`) was still on and `editor_level_loaded`
+holds a level only when it is off. Run the level now ends with its level (`editor_level_loading`):
+every level loaded after it is held. Checked: the start map, Ctrl+R, Esc - ABORT GAME - YES (the main
+menu, on the custom maps page), MAP EDITOR -> a new start map held, the bar there ("a new level - Run
+the level is off" in `LocoFix.log`).
+
 **The map the editor starts on** (`editor.cpp`, "the map the editor starts on"; `editor_newmap.cpp`
 `make_start_map`). Started on the template - `StartEditorMode("maps\\template\\template.map")` from
 the menu, or `--test-map maps\template\template.map` as the desktop shortcut's `edit_map.cmd` passes
@@ -1460,7 +1491,10 @@ blocks, otherwise the template's (`maps\template\template.lgc`, made by `map_too
 --script`: a whole mission like the sandbox - `CUSTOM_MAP`, the texts, the reinforcement, the
 win when the enemy had units and has none left, the loss when the player had units and has
 neither units nor a factory, and `MAP_WIN_TEST`, which destroys the enemy at 20 s to check the
-end). A script without the blocks (the campaign, the sandbox) is not changed: its settings and
+end). A map saved from the template does not keep its name: a title or a briefing header "TEMPLATE"
+(the template's own - the Esc menu's first page showed it in a map played from the editor) becomes
+the map's folder name in capitals (`mission_save`; checked: the template saved as `maps\tpltest\` has
+"TPLTEST" in its script and on the custom maps page). A script without the blocks (the campaign, the sandbox) is not changed: its settings and
 its push lines are read and shown, read-only, and saved under a new name the map becomes an
 editor mission with them.
 
@@ -1501,7 +1535,11 @@ patrolling), night and rain plays without errors too.
 
 **Ground, gravel bed, decals** (`editor_edit.cpp`, `ground.h`, `ground.cpp`). The strip's Ground height
 tool raises, lowers, flattens or smooths the GRID cells (8 x 8 px) in a circle around the cursor while
-the button is held (M the brush, + and - the radius; the brush and the picture: "The relief and the
+the button is held (M the brush, the mouse wheel or + and - the radius - the wheel sizes the brush of
+the Decals, Paint and Water tools too, where it turned nothing, and Shift+wheel stays the selected
+object's height in the Select tool; checked: three notches up, one down -> radius 5, then 4; a stroke
+ends - one step of the history - also when the window or the mouse's capture is lost or the tool
+changes, and the brush's repeat timer stops when the button is found let go; the brush and the picture: "The relief and the
 heights of objects" below), shows the brush's cells at their height coloured by it, leaves the track's
 cells and their ramp as they are, puts the objects back on the new ground and makes the stroke one
 undo step (World_SetGroundZ). New track gets the gravel bed decal the missions use

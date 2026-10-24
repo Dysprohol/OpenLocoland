@@ -202,7 +202,7 @@ lawy) oraz region, w którym wybuchy rozpryskują wodę. Shift+przeciąganie ją
 wody ma na mapie jeden poziom, tak jak w misjach.
 
 Narzędzie **Wysokosc terenu** kształtuje teren: trzymaj lewy przycisk i przeciągaj (`M` wybiera
-podnoszenie, obniżanie, wyrównywanie albo wygładzanie, `+`/`-` promień). Pędzel jest miękki - pełny
+podnoszenie, obniżanie, wyrównywanie albo wygładzanie, kółko myszy albo `+`/`-` promień). Pędzel jest miękki - pełny
 w środku, słabszy ku brzegowi - i działa dalej, gdy trzymasz go w miejscu. Obraz terenu idzie za
 wysokościami: wzgórze widać jako wzgórze z cieniem i zasłania to, co stoi za nim, w edytorze i w grze
 (obraz zapisuje się z mapą; na terenie misji kampanii staje się własnym obrazem mapy). Poziomice co
@@ -300,7 +300,7 @@ nim**.
 ### 8. Ozdoby
 
 **Dekoracje** z listwy: trawa, krzaki, kwiaty, kamienie, wraki... `[` `]` (albo kliknięcie pozycji)
-wybiera jedną; kliknięcie stawia jedną, przeciąganie rozrzuca je w promieniu (`+` `-`), nigdy
+wybiera jedną; kliknięcie stawia jedną, przeciąganie rozrzuca je w promieniu (kółko, `+` `-`), nigdy
 bliżej niż odstęp (`<` `>`). Shift+przeciąganie je zbiera. Drzewa, domy i reszta są we **Wszystkie
 obiekty**. **Region** (listwa): przeciągnij jego prostokąt; jego panel ustawia mgłę (mgła, pył,
 opar, poświata) i rozpryski.
@@ -337,8 +337,9 @@ fortyfikacji), a **przegrana**, gdy graczowi nie zostało żadnej jednostki ani 
 ### 11. Zagraj
 
 Menu → **ZAGRAJ NA MAPIE**: gra uruchamia się od nowa z twoją mapą jako misją - odprawa w menu Esc,
-przybywające posiłki, atakujący wróg. Gdy się skończy (albo wyjdziesz do menu głównego), gra wraca
-do edytora na twoją mapę. O niezapisane zmiany najpierw pyta.
+przybywające posiłki, atakujący wróg. Gdy się skończy, gra wraca do edytora na twoją mapę; żeby
+wrócić od razu, naciśnij Esc, przycisk wyjścia (WYJDZ Z GRY) i **WROC DO EDYTORA**. O niezapisane
+zmiany najpierw pyta.
 
 ### 12. Zapisz
 
@@ -394,7 +395,7 @@ misji, Wysokosc terenu, Skrzynka z pieniedzmi, Pojazdy, Malowanie terenu, Woda i
 | U / C | odczep / doczep wagon |
 | `[` `]` | dekoracja, tekstura |
 | `<` `>` | odstęp dekoracji |
-| `+` `-` | promień pędzla |
+| kółko, `+` `-` | rozmiar pędzla (Wysokosc terenu, Dekoracje, Malowanie, Woda) |
 | M | pędzel terenu: podnieś, obniż, wyrównaj, wygładź |
 | H | wysokości terenu (poziomice) przy każdym narzędziu |
 | B | podsypka nowych torów |

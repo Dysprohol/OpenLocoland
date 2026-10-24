@@ -8,7 +8,7 @@ JEDNOSMERNY USEK U NAVESTIDLA L / SHIFT+L
 SMAZAT VYBER            DEL
 ZPET / ZNOVU            CTRL+Z / CTRL+Y
 DEKORACE / ROZESTUP     [ ] / < >
-STETEC TERENU / POLOMER M / + -
+STETEC TERENU / POLOMER M / + -, KOLECKO
 STRKOVE LOZE TRATI      B
 SPUSTIT / ZASTAVIT      CTRL+R
 NAPOVEDA                F1

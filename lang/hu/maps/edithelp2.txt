@@ -8,7 +8,7 @@ SZAKASZ SZEMAFORHOZ     L / SHIFT+L
 KIJELÖLT TÖRLÉSE        DEL
 VISSZAVONÁS / ÚJRA      CTRL+Z / CTRL+Y
 DÍSZÍTÉS / TÉRKÖZE      [ ] / < >
-TEREPECSET / SUGARA     M / + -
+TEREPECSET / SUGARA     M / + -, GÖRGÕ
 PÁLYA KAVICSÁGYA        B
 SZINT FUTÁSA / SZÜNET   CTRL+R
 SÚGÓ                    F1

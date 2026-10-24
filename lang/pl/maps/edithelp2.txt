@@ -8,7 +8,7 @@ LINIA PRZY SEMAFORZE    L / SHIFT+L
 USUÑ ZAZNACZENIE        DEL
 COFNIJ / PONÓW          CTRL+Z / CTRL+Y
 DEKORACJA / ODSTÊP      [ ] / < >
-PÊDZEL TERENU / PROMIEÑ M / + -
+PÊDZEL TERENU / PROMIEÑ M / + -, KÓ£KO
 PODSYPKA NOWYCH TORÓW   B
 URUCHOM / WSTRZYMAJ     CTRL+R
 POMOC                   F1

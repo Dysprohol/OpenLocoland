@@ -998,8 +998,11 @@ bool on_bar(float x, float y) {
 
 void close_context();   // the context panel, below
 
+void end_strokes();   // a stroke under way ends first (the mouse, below)
+
 void choose_entry(int i) {
     if (i < 0 || i >= ENTRY_COUNT) return;
+    end_strokes();
     end_line();
     g_push_started = false;
     const bool again = g_entry == i;
@@ -3474,6 +3477,45 @@ void give_building_line(uint8_t* o) {
             at<float>(o, O_X), at<float>(o, O_Y),
             at<int>(o, O_DIRECTION), line.bx, line.by, line.ex, line.ey, static_cast<unsigned>(objects.size()));
 }
+// Every stroke and drag ends - the button let go, the window or the capture lost, the tool changed:
+// each is one step of the history as it stands; the brush's repeat timer stops.
+HWND g_window = nullptr;   // the window of the timer
+
+void end_strokes() {
+    if (g_window) KillTimer(g_window, HEIGHT_TIMER);
+    end_drag();
+    if (g_stroke.active && entry().tool == Tool::Height) end_height_stroke();
+    if (g_stroke.active && entry().tool == Tool::Decals) end_decal_stroke();
+    end_ground_stroke();
+    if (g_region_drag) {
+        float sx, sy;
+        mouse_on_map(sx, sy);
+        finish_region(sx, sy);
+    }
+    if (!g_test && GetCapture()) ReleaseCapture();
+}
+
+// ---- the size of the brushes ----
+//
+// The Ground height and Decals tools' radius (cells, 8 px of the scatter) and the Paint and Water
+// tools' brush (px) - + and - or the mouse wheel (up: bigger). The wheel turns nothing in these
+// tools (the decals turn at random, the ground has no direction) and Shift+wheel, the selected
+// object's height, is for the Select tool.
+bool brush_tool() {
+    const Tool t = entry().tool;
+    return t == Tool::Height || t == Tool::Decals || t == Tool::Paint || t == Tool::Water;
+}
+
+void brush_size(int steps) {
+    if (entry().tool == Tool::Paint || entry().tool == Tool::Water) {
+        g_paint_radius = (std::max)(MIN_PAINT_RADIUS, (std::min)(MAX_PAINT_RADIUS, g_paint_radius + steps * PAINT_STEP));
+        MESSAGE("MsgBrushSize", "brush %d px", g_paint_radius);
+    } else {
+        g_radius = (std::max)(0, (std::min)(MAX_RADIUS, g_radius + steps));
+        MESSAGE("MsgRadius", "radius %d", g_radius);
+    }
+}
+
 // ---- drawing ----
 
 // Graphics_DrawVid draws at (x, y - z) of the view with the depth z.
@@ -3664,7 +3706,7 @@ void draw_ground_tool(bool heights) {
             }
         const bool inside = c.first >= 0 && c.first < grid_width() && c.second >= 0 && c.second < grid_height();
         std::snprintf(text, sizeof text,
-                      ui_format("StatusHeight", "Ground height: %s (M), radius %d cells (+ -), the ground here %d - lines every 4 levels"),
+                      ui_format("StatusHeight", "Ground height: %s (M), radius %d cells (wheel, + -), the ground here %d - lines every 4 levels"),
                       brush_name(), g_radius, inside ? ground_cell(c.first, c.second) : 0);
     } else {
         const float r = (std::max)(8.0f * g_radius, 12.0f);
@@ -3678,7 +3720,7 @@ void draw_ground_tool(bool heights) {
             if (!shift_down()) draw_vid(v, frame_for(v, 0), x - cam_x, y - cam_y, ground_z(v, x, y));
         const char* name = object_name(decal_nvid());
         std::snprintf(text, sizeof text,
-                      ui_format("StatusDecals", "Decals: %s, VID %d ([ ]), radius %d (+ -), spacing %d px (< >) - Shift takes away"),
+                      ui_format("StatusDecals", "Decals: %s, VID %d ([ ]), radius %d (wheel, + -), spacing %d px (< >) - Shift takes away"),
                       name ? name : "?", decal_nvid(), g_radius, g_spacing);
     }
     g_ground_status = text;
@@ -3705,12 +3747,12 @@ void draw_paint_tool() {
             fill(graphics(), nullptr, mx + r + 5, my - 7, mx + r + 19, my + 7, 0xff000000 | rgb);
         }
         std::snprintf(text, sizeof text,
-                      ui_format("StatusPaint", "Paint: %s ([ ]), brush %d px (+ -) - Shift puts the original picture back"),
+                      ui_format("StatusPaint", "Paint: %s ([ ]), brush %d px (wheel, + -) - Shift puts the original picture back"),
                       ground_texture_name(g_texture), g_paint_radius);
     } else {
         const WaterKind& k = WATER_KINDS[g_water_kind];
         const int level = water_level_of(k.nvid);
-        std::snprintf(text, sizeof text, ui_format("StatusWater", "Water: %s (W), level %s, brush %d px (+ -) - Shift takes it away"),
+        std::snprintf(text, sizeof text, ui_format("StatusWater", "Water: %s (W), level %s, brush %d px (wheel, + -) - Shift takes it away"),
                       ui_text(k.key, k.english), level >= 0 ? std::to_string(level).c_str() : ui_text("WordNew", "new"), g_paint_radius);
     }
     g_ground_status = text;
@@ -4281,6 +4323,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         } else if (entry().tool == Tool::Height) {
             start_height_stroke();
             height_step();
+            g_window = window;
             SetTimer(window, HEIGHT_TIMER, HEIGHT_REPEAT, nullptr);
             if (!g_test) SetCapture(window);
         } else if (entry().tool == Tool::Decals) {
@@ -4323,22 +4366,21 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
     }
     case WM_TIMER:
         if (w != HEIGHT_TIMER) return false;
-        if (g_stroke.active && entry().tool == Tool::Height && GetTickCount() - g_stroke.time >= HEIGHT_REPEAT) height_step(true);
+        // the button let go where its message did not come (outside the window, the capture lost):
+        // the stroke ends as with the button up
+        if (!g_test && GetKeyState(VK_LBUTTON) >= 0) end_strokes();
+        else if (g_stroke.active && entry().tool == Tool::Height && GetTickCount() - g_stroke.time >= HEIGHT_REPEAT) height_step(true);
         else if (!g_stroke.active) KillTimer(window, HEIGHT_TIMER);
         return true;
     case WM_LBUTTONUP:
-        end_drag();
-        KillTimer(window, HEIGHT_TIMER);
-        if (entry().tool == Tool::Height) end_height_stroke();
-        if (entry().tool == Tool::Decals) end_decal_stroke();
-        end_ground_stroke();
-        if (g_region_drag) {
-            float sx, sy;
-            mouse_on_map(sx, sy);
-            finish_region(sx, sy);
-        }
-        if (!g_test && GetCapture()) ReleaseCapture();
+        end_strokes();
         return true;
+    case WM_CAPTURECHANGED:   // the mouse taken by another window (a message box, Alt+Tab)
+        if (!g_test && reinterpret_cast<HWND>(l) != window) end_strokes();
+        return false;
+    case WM_ACTIVATE:
+        if (LOWORD(w) == WA_INACTIVE) end_strokes();
+        return false;
     case WM_RBUTTONDOWN:
         if (g_patrol_train) {   // no patrol point after all
             g_patrol_train = nullptr;
@@ -4367,7 +4409,9 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
     case WM_RBUTTONUP:
         return true;
     case WM_MOUSEWHEEL:
-        if (shift_down() && !g_selection.empty() && entry().tool != Tool::Place && entry().tool != Tool::Track)
+        if (brush_tool())   // the brushes: the wheel sizes the brush, as + and - do
+            brush_size(GET_WHEEL_DELTA_WPARAM(w) > 0 ? 1 : -1);
+        else if (shift_down() && !g_selection.empty() && entry().tool != Tool::Place && entry().tool != Tool::Track)
             lift(GET_WHEEL_DELTA_WPARAM(w) > 0 ? LIFT_STEP : -LIFT_STEP, false);   // Shift: the object's height
         else
             turn(GET_WHEEL_DELTA_WPARAM(w) > 0 ? 1 : -1);
@@ -4385,14 +4429,8 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         else if (entry().tool == Tool::Height && w == 'M') {
             g_brush = static_cast<Brush>((static_cast<int>(g_brush) + 1) % 4);
             MESSAGE("MsgBrush", "ground: %s", brush_name());
-        } else if ((entry().tool == Tool::Height || entry().tool == Tool::Decals) &&
-                   (w == VK_OEM_PLUS || w == VK_ADD || w == VK_OEM_MINUS || w == VK_SUBTRACT)) {
-            g_radius = (std::max)(0, (std::min)(MAX_RADIUS, g_radius + (w == VK_OEM_PLUS || w == VK_ADD ? 1 : -1)));
-            MESSAGE("MsgRadius", "radius %d", g_radius);
-        } else if ((entry().tool == Tool::Paint || entry().tool == Tool::Water) &&
-                   (w == VK_OEM_PLUS || w == VK_ADD || w == VK_OEM_MINUS || w == VK_SUBTRACT)) {
-            g_paint_radius = (std::max)(MIN_PAINT_RADIUS, (std::min)(MAX_PAINT_RADIUS, g_paint_radius + (w == VK_OEM_PLUS || w == VK_ADD ? PAINT_STEP : -PAINT_STEP)));
-            MESSAGE("MsgBrushSize", "brush %d px", g_paint_radius);
+        } else if (brush_tool() && (w == VK_OEM_PLUS || w == VK_ADD || w == VK_OEM_MINUS || w == VK_SUBTRACT)) {
+            brush_size(w == VK_OEM_PLUS || w == VK_ADD ? 1 : -1);
         } else if (entry().tool == Tool::Paint && (w == VK_OEM_4 || w == VK_OEM_6)) {
             const int n = static_cast<int>(ground_textures().size());
             if (n) g_texture = (g_texture + (w == VK_OEM_6 ? 1 : n - 1)) % n;

@@ -946,6 +946,13 @@ void mission_save(const std::string& map) {
         g_map = map;
         return;
     }
+    // a map saved from the template keeps nothing of its name: "TEMPLATE" as the title (the custom
+    // maps page) or the briefing's header (the Esc menu's first page) becomes the map's own name
+    if (lstrcmpiA(folder_name(map).c_str(), "template") != 0) {
+        const bool title = ascii_upper(g_mission.title, 24) == "TEMPLATE";
+        if (title) g_mission.title = from_pack(upper(folder_name(map)));
+        if (title || ascii_upper(g_mission.header, 32) == "TEMPLATE") g_mission.header = g_mission.title;
+    }
     // the blocks anew; main()'s block keeps the indentation of its marker
     const std::string indent = lines[b.main_open].substr(0, lines[b.main_open].find_first_not_of(" \t"));
     std::vector<std::string> out(lines.begin(), lines.begin() + b.open + 1);

@@ -861,6 +861,13 @@ std::string editor_start_map(const std::string& map) { return start_map(map); }
 // otherwise carry the old level's pause time over) and the new one is held once it is loaded.
 void editor_level_loading(void* w) {
     if (g_enabled) edit_reset();   // the objects of the old level go away
+    // Run the level ends with its level: the next one is held for editing - a running level can
+    // leave through its own Esc menu for the main menu (the old-format menu runs as usual), and the
+    // map the menu's MAP EDITOR then loads here must not start running
+    if (g_enabled && g_running) {
+        g_running = false;
+        patch::log("editor: a new level - Run the level is off, the level will be held");
+    }
     if (!g_held) return;
     world_flags(static_cast<uint8_t*>(w)) &= ~(PAUSED | SCRIPTS_OFF);
     g_held = false;

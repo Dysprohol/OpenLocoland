@@ -8,7 +8,7 @@ PUSH LINE AT SEMAPHORE  L / SHIFT+L
 DELETE THE SELECTION    DEL
 UNDO / REDO             CTRL+Z / CTRL+Y
 DECAL / ITS SPACING     [ ] / < >
-GROUND BRUSH / RADIUS   M / + -
+GROUND BRUSH / RADIUS   M / + -, WHEEL
 GRAVEL BED OF TRACK     B
 RUN / HOLD THE LEVEL    CTRL+R
 HELP                    F1

@@ -20,7 +20,16 @@
 // and the cfg's StartDialog=0 would do the same.
 // --return-editor (File > Play the map): when the played map is left for the main menu (the end
 // of the mission, "exit to the main menu" of the Esc menu), the game starts again in editor mode
-// on that map instead (restart_level_loading, from frame_limit.cpp's Level_Load wrapper).
+// on that map instead (restart_level_loading, from frame_limit.cpp's Level_Load wrapper); the Esc
+// menu's exit page also has BACK TO THE EDITOR (menutact.lgc.patch), which does it at once:
+//
+//   extern PlayedFromEditor() 202;   // 1 in a map played from the editor
+//   extern BackToEditor() 203;       // the game starts again in editor mode on it
+//
+// Either way the menu's `return` flag (Players key: 2 after a custom map, so the main menu opens on
+// the custom maps page; the menu sets it back to 1 when it starts) gets the value it had before the
+// map was played - the menu does not start on the way back, and the next start of the game would
+// open the custom maps page.
 // The switches are taken out of the command line (patch::take_switch).
 #include "patch.h"
 #include "script_value.h"
@@ -45,15 +54,55 @@ constexpr size_t WORLD_SCRIPT_VALUES = 0x158;
 constexpr int EXTERN_START_EDITOR_MODE = 200;
 constexpr int EXTERN_RECALC_GRID_Z = 81;      // ReCalcGridZ(int unit): declared in export.lgc, missing in the exe
 constexpr int EXTERN_MOUSE_WHEEL = 201;       // GetMouseWheel(): the menu's custom maps page
+constexpr int EXTERN_PLAYED_FROM_EDITOR = 202;   // PlayedFromEditor(): the Esc menu (menutact.lgc.patch)
+constexpr int EXTERN_BACK_TO_EDITOR = 203;       // BackToEditor()
+constexpr uintptr_t SCRIPT_PUSH_INT = 0x442700;  // void __thiscall Script_PushInt(Script*, int)
+constexpr size_t WORLD_SCRIPT = 0x14c;
+// the scripts' Players key (player_registry.cpp moves it to HKEY_CURRENT_USER) and the menu's flag
+constexpr char PLAYERS_KEY[] = "SOFTWARE\\Gromada\\Locoland\\Players";
+constexpr char RETURN_VALUE[] = "return";
 constexpr DWORD WAIT_FOR_OLD_GAME_MS = 30000;
 
 using CallExtern_t = int(__fastcall*)(uint8_t* world, void* edx, int function);
+using PushInt_t = void(__fastcall*)(uint8_t* script, void* edx, int value);
 using DialogBoxParamA_t = INT_PTR(WINAPI*)(HINSTANCE, LPCSTR, HWND, DLGPROC, LPARAM);
 CallExtern_t g_call_extern = nullptr;
 DialogBoxParamA_t g_dialog_box = nullptr;
 bool g_no_launcher = false;
 bool g_return_editor = false;   // --return-editor
 std::string g_played;           // the map played, the first one loaded
+std::string g_return_flag;      // the menu's `return` before the map was played ("" when there was none)
+bool g_return_flag_known = false;
+
+// The menu's `return` flag of the Players key: read before the played map sets it, put back on the
+// way to the editor.
+bool read_return_flag(std::string& value) {
+    char data[32] = "";
+    DWORD size = sizeof data - 1, type = 0;
+    const bool there = RegGetValueA(HKEY_CURRENT_USER, PLAYERS_KEY, RETURN_VALUE, RRF_RT_REG_SZ, &type, data, &size) == ERROR_SUCCESS;
+    value = there ? data : "";
+    return there;
+}
+
+void restore_return_flag() {
+    if (!g_return_flag_known) return;
+    HKEY key = nullptr;
+    if (RegOpenKeyExA(HKEY_CURRENT_USER, PLAYERS_KEY, 0, KEY_SET_VALUE, &key) != ERROR_SUCCESS) return;
+    if (g_return_flag.empty()) RegDeleteValueA(key, RETURN_VALUE);
+    else RegSetValueExA(key, RETURN_VALUE, 0, REG_SZ, reinterpret_cast<const BYTE*>(g_return_flag.c_str()),
+                        static_cast<DWORD>(g_return_flag.size() + 1));
+    RegCloseKey(key);
+    patch::log("restart: the menu's return flag back to '%s'", g_return_flag.c_str());
+}
+
+// The played map is left for the editor: the game starts again in editor mode on it.
+void back_to_editor() {
+    if (!g_return_editor || g_played.empty()) return;
+    patch::log("restart: back to the editor on %s", g_played.c_str());
+    g_return_editor = false;
+    restore_return_flag();
+    restart_game(true, g_played);
+}
 std::string g_waited;   // "<pid> (n ms)" when --after waited, logged once the log is fresh
 
 INT_PTR WINAPI DialogBoxParamA_restart(HINSTANCE instance, LPCSTR name, HWND parent, DLGPROC proc, LPARAM param) {
@@ -68,6 +117,14 @@ INT_PTR WINAPI DialogBoxParamA_restart(HINSTANCE instance, LPCSTR name, HWND par
 int __fastcall CallExtern_restart(uint8_t* world, void* edx, int function) {
     if (function == EXTERN_RECALC_GRID_Z) return recalc_grid_z_extern(world);
     if (function == EXTERN_MOUSE_WHEEL) return mouse_wheel_extern(world);
+    if (function == EXTERN_PLAYED_FROM_EDITOR) {
+        reinterpret_cast<PushInt_t>(SCRIPT_PUSH_INT)(world + WORLD_SCRIPT, nullptr, g_return_editor && !g_played.empty() ? 1 : 0);
+        return 0;
+    }
+    if (function == EXTERN_BACK_TO_EDITOR) {
+        back_to_editor();
+        return 0;
+    }
     if (function != EXTERN_START_EDITOR_MODE) return g_call_extern(world, edx, function);
     int32_t& count = *reinterpret_cast<int32_t*>(world + WORLD_SCRIPT_COUNT);
     auto* values = *reinterpret_cast<sv::Value**>(world + WORLD_SCRIPT_VALUES);
@@ -128,6 +185,7 @@ void install_restart() {
     if (!g_waited.empty()) patch::log("restart: waited for the old game %s", g_waited.c_str());
     g_no_launcher = patch::take_switch("--no-launcher");
     g_return_editor = patch::take_switch("--return-editor");
+    if (g_return_editor) g_return_flag_known = true, read_return_flag(g_return_flag);   // before the map's script sets it
     g_dialog_box = *reinterpret_cast<DialogBoxParamA_t*>(IAT_DialogBoxParamA);
     void* dialog_box = reinterpret_cast<void*>(&DialogBoxParamA_restart);
     patch::write(IAT_DialogBoxParamA, &dialog_box, sizeof dialog_box);
@@ -148,9 +206,5 @@ void restart_level_loading(const char* map) {
         return;
     }
     const size_t n = std::strlen(map);
-    if (n >= 8 && lstrcmpiA(map + n - 8, "menu.map") == 0) {
-        patch::log("restart: back to the editor on %s", g_played.c_str());
-        g_return_editor = false;
-        restart_game(true, g_played);
-    }
+    if (n >= 8 && lstrcmpiA(map + n - 8, "menu.map") == 0) back_to_editor();
 }

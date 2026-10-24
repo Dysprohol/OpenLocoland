@@ -205,7 +205,7 @@ water, bubbles, lava eruptions) and a region where explosions splash. Shift+drag
 One kind of water has one level on a map, as in the missions.
 
 The **Ground height** tool shapes the ground: hold the left button and drag (`M` picks raise,
-lower, flatten or smooth, `+`/`-` the radius). The brush is soft - full in the middle, less toward
+lower, flatten or smooth, the mouse wheel or `+`/`-` the radius). The brush is soft - full in the middle, less toward
 its edge - and goes on while you hold it still. The ground's picture follows: a hill shows as a
 shaded hill and hides what stands behind it, in the editor and in the game (the picture is saved
 with the map; on a campaign terrain it becomes the map's own). Contour lines every 4 levels show
@@ -303,7 +303,7 @@ right next to it**.
 ### 8. Decorate
 
 The strip's **Decals**: grass, bushes, flowers, stones, wrecks... `[` `]` (or a click on the
-entry) picks one; a click puts one, a drag scatters them in the radius (`+` `-`), never nearer than
+entry) picks one; a click puts one, a drag scatters them in the radius (wheel, `+` `-`), never nearer than
 the spacing (`<` `>`). Shift+drag takes them away. Trees, houses and the rest are in **All objects**.
 A **Region** (strip): drag its rectangle; its panel sets fog (mist, dust, haze, glow) and splashes.
 
@@ -340,8 +340,9 @@ fort's guns), and **lost** when the player has no units left and no factory.
 ### 11. Play it
 
 Menu → **PLAY THE MAP**: the game starts again with your map as a mission - the briefing in the Esc
-menu, the reinforcement arriving, the enemy attacking. When it ends (or you leave it for the main
-menu), the game comes back to the editor on your map. Unsaved changes are asked about first.
+menu, the reinforcement arriving, the enemy attacking. When it ends, the game comes back to the
+editor on your map; to go back at once, press Esc, the exit button (ABORT GAME) and **BACK TO THE
+EDITOR**. Unsaved changes are asked about first.
 
 ### 12. Save
 
@@ -397,7 +398,7 @@ Mission settings, Ground height, Money crate, Vehicles, Paint the ground, Water 
 | U / C | uncouple / couple a car |
 | `[` `]` | the decal, the texture |
 | `<` `>` | the decals' spacing |
-| `+` `-` | the brush's radius |
+| wheel, `+` `-` | the brush's size (Ground height, Decals, Paint, Water) |
 | M | the ground brush: raise, lower, flatten, smooth |
 | H | the ground's heights (contour lines) with any tool |
 | B | the gravel bed of new track |
