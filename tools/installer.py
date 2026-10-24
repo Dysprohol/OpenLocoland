@@ -97,6 +97,7 @@ TEXTS = {
         "uninstall": "Uninstall",
         "run": "Play",
         "close": "Close",
+        "github": "GitHub",
         "no_steam": "Locoland was not found in Steam. Install it through Steam or choose its folder "
                     "(the one with Steam.exe).",
         "bad_steam": "This folder has no Locoland from Steam (Steam.exe is missing):\n{path}",
@@ -145,6 +146,7 @@ TEXTS = {
         "uninstall": "Deinstallieren",
         "run": "Spielen",
         "close": "Schließen",
+        "github": "GitHub",
         "no_steam": "Locoland wurde in Steam nicht gefunden. Installiere es über Steam oder wähle seinen "
                     "Ordner (den mit Steam.exe).",
         "bad_steam": "In diesem Ordner ist kein Locoland aus Steam (Steam.exe fehlt):\n{path}",
@@ -192,6 +194,7 @@ TEXTS = {
         "uninstall": "Eltávolítás",
         "run": "Játék",
         "close": "Bezárás",
+        "github": "GitHub",
         "no_steam": "A Locoland nem található a Steamben. Telepítsd a Steamen keresztül, vagy válaszd ki a "
                     "mappáját (amelyikben a Steam.exe van).",
         "bad_steam": "Ebben a mappában nincs Steames Locoland (hiányzik a Steam.exe):\n{path}",
@@ -239,6 +242,7 @@ TEXTS = {
         "uninstall": "Odinstaluj",
         "run": "Graj",
         "close": "Zamknij",
+        "github": "GitHub",
         "no_steam": "Nie znaleziono Locoland w Steamie. Zainstaluj grę przez Steam albo wskaż jej folder "
                     "(ten z plikiem Steam.exe).",
         "bad_steam": "W tym folderze nie ma Locoland ze Steama (brak Steam.exe):\n{path}",
@@ -286,6 +290,7 @@ TEXTS = {
         "uninstall": "Desinstalar",
         "run": "Jogar",
         "close": "Fechar",
+        "github": "GitHub",
         "no_steam": "O Locoland não foi encontrado no Steam. Instala-o através do Steam ou escolhe a sua "
                     "pasta (a que tem o Steam.exe).",
         "bad_steam": "Esta pasta não tem o Locoland do Steam (falta o Steam.exe):\n{path}",
@@ -333,6 +338,7 @@ TEXTS = {
         "uninstall": "Удалить",
         "run": "Играть",
         "close": "Закрыть",
+        "github": "GitHub",
         "no_steam": "Locoland не найдена в Steam. Установите её через Steam или выберите её папку "
                     "(ту, где лежит Steam.exe).",
         "bad_steam": "В этой папке нет Locoland из Steam (нет Steam.exe):\n{path}",
@@ -380,6 +386,7 @@ TEXTS = {
         "uninstall": "Odinstalovat",
         "run": "Hrát",
         "close": "Zavřít",
+        "github": "GitHub",
         "no_steam": "Locoland nebyl ve Steamu nalezen. Nainstaluj ho přes Steam nebo vyber jeho složku "
                     "(tu se Steam.exe).",
         "bad_steam": "V této složce není Locoland ze Steamu (chybí Steam.exe):\n{path}",
@@ -761,6 +768,10 @@ class Installer:
     def t(self, key, **values):
         return TEXTS[self.lang][key].format(version=self.version, **values)
 
+    def open_github(self):
+        import webbrowser
+        webbrowser.open("https://github.com/Dysprohol/OpenLocoland")
+
     def layout(self):
         r = self.root
         r.resizable(True, True)
@@ -786,6 +797,10 @@ class Installer:
                               state="readonly", width=10)
         choice.grid(row=0, column=2, sticky="e")
         choice.bind("<<ComboboxSelected>>", lambda e: self.switch_language())
+        # GitHub link
+        w["github"] = ttk.Label(top, text=self.t("github"), cursor="hand2", foreground="#0366d6")
+        w["github"].grid(row=0, column=3, sticky="e", padx=(4, 0))
+        w["github"].bind("<Button-1>", lambda e: self.open_github())
 
         for row, (key, var, command) in enumerate([("steam", self.steam, self.browse_steam),
                                                    ("target", self.target, self.browse_target)], start=1):
