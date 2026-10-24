@@ -2249,6 +2249,14 @@ mode above) are not tested in full screen.
       with All missions on a test player of progress 3 sees all 20 dots playable, plays mission 10
       and wins it (W): the score `s1l9` is saved and the progress stays 3; with it off the map
       shows the progress 3 again (mission 10 cannot be clicked) and a win of mission 4 makes it 4,
+  31. a faster float-to-integer conversion (`fast_ftol.cpp`): the exe turns every float into an
+      integer through VC6's `_ftol` (`crt_ftol` 0x456a0c, 351 call sites - the software sprites,
+      the light buffers, every coordinate), which sets the FPU's rounding to zero and back around
+      a `fistp`; the two control word changes stall the FPU. With SSE3 (every x86 CPU since 2005)
+      the function becomes `fisttp`, which truncates by itself: the same 64-bit result in
+      edx:eax for every value (out of range and NaN give the same integer indefinite), st0
+      popped as before. In a sampling profile of mission 13 at 2560x1440 `crt_ftol` was 8% of the
+      main thread, after it 1.4%,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
