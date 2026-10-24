@@ -191,11 +191,13 @@ template; you will fill them in at step 10. (**MAP SIZE** in the menu changes th
 
 ### 2. Paint the ground
 
-The strip's **Paint the ground**: `[` and `]` pick a texture (grass, light grass, forest floor,
-sand, desert, snow, ice, rock, dark rock, lava, swamp, lake bed - taken from the campaign's
-maps), `+` and `-` the brush (8 - 200 px). Paint by dragging. Shift+drag puts the original picture
-back. Paint a sand path where the track will run and some patches of other textures. The painted
-picture is saved with the map.
+The strip's **Paint the ground**: its row of buttons above the bar has the textures (grass, light
+grass, forest floor, sand, desert, snow, ice, rock, dark rock, lava, swamp, lake bed - taken from the
+campaign's maps; `[` and `]` pick them too), **SIZE** (8 - 200 px; the mouse wheel too), **STRENGTH**
+(how much a pass covers: lower it to blend textures) and **EDGE** soft or hard. Paint by dragging
+with the left button; the right button (or Shift+drag) puts the original picture back; Alt+click
+takes a texture painted earlier in the session. Paint a sand path where the track will run and some
+patches of other textures. The painted picture is saved with the map.
 
 ### 3. Water, swamp, lava
 
@@ -204,13 +206,18 @@ ground into a basin with a shore, lays the water's surface and adds its effects 
 water, bubbles, lava eruptions) and a region where explosions splash. Shift+drag takes it away.
 One kind of water has one level on a map, as in the missions.
 
-The **Ground height** tool shapes the ground: hold the left button and drag (`M` picks raise,
-lower, flatten or smooth, the mouse wheel or `+`/`-` the radius). The brush is soft - full in the middle, less toward
-its edge - and goes on while you hold it still. The ground's picture follows: a hill shows as a
+The **Ground height** tool shapes the ground with its row of buttons above the bar: the mode -
+**RAISE/LOWER** (the left button raises, the right one lowers), **FLATTEN**, **SMOOTH**, **RAMP** (drag
+from one point to another: an even slope between their levels, for a driveway up to a plateau) and
+**ROUGH** (a slight random unevenness); **SIZE** (the mouse wheel too), **STRENGTH** (how fast it works)
+and **EDGE** soft or hard (hard for cliffs and plateaus). Shift flattens and Ctrl smooths for a stroke
+without changing the mode; `M` steps through the modes. The brush goes on while you hold it still,
+and the level under the cursor is always in the status line. The ground's picture follows: a hill shows as a
 shaded hill and hides what stands behind it, in the editor and in the game (the picture is saved
 with the map; on a campaign terrain it becomes the map's own). Contour lines every 4 levels show
 the heights while the tool is chosen; `H` shows them with any tool. **Flatten** takes the level
-where the stroke begins: begin it on the track to make a plateau at the track's level. Objects
+where the stroke begins - begin it on the track to make a plateau at the track's level - or the level
+you take with Alt+click. Objects
 stay on the ground; the tool leaves the track and the ground beside it alone.
 
 An object can stand higher or lower on its own: select it and press `PgUp` / `PgDn` (or Shift+wheel,

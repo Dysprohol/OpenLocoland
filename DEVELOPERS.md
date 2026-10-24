@@ -1595,10 +1595,16 @@ and the tester's "how do I change an object's height" had no answer either. Now:
   picture's heights where it paints, MAP_RULES.md 2). Chosen over an overlay alone because it shows
   in the game too: the hill is in the saved picture, the objects stand on what is seen, the depth hides
   what is behind it; the cost is a picture of the map's own (a few MB) once the ground is shaped.
-- *The brush.* Soft: raise and lower add 2 a step times a smoothstep of the distance (full in the
-  middle, 0 at the edge), the parts of a level kept per cell for its next step, so hills come out
-  round instead of as flat-topped discs; flatten pulls toward its level the same way (fully in the
-  middle half). Held still the brush goes on every 150 ms (a window timer, `HEIGHT_TIMER`) - before,
+- *The brush.* Raise and lower add the strength (1-5, 2 at first) a step times the edge's weight -
+  soft: a smoothstep of the distance (full in the middle, 0 at the edge), hard: full to the edge -,
+  the parts of a level kept per cell for its next step, so hills come out round instead of as
+  flat-topped discs; flatten and smooth pull toward their aim by the weight times 0.4 a strength
+  (`blend`), rough adds a random -0.5 to +0.5 of the strength times the weight (`mix` of the stroke's
+  seed, its step and the cell), ramp sets the cells within the brush of a dragged line to the level
+  along it (`ramp_apply`, when the drag ends). The right button lowers in the Raise mode; Shift
+  flattens and Ctrl smooths for a stroke (`Stroke.brush`); Alt+click takes the level under the
+  cursor for Flatten (`g_flatten_level`; the Alt keys are kept, `WM_SYSKEYDOWN`/`UP` of VK_MENU are
+  taken so Alt alone does not open the window's system menu). Held still the brush goes on every 150 ms (a window timer, `HEIGHT_TIMER`) - before,
   it worked only when the cursor entered a new cell. Flatten's level is the cell where the stroke
   begins, now named in the status line ("flatten to level 92"): begun on the track it gives a plateau
   at the track's level - the way to put a line and its factory on a hill: lay the line up its ramps
@@ -1732,6 +1738,25 @@ dragged (a band of bushes 16 px apart, none stacked), the map saved, loaded and 
 60 objects); played: the enemy's citadel, fort and mining plant fire on the player's factory and
 train, the enemy's train shoots the guns of the player's fort and its missile tower fires at an
 enemy robot.
+
+**The rows of the ground's tools** (`editor_edit.cpp`, the section of the same name). While the
+Ground height or the Paint tool is chosen, a row of buttons stands above the bar's strip: the depot
+panel's strip (VID 497) laid as long as the row, centred on the view, the menu font (VID 2; VID 7 lit
+for what is set and what is under the mouse, the set choice underlined). Ground height: the modes
+RAISE/LOWER, FLATTEN, SMOOTH, RAMP, ROUGH, SIZE - n +, STRENGTH - n +, EDGE SOFT / HARD; Paint: a
+swatch of each texture (its mean colour, the chosen one framed), SIZE, STRENGTH (a fifth to all of the
+texture a pass: `ground_paint`'s strength), EDGE (`weight` full to the edge). A group that does not fit
+beside the others goes into a row above (the window's or the screen's width). A click on a button
+sets it; nothing under the rows is painted, raised or picked (`on_options`, as `on_bar`). The right
+button stays with the Ground height, Paint and Water tools (Esc leaves them): Raise lowers with it,
+Paint and Water put the original back with it. Paint's pipette, Alt+click, reads `ground_texture_at`:
+the editor keeps the texture of each pixel it paints (a byte a pixel, `NO_TEXTURE` for the original;
+in each stroke's `PaintPatch` for undo, carried by the relief), so it knows the textures painted in
+this session, not those of a picture saved before. Checked in the game (English and Polish): the
+rows of both tools, HARD and STRENGTH set, the right button lowering, the wheel, a hill, a ramp from
+level 70 up to it (106), rough ground, the level taken with Alt+click and Flatten (also with Shift)
+going to it, undo; sand chosen in the row and painted, the right button putting the original back,
+Alt+click on the sand ("texture: Sand (taken from the picture)") and on the original picture.
 
 **Wrecks on the track** (`editor_edit.cpp`, the section of the same name). The palette's Wrecks group
 has five objects - the burnt carts and cars 13, 94, 57, 22 and 92 (class OBJECT, flags 0x4040,
@@ -1884,7 +1909,7 @@ there - read through it the lookups found nothing), and keeps each text (the lan
 change in a run); a key not found is logged once. The status line's messages are made twice: in
 the pack's language for the screen and in English for `LocoFix.log` (`ui_english`), so tests read
 the same log lines in any language; the test commands (`WM_COPYDATA`) run in English as well. The
-644 keys are in `[Editor]` of `lang/en/strings.override.ini` (the English texts),
+670 keys are in `[Editor]` of `lang/en/strings.override.ini` (the English texts),
 `lang/pl/strings.override.ini` (Polish without diacritics, the Polish game's names: Fabryka, Punkt
 naprawczy, Fortyfikacja, Wieza rakietowa) and the German, Hungarian and Russian ones (with the
 names of each pack's own `strings.ini`: Fabrik / Gyáregység / Депо, Werkstatt / Szervízdepó /
@@ -1912,9 +1937,9 @@ pictures (22 px right of the device's middle, 18 up), the title in the menu titl
 the text in the menu font (VID 2), the page arrows (VIDs 475/476) and the start button (VID 477)
 with "back to the map". **Help** (the ? button or F1) shows the editor's help pages the way the
 game shows its own (`maps\menu4.lst` -> `menu41.txt` ...): `maps\edithelp.lst` lists
-`maps\edithelp1.txt` ... `edithelp11.txt` - the mouse, the keys, the bar, laying track, the mission,
+`maps\edithelp1.txt` ... `edithelp12.txt` - the mouse, the keys, the bar, laying track, the mission,
 the buttons, the object's panel, all objects and decals, trains and rails, water, painting and
-regions, heights - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
+regions, heights, the ground tools' rows - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
 44 characters a line and 14 lines, ESC 7 / ESC 2 switch to the lit font VID 7 and back to VID 2):
 English in `game/maps/` (the fallback of every pack) and the others in `lang/<code>/maps/`; the files are
 opened through the game's own `CreateFileA` import, so the chosen pack's copies are read. **Menu**

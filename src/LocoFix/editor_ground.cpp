@@ -73,6 +73,7 @@ uint8_t* g_vid = nullptr;
 std::vector<uint16_t> g_pixels, g_heights, g_original_pixels, g_original_heights;
 // the stroke: the picture before it and the rectangle it changed
 std::vector<uint16_t> g_stroke_pixels, g_stroke_heights;
+std::vector<uint8_t> g_textures_of, g_stroke_textures;   // the texture painted on each pixel (NO_TEXTURE: the original)
 bool g_stroke = false;
 int g_x0 = 0, g_y0 = 0, g_x1 = -1, g_y1 = -1;
 
@@ -181,10 +182,11 @@ uint32_t hash(int x, int y) {
 }
 
 // The weight of a brush at a distance: full inside, falling off over the outer 45 %, the edge
-// broken by a grain so it does not look drawn with a compass.
-float weight(float distance, float radius, int x, int y) {
-    const float d = distance / radius + ((hash(x, y) & 255) / 255.0f - 0.5f) * 0.12f;
+// broken by a grain so it does not look drawn with a compass; a hard brush is full to its edge.
+float weight(float distance, float radius, int x, int y, bool hard = false) {
+    const float d = distance / radius + ((hash(x, y) & 255) / 255.0f - 0.5f) * (hard ? 0.03f : 0.12f);
     if (d >= 1) return 0;
+    if (hard) return 1;
     const float t = d <= 0.55f ? 1.0f : (1.0f - d) / 0.45f;
     return t * t * (3 - 2 * t);
 }
@@ -277,7 +279,7 @@ bool to_picture(float x, float y, int& px, int& py) {
     return px >= 0 && py >= 0 && px < g_w && py < g_h;
 }
 
-template <typename F> void each_pixel(float x, float y, float radius, F f) {
+template <typename F> void each_pixel(float x, float y, float radius, F f, bool hard = false) {
     int cx, cy;
     to_picture(x, y, cx, cy);
     const int r = static_cast<int>(std::ceil(radius));
@@ -286,7 +288,7 @@ template <typename F> void each_pixel(float x, float y, float radius, F f) {
     if (x0 >= x1 || y0 >= y1) return;
     for (int py = y0; py < y1; ++py)
         for (int px = x0; px < x1; ++px) {
-            const float w = weight(std::hypot(static_cast<float>(px - cx), static_cast<float>(py - cy)), radius, px, py);
+            const float w = weight(std::hypot(static_cast<float>(px - cx), static_cast<float>(py - cy)), radius, px, py, hard);
             if (w > 0) f(px, py, static_cast<size_t>(py) * g_w + px, w);
         }
     touch(x0, y0);
@@ -346,6 +348,7 @@ bool ground_prepare(const std::string& map, float x, float y, void* vid, std::st
         return false;
     }
     g_image = image;
+    g_textures_of.assign(g_pixels.size(), NO_TEXTURE);
     g_original_pixels = g_pixels;
     g_original_heights = g_heights;
     g_left = x - g_w / 2.0f;
@@ -368,6 +371,8 @@ void ground_reset() {
     g_original_heights.clear();
     g_stroke_pixels.clear();
     g_stroke_heights.clear();
+    g_textures_of.clear();
+    g_stroke_textures.clear();
 }
 
 const std::vector<GroundTexture>& ground_textures() {
@@ -387,18 +392,28 @@ void ground_stroke_begin() {
     g_stroke = true;
     g_stroke_pixels = g_pixels;
     g_stroke_heights = g_heights;
+    g_stroke_textures = g_textures_of;
     g_x0 = 0;
     g_x1 = -1;
 }
 
-void ground_paint(float x, float y, float radius, int texture, bool restore) {
+void ground_paint(float x, float y, float radius, int texture, bool restore, float strength, bool hard) {
     read_textures();
     if (!g_ready || (!restore && (texture < 0 || texture >= static_cast<int>(g_textures.size()) || !g_textures[texture].sampled)))
         return;
     each_pixel(x, y, radius, [&](int px, int py, size_t i, float w) {
-        g_pixels[i] = blend(g_pixels[i], restore ? g_original_pixels[i] : sample(g_textures[texture], px, py), w);
-        if (restore) g_heights[i] = static_cast<uint16_t>(g_heights[i] + (g_original_heights[i] - g_heights[i]) * w);
-    });
+        const float a = w * strength;
+        g_pixels[i] = blend(g_pixels[i], restore ? g_original_pixels[i] : sample(g_textures[texture], px, py), a);
+        if (restore) g_heights[i] = static_cast<uint16_t>(g_heights[i] + (g_original_heights[i] - g_heights[i]) * a);
+        if (a >= 0.5f) g_textures_of[i] = restore ? NO_TEXTURE : static_cast<uint8_t>(texture);
+    }, hard);
+}
+
+int ground_texture_at(float x, float y) {
+    int px, py;
+    if (!g_ready || !to_picture(x, y, px, py)) return -1;
+    const uint8_t t = g_textures_of[static_cast<size_t>(py) * g_w + px];
+    return t == NO_TEXTURE ? -1 : t;
 }
 
 void ground_lower(float x, float y, float radius, int bed, int texture, bool restore) {
@@ -410,11 +425,13 @@ void ground_lower(float x, float y, float radius, int bed, int texture, bool res
         if (restore) {
             g_heights[i] = static_cast<uint16_t>(g_heights[i] + (g_original_heights[i] - g_heights[i]) * w);
             g_pixels[i] = blend(g_pixels[i], g_original_pixels[i], w);
+            if (w >= 0.5f) g_textures_of[i] = NO_TEXTURE;
             return;
         }
         const float lowered = g_heights[i] + (bed_height - g_heights[i]) * w;
         if (lowered < g_heights[i]) g_heights[i] = static_cast<uint16_t>(lowered);
         if (tex) g_pixels[i] = blend(g_pixels[i], sample(g_textures[texture], px, py), w * 0.85f);
+        if (tex && w * 0.85f >= 0.5f) g_textures_of[i] = static_cast<uint8_t>(texture);
     });
 }
 
@@ -463,6 +480,7 @@ void ground_relief(const short* from, const short* to, int gw, int gh, int cx0, 
                 const size_t i = static_cast<size_t>(py) * g_w + px;
                 g_pixels[i] = colour;
                 g_heights[i] = h16;
+                if (g_stroke_textures.size() == g_textures_of.size()) g_textures_of[i] = g_stroke_textures[src];
                 py0 = (std::min)(py0, py);
                 py1 = (std::max)(py1, py);
             }
@@ -505,11 +523,14 @@ std::shared_ptr<PaintPatch> ground_stroke_end() {
                 p->height_before.push_back(g_stroke_heights[i]);
                 p->colour_after.push_back(g_pixels[i]);
                 p->height_after.push_back(g_heights[i]);
+                p->texture_before.push_back(g_stroke_textures.empty() ? NO_TEXTURE : g_stroke_textures[i]);
+                p->texture_after.push_back(g_textures_of[i]);
             }
         g_painted = true;
     }
     g_stroke_pixels.clear();
     g_stroke_heights.clear();
+    g_stroke_textures.clear();
     return p;
 }
 
@@ -520,6 +541,7 @@ void ground_apply(const PaintPatch& p, bool after) {
             const size_t i = static_cast<size_t>(p.y + y) * g_w + p.x + x, k = static_cast<size_t>(y) * p.w + x;
             g_pixels[i] = after ? p.colour_after[k] : p.colour_before[k];
             g_heights[i] = after ? p.height_after[k] : p.height_before[k];
+            if (k < p.texture_after.size()) g_textures_of[i] = after ? p.texture_after[k] : p.texture_before[k];
         }
     upload(p.x, p.y, p.x + p.w, p.y + p.h);
     g_painted = true;

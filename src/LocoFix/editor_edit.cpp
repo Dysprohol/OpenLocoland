@@ -1024,6 +1024,8 @@ POINT g_mouse = {-1, -1};   // logical pixels
 bool g_ctrl = false, g_shift = false;
 
 bool shift_down() { return g_shift || GetKeyState(VK_SHIFT) < 0; }
+bool g_alt = false;
+bool alt_down() { return g_alt || GetKeyState(VK_MENU) < 0; }
 
 struct Drag {
     bool active = false;
@@ -2211,23 +2213,35 @@ std::vector<uint8_t*> section_of(uint8_t* start) {
 // (the relief, editor_ground.h: raised ground shows higher, shaded by its slope, its height texture
 // with it) - always for the Ground height tool, for the track's and the buildings' flattening when
 // the picture is the map's own (not a campaign terrain's lNN.vid as it came). The Ground height tool
-// raises (2 a step in the middle of the brush, less and less out to its edge), lowers, flattens (to
-// the level where the stroke began - begun on the track, to the track's level -, softly at the edge)
-// or smooths (the mean of the 3 x 3 cells) the cells in a circle around the cursor while the button
-// is held; held still it goes on every 150 ms. The contours (H, and always with the tool) show the
-// heights over the whole view. The cells of the track and the
+// works on the cells in a circle around the cursor while the button is held (held still it goes on
+// every 150 ms), in the mode chosen in its row above the bar (or with M):
+//  - Raise: the left button raises, the right one lowers - strength levels a step in the middle of
+//    the brush, out to its edge less and less (a soft edge) or as much (a hard one: cliffs, plateaus),
+//  - Flatten: toward the level where the stroke begins (begun on the track, the track's level) or the
+//    level taken with Alt+click (the pipette),
+//  - Smooth: toward the mean of the 3 x 3 cells,
+//  - Ramp: a drag from one point to another lays an even slope between their levels along the line,
+//    as wide as the brush (a driveway up to a plateau),
+//  - Rough: a slight random unevenness (seeded by the stroke: undo and redo keep its result).
+// Shift flattens and Ctrl smooths for a stroke without changing the mode. The contours (H, and always
+// with the tool) show the heights over the whole view. The cells of the track and the
 // ring around them are left as the Track tool made them (MAP_RULES.md 3: flat at the track's
 // height, a half ramp around). When the button is let go the objects stand on the new ground
 // again (their height above it is kept: a fort's guns on its wall) and the stroke is one step
 // of the history. Every height goes through World_SetGroundZ.
 
-enum class Brush { Raise, Lower, Flatten, Smooth };
-const char* const BRUSH_NAMES[] = {"raise", "lower", "flatten", "smooth"};
-const char* const BRUSH_KEYS[] = {"BrushRaise", "BrushLower", "BrushFlatten", "BrushSmooth"};
-Brush g_brush = Brush::Raise;
-const char* brush_name() { return ui_text(BRUSH_KEYS[static_cast<int>(g_brush)], BRUSH_NAMES[static_cast<int>(g_brush)]); }
+enum class Brush { Raise, Lower, Flatten, Smooth, Ramp, Rough };
+const char* const BRUSH_NAMES[] = {"raise", "lower", "flatten", "smooth", "ramp", "rough"};
+const char* const BRUSH_KEYS[] = {"BrushRaise", "BrushLower", "BrushFlatten", "BrushSmooth", "BrushRamp", "BrushRough"};
+Brush g_brush = Brush::Raise;   // the mode (Lower is Raise's right button)
+const char* brush_name(Brush b) { return ui_text(BRUSH_KEYS[static_cast<int>(b)], BRUSH_NAMES[static_cast<int>(b)]); }
+const char* brush_name() { return brush_name(g_brush); }
 int g_radius = 2;   // cells of the brush (the Height tool) / 8 px of the scatter (Decals)
-constexpr int MAX_RADIUS = 12, MIN_Z = 0, MAX_Z = 400, BRUSH_STEP = 2;
+constexpr int MAX_RADIUS = 12, MIN_Z = 0, MAX_Z = 400;
+int g_strength = 2;          // the Height tool's strength: levels a step in the middle of the brush (1-5)
+bool g_hard_edge = false;    // its edge: soft or hard
+int g_flatten_level = -1;    // the level taken with Alt+click for Flatten (-1: where the stroke begins)
+constexpr int MIN_STRENGTH = 1, MAX_STRENGTH = 5;
 constexpr DWORD HEIGHT_REPEAT = 150;        // ms: the brush held still works again (a window timer)
 constexpr UINT_PTR HEIGHT_TIMER = 0x4c48;
 int g_spacing = 16;   // Decals: the least distance between two decals, px (< and >)
@@ -2250,6 +2264,12 @@ struct Stroke {
     DWORD time = 0;                        // Height: the last step (held still, the brush goes on: HEIGHT_TIMER)
     bool relief = false;                   // the picture follows (editor_ground.h)
     std::vector<short> grid_from;          // the GRID when it began
+    Brush brush = Brush::Raise;            // Height: what this stroke does (the mode, or Lower, Shift, Ctrl)
+    bool right = false;                    // Height: begun with the right button
+    rail::Cell ramp_from = {-1, -1};       // Ramp: where the drag began and its level
+    int ramp_level = 0;
+    uint32_t seed = 0;                     // Rough: its randomness
+    int steps = 0;
 } g_stroke;
 
 bool ground_paintable(bool quiet);   // the ground's picture, below
@@ -2311,15 +2331,30 @@ bool follows_ground(uint8_t* o) {   // objects that stand on the ground (not rai
     return pickable(o) && class_of(o) != B_RAIL && class_of(o) != B_ENGINE;
 }
 
-void start_height_stroke() {
+bool in_grid(const rail::Cell& c) { return c.first >= 0 && c.first < grid_width() && c.second >= 0 && c.second < grid_height(); }
+
+void start_height_stroke(bool right) {
     g_stroke = Stroke();
     g_stroke.active = true;
+    g_stroke.right = right;
+    g_stroke.brush = right ? Brush::Lower : g_brush;
+    if (shift_down()) g_stroke.brush = Brush::Flatten;   // for the stroke, the mode stays
+    else if (g_ctrl || GetKeyState(VK_CONTROL) < 0) g_stroke.brush = Brush::Smooth;
     g_stroke.track = track_cells();
     float x, y;
     const rail::Cell c = cursor_cell(x, y);
-    if (c.first >= 0 && c.first < grid_width() && c.second >= 0 && c.second < grid_height())
-        g_stroke.level = ground_cell(c.first, c.second);
-    if (g_brush == Brush::Flatten) MESSAGE("MsgFlattenTo", "ground: flatten to level %d (where the stroke began)", g_stroke.level);
+    const int here = in_grid(c) ? ground_cell(c.first, c.second) : 0;
+    g_stroke.level = g_flatten_level >= 0 ? g_flatten_level : here;
+    g_stroke.seed = GetTickCount() ^ (static_cast<uint32_t>(c.first) * 73856093u) ^ (static_cast<uint32_t>(c.second) * 19349663u);
+    if (g_stroke.brush == Brush::Flatten) {
+        if (g_flatten_level >= 0) MESSAGE("MsgFlattenPicked", "ground: flatten to level %d (taken with Alt+click)", g_stroke.level);
+        else MESSAGE("MsgFlattenTo", "ground: flatten to level %d (where the stroke began)", g_stroke.level);
+    }
+    if (g_stroke.brush == Brush::Ramp) {
+        g_stroke.ramp_from = c;
+        g_stroke.ramp_level = here;
+        MESSAGE("MsgRampFrom", "ramp: from level %d - drag to its other end", here);
+    }
     if (grid() && relief_on(true)) {
         g_stroke.relief = true;
         g_stroke.grid_from.assign(grid(), grid() + grid_width() * grid_height());
@@ -2333,47 +2368,17 @@ void start_height_stroke() {
     });
 }
 
-void height_step(bool again = false) {
-    float x, y;
-    const rail::Cell centre = cursor_cell(x, y);
-    if (centre == g_stroke.last && !again) return;
-    g_stroke.last = centre;
-    g_stroke.time = GetTickCount();
+uint32_t mix(uint32_t h) {
+    h ^= h >> 16;
+    h *= 0x7feb352du;
+    h ^= h >> 15;
+    h *= 0x846ca68bu;
+    return h ^ (h >> 16);
+}
+
+// The cells changed by a step (`heights`: the new levels), with the relief of the picture.
+void apply_heights(const std::vector<std::pair<rail::Cell, short>>& heights) {
     const int w = grid_width(), h = grid_height();
-    std::vector<std::pair<rail::Cell, short>> heights;
-    for (int dy = -g_radius; dy <= g_radius; ++dy)
-        for (int dx = -g_radius; dx <= g_radius; ++dx) {
-            if (dx * dx + dy * dy > g_radius * g_radius) continue;
-            const rail::Cell c = {centre.first + dx, centre.second + dy};
-            if (c.first < 0 || c.first >= w || c.second < 0 || c.second >= h || g_stroke.track.count(c)) continue;
-            const int z = ground_cell(c.first, c.second);
-            int to = z;
-            // a soft brush: full in the middle, less and less out to its edge (smoothstep)
-            const float d = std::sqrt(static_cast<float>(dx * dx + dy * dy)) / (g_radius + 0.5f), t = 1 - d;
-            const float soft = t * t * (3 - 2 * t);
-            if (g_brush == Brush::Raise || g_brush == Brush::Lower) {
-                // the step's parts of a level kept for the cell's next step - so hills come out round
-                float& part = g_stroke.parts[c];
-                part += BRUSH_STEP * soft;
-                const int n = static_cast<int>(part);
-                part -= n;
-                to = g_brush == Brush::Raise ? z + n : z - n;
-            }
-            else if (g_brush == Brush::Flatten) to = static_cast<int>(std::lround(z + (g_stroke.level - z) * (std::min)(1.0f, 2 * soft)));
-            else {
-                int sum = 0, n = 0;
-                for (int ny = -1; ny <= 1; ++ny)
-                    for (int nx = -1; nx <= 1; ++nx) {
-                        const int px = c.first + nx, py = c.second + ny;
-                        if (px < 0 || px >= w || py < 0 || py >= h) continue;
-                        sum += ground_cell(px, py);
-                        ++n;
-                    }
-                to = static_cast<int>(std::lround(static_cast<double>(sum) / n));
-            }
-            to = (std::max)(MIN_Z, (std::min)(MAX_Z, to));
-            if (to != z) heights.push_back({c, static_cast<short>(to)});
-        }
     int cx0 = w, cy0 = h, cx1 = -1, cy1 = -1, z_lo = 1 << 20, z_hi = -(1 << 20);
     for (const auto& ch : heights) {   // all from the heights before this step (the smoothing)
         const short was = ground_cell(ch.first.first, ch.first.second);
@@ -2389,6 +2394,91 @@ void height_step(bool again = false) {
     // the picture as it shows the new heights, from the stroke's start (no loss step by step)
     if (g_stroke.relief && !heights.empty())
         ground_relief(g_stroke.grid_from.data(), grid(), w, h, cx0, cy0, cx1, cy1, z_lo, z_hi);
+}
+
+// The weight of the brush at a distance d (0 in the middle, 1 at its edge).
+float brush_weight(float d) {
+    if (d >= 1) return 0;
+    if (g_hard_edge) return 1;
+    const float t = 1 - d;
+    return t * t * (3 - 2 * t);
+}
+
+// Ramp, when the drag ends: the cells within the brush of the line from where it began to where it
+// ends get the level along it - the begin's level to the end's -, the edge as the brush's.
+void ramp_apply() {
+    float x, y;
+    const rail::Cell a = g_stroke.ramp_from, b = cursor_cell(x, y);
+    if (!in_grid(a) || !in_grid(b)) return;
+    const int la = g_stroke.ramp_level, lb = ground_cell(b.first, b.second);
+    const float ux = static_cast<float>(b.first - a.first), uy = static_cast<float>(b.second - a.second), len2 = ux * ux + uy * uy;
+    const int r = g_radius;
+    std::vector<std::pair<rail::Cell, short>> heights;
+    for (int cy = (std::min)(a.second, b.second) - r; cy <= (std::max)(a.second, b.second) + r; ++cy)
+        for (int cx = (std::min)(a.first, b.first) - r; cx <= (std::max)(a.first, b.first) + r; ++cx) {
+            const rail::Cell c{cx, cy};
+            if (!in_grid(c) || g_stroke.track.count(c)) continue;
+            float t = len2 > 0 ? ((cx - a.first) * ux + (cy - a.second) * uy) / len2 : 0;
+            t = (std::max)(0.0f, (std::min)(1.0f, t));
+            const float d = std::hypot(cx - (a.first + ux * t), cy - (a.second + uy * t)) / (r + 0.5f);
+            const float weight = brush_weight(d);
+            if (weight <= 0) continue;
+            const int z = ground_cell(cx, cy);
+            const int to = (std::max)(MIN_Z, (std::min)(MAX_Z, static_cast<int>(std::lround(z + (la + (lb - la) * t - z) * weight))));
+            if (to != z) heights.push_back({c, static_cast<short>(to)});
+        }
+    apply_heights(heights);
+    MESSAGE("MsgRampDone", "ramp: from level %d to %d", la, lb);
+}
+
+void height_step(bool again = false) {
+    if (g_stroke.brush == Brush::Ramp) return;   // laid when the drag ends
+    float x, y;
+    const rail::Cell centre = cursor_cell(x, y);
+    if (centre == g_stroke.last && !again) return;
+    g_stroke.last = centre;
+    g_stroke.time = GetTickCount();
+    ++g_stroke.steps;
+    const int w = grid_width(), h = grid_height();
+    const Brush brush = g_stroke.brush;
+    const float blend = (std::min)(1.0f, g_strength * 0.4f);   // Flatten and Smooth: how far toward the aim a step goes
+    std::vector<std::pair<rail::Cell, short>> heights;
+    for (int dy = -g_radius; dy <= g_radius; ++dy)
+        for (int dx = -g_radius; dx <= g_radius; ++dx) {
+            if (dx * dx + dy * dy > g_radius * g_radius) continue;
+            const rail::Cell c = {centre.first + dx, centre.second + dy};
+            if (c.first < 0 || c.first >= w || c.second < 0 || c.second >= h || g_stroke.track.count(c)) continue;
+            const int z = ground_cell(c.first, c.second);
+            int to = z;
+            const float weight = brush_weight(std::sqrt(static_cast<float>(dx * dx + dy * dy)) / (g_radius + 0.5f));
+            if (brush == Brush::Raise || brush == Brush::Lower) {
+                // the step's parts of a level kept for the cell's next step - so hills come out round
+                float& part = g_stroke.parts[c];
+                part += g_strength * weight;
+                const int n = static_cast<int>(part);
+                part -= n;
+                to = brush == Brush::Raise ? z + n : z - n;
+            } else if (brush == Brush::Flatten) {
+                to = static_cast<int>(std::lround(z + (g_stroke.level - z) * (std::min)(1.0f, 2 * weight * blend)));
+            } else if (brush == Brush::Rough) {
+                const uint32_t r = mix(g_stroke.seed + static_cast<uint32_t>(g_stroke.steps) * 2654435761u +
+                                       static_cast<uint32_t>(c.first) * 40503u + static_cast<uint32_t>(c.second) * 9973u);
+                to = z + static_cast<int>(std::lround(((r & 1023) / 511.5f - 1) * g_strength * 0.5f * weight));
+            } else {
+                int sum = 0, n = 0;
+                for (int ny = -1; ny <= 1; ++ny)
+                    for (int nx = -1; nx <= 1; ++nx) {
+                        const int px = c.first + nx, py = c.second + ny;
+                        if (px < 0 || px >= w || py < 0 || py >= h) continue;
+                        sum += ground_cell(px, py);
+                        ++n;
+                    }
+                to = static_cast<int>(std::lround(z + (static_cast<double>(sum) / n - z) * (std::min)(1.0f, weight * blend * 2)));
+            }
+            to = (std::max)(MIN_Z, (std::min)(MAX_Z, to));
+            if (to != z) heights.push_back({c, static_cast<short>(to)});
+        }
+    apply_heights(heights);
 }
 
 void end_height_stroke() {
@@ -2417,7 +2507,7 @@ void end_height_stroke() {
     commit({"OpHeight", "ground height"}, moved, moved_before);
     g_undo.back().grid = changes;
     g_undo.back().paint = relief;
-    MESSAGE("MsgGround", "ground: %s - %u cells, %u objects on them", brush_name(),
+    MESSAGE("MsgGround", "ground: %s - %u cells, %u objects on them", brush_name(g_stroke.brush),
             static_cast<unsigned>(changes.size()), static_cast<unsigned>(moved.size()));
 }
 
@@ -2571,6 +2661,8 @@ void open_context(uint8_t* o);
 int g_texture = 0;              // Paint: the texture ([ and ], editor\textures.tsv's order)
 int g_water_kind = 0;           // Water: WATER_KINDS (W)
 int g_paint_radius = 40;        // px, + and -
+int g_paint_strength = 5;       // Paint: how much of the texture a pass lays (1-5: a fifth to all of it)
+bool g_paint_hard = false;      // Paint: the brush's edge soft or hard
 constexpr int MIN_PAINT_RADIUS = 8, MAX_PAINT_RADIUS = 200, PAINT_STEP = 8, WATER_BED = 25;
 std::map<rail::Cell, short> g_grid_original;   // the cells the Water tool changed, as the level had them
 
@@ -2619,12 +2711,12 @@ std::pair<int, int> tile_square(float sx, float sy, int level) {   // the tile o
     return {static_cast<int>(std::floor(sx / 128)), static_cast<int>(std::floor((sy + level) / 128))};
 }
 
-void start_ground_stroke(bool water) {
+void start_ground_stroke(bool water, bool erase = false) {
     if (!ground_paintable(false)) return;
     g_gstroke = GroundStroke();
     g_gstroke.active = true;
     g_gstroke.water = water;
-    g_gstroke.erase = shift_down();
+    g_gstroke.erase = erase || shift_down();
     if (water) {
         const WaterKind& k = WATER_KINDS[g_water_kind];
         float x, y, z;
@@ -2679,7 +2771,7 @@ void ground_dab(float sx, float sy, bool first) {
     g_gstroke.x1 = (std::max)(g_gstroke.x1, sx + r);
     g_gstroke.y1 = (std::max)(g_gstroke.y1, sy + r);
     if (!g_gstroke.water) {
-        ground_paint(sx, sy, r, g_texture, g_gstroke.erase);
+        ground_paint(sx, sy, r, g_texture, g_gstroke.erase, g_paint_strength / static_cast<float>(MAX_STRENGTH), g_paint_hard);
         return;
     }
     const WaterKind& k = WATER_KINDS[g_water_kind];
@@ -3553,7 +3645,10 @@ HWND g_window = nullptr;   // the window of the timer
 void end_strokes() {
     if (g_window) KillTimer(g_window, HEIGHT_TIMER);
     end_drag();
-    if (g_stroke.active && entry().tool == Tool::Height) end_height_stroke();
+    if (g_stroke.active && entry().tool == Tool::Height) {
+        if (g_stroke.brush == Brush::Ramp) ramp_apply();
+        end_height_stroke();
+    }
     if (g_stroke.active && entry().tool == Tool::Decals) end_decal_stroke();
     end_ground_stroke();
     if (g_region_drag) {
@@ -3773,10 +3868,24 @@ void draw_ground_tool(bool heights) {
                 const float sx = cx * 8 + 4 - cam_x, sy = cy * 8 + 4 - z - cam_y;
                 fill(graphics(), nullptr, sx - 2, sy - 2, sx + 2, sy + 2, 0xc0000000u | rgb);
             }
+        if (g_stroke.active && g_stroke.brush == Brush::Ramp && in_grid(g_stroke.ramp_from) && in_grid(c)) {
+            // the ramp being dragged: its line at the levels it will give, from its begin to the cursor
+            const rail::Cell a = g_stroke.ramp_from;
+            const int la = g_stroke.ramp_level, lb = ground_cell(c.first, c.second);
+            const int n = (std::max)(1, static_cast<int>(std::hypot(c.first - a.first, c.second - a.second)));
+            for (int k = 0; k <= n; ++k) {
+                const float t = static_cast<float>(k) / n;
+                const float px = (a.first + (c.first - a.first) * t) * 8 + 4, py = (a.second + (c.second - a.second) * t) * 8 + 4;
+                const float sz = la + (lb - la) * t;
+                fill(graphics(), nullptr, px - cam_x - 2, py - sz - cam_y - 2, px - cam_x + 2, py - sz - cam_y + 2, 0xf0ffd040);
+            }
+        }
         const bool inside = c.first >= 0 && c.first < grid_width() && c.second >= 0 && c.second < grid_height();
         std::snprintf(text, sizeof text,
-                      ui_format("StatusHeight", "Ground height: %s (M), radius %d cells (wheel, + -), the ground here %d - lines every 4 levels"),
-                      brush_name(), g_radius, inside ? ground_cell(c.first, c.second) : 0);
+                      ui_format("StatusHeight", "Ground height: %s (M), radius %d (wheel), strength %d, edge %s - the ground here %d%s"),
+                      brush_name(), g_radius, g_strength, g_hard_edge ? ui_text("WordHard", "hard") : ui_text("WordSoft", "soft"),
+                      inside ? ground_cell(c.first, c.second) : 0,
+                      g_flatten_level >= 0 ? ui_printf(ui_format("StatusLevelTaken", " - Flatten to %d (Alt+click)"), g_flatten_level).c_str() : "");
     } else {
         const float r = (std::max)(8.0f * g_radius, 12.0f);
         for (int k = 0; k < 24; ++k) {
@@ -3816,8 +3925,9 @@ void draw_paint_tool() {
             fill(graphics(), nullptr, mx + r + 5, my - 7, mx + r + 19, my + 7, 0xff000000 | rgb);
         }
         std::snprintf(text, sizeof text,
-                      ui_format("StatusPaint", "Paint: %s ([ ]), brush %d px (wheel, + -) - Shift puts the original picture back"),
-                      ground_texture_name(g_texture), g_paint_radius);
+                      ui_format("StatusPaint", "Paint: %s ([ ]), brush %d px (wheel), strength %d, edge %s - the right button puts the original back"),
+                      ground_texture_name(g_texture), g_paint_radius, g_paint_strength,
+                      g_paint_hard ? ui_text("WordHard", "hard") : ui_text("WordSoft", "soft"));
     } else {
         const WaterKind& k = WATER_KINDS[g_water_kind];
         const int level = water_level_of(k.nvid);
@@ -3911,6 +4021,233 @@ void draw_bar() {
     float cx, cy;
     entry_cell(g_entry, cx, cy);
     draw_screen(VID_SLOT_FRAME, 0, cx, cy, 3);
+}
+
+// ---- the rows of the ground's tools ----
+//
+// While the Ground height or the Paint tool is chosen, its options stand in a row of buttons above the
+// bar's strip - the depot panel's strip (VID 497) laid as long as the row, the menu font (VID 2, the lit
+// one VID 7 for what is set and what is under the mouse): the Ground height tool's modes, size,
+// strength and edge, the Paint tool's textures (their colours; the chosen one framed), size, strength
+// and edge. A group that does not fit beside the others goes into a row above. A click on a button
+// sets it; the rows are not the map (nothing under them is painted or picked).
+
+struct OptionItem {
+    UiText text;            // a button or a label
+    std::string value;      // or a number shown as it is
+    int swatch = -1;        // or the colour of a texture (Paint)
+    bool lit = false, button = false;
+    std::function<void()> act;
+};
+using OptionGroup = std::vector<OptionItem>;
+
+struct OptionHit {
+    float l, t, r, b;
+    std::function<void()> act;
+};
+std::vector<OptionHit> g_option_hits;    // the buttons where the last frame drew them
+std::vector<Box> g_option_rows;          // the rows' boxes
+constexpr int OPTION_STEP = 3, CONTEXT_FONT_VID = 2, CONTEXT_FONT_LIT = 7;   // the menu font and its lit one
+constexpr float SWATCH = 15;
+
+bool options_tool() { return entry().tool == Tool::Height || entry().tool == Tool::Paint; }
+
+OptionItem option_button(UiText text, bool lit, std::function<void()> act) {
+    OptionItem i;
+    i.text = text;
+    i.lit = lit;
+    i.button = true;
+    i.act = std::move(act);
+    return i;
+}
+
+OptionItem option_label(UiText text) {
+    OptionItem i;
+    i.text = text;
+    return i;
+}
+
+OptionItem option_value(int v) {
+    OptionItem i;
+    i.value = std::to_string(v);
+    return i;
+}
+
+// - value + (a click on - or +, `step` a click, within the limits)
+OptionGroup option_number(UiText label, int& value, int low, int high, int step, const char* key, const char* english) {
+    OptionGroup g{option_label(label)};
+    int* v = &value;
+    g.push_back(option_button({nullptr, "-"}, false, [=] {
+        *v = (std::max)(low, *v - step);
+        message_by([&] { return ui_printf(ui_format(key, english), *v); });
+    }));
+    g.push_back(option_value(value));
+    g.push_back(option_button({nullptr, "+"}, false, [=] {
+        *v = (std::min)(high, *v + step);
+        message_by([&] { return ui_printf(ui_format(key, english), *v); });
+    }));
+    return g;
+}
+
+OptionGroup option_edge(bool& hard) {
+    bool* h = &hard;
+    return {option_label({"OptEdge", "EDGE:"}),
+            option_button({"OptSoft", "SOFT"}, !hard, [h] {
+                *h = false;
+                MESSAGE("MsgEdge", "edge: %s", ui_text("WordSoft", "soft"));
+            }),
+            option_button({"OptHard", "HARD"}, hard, [h] {
+                *h = true;
+                MESSAGE("MsgEdge", "edge: %s", ui_text("WordHard", "hard"));
+            })};
+}
+
+std::vector<OptionGroup> option_groups() {
+    std::vector<OptionGroup> groups;
+    if (entry().tool == Tool::Height) {
+        OptionGroup modes;
+        const struct {
+            Brush brush;
+            const char* key;
+            const char* english;
+        } MODES[] = {{Brush::Raise, "OptRaise", "RAISE/LOWER"},
+                     {Brush::Flatten, "OptFlatten", "FLATTEN"},
+                     {Brush::Smooth, "OptSmooth", "SMOOTH"},
+                     {Brush::Ramp, "OptRamp", "RAMP"},
+                     {Brush::Rough, "OptRough", "ROUGH"}};
+        for (const auto& m : MODES) {
+            const Brush b = m.brush;
+            modes.push_back(option_button({m.key, m.english}, g_brush == b, [b] {
+                g_brush = b;
+                MESSAGE("MsgBrush", "ground: %s", brush_name());
+            }));
+        }
+        groups.push_back(modes);
+        groups.push_back(option_number({"OptSize", "SIZE:"}, g_radius, 0, MAX_RADIUS, 1, "MsgRadius", "radius %d"));
+        groups.push_back(option_number({"OptStrength", "STRENGTH:"}, g_strength, MIN_STRENGTH, MAX_STRENGTH, 1, "MsgStrength", "strength %d"));
+        groups.push_back(option_edge(g_hard_edge));
+    } else {
+        OptionGroup textures;
+        const std::vector<GroundTexture>& t = ground_textures();
+        for (int k = 0; k < static_cast<int>(t.size()); ++k) {
+            if (!t[k].available) continue;
+            OptionItem i;
+            i.swatch = k;
+            i.lit = g_texture == k;
+            i.button = true;
+            i.act = [k] {
+                g_texture = k;
+                MESSAGE("MsgTexture", "texture: %s", ground_texture_name(g_texture));
+            };
+            textures.push_back(i);
+        }
+        groups.push_back(textures);
+        groups.push_back(option_number({"OptSize", "SIZE:"}, g_paint_radius, MIN_PAINT_RADIUS, MAX_PAINT_RADIUS, PAINT_STEP,
+                                       "MsgBrushSize", "brush %d px"));
+        groups.push_back(option_number({"OptStrength", "STRENGTH:"}, g_paint_strength, MIN_STRENGTH, MAX_STRENGTH, 1, "MsgStrength",
+                                       "strength %d"));
+        groups.push_back(option_edge(g_paint_hard));
+    }
+    return groups;
+}
+
+float option_width(const OptionItem& i, float cw) {
+    if (i.swatch >= 0) return SWATCH + 5;
+    const char* text = i.value.empty() ? i.text.get() : i.value.c_str();
+    return std::strlen(text) * cw + cw;
+}
+
+float group_width(const OptionGroup& g, float cw) {
+    float w = 0;
+    for (const OptionItem& i : g) w += option_width(i, cw);
+    return w;
+}
+
+// Lays the groups out in rows from the strip up and calls `f` for each item at its place.
+template <typename F> void layout_options(F f) {
+    g_option_rows.clear();
+    if (!options_tool() || panel_open()) return;
+    float cw = 8, ch = 13;
+    if (uint8_t* font = vid_by_number(CONTEXT_FONT_VID)) {
+        cw = at<float>(font, V_SIZE_X);
+        ch = at<float>(font, V_SIZE_Y);
+    }
+    const Box v = view();
+    const std::vector<OptionGroup> groups = option_groups();
+    const float gap = 2 * cw, room = (v.r - v.l) - 40;
+    std::vector<std::vector<size_t>> rows(1);
+    float width = 0;
+    for (size_t k = 0; k < groups.size(); ++k) {
+        const float gw = group_width(groups[k], cw);
+        if (!rows.back().empty() && width + gap + gw > room) {
+            rows.emplace_back();
+            width = 0;
+        }
+        width += (rows.back().empty() ? 0 : gap) + gw;
+        rows.back().push_back(k);
+    }
+    float sx, sy;
+    entry_cell(SLOTS, sx, sy);   // the strip; the rows go above it
+    for (size_t r = 0; r < rows.size(); ++r) {
+        float w = 0;
+        for (size_t k : rows[r]) w += group_width(groups[k], cw) + (w > 0 ? gap : 0);
+        const float cy = sy - SLOT * (r + 1), mid = (v.l + v.r) / 2;
+        const float strips = std::ceil((w + 24) / STRIP_WIDTH);
+        const Box box{mid - strips * STRIP_WIDTH / 2, cy - SLOT / 2, mid + strips * STRIP_WIDTH / 2, cy + SLOT / 2};
+        g_option_rows.push_back(box);
+        float x = mid - w / 2;
+        for (size_t n = 0; n < rows[r].size(); ++n) {
+            if (n) x += gap;
+            for (const OptionItem& i : groups[rows[r][n]]) {
+                const float iw = option_width(i, cw);
+                f(i, x, cy, iw, ch, box);
+                x += iw;
+            }
+        }
+    }
+}
+
+bool on_options(float x, float y) {
+    for (const Box& b : g_option_rows)
+        if (b.contains(x, y)) return true;
+    return false;
+}
+
+void draw_options() {
+    g_option_hits.clear();
+    std::vector<Box> drawn;
+    layout_options([&](const OptionItem& i, float x, float cy, float iw, float ch, const Box& box) {
+        if (std::find_if(drawn.begin(), drawn.end(), [&](const Box& b) { return b.t == box.t; }) == drawn.end()) {
+            for (float sx = box.l + STRIP_WIDTH / 2; sx < box.r; sx += STRIP_WIDTH) draw_screen(VID_STRIP, 0, sx, cy, OPTION_STEP - 1);
+            drawn.push_back(box);
+        }
+        const bool hover = i.button && g_mouse.x >= x && g_mouse.x < x + iw && g_mouse.y >= cy - SLOT / 2 && g_mouse.y < cy + SLOT / 2;
+        if (i.swatch >= 0) {
+            const std::vector<GroundTexture>& t = ground_textures();
+            const uint16_t c = t[i.swatch].mean;
+            const uint32_t rgb = ((c >> 11) << 19) | (((c >> 5) & 63) << 10) | ((c & 31) << 3);
+            const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
+            const float l = x + 2, t0 = cy - SWATCH / 2;
+            if (i.lit || hover) fill(graphics(), nullptr, l - 2, t0 - 2, l + SWATCH + 2, t0 + SWATCH + 2, i.lit ? 0xfff0e080 : 0xc0f0e080);
+            fill(graphics(), nullptr, l, t0, l + SWATCH, t0 + SWATCH, 0xff000000 | rgb);
+        } else {
+            const char* text = i.value.empty() ? i.text.get() : i.value.c_str();
+            draw_text(i.lit || hover ? CONTEXT_FONT_LIT : CONTEXT_FONT_VID, x + (i.button ? 0 : 0), cy - ch / 2, text, false, OPTION_STEP);
+            if (i.lit) reinterpret_cast<FillRect_t>(FILL_RECT)(graphics(), nullptr, x, cy + ch / 2 + 1, x + iw - 8, cy + ch / 2 + 3, 0xe0f0e080);
+        }
+        if (i.button) g_option_hits.push_back({x - 2, cy - SLOT / 2, x + iw, cy + SLOT / 2, i.act});
+    });
+}
+
+// A click on the rows: true when it was theirs (a button set, or nothing under the click).
+bool options_click(POINT m) {
+    if (!on_options(static_cast<float>(m.x), static_cast<float>(m.y))) return false;
+    for (const OptionHit& h : g_option_hits)
+        if (m.x >= h.l && m.x < h.r && m.y >= h.t && m.y < h.b) {
+            h.act();
+            break;
+        }
+    return true;
 }
 
 // ---- the context panel ----
@@ -4185,7 +4522,8 @@ void draw_overlay() {
     void* g = graphics();
     if (!w || !g) return;
     const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
-    const bool over_bar = on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y));
+    const bool over_bar = on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)) ||
+                          on_options(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y));
     const float mx = cam_x + g_mouse.x, my = cam_y + g_mouse.y;
 
     if (g_show_heights || entry().tool == Tool::Height) draw_contours();
@@ -4276,6 +4614,7 @@ void draw_overlay() {
     draw_push_lines(entry().tool == Tool::PushLine);
 
     draw_bar();
+    draw_options();
 
     // the status line, in the mouse tips' font on a dark band: the tool (or the entry under
     // the cursor), the undo and redo counts, "not saved" and the last message
@@ -4387,6 +4726,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             else choose_entry(i);
             return true;
         }
+        if (options_click(g_mouse)) return true;   // the rows of the ground's tools
         if (on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)))
             return true;   // the plates of the bar: nothing under them is picked or placed
         uint8_t* w0 = world();
@@ -4396,8 +4736,25 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         } else if (entry().tool == Tool::Track) {
             if (g_line.empty()) start_line();
             else lay_step();
+        } else if (entry().tool == Tool::Height && alt_down()) {   // the pipette: the level for Flatten
+            float cx, cy;
+            const rail::Cell c = cursor_cell(cx, cy);
+            if (in_grid(c)) {
+                g_flatten_level = ground_cell(c.first, c.second);
+                MESSAGE("MsgLevelTaken", "ground: level %d taken - Flatten goes to it", g_flatten_level);
+            }
+        } else if (entry().tool == Tool::Paint && alt_down()) {   // the pipette: the texture painted there
+            float px, py;
+            mouse_on_map(px, py);
+            const int t = ground_paintable(true) ? ground_texture_at(px, py) : -1;
+            if (t >= 0) {
+                g_texture = t;
+                MESSAGE("MsgTextureTaken", "texture: %s (taken from the picture)", ground_texture_name(g_texture));
+            } else {
+                MESSAGE("MsgTextureOriginal", "the picture here is the original (or painted before this session)");
+            }
         } else if (entry().tool == Tool::Height) {
-            start_height_stroke();
+            start_height_stroke(false);
             height_step();
             g_window = window;
             SetTimer(window, HEIGHT_TIMER, HEIGHT_REPEAT, nullptr);
@@ -4444,7 +4801,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         if (w != HEIGHT_TIMER) return false;
         // the button let go where its message did not come (outside the window, the capture lost):
         // the stroke ends as with the button up
-        if (!g_test && GetKeyState(VK_LBUTTON) >= 0) end_strokes();
+        if (!g_test && GetKeyState(g_stroke.right ? VK_RBUTTON : VK_LBUTTON) >= 0) end_strokes();
         else if (g_stroke.active && entry().tool == Tool::Height && GetTickCount() - g_stroke.time >= HEIGHT_REPEAT) height_step(true);
         else if (!g_stroke.active) KillTimer(window, HEIGHT_TIMER);
         return true;
@@ -4470,6 +4827,24 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             g_push_started = false;   // the begin is dropped first
             return true;
         }
+        if ((entry().tool == Tool::Height || entry().tool == Tool::Paint || entry().tool == Tool::Water) &&
+            !on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)) &&
+            !on_options(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
+            // the right button stays with these tools (Esc leaves them): Raise lowers, the brushes of
+            // the picture put the original back
+            if (entry().tool == Tool::Height && g_brush == Brush::Raise) {
+                start_height_stroke(true);
+                height_step();
+                g_window = window;
+                SetTimer(window, HEIGHT_TIMER, HEIGHT_REPEAT, nullptr);
+                if (!g_test) SetCapture(window);
+            } else if (entry().tool != Tool::Height) {
+                start_ground_stroke(entry().tool == Tool::Water, true);
+                ground_step(true);
+                if (!g_test) SetCapture(window);
+            }
+            return true;
+        }
         if (entry().tool == Tool::Select && !on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
             uint8_t* w0 = world();
             uint8_t* o = pick(at<float>(w0, W_CAMERA_X) + g_mouse.x, at<float>(w0, W_CAMERA_Y) + g_mouse.y);
@@ -4483,6 +4858,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         select(nullptr);
         return true;
     case WM_RBUTTONUP:
+        end_strokes();
         return true;
     case WM_MOUSEWHEEL:
         if (brush_tool())   // the brushes: the wheel sizes the brush, as + and - do
@@ -4492,8 +4868,14 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         else
             turn(GET_WHEEL_DELTA_WPARAM(w) > 0 ? 1 : -1);
         return true;
+    case WM_SYSKEYDOWN:
+    case WM_SYSKEYUP:
+        if (w != VK_MENU) return false;   // Alt+F4 and the accelerators as before
+        g_alt = m == WM_SYSKEYDOWN;
+        return true;   // Alt alone: no system menu (Alt+click is the pipette)
     case WM_KEYDOWN:
     case WM_KEYUP: {
+        if (w == VK_MENU) g_alt = m == WM_KEYDOWN;
         if (w == VK_CONTROL) g_ctrl = m == WM_KEYDOWN;
         if (w == VK_SHIFT) g_shift = m == WM_KEYDOWN;
         if (m == WM_KEYUP) return w != VK_CONTROL && w != VK_SHIFT && (w < VK_LEFT || w > VK_DOWN);
@@ -4503,7 +4885,8 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         else if (entry().tool == Tool::PushLine && (w == VK_DELETE || w == 'T' || w == 'R')) push_change(static_cast<int>(w));
         else if (entry().tool == Tool::PushLine && w == 'S') push_semaphores();
         else if (entry().tool == Tool::Height && w == 'M') {
-            g_brush = static_cast<Brush>((static_cast<int>(g_brush) + 1) % 4);
+            g_brush = g_brush == Brush::Raise ? Brush::Flatten : g_brush == Brush::Flatten ? Brush::Smooth
+                    : g_brush == Brush::Smooth ? Brush::Ramp : g_brush == Brush::Ramp ? Brush::Rough : Brush::Raise;
             MESSAGE("MsgBrush", "ground: %s", brush_name());
         } else if (brush_tool() && (w == VK_OEM_PLUS || w == VK_ADD || w == VK_OEM_MINUS || w == VK_SUBTRACT)) {
             brush_size(w == VK_OEM_PLUS || w == VK_ADD ? 1 : -1);

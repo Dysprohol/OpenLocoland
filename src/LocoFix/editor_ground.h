@@ -14,7 +14,10 @@ inline uint16_t picture_height(int level) { return static_cast<uint16_t>(1026 + 
 struct PaintPatch {
     int x = 0, y = 0, w = 0, h = 0;
     std::vector<uint16_t> colour_before, height_before, colour_after, height_after;
+    std::vector<uint8_t> texture_before, texture_after;   // the painted texture of each pixel (NO_TEXTURE: the original)
 };
+
+constexpr uint8_t NO_TEXTURE = 255;
 
 struct GroundTexture {
     std::string key, english;
@@ -36,9 +39,11 @@ bool ground_texture_sample(int texture, std::vector<uint16_t>& patch);
 
 // A stroke: begin, any number of steps, end (the patch for the history, null when nothing changed).
 void ground_stroke_begin();
-// Paints a texture into a circle of the picture (screen coordinates of the map: x, y - z) with a soft
-// edge; `restore` puts the original picture back there instead.
-void ground_paint(float x, float y, float radius, int texture, bool restore);
+// Paints a texture into a circle of the picture (screen coordinates of the map: x, y - z) - `strength`
+// (0-1) of it a pass, the edge soft or hard; `restore` puts the original picture back there instead.
+void ground_paint(float x, float y, float radius, int texture, bool restore, float strength = 1, bool hard = false);
+// The texture painted at a screen point of the map (its index), -1 where the picture is the original.
+int ground_texture_at(float x, float y);
 // Lowers the picture in a circle to `bed` (a GRID level) with a sloping shore, painting the bed
 // with a texture (-1: none); `restore` puts the original heights and colours back.
 void ground_lower(float x, float y, float radius, int bed, int texture, bool restore);

@@ -188,9 +188,12 @@ kroku 10. (**ROZMIAR MAPY** w menu zmienia rozmiar później.)
 
 ### 2. Pomaluj teren
 
-**Malowanie terenu** z listwy: `[` i `]` wybierają teksturę (trawa, jasna trawa, ściółka, piasek,
-pustynia, śnieg, lód, skała, ciemna skała, lawa, bagno, dno jeziora - wzięte z map kampanii), `+` i
-`-` pędzel (8 - 200 px). Maluj przeciągając. Shift+przeciąganie przywraca oryginalny obraz. Namaluj
+**Malowanie terenu** z listwy: jego rząd przycisków nad paskiem ma tekstury (trawa, jasna trawa,
+ściółka, piasek, pustynia, śnieg, lód, skała, ciemna skała, lawa, bagno, dno jeziora - wzięte z map
+kampanii; `[` i `]` też je wybierają), **ROZMIAR** (8 - 200 px; także kółko myszy), **SILA** (ile
+pokrywa jedno pociągnięcie: mniejsza pozwala mieszać tekstury) i **KRAWEDZ** miękką albo twardą. Maluj
+przeciągając lewym przyciskiem; prawy (albo Shift+przeciąganie) przywraca oryginalny obraz; Alt+klik
+pobiera teksturę namalowaną wcześniej w tej sesji. Namaluj
 piaszczystą drogę tam, gdzie pobiegną tory, i kilka plam innych tekstur. Pomalowany obraz zapisuje
 się razem z mapą.
 
@@ -201,14 +204,18 @@ w nieckę z brzegiem, kładzie powierzchnię wody i dodaje jej efekty (kręgi na
 lawy) oraz region, w którym wybuchy rozpryskują wodę. Shift+przeciąganie ją usuwa. Jeden rodzaj
 wody ma na mapie jeden poziom, tak jak w misjach.
 
-Narzędzie **Wysokosc terenu** kształtuje teren: trzymaj lewy przycisk i przeciągaj (`M` wybiera
-podnoszenie, obniżanie, wyrównywanie albo wygładzanie, kółko myszy albo `+`/`-` promień). Pędzel jest miękki - pełny
-w środku, słabszy ku brzegowi - i działa dalej, gdy trzymasz go w miejscu. Obraz terenu idzie za
+Narzędzie **Wysokosc terenu** kształtuje teren swoim rzędem przycisków nad paskiem: tryb -
+**PODNIES/OBNIZ** (lewy przycisk podnosi, prawy obniża), **WYROWNAJ**, **WYGLADZ**, **RAMPA** (przeciągnij
+z jednego punktu do drugiego: równy spadek między ich poziomami, np. podjazd na płaskowyż) i
+**NIEROWNOSCI** (lekkie losowe nierówności); **ROZMIAR** (także kółko myszy), **SILA** (jak szybko działa) i
+**KRAWEDZ** miękka albo twarda (twarda: urwiska i płaskowyże). Shift wyrównuje, a Ctrl wygładza na
+jeden ruch bez zmiany trybu; `M` przełącza tryby. Pędzel działa dalej, gdy trzymasz go w miejscu, a
+poziom pod kursorem zawsze widać w wierszu stanu. Obraz terenu idzie za
 wysokościami: wzgórze widać jako wzgórze z cieniem i zasłania to, co stoi za nim, w edytorze i w grze
 (obraz zapisuje się z mapą; na terenie misji kampanii staje się własnym obrazem mapy). Poziomice co
 4 poziomy pokazują wysokości, gdy narzędzie jest wybrane; `H` pokazuje je przy każdym narzędziu.
-**Wyrównywanie** bierze poziom miejsca, w którym zaczynasz: zacznij na torze, żeby zrobić płaskowyż
-na wysokości toru. Obiekty zostają na ziemi; torów i terenu tuż przy nich narzędzie nie rusza.
+**Wyrównywanie** bierze poziom miejsca, w którym zaczynasz - zacznij na torze, żeby zrobić płaskowyż
+na wysokości toru - albo poziom pobrany przez Alt+klik. Obiekty zostają na ziemi; torów i terenu tuż przy nich narzędzie nie rusza.
 
 Obiekt może też stać wyżej albo niżej sam: zaznacz go i naciśnij `PgUp` / `PgDn` (albo Shift+kółko,
 albo WYSOKOSC w jego panelu); `Home` stawia go z powrotem na ziemi. Wagony i szyny zostają na torach.
