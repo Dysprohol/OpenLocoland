@@ -456,7 +456,8 @@ def libraries(steam):
 
 
 def is_game(folder):
-    return bool(folder) and os.path.isfile(os.path.join(folder, "Steam.exe"))
+    """True if folder contains Locoland.exe (the game executable)."""
+    return bool(folder) and os.path.isfile(os.path.join(folder, "Locoland.exe"))
 
 
 def true_case(path):
