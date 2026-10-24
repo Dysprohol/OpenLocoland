@@ -216,6 +216,10 @@ void hold_level(uint8_t* w, bool hold) {
         world_flags(w) |= SCRIPTS_OFF;
         // the scripts would set it (SetScrollType); a level starts with the screen edge only
         *reinterpret_cast<uint32_t*>(w + WORLD_SCROLL_TYPE) |= SCROLL_FROM_BORDER | SCROLL_WITH_ARROWS;
+        // Hide the game's state bar (icons/units UI) when returning to editor mode
+        // Use Player_ReleaseLevel instead of Player_HideStateBar - it also clears bar slots/messages
+        if (void* player = *reinterpret_cast<void**>(w + 0x220))  // World.players[0] (human player)
+            reinterpret_cast<void(__fastcall*)(void*, void*)>(0x42e3b0)(player, nullptr);  // Player_ReleaseLevel
         edit_level_held();
     } else {
         world_flags(w) &= ~SCRIPTS_OFF;
