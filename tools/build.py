@@ -329,6 +329,10 @@ def build(steam, target, locofix=None, captured=None, progress=None):
               f"(Steam console: download_depot {languages.STEAM_APP_ID} 352131)")
     steam_files = sum(len(files) for _, _, files in os.walk(a.steam)) or 1
     seen = 0
+    # Files that have patches in the repo - we need to re-copy the Steam original before patching
+    patched_files = {os.path.normcase(patch_text.target_name(rel)) for rel in game_files(game)
+                     if rel.endswith(".patch")}
+
     for directory, subdirs, files in os.walk(a.steam):
         rel = os.path.relpath(directory, a.steam)
         if rel == ".":
@@ -339,7 +343,11 @@ def build(steam, target, locofix=None, captured=None, progress=None):
             path = os.path.normpath(os.path.join(rel, f))
             if rel == "." and (f.lower() in SKIPPED or f.lower() not in GAME_ROOT_FILES):
                 continue
-            if os.path.normcase(path) in from_repo or os.path.normcase(path) == FORT_CANNON:
+            # Always copy patched files (so patches apply to fresh Steam original)
+            # Skip other repo files (they're copied from repo later)
+            if os.path.normcase(path) in from_repo and path not in patched_files:
+                continue
+            if os.path.normcase(path) == FORT_CANNON:
                 continue
             dst = os.path.join(a.target, path)
             if player_data(path) and os.path.exists(dst):
