@@ -329,7 +329,7 @@ def build(steam, target, locofix=None, captured=None, progress=None):
               f"(Steam console: download_depot {languages.STEAM_APP_ID} 352131)")
     steam_files = sum(len(files) for _, _, files in os.walk(a.steam)) or 1
     seen = 0
-    # Files that have patches in the repo - we need to re-copy the Steam original before patching
+    # Files that have patches in the repo - we ALWAYS re-copy the Steam original before patching
     patched_files = {os.path.normcase(patch_text.target_name(rel)) for rel in game_files(game)
                      if rel.endswith(".patch")}
 
@@ -343,7 +343,7 @@ def build(steam, target, locofix=None, captured=None, progress=None):
             path = os.path.normpath(os.path.join(rel, f))
             if rel == "." and (f.lower() in SKIPPED or f.lower() not in GAME_ROOT_FILES):
                 continue
-            # Always copy patched files (so patches apply to fresh Steam original)
+            # Always copy patched files fresh from Steam so patches apply cleanly
             # Skip other repo files (they're copied from repo later)
             if os.path.normcase(path) in from_repo and path not in patched_files:
                 continue
@@ -355,7 +355,11 @@ def build(steam, target, locofix=None, captured=None, progress=None):
             src = os.path.join(directory, f)
             if english and languages.is_language_file(path):
                 src = english.get(os.path.normcase(path), src)
-            copy(src, dst, copied)
+            # For patched files, always overwrite to ensure clean base for patch
+            if os.path.normcase(path) in patched_files:
+                copy(src, dst, copied)  # always overwrite patched files
+            else:
+                copy(src, dst, copied)
 
     for rel in game_files(game):
         name = patch_text.target_name(rel)
@@ -364,10 +368,13 @@ def build(steam, target, locofix=None, captured=None, progress=None):
         elif name is None:
             copy(os.path.join(game, rel), os.path.join(a.target, rel), copied)
         else:
-            copied[0] += patch_text.write_if_changed(
-                os.path.join(a.target, name),
-                patch_text.changed_file(os.path.join(game, rel), os.path.join(a.steam, name),
+            try:
+                copied[0] += patch_text.write_if_changed(
+                    os.path.join(a.target, name),
+                    patch_text.changed_file(os.path.join(game, rel), os.path.join(a.steam, name),
                                         steam_original(a.steam, os.path.join(a.steam, name))))
+            except Exception as e:
+                print(f"Patch failed for {rel} -> {name}: {e}")
 
     done(0.62)
     depots = {code: depot for depot, code in languages.DEPOT_LANGUAGES.items()}
