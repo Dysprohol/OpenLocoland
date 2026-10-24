@@ -1,7 +1,8 @@
 @echo off
-rem Starts a map of this game in editor mode (LocoFix --editor): the File menu (Load, Save),
-rem decals as objects, the ground heights as authored. No intro and no menu, as run_map.cmd.
+rem Starts a map of this game in editor mode (LocoFix --editor): decals as objects, the ground
+rem heights as authored, the editor's bar and Menu panel. No intro and no menu, as run_map.cmd.
 rem Double-click opens the sample map; from a console: edit_map maps\l01\l01.map
+rem (maps\template\template.map, as the desktop shortcut gives it, opens a new empty map).
 setlocal
 set "MAP=%~1"
 if "%MAP%"=="" set "MAP=maps\sandbox\sandbox.map"

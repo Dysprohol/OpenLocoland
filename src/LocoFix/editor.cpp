@@ -82,6 +82,9 @@ void edit_level_held();
 void edit_touch();
 void new_map_dialog(HWND owner);                // editor_newmap.cpp
 bool new_map_for_test(const std::string& text);  // editor_newmap.cpp
+std::string make_start_map();                    // editor_newmap.cpp: maps\mapN\, empty grass
+std::string map_ground_image(const std::string& map);                          // editor_newmap.cpp
+bool set_map_ground_image(const std::string& map, const std::string& image);  // editor_newmap.cpp
 bool map_size_dialog(HWND owner, int& w, int& h);   // editor_newmap.cpp
 bool resize_map(const std::string& map, int w, int h, std::string& error);   // editor_newmap.cpp
 void edit_map_size(int& w, int& h);              // editor_edit.cpp
@@ -265,11 +268,101 @@ private:
     char dir_[MAX_PATH] = "";
 };
 
+// ---- the map the editor starts on ----
+//
+// The editor started from the menu (EDYTOR MAP: StartEditorMode("maps\\template\\template.map")) or
+// by the desktop shortcut (edit_map.cmd maps\template\template.map) does not open the template but
+// a new empty map: 2048 x 1536 of grass in maps\map1\ (map2 ... the first folder free), titled MAP 1,
+// as File > New makes it (editor_newmap.cpp). Its folder holds a mark (AUTO_MARK) until the map is
+// saved there; a map that still has it when the editor leaves it - for another map, back to the menu,
+// the end of the game - goes with its folder, so an untouched start leaves nothing in maps\ (nor in
+// maps\custom.lst, which gets a map's line when it is saved). Play the map keeps it: the played game
+// and the editor coming back open it. A marked folder left behind (the game ended in play) is removed
+// at the next start. The template itself stays: it is loaded like any map, and new maps take their
+// script and texts from it.
+constexpr const char* AUTO_MARK = "editor_new.txt";
+bool g_playing = false;   // Play the map: the current map is kept for the game that plays it
+
+std::string current_map();
+
+std::string lower_path(std::string s) {
+    for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return s;
+}
+
+std::string folder_of(const std::string& map) {
+    const size_t slash = map.find_last_of('\\');
+    return slash == std::string::npos ? "" : map.substr(0, slash);
+}
+
+bool auto_folder(const std::string& folder) {
+    return !folder.empty() && GetFileAttributesA((folder + "\\" + AUTO_MARK).c_str()) != INVALID_FILE_ATTRIBUTES;
+}
+
+// A marked folder of maps\ with its files (the editor made them all; it has no subfolders).
+void remove_auto_folder(const std::string& folder) {
+    if (!auto_folder(folder)) return;
+    WIN32_FIND_DATAA f;
+    HANDLE find = FindFirstFileA((folder + "\\*").c_str(), &f);
+    if (find != INVALID_HANDLE_VALUE) {
+        do {
+            if (!(f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) DeleteFileA((folder + "\\" + f.cFileName).c_str());
+        } while (FindNextFileA(find, &f));
+        FindClose(find);
+    }
+    const bool removed = RemoveDirectoryA(folder.c_str()) != 0;
+    patch::log("editor: the new map %s left unsaved - %s", folder.c_str(), removed ? "removed" : "could not be removed");
+}
+
+// The marked folders of maps\ left behind.
+void sweep_auto_folders() {
+    WIN32_FIND_DATAA f;
+    HANDLE find = FindFirstFileA("maps\\*", &f);
+    if (find == INVALID_HANDLE_VALUE) return;
+    std::vector<std::string> folders;
+    do {
+        if ((f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && f.cFileName[0] != '.') folders.push_back(std::string("maps\\") + f.cFileName);
+    } while (FindNextFileA(find, &f));
+    FindClose(find);
+    for (const std::string& folder : folders) remove_auto_folder(folder);
+}
+
+// The map to open when the editor is started on `requested`: for the template, a new empty map.
+std::string start_map(const std::string& requested) {
+    if (!g_enabled || lower_path(game_path(requested)) != "maps\\template\\template.map") return requested;
+    sweep_auto_folders();
+    const std::string map = make_start_map();
+    if (map.empty()) return requested;
+    HANDLE mark = CreateFileA((folder_of(map) + "\\" + AUTO_MARK).c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, 0, nullptr);
+    if (mark != INVALID_HANDLE_VALUE) {
+        const char text[] = "Made by the editor at its start; removed with this folder unless the map is saved here.\r\n";
+        DWORD written = 0;
+        WriteFile(mark, text, sizeof text - 1, &written, nullptr);
+        CloseHandle(mark);
+    }
+    patch::log("editor: starts on a new empty map %s", map.c_str());
+    return map;
+}
+
+// The current map is left for `next` (empty: the game ends or goes back to the menu): a new map of
+// the start that was never saved goes with its folder.
+// (the loaded level's folder, or the last saved map's: saved under another name, the level is still
+// the start's map)
+void leave_map(const std::string& next) {
+    if (g_playing) return;
+    for (const std::string& map : {game_path(level_file()), game_path(current_map())}) {
+        if (!auto_folder(folder_of(map))) continue;
+        if (!next.empty() && lower_path(folder_of(game_path(next))) == lower_path(folder_of(map))) continue;
+        remove_auto_folder(folder_of(map));
+    }
+}
+
 // ---- Load and Save ----
 
 void load_map(const std::string& path) {
     uint8_t* w = world();
     if (!w) return;
+    leave_map(path);
     reinterpret_cast<AssignCStr_t>(STRING_ASSIGN_CSTR)(reinterpret_cast<char**>(w + WORLD_NEXT_LEVEL_FILE), nullptr,
                                                        path.c_str());
     *reinterpret_cast<uint32_t*>(w + WORLD_FLAGS) |= LEVEL_CHANGE;
@@ -293,6 +386,15 @@ bool save_map(const std::string& path) {
     edit_saved();
     // a painted ground: its own image next to the map, the map pointing at it
     ground_save(game_path(path));
+    // the start's new map saved in its own folder is a map like any other now; saved elsewhere, it
+    // takes its ground image along (the folder of the start goes when the editor leaves it)
+    const std::string target = folder_of(game_path(path)), image = map_ground_image(game_path(path));
+    if (auto_folder(target)) DeleteFileA((target + "\\" + AUTO_MARK).c_str());
+    if (!image.empty() && auto_folder(folder_of(image))) {
+        const std::string base = game_path(path), own = base.substr(0, base.find_last_of('.')) + ".vid";
+        if (CopyFileA(image.c_str(), own.c_str(), FALSE) && set_map_ground_image(base, own))
+            patch::log("editor: %s takes its ground along as %s", base.c_str(), own.c_str());
+    }
     // its mission: the script (a new map gets one), the texts, the custom maps page
     mission_save(game_path(path));
     return true;
@@ -624,9 +726,13 @@ void handle_command(HWND window, int id) {
     } else if (id == ID_RUN) {
         set_running(window, !g_running);
     } else if (id == ID_PLAY) {
-        if (ask_save(window)) restart_game(false, current_map(), true);   // back here when it ends
+        if (!ask_save(window)) return;
+        g_playing = true;   // the map stays for the game that plays it
+        g_playing = restart_game(false, current_map(), true);   // back here when it ends
     } else if (id == ID_BACK) {
-        if (ask_save(window)) restart_game(false, "", false);
+        if (!ask_save(window)) return;
+        leave_map("");
+        restart_game(false, "", false);
     } else if (id >= ID_UNDO && id <= ID_SEMAPHORE) {
         if (g_held) edit_command(id);
     }
@@ -645,7 +751,9 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
     if (g_held && !g_in_dialog && !g_in_menu && edit_message(window, m, w, l)) return 0;
     switch (m) {
     case WM_CLOSE:
-        if (!g_in_dialog && !ask_save(window)) return 0;
+        if (g_in_dialog) break;
+        if (!ask_save(window)) return 0;
+        leave_map("");
         break;
     case WM_COMMAND:
         if (HIWORD(w) <= 1 && (LOWORD(w) == ID_LOAD || LOWORD(w) == ID_SAVE || LOWORD(w) == ID_ABOUT ||
@@ -654,7 +762,10 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
             handle_command(window, LOWORD(w));
             return 0;
         }
-        if (HIWORD(w) <= 1 && LOWORD(w) == ID_EXIT && (g_in_dialog || !ask_save(window))) return 0;
+        if (HIWORD(w) <= 1 && LOWORD(w) == ID_EXIT) {
+            if (g_in_dialog || !ask_save(window)) return 0;
+            leave_map("");
+        }
         break;
     case WM_ENTERMENULOOP:
     case WM_EXITMENULOOP:
@@ -742,6 +853,9 @@ ATOM WINAPI RegisterClassA_editor(const WNDCLASSA* cls) {
 // restart.cpp: script StartEditorMode in editor mode loads the map.
 bool editor_mode_on() { return g_enabled; }
 void editor_load_map(const std::string& map) { load_map(map); }
+// restart.cpp's StartEditorMode and test_map.cpp's --test-map in editor mode: the template opens as a
+// new empty map ("the map the editor starts on").
+std::string editor_start_map(const std::string& map) { return start_map(map); }
 
 // frame_limit.cpp's Level_Load wrapper: a held level is let go for the load (the flags would
 // otherwise carry the old level's pause time over) and the new one is held once it is loaded.
@@ -758,6 +872,13 @@ void editor_level_loaded(void* w) {
     if (g_enabled && !g_running && current_format(map)) {
         mission_load(game_path(map));
         hold_level(world, true);
+        // the start's new map fills the view from its top-left corner (a new map's first view
+        // would show it 300 px into the void around it)
+        if (auto_folder(folder_of(game_path(map))) && graphics()) {
+            const float* screen = reinterpret_cast<const float*>(static_cast<uint8_t*>(graphics()) + 0x20c);
+            reinterpret_cast<SetPosition_t>(SET_POSITION)(world, nullptr, screen[0] / 2, screen[1] / 2, 0);
+            patch::log("editor: the view at %.0f,%.0f", *reinterpret_cast<float*>(world + 0x44), *reinterpret_cast<float*>(world + 0x48));
+        }
     }
 }
 

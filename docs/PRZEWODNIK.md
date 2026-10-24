@@ -116,7 +116,10 @@ udostępniła: co postawisz, to gra zagra. Otworzysz w nim każdą mapę - nową
 kampanii (mapę kampanii zapisz pod własną nazwą, zanim zaczniesz ją zmieniać).
 
 **Uruchamianie:** **EDYTOR MAP** na stronie własnych map - gra uruchamia się od nowa w edytorze, na
-pustej mapie-szablonie. Skrót na pulpicie **Locoland - edytor map** otwiera go od razu.
+nowej pustej mapie: 2048 x 1536, trawa, we własnym folderze (`maps\map1\`, potem `map2` ...), z tytułem
+MAP 1. Skrót na pulpicie **Locoland - edytor map** od razu otwiera taką mapę. Zapisz ją, żeby została
+(Menu → **ZAPISZ MAPE**): niezapisana mapa startowa znika, gdy ją opuścisz (inna mapa, powrót do menu,
+wyjście), więc wypróbowanie edytora niczego nie zostawia.
 
 ![Edytor](img/editor-factory-pl.jpg)
 
@@ -167,7 +170,9 @@ gdy wrogowi nie zostanie żadna jednostka.
 
 ### 1. Nowa mapa
 
-Przycisk menu → **NOWA MAPA**:
+Edytor startuje na pustej mapie 2048 x 1536 z trawą - możesz zrobić misję od razu na niej i zapisać
+ją pod własną nazwą (Menu → **ZAPISZ MAPE**, np. `maps\most_1\most_1.map`). Dla innego terenu albo
+rozmiaru: przycisk menu → **NOWA MAPA**:
 
 ![Okno Nowa mapa](img/new-map-pl.jpg)
 

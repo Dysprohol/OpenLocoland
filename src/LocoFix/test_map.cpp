@@ -21,6 +21,8 @@
 // other variables moved there.)
 #include "patch.h"
 
+std::string editor_start_map(const std::string& map);   // editor.cpp: in editor mode the template -> a new empty map
+
 namespace {
 
 constexpr size_t WORLD_LEVEL_FILE = 0x014;   // World: the current map (String)
@@ -62,6 +64,8 @@ void install_test_map() {
 
 const char* test_map_replace(const char* requested) {
     if (!g_map[0] || g_pending || g_checked) return requested;
+    // the editor started on the template opens a new empty map instead (editor.cpp)
+    lstrcpynA(g_map, editor_start_map(g_map).c_str(), sizeof g_map);
     const size_t size = lstrlenA(g_map) + 1;
     char* map = reinterpret_cast<New_t>(CRT_NEW)(size);
     if (!map) return requested;

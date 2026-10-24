@@ -445,10 +445,10 @@ bool new_map_chunks(const std::string& source, const std::string& image, int w, 
 }
 
 // Makes maps\<name>\: the map (a campaign terrain, or a meadow of w x h - or an empty map, a plain
-// ground of the texture `sample`), the template's script and texts. Returns the map's path, or empty
-// with `error`.
+// ground of the texture `sample`), the template's script and texts, titled `title` (the name in
+// capitals by default). Returns the map's path, or empty with `error`.
 std::string make_map(const std::string& name, bool generated, const Terrain& terrain, int w, int h, std::string& error,
-                     const std::vector<uint16_t>* sample = nullptr) {
+                     const std::vector<uint16_t>* sample = nullptr, const std::string& title = "") {
     char number[8];
     std::snprintf(number, sizeof number, "l%02d", generated ? 1 : terrain.mission);
     const std::string folder = "maps\\" + name, map = folder + "\\" + name + ".map";
@@ -474,7 +474,7 @@ std::string make_map(const std::string& name, bool generated, const Terrain& ter
         return "";
     }
     // the template's mission under the new name (the editor writes its blocks anew on a save)
-    const std::string upper = [&] {
+    const std::string upper = !title.empty() ? title : [&] {
         std::string u = name;
         for (char& c : u) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
         return u;
@@ -857,6 +857,26 @@ void new_map_dialog(HWND owner) {
     Choice c;
     if (DialogBoxIndirectParamW(GetModuleHandleW(nullptr), t.get(), owner, new_map_proc, reinterpret_cast<LPARAM>(&c)) == 1)
         create(c, owner);
+}
+
+// The map the editor starts on (editor.cpp): what File > New makes with "an empty map: Grass" and
+// 2048 x 1536, in maps\map1\ - or map2, map3 ... the first folder not there yet -, titled MAP 1 ...
+// Returns its path (empty when it could not be made: the reason is in LocoFix.log).
+std::string make_start_map() {
+    std::vector<uint16_t> sample;
+    const std::vector<GroundTexture>& textures = ground_textures();
+    for (size_t k = 0; k < textures.size() && sample.empty(); ++k)
+        if (textures[k].key == "TexGrass") ground_texture_sample(static_cast<int>(k), sample);
+    for (int n = 1; n < 1000; ++n) {
+        const std::string name = "map" + std::to_string(n);
+        if (GetFileAttributesA(("maps\\" + name).c_str()) != INVALID_FILE_ATTRIBUTES) continue;
+        std::string error;
+        const std::string map = make_map(name, true, CAMPAIGN[0], 2048, 1536, error, sample.empty() ? nullptr : &sample,
+                                         "MAP " + std::to_string(n));
+        if (map.empty()) patch::log("new map: %s", error.c_str());
+        return map;
+    }
+    return "";
 }
 
 // Test mode (editor.cpp's WM_COPYDATA 40043): "<name> <ground> [<width> <height>]" without the dialog

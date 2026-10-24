@@ -28,6 +28,7 @@
 #include <cstring>
 
 void editor_load_map(const std::string& map);   // editor.cpp
+std::string editor_start_map(const std::string& map);   // editor.cpp: the template -> a new empty map
 bool editor_mode_on();                            // editor.cpp
 int recalc_grid_z_extern(uint8_t* world);         // ground.cpp
 int mouse_wheel_extern(uint8_t* world);           // menu_input.cpp
@@ -75,7 +76,7 @@ int __fastcall CallExtern_restart(uint8_t* world, void* edx, int function) {
         const sv::Value& top = values[--count];
         if ((top.flags & 1) && top.text) map = top.text;
     }
-    if (editor_mode_on()) editor_load_map(map);
+    if (editor_mode_on()) editor_load_map(editor_start_map(map));
     else restart_game(true, map);
     return 0;
 }

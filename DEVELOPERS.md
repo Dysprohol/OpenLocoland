@@ -679,7 +679,8 @@ briefing pages (`maps\<folder>\brief.lst`) under its title, with a previous butt
 list on the first page, and the start button loads `maps\<folder>\<folder>.map` the way a
 campaign mission starts. "EDYTOR MAP" calls `StartEditor()` in `menu.lgc`, the one place the
 menu starts the editor from: fade, music off, then LocoFix's `StartEditorMode` (extern 200)
-starts the game again in editor mode on `maps\template\template.map` (see "Editor mode").
+starts the game again in editor mode on `maps\template\template.map`, which opens as a new empty
+map (see "Editor mode", "The map the editor starts on").
 
 `CUSTOM_MAP` (the map's own file, `#define CUSTOM_MAP "maps\\sandbox\\sandbox.map"` before
 `header.lgc`) marks a map that is not a campaign mission, hooks in `menuend.lgc` (the root and
@@ -1285,6 +1286,30 @@ is unknown ("Unknown extern" in the log) and the entry does nothing. Checked thr
 in the editor; File > Back to the menu -> the main menu) and from a script (a mission calling
 `StartEditorMode` -> the editor on the sandbox; edits, File > Save, File > Play the map -> the
 saved map playing with its interface).
+
+**The map the editor starts on** (`editor.cpp`, "the map the editor starts on"; `editor_newmap.cpp`
+`make_start_map`). Started on the template - `StartEditorMode("maps\\template\\template.map")` from
+the menu, or `--test-map maps\template\template.map` as the desktop shortcut's `edit_map.cmd` passes
+it (`test_map.cpp` asks `editor_start_map` before the first `Level_Load`) - the editor opens a new
+empty map instead, at once and without a question: what File > New makes with "an empty map: Grass"
+and 2048 x 1536 (the template's script and texts under the new name), in `maps\map1\` - `map2` ...,
+the first folder not there yet -, titled MAP 1 ...; the view starts at its top-left corner. Its folder
+holds `editor_new.txt` until the map is saved there (then it is a map like any other and gets its
+line in `maps\custom.lst`, as every saved map does). A start map that still has the mark when the
+editor leaves it - another map loaded, made or imported, Back to the menu, Exit, the window closed -
+goes with its folder ("the new map maps\map1 left unsaved - removed" in `LocoFix.log`); saved under
+another name, the saved map takes the ground image along (`<name>.vid`), and the start's folder still
+goes. Play the map keeps it - the played game and the editor coming back open it -, and a marked
+folder left behind (the game was ended in play) is removed at the next start. The template stays as
+it was: it can be loaded, and every new map takes its script and texts from it. Checked in the game
+(in a window): from the menu (MAP EDITOR on the custom maps page -> the empty grass map held in the
+editor, MAP 2 as `map1` was taken) and with `--test-map` on the template; left untouched and closed -
+its folder gone, `custom.lst` unchanged; a hill raised with the Ground height tool and saved as
+`maps\map1\map1.map` - the mark gone, "map1 / MAP 1" on the custom maps page, loaded again with the
+hill and played; an untouched start map played (its folder kept with the mark) and swept at the next
+start; the start map saved as `maps\other1\other1.map` - `other1.vid` written, the start's folder
+removed when `other1` was loaded; in full screen at 2560 x 1440 the start map made, a hill raised on
+it, saved in its own folder (the mark gone) and loaded again.
 
 **Editing objects** (`src/LocoFix/editor_edit.cpp`). On the held level LocoFix does the editing
 with the engine's own pieces (scripts and object updates are off, so nothing else would):
@@ -2389,7 +2414,7 @@ the system's display language when there is a pack for it, else English; an upda
 when it was changed in the window, so the language chosen in the game's launcher stays), the
 shortcuts (through PowerShell's `WScript.Shell`; the editor's
 runs `edit_map.cmd maps\template\template.map` minimised, so no console flashes up - the template
-is what the menu's "EDYTOR MAP" opens) and `OpenLocoland.json` in the install folder (the
+is what the menu's "EDYTOR MAP" opens, and both open a new empty map in its place) and `OpenLocoland.json` in the install folder (the
 version, the Steam folder, the captures' folder and the shortcuts, so an update or uninstall
 removes the old ones). The language captures go to `%LOCALAPPDATA%\OpenLocoland\captured`
 (`build.py --captured`), not into a repository: the language Steam installed and every depot

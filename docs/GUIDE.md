@@ -116,8 +116,11 @@ The editor is the engine's own editor mode, which the authors used for their map
 game never offered: what you place is what the game plays. You can open any map in it - a new
 one, POLIGON or a campaign mission (save a campaign map under a name of its own before changing it).
 
-**Starting it:** **MAP EDITOR** on the custom maps page - the game starts again in the editor, on
-an empty template map. The desktop shortcut **Locoland - map editor** opens it straight away.
+**Starting it:** **MAP EDITOR** on the custom maps page - the game starts again in the editor, on a
+new empty map: 2048 x 1536 of grass in a folder of its own (`maps\map1\`, then `map2` ...), titled
+MAP 1. The desktop shortcut **Locoland - map editor** opens one straight away. Save it to keep it
+(Menu → **SAVE MAP**): a start map left unsaved is removed when you leave it (another map, back to the
+menu, exit), so trying the editor out leaves nothing behind.
 
 ![The editor](img/editor-factory-en.jpg)
 
@@ -169,7 +172,9 @@ The mission is won when the enemy has no units left.
 
 ### 1. A new map
 
-Menu button → **NEW MAP**:
+The editor starts on an empty 2048 x 1536 grass map - you can build the mission right on it and
+save it under a name of your own (Menu → **SAVE MAP**, e.g. `maps\bridge_1\bridge_1.map`). For another
+ground or size, Menu button → **NEW MAP**:
 
 ![The New map dialog](img/new-map-en.jpg)
 
