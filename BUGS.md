@@ -166,6 +166,55 @@ Engine:
   (`AppAccel`) are Alt+F3, Alt+F2 and Alt+F10 - the plain function keys belong to the factory
   build list. LocoFix shows the real keys in the menu.
 
+Player tricks (reported by testers; part of the game, kept as they are - checked in the sandbox,
+the last three with a test copy of its script):
+
+- Building at once: `Depo_ReplaceInQueue` (0x404fd0) gives the replaced entry the new unit's
+  full build time in `timeLeft` but starts the building again only when `building != 1` - the
+  number of the first slot, not of the replaced entry. Replacing the first entry of a factory's
+  queue while it is being built leaves the factory's timer running down for the old unit, and the
+  new one comes out when the old one would have. In play: queue a quick unit, click its slot (the
+  queue edit panel: remove, pause, back, forward, replace), choose replace (the circling arrows)
+  and click another unit of the list - the locomotive (VID 5, 30 s) replaced after 22 s by the
+  nuclear rocket (VID 62, 120 s) gave the rocket about 30 s after the locomotive was queued.
+  Replacing at the last moment gives any unit at once. The money is right: the old price comes
+  back and the new one is paid (300 -> 180), and the list offers only the units the money covers
+  (their icons are grey, a click on them does nothing). Pausing, moving and removing entries save
+  the time of the entry being built before they start building again; a replace while a later
+  entry is being built (the first one paused) starts again without saving it, so that entry
+  loses its progress.
+- Taking over enemy trains: `Engine_CanCoupleWith` (0x40ab30) couples two trains whenever one
+  has the link command aimed at a car of the other, whatever their armies, and
+  `Player_HandleMouse` offers the link order (action 0x96) on a car of another train when that
+  train has a car of the player's army, or has no locomotive (`Train_IsUnpowered`) and the
+  player's locomotive drives alone with power to spare (or Ctrl is held). So the wagons of an
+  enemy train whose locomotive was destroyed can be coupled to the player's locomotive and driven
+  away: `Train_HandleContact` cancels the attacks on them and calls the script event
+  `EnemyLinked`, whose handler in `ai_events.lgc` (a comment: the player linked the train, "for
+  repainting") drops the train from the AI's plans. A repair point (VID 104) then makes them the
+  player's: `Building_UpdateWorkshop` gives a car of another army, in a train whose locomotive is
+  of another army, to the repair point's army. Checked: two army-1 mortar carts (VID 25) without
+  a locomotive, an army-0 locomotive ordered to link - they coupled, were driven round the loop
+  and changed to army 0 one after the other as they passed the player's repair point. Selecting
+  an enemy train directly (the key E, "CanSelectEnemy" in `Player_HandleHotkey`) needs the
+  engine's DebugMode and is not part of normal play.
+- One unit destroys a factory: the factory (VID 102) has 150 hit points, and the explosion of a
+  unit with damage when it dies (`Object_Action` 15) gives that damage in full to every object in
+  a box of its damage radius around it (with VID flag 0x4000000 it falls off with the distance).
+  The brander (VID 97, a locomotive that blows up, 40 hit points) deals 500 within 140 px, so
+  one brander that dies next to an enemy factory - shot by its defenders, or ramming a train
+  there (`Train_Collide`) - destroys it. Checked: an army-0 brander on the track in front of
+  the enemy factory, destroyed: the factory went from 150 hit points to gone within a second.
+  The explosive mine (VID 86) deals 1000 within 100 px, falling off with the distance.
+- Turning a train round at a track end: every train reverses as one piece with no loop -
+  `Train_Reverse` (0x409930) makes the last car the leading one and the first car takes over
+  the speed and the route; the cars keep facing as they were, so the locomotive pushes. A
+  stopped train reverses anywhere; a moving train plans a reversal only where the track goes on
+  for the train's length (`RailDot_HasRoomToReverse`, called from `RailDot_Search` only while
+  the train moves), so any spur or dead end serves to change direction. Checked: a locomotive
+  with two carts sent up the spur to the player's factory stopped there and, sent back to the
+  main line, backed out with the carts leading and the locomotive pushing behind them.
+
 Harmless log errors:
 
 - "Reference count non zero after delete", "noRef for SPRITE with EmptyVid" (SPRITE -1, an
