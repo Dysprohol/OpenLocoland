@@ -56,8 +56,8 @@ in the same window removes it. The player's guide is `docs/PRZEWODNIK.md` / `doc
 under the frame limit - the launcher's choice counts from that start on, nothing is reinstalled):
 
 - **Cheats** ("Kody twórców" / "Cheat keys"): the developer keys of the original game -
-  h repair, W win, B create units, A change army, K destroy the enemy, M money, # a big train,
-  x an explosion, D the AI's debug view (`maps\script\dokeys.lgc`; see "Developer mode").
+  h repair, W win, B create units, A change army, K destroy the enemy, M money, # a big train
+  (wagons on the track nearest to the pointer), x an explosion, D the AI's debug view (`maps\script\dokeys.lgc`; see "Developer mode").
 - **All missions** ("Wszystkie misje"): every mission of the strategic map can be played. The
   player's progress is not written: the later missions show as playable while the stored progress
   stays as it was, and a win advances it only when the mission won is the next one in line (as
@@ -83,6 +83,22 @@ The choice is remembered.
 
 `build.py` copies only changed files and does not overwrite the high score tables, so it
 can be run after every change in the repo.
+
+The Steam copy has to be the original. `build.py` (and so Setup) stops when `Steam.exe` is not
+the exe of 2003-10-07 that LocoFix is made for (its SHA-256 in `build.py`; the same exe for every
+language) and asks to restore it in Steam (Properties > Installed Files > Verify integrity of
+game files; Setup says it in its own languages). So it does, before anything is built, when a
+file our patches change differs from the original (the targets of `game/**/*.patch` and of the
+script patches of `lang/<code>/`, by their SHA-256 in `build.py`, the same in every language):
+an old way to turn on the developer keys was to edit `maps\script\constants.lgc` in the Steam
+folder, and the patch then stopped Setup with a Python error. A `#define KEYS_ENABLE` line added
+there is left out by itself when the file without it is the original exactly - the launcher's
+Cheats option does that job now. Of the Steam folder's root only the game's own
+files and folders are used (`Steam.exe`, `objects.res`, `strings.ini`, `steam.cfg`, `cursores`,
+`fonts`, `maps`, `music`, `vid`, `video`, `wav`): anything a player added there - another
+DirectDraw wrapper (dgVoodoo2, DDrawCompat, cnc-ddraw), DxWnd, their settings - is ignored and
+listed in the log, and such a file that an older build copied into the game folder is removed
+(the same name and size, unless the build writes a file of that name itself).
 
 **Languages.** Every language is a separate Steam depot with the whole game (about 180 MB
 to download each). Steam ships six of them: English, German, Hungarian, Polish, Portuguese
@@ -118,7 +134,7 @@ For working on the engine, generate the local reverse-engineering output (not in
 
 | Folder | Contents |
 |---|---|
-| `game/` | Our files for the game folder (`Locoland.cfg`, `dgVoodoo.conf`, `maps/custom.lst` - the custom maps of the menu) and changes to original files as `<file>.patch` (`maps/logo.lgc.patch`, `maps/menu.lgc.patch`) - same structure as the game folder; `maps/script/cheats.lgc`, `unlock.lgc` and their `_on` variants are the launcher's options (LocoFix fix 30). `objects.override/` would hold changed values of `objects.res` (see "Editing objects.res"), `maps.override/<map>/` changed objects of a map and `maps.new/<map>/` whole new maps (see "Editing maps and images"); `maps.new/template` (the empty template) and `maps.new/sandbox` (the one to play) at the moment, and `run_map.cmd` - a double-click at the game starts the sample map, `run_map <map>` any map; `edit_map.cmd` the same in editor mode (see "Editor mode"). |
+| `game/` | Our files for the game folder (`Locoland.cfg`, `dgVoodoo.conf`, `maps/custom.lst` - the custom maps of the menu) and changes to original files as `<file>.patch` (`maps/logo.lgc.patch`, `maps/menu.lgc.patch`) - same structure as the game folder; `maps/script/cheats.lgc`, `unlock.lgc` and their `_on` variants are the launcher's options (LocoFix fix 30). `objects.override/` would hold changed values of `objects.res` (see "Editing objects.res"), `maps.override/<map>/` changed objects of a map (`l11`: a rail of mission 11, `BUGS.md` F21) and `maps.new/<map>/` whole new maps (see "Editing maps and images"); `maps.new/template` (the empty template) and `maps.new/sandbox` (the one to play) at the moment, and `run_map.cmd` - a double-click at the game starts the sample map, `run_map <map>` any map; `edit_map.cmd` the same in editor mode (see "Editor mode"). |
 | `docs/` | The player's guide for the release, in Polish and English only (the German, Hungarian and Russian players get the English one): `PRZEWODNIK.md` (Polish) and `GUIDE.md` (English) - installing, what is new in the game, the custom maps page, the map editor with a tutorial and its keys - and a few screenshots of the game in `docs/img/`. Version 0.1; keep the guides in step with the in-game help pages (`maps/edithelp*.txt`) and "Editor mode" below. |
 | `lang/<code>/` | Our part of the language packs, `cs`, `de`, `en`, `hu`, `pl` and `ru`: `language.ini` (name, code page, `base` for a translation Steam does not ship, and launcher labels), `strings.override.ini` (our keys for `strings.ini`: the custom maps page, the mine VID 165, the map editor's `[Editor]`; `pl` and `en` also complete the original's gaps), `maps/edithelp*.txt` (the editor's help pages; English at the root, `game/maps/`), `maps/sandbox/` and `maps/template/` (the maps' texts in the language; English at the root) and, for `pl` and `en`, `*.patch` for the developer mode files (`maps/shiftb.txt`, four `maps/script/*.lgc`). Each in the pack's code page. Format in `tools/patch_text.py`. |
 | `external/dgVoodoo2/` | dgVoodoo2 2.87.5 (`DDraw.dll`, `D3DImm.dll`, unmodified; credit in `NOTICE.md`). |
@@ -195,6 +211,10 @@ the menu's headers) has capitals only.
 **Developer mode.** `#define KEYS_ENABLE 1` (in `maps\script\constants.lgc`, off in the
 original game) enables the keys from `dokeys.lgc`: h - repair, W - victory, B - create units (menu `maps\shiftb.txt`),
 A - change army, K - destroy the enemy, D - AI debug view, M - money, # - big train.
+(`#` creates 16 wagons of army 0 - the nuclear mortar, the arsenal, mortars, the repairer and
+rocket carts, no locomotive - at the pointer, and the engine puts them on the track point
+nearest to it, `Engine_PutOnRails`: with the pointer away from the track they appear on the
+nearest one, possibly outside the view).
 The exe also kept the editor mode of the authors' map editor - a File menu with Load and Save
 and a map saving function (`Level_Save`, script `Save()`) that writes the same `.map` format
 the game loads; LocoFix brings it back (`--editor`, see "Editor mode").
@@ -1982,6 +2002,9 @@ mode above) are not tested in full screen.
   Dragon).
 - Intros disabled (`game/maps/logo.lgc.patch`); the outro is a scene in `maps\outro` and
   stays.
+- Mission 11 (`maps\l11\l11.map`): a rail at 745,2075 laid as a ramp the wrong way up
+  is laid flat (`game/maps.override/l11/objects.tsv`, `BUGS.md` F21), so the line at x 745
+  goes on south there instead of ending; trains no longer go round through the fort gate.
 - The strategic map of the menu has a second page with the custom maps (`maps\custom.lst`:
   the sandbox "POLIGON") and the map editor entry (`game/maps/menu.lgc.patch`; "The custom
   maps page" above).
@@ -2235,6 +2258,22 @@ mode above) are not tested in full screen.
       with All missions on a test player of progress 3 sees all 20 dots playable, plays mission 10
       and wins it (W): the score `s1l9` is saved and the progress stays 3; with it off the map
       shows the progress 3 again (mission 10 cannot be clicked) and a win of mission 4 makes it 4,
+  31. a faster float-to-integer conversion (`fast_ftol.cpp`): the exe turns every float into an
+      integer through VC6's `_ftol` (`crt_ftol` 0x456a0c, 351 call sites - the software sprites,
+      the light buffers, every coordinate), which sets the FPU's rounding to zero and back around
+      a `fistp`; the two control word changes stall the FPU. With SSE3 (every x86 CPU since 2005)
+      the function becomes `fisttp`, which truncates by itself: the same 64-bit result in
+      edx:eax for every value (out of range and NaN give the same integer indefinite), st0
+      popped as before. In a sampling profile of mission 13 at 2560x1440 `crt_ftol` was 8% of the
+      main thread, after it 1.4%,
+  32. no second lock for an empty layer 10 (`layer10_lock.cpp`): `Graphics_DrawScene` locks the
+      back buffer and the depth buffer once for the software sprites of layers 2-4 and again, after
+      the Direct3D layers 5-9, for layer 10 - which holds only the on-screen messages (VID 14) and
+      is empty most of the time. Each lock of a surface the GPU drew on makes dgVoodoo wait for the
+      GPU and copy the whole surface to the CPU (and back at the unlock); at 2560x1440 the locks
+      were about a quarter of the main thread. With nothing in layer 10 (no object, and no member
+      of the cursor chain drawn there) the block is skipped; with a message on the screen the
+      original code runs. 5 locks per frame became 3,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
@@ -2308,8 +2347,8 @@ mode above) are not tested in full screen.
   in a 16:9 window), so the points are scaled and moved the same way. The logs it watches
   are the game's own and `LocoFix.log`, where test mode also lists every file the game
   opens. The game only runs while its window is in front, so the test keeps bringing
-  it forward while waiting. Full screen is not tested automatically - switching the mode
-  breaks the redrawing of other windows. `-Map maps\l01\l01.map` starts straight into that
+  it forward while waiting. Full screen is not part of the automatic tests - switching the mode
+  breaks the redrawing of other windows; `-SetFull 1` runs a single test in it. `-Map maps\l01\l01.map` starts straight into that
   map (LocoFix `--test-map`: no intro, no menu) and `-LogWait` sets how long `-WaitFor` may
   take (60 s). `-Editor` starts the game in editor mode (`--editor`); there the steps
   `S<file>` and `L<file>` save and load a map without the file dialog (sent as
@@ -2325,7 +2364,9 @@ mode above) are not tested in full screen.
   New would with the dialog's ground line (test mode), `Z<w>:<h>` resizes the map as File > Map size (test mode), `^<code>` / `+<code>` press a key with
   Ctrl / Shift (`^90` = Ctrl+Z), `K<code>` / `U<code>` only press / only let go a key (`K16`
   before a drag holds Shift), `C<code>` sends a character (`WM_CHAR`, which the scripts'
-  `GetKey()` reads - a posted key gives the lower case letter: `C77` is the developer key M),
+  `GetKey()` reads - a posted key gives the lower case letter: `C77` is the developer key M), `A<seconds>`
+  presses Alt+Tab (real keys) and after that many seconds Alt+Tab again, with a screenshot of the
+  game window while it is away (`<Shot>_<n>_away.png`),
   `l<x>:<y>-<x>:<y>` drags with the left button, and `x<seconds>` follows the game when it
   starts again (`StartEditorMode`, Play the map, Back to the menu) - the test goes on with the
   new process of the same exe; when a step ends with the old game gone the test looks for a
@@ -2426,6 +2467,30 @@ The result: at 1920x1080 mission 1 and the menus are 1024x768 stretched to 1440x
 other missions use the whole 1920x1080 with the interface at the window edges (the map
 fills it). In full screen dgVoodoo scales the chosen mode to the monitor
 (`ScalingMode = stretched_ar`).
+
+**Frame rate at high resolutions.** The game draws on one thread, and the cost of a frame grows
+with the screen: the engine draws the ground with Direct3D, then locks the back buffer and the
+depth buffer whole for the software sprites (dgVoodoo waits for the GPU and copies both to the
+CPU and back), and every light of a colour-box VID (`Graphics_DrawLight`) fills a texture on the
+CPU and draws it. Measured in mission 13 (a big map, many lights; Ryzen 9 7900X, RTX 4070 Ti
+SUPER; `LocoFix.log`'s frame rate of the level, about 30 s each; the numbers vary by a few fps
+between runs):
+
+| | 1024x768 | 1920x1080 | 2560x1440 |
+|---|---|---|---|
+| window, limit 60 | 60 / 60 | 60 / 60 | 39 / 45 |
+| window, no limit | 201 / 200 | 67 / 81 | 37 / 45 |
+| full screen, limit 60 | 60 / 60 | 58 / 60 | 36.5 / 42 |
+
+(before / after LocoFix fixes 31 and 32). The limit itself keeps its rate whenever a frame takes
+less than its period. What remains at 2560x1440 (a sampling profile of the main thread): the
+lights - `Texture_DrawZ` and the driver under it about a third, `Graphics_DrawLight` a fifth -,
+the three surface locks and the software sprites (`SpriteVid_Draw`). The editor draws the
+decals and every light of the map and is slower (mission 13 at 2560x1440: about 18 fps, 20
+after the fixes). Less than that needs a renderer of our own instead of the engine's mix of
+software drawing and Direct3D 7 through dgVoodoo. dgVoodoo's `FastVideoMemoryAccess` breaks
+the ground (`Load Can't decode` and an exception when a map loads), and
+`DDLOCK_DISCARDCONTENTS` on the light textures made no difference.
 
 Before drawing, the engine skips objects far from the screen centre, with a box sized for
 1024x768: objects (`World_DrawLayer`) within x +-1024 and y +-512, their shadows (the shadow

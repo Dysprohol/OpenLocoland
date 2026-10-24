@@ -24,6 +24,7 @@ end; they are not bugs of the game itself.
 
 | # | What | Where | Fix |
 |---|---|---|---|
+| F21 | Mission 11 (l11) at 745,2100: rail 10467264 (745,2075, z 83, direction 83 - frame 12, a ramp whose end 0 is 11 higher) is a ramp the wrong way up. Its high end meets the line at x 745 coming from the north (rail points at 104), its low end (93) the same line going on south (104), so the two do not link (`map_tool.py check-track`: "rail ends (0, 1) at height 93 meet the opposite ends at height 104"; the editor's `D` shows the point 745,2087 at 93 with one link). A ramp curve at the same place (rail 10460128) joins the line going south to the lower fort-gate line, and the line from the north ended in the stub. A locomotive sent from the north line (745,1967) to 620,2212 went north, reversed and came round through the fort gate (arrived after about 19 s). The rail is also drawn lower than the line, which shows as a gap | `maps\l11\l11.map` | `game/maps.override/l11/objects.tsv`: the rail laid flat (z 94, direction 0 - the same shape, points at 104 at both ends). check-track then lists only the doubled rails; the same trip goes straight down the x 745 line (about 6 s), the fort-gate line still joins it through the ramp curve (driven from 883,1968 to 620,2212), and the line is drawn without the gap. What changes in play: trains - the player's and the AI's - can now go between the north line and the south-west corner at x 745 instead of round through the fort gate. Nothing else of the map changes (2 values of one object) |
 | F20 | `ResFile_CopyChunk`, which `Level_Save` uses to copy the OBJ chunk (the level's own VIDs) from the loaded map, copies the chunk as one record of `chunkSize` bytes read from the first record's data on - but `chunkSize` also counts the 12-byte chunk header and the 4-byte record size, so it takes 16 bytes too many: every save appends the pad byte and the header of the next chunk (`\0GRPH...`) to the OBJ record, and a map saved again and again grows by 16 bytes each time (harmless to the loader, which stops after the image file name). A chunk of several records would come out as one record holding them all | `ResFile_CopyChunk` 0x4370b0 (`size = source->chunkSize` after `ResFile_FindFirst`) | LocoFix `level_save.cpp`: the function is rewritten to copy record by record with the game's `ResFile_FindFirst`/`NextRecord`/`BeginRecord`/`EndRecord`; a saved sandbox or mission 1 keeps the size of the original byte for byte |
 | F19 | A ground the engine made itself (`World_CreateEmptyGround`: a map without VID 1024 that has decals) carries the level flag 0x200 like the VIDs read from the map (imageFlags 0x225), so `Level_Save` copies OBJ from the loaded map, which does not describe that ground | `GroundVid_ConstructEmpty` 0x452f00, the loop at 0x41e2bc | LocoFix `level_save.cpp`: the self-made ground (its name "Self Created Hardware Prerendered Ground") loses the flag for the save |
 | F18 | `Level_Save` creates the target first (`ResFile_Create` at 0x41e23b truncates it) and then copies OBJ from the loaded map; a save that fails on the way leaves a broken map, and when the loaded map cannot be opened it shows "Can't open file ... needed for ..." and writes the map without its VIDs | `Level_Save` 0x41e0b0 | LocoFix `level_save.cpp`: every save goes to `<target>.saving` next to the target and replaces it (`MoveFileEx`) only when it was written - a read-only target stays as it was (checked); a level whose VIDs come from a map file that is gone is not saved (checked) |
@@ -118,7 +119,8 @@ Engine:
   same map comes back object for object and with the same GRID.
 - The rails of the missions, as the engine links them (`map_tool.py check-track`, which models
   `Rail_Action` with the ramps and the point heights - DEVELOPERS.md "Trains and rails"; its links are those
-  the game logs with the editor's test command `D` on l11, l12 and l15). The maps are not changed.
+  the game logs with the editor's test command `D` on l11, l12 and l15). The maps are not changed,
+  except l11 745,2100 (F21).
   Checked in the game by driving a locomotive (army 0, enemy trains off) across each place
   (`ACT_MOVE` from a test copy of the mission script, positions in `error.log`); the load logs of
   l11, l12 and l15 have no `R_MAP`, `R_DOT`, `RAIL` or "Too many links" line.
@@ -142,12 +144,8 @@ Engine:
     (from line A's leg along y 825 and down to its far side) and arrived - over an enemy mine
     (VID 86 at 1033,878) that destroyed the first locomotive and broke the rail, which the next
     one crawled over at the broken-rail speed. Intentional.
-  - l11 745,2100: rail 2128 (745,2075, z 83, direction 83) is a ramp the wrong way up - its low
-    end (point at 93) meets the south line at 104, so the north line (104) does not continue south
-    there; a ramp curve at the same place (rail 2159) joins the south line to the fort-gate line.
-    Driven from the north line to the south (620,2212): the train reversed twice and came round
-    through the fort gate (15 s instead of about 3). An authoring error worth fixing: the rail laid
-    flat (direction 0, z 94) links at both ends.
+  - l11 745,2100: a rail laid as a ramp the wrong way up, so the line at x 745 ended there -
+    fixed by a map override, F21.
   - l15 1881,350: rail 552 (1881,325, z 132, flat) lies 11 below rail 576 at the same place and
     links to nothing - a stray copy. Harmless: a train drove along the track there (1756,275 to
     1881,462) as if it were not there.
@@ -166,6 +164,55 @@ Engine:
   (`AppAccel`) are Alt+F3, Alt+F2 and Alt+F10 - the plain function keys belong to the factory
   build list. LocoFix shows the real keys in the menu.
 
+Player tricks (reported by testers; part of the game, kept as they are - checked in the sandbox,
+the last three with a test copy of its script):
+
+- Building at once: `Depo_ReplaceInQueue` (0x404fd0) gives the replaced entry the new unit's
+  full build time in `timeLeft` but starts the building again only when `building != 1` - the
+  number of the first slot, not of the replaced entry. Replacing the first entry of a factory's
+  queue while it is being built leaves the factory's timer running down for the old unit, and the
+  new one comes out when the old one would have. In play: queue a quick unit, click its slot (the
+  queue edit panel: remove, pause, back, forward, replace), choose replace (the circling arrows)
+  and click another unit of the list - the locomotive (VID 5, 30 s) replaced after 22 s by the
+  nuclear rocket (VID 62, 120 s) gave the rocket about 30 s after the locomotive was queued.
+  Replacing at the last moment gives any unit at once. The money is right: the old price comes
+  back and the new one is paid (300 -> 180), and the list offers only the units the money covers
+  (their icons are grey, a click on them does nothing). Pausing, moving and removing entries save
+  the time of the entry being built before they start building again; a replace while a later
+  entry is being built (the first one paused) starts again without saving it, so that entry
+  loses its progress.
+- Taking over enemy trains: `Engine_CanCoupleWith` (0x40ab30) couples two trains whenever one
+  has the link command aimed at a car of the other, whatever their armies, and
+  `Player_HandleMouse` offers the link order (action 0x96) on a car of another train when that
+  train has a car of the player's army, or has no locomotive (`Train_IsUnpowered`) and the
+  player's locomotive drives alone with power to spare (or Ctrl is held). So the wagons of an
+  enemy train whose locomotive was destroyed can be coupled to the player's locomotive and driven
+  away: `Train_HandleContact` cancels the attacks on them and calls the script event
+  `EnemyLinked`, whose handler in `ai_events.lgc` (a comment: the player linked the train, "for
+  repainting") drops the train from the AI's plans. A repair point (VID 104) then makes them the
+  player's: `Building_UpdateWorkshop` gives a car of another army, in a train whose locomotive is
+  of another army, to the repair point's army. Checked: two army-1 mortar carts (VID 25) without
+  a locomotive, an army-0 locomotive ordered to link - they coupled, were driven round the loop
+  and changed to army 0 one after the other as they passed the player's repair point. Selecting
+  an enemy train directly (the key E, "CanSelectEnemy" in `Player_HandleHotkey`) needs the
+  engine's DebugMode and is not part of normal play.
+- One unit destroys a factory: the factory (VID 102) has 150 hit points, and the explosion of a
+  unit with damage when it dies (`Object_Action` 15) gives that damage in full to every object in
+  a box of its damage radius around it (with VID flag 0x4000000 it falls off with the distance).
+  The brander (VID 97, a locomotive that blows up, 40 hit points) deals 500 within 140 px, so
+  one brander that dies next to an enemy factory - shot by its defenders, or ramming a train
+  there (`Train_Collide`) - destroys it. Checked: an army-0 brander on the track in front of
+  the enemy factory, destroyed: the factory went from 150 hit points to gone within a second.
+  The explosive mine (VID 86) deals 1000 within 100 px, falling off with the distance.
+- Turning a train round at a track end: every train reverses as one piece with no loop -
+  `Train_Reverse` (0x409930) makes the last car the leading one and the first car takes over
+  the speed and the route; the cars keep facing as they were, so the locomotive pushes. A
+  stopped train reverses anywhere; a moving train plans a reversal only where the track goes on
+  for the train's length (`RailDot_HasRoomToReverse`, called from `RailDot_Search` only while
+  the train moves), so any spur or dead end serves to change direction. Checked: a locomotive
+  with two carts sent up the spur to the player's factory stopped there and, sent back to the
+  main line, backed out with the carts leading and the locomotive pushing behind them.
+
 Harmless log errors:
 
 - "Reference count non zero after delete", "noRef for SPRITE with EmptyVid" (SPRITE -1, an
@@ -178,6 +225,13 @@ Harmless log errors:
   `Level_Load` first tries every map as a demo file, and the menu maps have no `OBJ` chunk.
 
 ## Checked, not bugs
+
+- The developer key `#` (big train, launcher option Cheats) works: it creates 16 wagons of
+  army 0 with no locomotive (`maps\script\dokeys.lgc`, `KEY_CREATE_BIG_TRAIN`) at the pointer,
+  and `Engine_PutOnRails` moves them to the nearest track point. A report that it did nothing
+  came from a test that sent the key without moving its mouse onto the map, so the wagons
+  appeared on a track outside the view; with the pointer over the map they appear there
+  (checked in the sandbox and mission 13).
 
 - `Level_Save` writes the current game time into HEAD, which looks like it should be 0: the
   shipped maps all carry the time of the authors' editor session (93368 ms in l01, 1911886 in
@@ -220,4 +274,43 @@ Harmless log errors:
 - Objects skipped outside a box sized for 1024x768: shadows cut off at the sides above
   1024x768, whole objects missing above 2048x1024 (`view_culling.cpp`).
 - No frame limit: 180-600 fps and a whole CPU core busy (`frame_limit.cpp`).
+- Low frame rate at high resolutions (reported: 50-55 fps in missions on a Ryzen 9800X3D with
+  an RTX 5080): the engine draws on one thread, locks the whole back buffer and depth buffer
+  every frame for its software sprites (through dgVoodoo a copy from the GPU and back) and
+  fills a texture on the CPU for every light. LocoFix fixes 31 (`fast_ftol.cpp`) and 32
+  (`layer10_lock.cpp`) take about a sixth off a frame at 2560x1440 (mission 13: 37-39 fps
+  -> 45); the rest belongs to the renderer's design (DEVELOPERS.md "Frame rate at high
+  resolutions").
 - Dated logs left behind after every crash pile up (LocoFix keeps the 3 newest).
+- A player who had put dgVoodoo2 into the Steam folder of the game (for its resolutions) built
+  with Setup from it, and the game crashed at the start; after verifying the game files in Steam
+  it worked. The build copied every file of the Steam folder's root but `Steam.exe`, `steam.cfg`
+  and `objects.res`; our `DDraw.dll`, `D3DImm.dll` and `dgVoodoo.conf` replaced the player's and
+  `D3D8.dll`/`D3D9.dll` were removed, so the other files (or a changed `Steam.exe`, which only
+  the PE date was checked of) are the likely cause - which ones the player had is not known.
+  `build.py` and Setup now stop with a request to verify the game files when `Steam.exe` is not
+  the original (SHA-256) and use nothing of the Steam folder's root but the game's own files and
+  folders (DEVELOPERS.md "Quick start"); checked with a copy of the Steam folder with a wrapper's
+  files added (ignored, the game runs) and with a changed `Steam.exe` (stopped, Polish and German
+  texts of Setup).
+- A player's Setup of 0.1.1 stopped with "ValueError: ...constants.lgc.patch: line 37 differs from
+  the original the patch was made for": `maps\script\constants.lgc` of the Steam folder had a
+  line added after line 36 - most likely `#define KEYS_ENABLE 1`, the old way to turn on the
+  developer keys. `build.py` and Setup now compare every Steam file our patches change with the
+  original (SHA-256) before building and stop with a request to verify the game files (Setup's
+  languages, naming the files); the `#define KEYS_ENABLE` lines alone are left out instead, when
+  that gives the original exactly. Checked on a copy of the Steam folder: the define added after
+  line 36 - built, the scripts the same as from the clean copy; another change of
+  `constants.lgc` and a line added to `maps\menu.lgc` - stopped (`build.py`, and Setup's
+  `--silent` with the Polish text, nothing installed).
+- Reported by a player of the original game on Windows 10: Alt+Tab spoils the game, and the
+  train icons of the factory panel do not show. Neither happens in OpenLocoland (checked with
+  `test_game.ps1`'s Alt+Tab step, `A`): in a window (1024x768, 1920x1080) and in full screen at
+  the desktop's resolution (2560x1440) and below it (1024x768 and 1920x1080, where the window is
+  minimised while away and the engine restores its lost surfaces - "Restore surface" in the
+  log - when it is back), the game pauses while away and comes back drawing the map, the bar
+  and the factory panel; the panel shows both rows of icons (all 14 units of the sandbox
+  factory) at 800x600, 1024x768, 1920x1080 and in full screen, before and after Alt+Tab. The
+  original was not run
+  (full screen without dgVoodoo2 switches the display mode); the likely cause there is the
+  system DirectDraw, which OpenLocoland replaces with dgVoodoo2 (first entry of this list).

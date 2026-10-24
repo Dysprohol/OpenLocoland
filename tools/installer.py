@@ -101,6 +101,8 @@ TEXTS = {
                     "(the one with Steam.exe).",
         "bad_steam": "This folder has no Locoland from Steam (Steam.exe is missing):\n{path}",
         "inside_steam": "The install folder must not be the Steam folder of the game or inside it.",
+        "modified_steam": "Steam.exe in this folder is not the original file of the game - it was changed or replaced (e.g. by a resolution fix):\n{path}\n\nRestore the original in Steam: right-click Locoland > Properties > Installed Files > Verify integrity of game files. Then run Setup again.",
+        "modified_files": "Your Locoland files in Steam are modified ({files}):\n{path}\n\nRestore them in Steam: right-click Locoland > Properties > Installed Files > Verify integrity of game files. Then run Setup again. OpenLocoland has its own option for the developer keys: Cheats, below.",
         "not_empty": "The folder is not empty and has no OpenLocoland install:\n{path}\n\n"
                      "Install there anyway? Its other files are left alone.",
         "running": "Locoland is running from this folder. Close the game first.",
@@ -147,6 +149,8 @@ TEXTS = {
                     "Ordner (den mit Steam.exe).",
         "bad_steam": "In diesem Ordner ist kein Locoland aus Steam (Steam.exe fehlt):\n{path}",
         "inside_steam": "Der Installationsordner darf nicht der Steam-Ordner des Spiels sein oder darin liegen.",
+        "modified_steam": "Die Steam.exe in diesem Ordner ist nicht die Originaldatei des Spiels - sie wurde geändert oder ersetzt (z. B. durch einen Auflösungs-Fix):\n{path}\n\nStelle das Original in Steam wieder her: Rechtsklick auf Locoland > Eigenschaften > Installierte Dateien > Dateien auf Fehler überprüfen. Dann Setup erneut starten.",
+        "modified_files": "Deine Locoland-Dateien in Steam sind verändert ({files}):\n{path}\n\nStelle sie in Steam wieder her: Rechtsklick auf Locoland > Eigenschaften > Installierte Dateien > Dateien auf Fehler überprüfen. Dann Setup erneut starten. OpenLocoland hat für die Entwicklertasten eine eigene Option: Cheats, unten.",
         "not_empty": "Der Ordner ist nicht leer und enthält keine OpenLocoland-Installation:\n{path}\n\n"
                      "Trotzdem dort installieren? Seine anderen Dateien bleiben unberührt.",
         "running": "Locoland läuft aus diesem Ordner. Beende zuerst das Spiel.",
@@ -192,6 +196,8 @@ TEXTS = {
                     "mappáját (amelyikben a Steam.exe van).",
         "bad_steam": "Ebben a mappában nincs Steames Locoland (hiányzik a Steam.exe):\n{path}",
         "inside_steam": "A telepítési mappa nem lehet a játék Steam-mappája, és nem lehet azon belül.",
+        "modified_steam": "Ebben a mappában a Steam.exe nem a játék eredeti fájlja - módosították vagy kicserélték (pl. egy felbontásjavítás):\n{path}\n\nÁllítsd vissza az eredetit a Steamben: jobb klikk a Locolandon > Tulajdonságok > Telepített fájlok > Játékfájlok sértetlenségének ellenőrzése. Utána futtasd újra a Setupot.",
+        "modified_files": "A Locoland Steames fájljai módosítva vannak ({files}):\n{path}\n\nÁllítsd vissza őket a Steamben: jobb klikk a Locolandon > Tulajdonságok > Telepített fájlok > Játékfájlok sértetlenségének ellenőrzése. Utána futtasd újra a Setupot. Az OpenLocolandnak saját beállítása van a fejlesztői billentyűkhöz: Csalások, lent.",
         "not_empty": "A mappa nem üres, és nincs benne OpenLocoland:\n{path}\n\n"
                      "Mégis ide telepítsem? A többi fájlja érintetlen marad.",
         "running": "A Locoland ebből a mappából fut. Előbb zárd be a játékot.",
@@ -237,6 +243,8 @@ TEXTS = {
                     "(ten z plikiem Steam.exe).",
         "bad_steam": "W tym folderze nie ma Locoland ze Steama (brak Steam.exe):\n{path}",
         "inside_steam": "Folder instalacji nie może być folderem gry w Steamie ani leżeć w nim.",
+        "modified_steam": "Steam.exe w tym folderze nie jest oryginalnym plikiem gry - został zmieniony lub podmieniony (np. przez poprawkę rozdzielczości):\n{path}\n\nPrzywróć oryginał w Steamie: prawy klik na Locoland > Właściwości > Zainstalowane pliki > Sprawdź spójność plików gry. Potem uruchom Setup jeszcze raz.",
+        "modified_files": "Twoje pliki Locoland w Steamie są zmienione ({files}):\n{path}\n\nPrzywróć je w Steamie: prawy klik na Locoland > Właściwości > Zainstalowane pliki > Sprawdź spójność plików gry. Potem uruchom Setup jeszcze raz. OpenLocoland ma własną opcję klawiszy twórców: Kody, poniżej.",
         "not_empty": "Folder nie jest pusty i nie ma w nim OpenLocoland:\n{path}\n\n"
                      "Zainstalować mimo to? Pozostałe pliki zostaną nietknięte.",
         "running": "Locoland jest uruchomiony z tego folderu. Najpierw zamknij grę.",
@@ -282,6 +290,8 @@ TEXTS = {
                     "pasta (a que tem o Steam.exe).",
         "bad_steam": "Esta pasta não tem o Locoland do Steam (falta o Steam.exe):\n{path}",
         "inside_steam": "A pasta de instalação não pode ser a pasta do jogo no Steam nem estar dentro dela.",
+        "modified_steam": "O Steam.exe desta pasta não é o ficheiro original do jogo - foi alterado ou substituído (p. ex. por uma correção de resolução):\n{path}\n\nReponha o original no Steam: clique com o botão direito em Locoland > Propriedades > Ficheiros instalados > Verificar a integridade dos ficheiros do jogo. Depois execute o Setup outra vez.",
+        "modified_files": "Os seus ficheiros do Locoland no Steam foram alterados ({files}):\n{path}\n\nReponha-os no Steam: clique com o botão direito em Locoland > Propriedades > Ficheiros instalados > Verificar a integridade dos ficheiros do jogo. Depois execute o Setup outra vez. O OpenLocoland tem uma opção própria para as teclas de programador: Batotas, abaixo.",
         "not_empty": "A pasta não está vazia e não tem uma instalação do OpenLocoland:\n{path}\n\n"
                      "Instalar mesmo assim? Os outros ficheiros ficam intactos.",
         "running": "O Locoland está a correr a partir desta pasta. Fecha primeiro o jogo.",
@@ -327,6 +337,8 @@ TEXTS = {
                     "(ту, где лежит Steam.exe).",
         "bad_steam": "В этой папке нет Locoland из Steam (нет Steam.exe):\n{path}",
         "inside_steam": "Папка установки не может быть папкой игры в Steam или находиться внутри неё.",
+        "modified_steam": "Steam.exe в этой папке - не оригинальный файл игры: он изменён или заменён (например, исправлением разрешения):\n{path}\n\nВосстановите оригинал в Steam: правый щелчок по Locoland > Свойства > Установленные файлы > Проверить целостность файлов игры. Затем снова запустите Setup.",
+        "modified_files": "Ваши файлы Locoland в Steam изменены ({files}):\n{path}\n\nВосстановите их в Steam: правый щелчок по Locoland > Свойства > Установленные файлы > Проверить целостность файлов игры. Затем снова запустите Setup. У OpenLocoland есть своя настройка для клавиш разработчиков: Читы, ниже.",
         "not_empty": "Папка не пуста, и в ней нет OpenLocoland:\n{path}\n\n"
                      "Всё равно установить туда? Остальные файлы останутся нетронутыми.",
         "running": "Locoland запущена из этой папки. Сначала закройте игру.",
@@ -372,6 +384,8 @@ TEXTS = {
                     "(tu se Steam.exe).",
         "bad_steam": "V této složce není Locoland ze Steamu (chybí Steam.exe):\n{path}",
         "inside_steam": "Instalační složka nesmí být složkou hry ve Steamu ani v ní ležet.",
+        "modified_steam": "Steam.exe v této složce není původní soubor hry - byl změněn nebo nahrazen (např. opravou rozlišení):\n{path}\n\nObnovte originál ve Steamu: pravým tlačítkem na Locoland > Vlastnosti > Nainstalované soubory > Ověřit integritu herních souborů. Pak spusťte Setup znovu.",
+        "modified_files": "Vaše soubory Locoland ve Steamu jsou změněné ({files}):\n{path}\n\nObnovte je ve Steamu: pravým tlačítkem na Locoland > Vlastnosti > Nainstalované soubory > Ověřit integritu herních souborů. Pak spusťte Setup znovu. OpenLocoland má pro klávesy vývojářů vlastní volbu: Cheaty, níže.",
         "not_empty": "Složka není prázdná a není v ní OpenLocoland:\n{path}\n\n"
                      "Přesto do ní instalovat? Ostatní soubory zůstanou nedotčené.",
         "running": "Locoland běží z této složky. Nejdřív hru ukonči.",
@@ -656,6 +670,11 @@ def install(steam, target, choices, ver, progress=None):
         sys.exit(f"No Locoland from Steam in {steam}")
     if inside(target, steam):
         sys.exit("The install folder must not be the Steam folder of the game or inside it")
+    if not build.steam_exe_original(steam):
+        sys.exit(TEXTS[choices["lang"]]["modified_steam"].format(path=steam))
+    modified = build.modified_steam_files(steam)
+    if modified:
+        sys.exit(TEXTS[choices["lang"]]["modified_files"].format(path=steam, files=", ".join(modified)))
     if game_running(target):
         sys.exit("Locoland is running from the install folder - close it first")
     locofix = os.path.join(BUNDLE, "LocoFix.dll") if BUNDLE else None
@@ -927,6 +946,13 @@ class Installer:
             return
         if not target or inside(target, steam):
             self.error(self.t("inside_steam"))
+            return
+        if not build.steam_exe_original(steam):
+            self.error(self.t("modified_steam", path=steam))
+            return
+        modified = build.modified_steam_files(steam)
+        if modified:
+            self.error(self.t("modified_files", path=steam, files=", ".join(modified)))
             return
         target = os.path.abspath(target)
         update = read_manifest(target) is not None
