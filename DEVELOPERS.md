@@ -84,6 +84,16 @@ The choice is remembered.
 `build.py` copies only changed files and does not overwrite the high score tables, so it
 can be run after every change in the repo.
 
+The Steam copy has to be the original. `build.py` (and so Setup) stops when `Steam.exe` is not
+the exe of 2003-10-07 that LocoFix is made for (its SHA-256 in `build.py`; the same exe for every
+language) and asks to restore it in Steam (Properties > Installed Files > Verify integrity of
+game files; Setup says it in its own languages). Of the Steam folder's root only the game's own
+files and folders are used (`Steam.exe`, `objects.res`, `strings.ini`, `steam.cfg`, `cursores`,
+`fonts`, `maps`, `music`, `vid`, `video`, `wav`): anything a player added there - another
+DirectDraw wrapper (dgVoodoo2, DDrawCompat, cnc-ddraw), DxWnd, their settings - is ignored and
+listed in the log, and such a file that an older build copied into the game folder is removed
+(the same name and size, unless the build writes a file of that name itself).
+
 **Languages.** Every language is a separate Steam depot with the whole game (about 180 MB
 to download each). Steam ships six of them: English, German, Hungarian, Polish, Portuguese
 and Russian. Steam installs one; the others can be downloaded next to it, without

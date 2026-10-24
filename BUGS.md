@@ -228,6 +228,17 @@ Harmless log errors:
   1024x768, whole objects missing above 2048x1024 (`view_culling.cpp`).
 - No frame limit: 180-600 fps and a whole CPU core busy (`frame_limit.cpp`).
 - Dated logs left behind after every crash pile up (LocoFix keeps the 3 newest).
+- A player who had put dgVoodoo2 into the Steam folder of the game (for its resolutions) built
+  with Setup from it, and the game crashed at the start; after verifying the game files in Steam
+  it worked. The build copied every file of the Steam folder's root but `Steam.exe`, `steam.cfg`
+  and `objects.res`; our `DDraw.dll`, `D3DImm.dll` and `dgVoodoo.conf` replaced the player's and
+  `D3D8.dll`/`D3D9.dll` were removed, so the other files (or a changed `Steam.exe`, which only
+  the PE date was checked of) are the likely cause - which ones the player had is not known.
+  `build.py` and Setup now stop with a request to verify the game files when `Steam.exe` is not
+  the original (SHA-256) and use nothing of the Steam folder's root but the game's own files and
+  folders (DEVELOPERS.md "Quick start"); checked with a copy of the Steam folder with a wrapper's
+  files added (ignored, the game runs) and with a changed `Steam.exe` (stopped, Polish and German
+  texts of Setup).
 - Reported by a player of the original game on Windows 10: Alt+Tab spoils the game, and the
   train icons of the factory panel do not show. Neither happens in OpenLocoland (checked with
   `test_game.ps1`'s Alt+Tab step, `A`): in a window (1024x768, 1920x1080) and in full screen at

@@ -7,6 +7,13 @@ The default target is the folder Locoland next to the repository (..\Locoland).
 --locofix takes a prebuilt LocoFix.dll instead of compiling src\LocoFix (the installer,
 tools/release.py), --captured keeps the language captures in another folder than captured/.
 
+The Steam copy has to be the original: Steam.exe must be the Steam version of 2003-10-07 (its
+SHA-256, the exe LocoFix is made for) - a changed or replaced exe stops the build with a request
+to verify the game files in Steam. Only the game's own files and folders of the Steam folder's
+root are used: anything else there (a DirectDraw wrapper such as dgVoodoo2, DDrawCompat or
+cnc-ddraw, DxWnd, config files) is ignored and listed, and such a file copied into the target
+by an older build is removed.
+
 Order:
   1. game files from Steam (without Steam.exe, steam.cfg and the movies in video/); the
      language files (languages.LANGUAGE_FILES) are taken from the English capture
@@ -34,6 +41,7 @@ writes itself (high score tables) are not overwritten once they exist in the tar
 folder. Other files in the target folder are left alone.
 """
 import argparse
+import hashlib
 import os
 import shutil
 import sys
@@ -57,6 +65,16 @@ SKIPPED = {"steam.exe", "steam.cfg", "steam_appid.txt",
            "objects.res"}               # objects.res is written with the fix (patch_data.py)
 FORT_CANNON = os.path.join("vid", "110.vid")   # written with the fix (patch_data.py)
 SKIPPED_DIRS = {"video"}                # intros (the outro is a scene in maps/outro)
+# the root of the game in Steam: the files and folders of the original; anything else there was
+# added by the player (a DirectDraw wrapper, its settings...) and is not used
+GAME_ROOT_FILES = {"steam.exe", "steam.cfg", "steam_appid.txt", "objects.res", "strings.ini"}
+GAME_ROOT_DIRS = {"cursores", "fonts", "maps", "music", "vid", "video", "wav"}
+# Steam.exe of the Steam version (2003-10-07, the same exe for every language): the one LocoFix
+# and patch_exe.py are made for
+STEAM_EXE_SHA256 = "a31e9e512968d52352cb06c7e2a6c34e2a088175d86b38de6dd15e454f076020"
+MODIFIED_STEAM = ("Steam.exe in {path} is not the original file of the game (it was changed or replaced). "
+                  "Restore the original in Steam: Locoland > Properties > Installed Files > Verify integrity "
+                  "of game files, then build again.")
 DGVOODOO = ["DDraw.dll", "D3DImm.dll"]  # the game only uses DirectDraw/Direct3D 7
 # files from earlier versions of this folder that are no longer needed
 OBSOLETE = ["Steam.exe", "steam.cfg", "steam_appid.txt", "D3D8.dll", "D3D9.dll", "dgVoodooCpl.exe"]
@@ -164,6 +182,25 @@ def merge_custom_list(src, dst, target, counter):
         counter[0] += 1
 
 
+def steam_exe_original(steam):
+    """Whether Steam.exe of the Steam folder is the original exe of the game."""
+    try:
+        data = open(os.path.join(steam, "Steam.exe"), "rb").read()
+    except OSError:
+        return False
+    return hashlib.sha256(data).hexdigest() == STEAM_EXE_SHA256
+
+
+def foreign_root_entries(steam):
+    """The files and folders of the Steam folder's root that are not the game's own (sorted)."""
+    found = []
+    for name in os.listdir(steam):
+        known = GAME_ROOT_DIRS if os.path.isdir(os.path.join(steam, name)) else GAME_ROOT_FILES
+        if name.lower() not in known:
+            found.append(name)
+    return sorted(found, key=str.lower)
+
+
 def copy(src, dst, counter):
     if os.path.exists(dst):
         a, b = os.stat(src), os.stat(dst)
@@ -190,6 +227,11 @@ def build(steam, target, locofix=None, captured=None, progress=None):
         sys.exit(f"No game in {a.steam}")
     if os.path.normcase(os.path.abspath(a.target)) == os.path.normcase(os.path.abspath(a.steam)):
         sys.exit("The target is the Steam game folder itself - the game is built next to it")
+    if not steam_exe_original(a.steam):
+        sys.exit(MODIFIED_STEAM.format(path=a.steam))
+    foreign = foreign_root_entries(a.steam)
+    if foreign:
+        print(f"Steam folder: not the game's, not used: {', '.join(foreign)}")
     copied = [0]
     game = os.path.join(REPO, "game")
     from_repo = {os.path.normcase(patch_text.target_name(rel) or rel) for rel in game_files(game)}
@@ -208,12 +250,12 @@ def build(steam, target, locofix=None, captured=None, progress=None):
     for directory, subdirs, files in os.walk(a.steam):
         rel = os.path.relpath(directory, a.steam)
         if rel == ".":
-            subdirs[:] = [d for d in subdirs if d.lower() not in SKIPPED_DIRS]
+            subdirs[:] = [d for d in subdirs if d.lower() in GAME_ROOT_DIRS - SKIPPED_DIRS]
         for f in files:
             seen += 1
             done(0.6 * seen / steam_files)
             path = os.path.normpath(os.path.join(rel, f))
-            if rel == "." and f.lower() in SKIPPED:
+            if rel == "." and (f.lower() in SKIPPED or f.lower() not in GAME_ROOT_FILES):
                 continue
             if os.path.normcase(path) in from_repo or os.path.normcase(path) == FORT_CANNON:
                 continue
@@ -309,6 +351,16 @@ def build(steam, target, locofix=None, captured=None, progress=None):
         if os.path.isfile(path):
             os.remove(path)
             removed += 1
+    # a foreign file of the Steam folder that an older build copied into the target (the same
+    # size), unless the build writes a file of that name itself
+    ours = {f.lower() for f in DGVOODOO + ["LocoFix.dll", "Locoland.exe"] + os.listdir(game)}
+    for f in foreign:
+        path = os.path.join(a.target, f)
+        if (f.lower() not in ours and os.path.isfile(path) and os.path.isfile(os.path.join(a.steam, f))
+                and os.path.getsize(path) == os.path.getsize(os.path.join(a.steam, f))):
+            os.remove(path)
+            removed += 1
+            print(f"{f}: removed - copied from the Steam folder by an older build, not the game's")
     if os.path.isdir(os.path.join(a.target, "video")):
         shutil.rmtree(os.path.join(a.target, "video"))
         removed += 1
