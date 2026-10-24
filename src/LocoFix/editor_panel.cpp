@@ -494,6 +494,7 @@ bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse) {
         if (m == WM_LBUTTONDOWN && on_circle(mouse, help_button(), HELP_R)) open(Panel::Help);
         else if (m == WM_LBUTTONDOWN && on_circle(mouse, menu_button(), MENU_R)) open(Panel::Menu);
         else if (m == WM_KEYDOWN && w == VK_F1) open(Panel::Help);
+        else if (m == WM_KEYDOWN && w == VK_ESCAPE) open(Panel::Menu);   // Esc opens Menu when no panel is open
         else return false;
         return true;
     }
@@ -527,7 +528,13 @@ bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse) {
             g_palette_page = (std::max)(0, (std::min)(g_palette_page + (GET_WHEEL_DELTA_WPARAM(w) > 0 ? -1 : 1), pages_of(g_group) - 1));
         return true;
     case WM_KEYDOWN:
-        if (w == VK_ESCAPE || w == VK_F1) open(Panel::None);
+        if (w == VK_ESCAPE) {
+            // Esc toggles the Menu panel: opens it when no panel is open, closes it when Menu is open,
+            // closes Help/Palette without opening Menu
+            if (g_panel == Panel::None) open(Panel::Menu);
+            else if (g_panel == Panel::Menu) open(Panel::None);
+            else open(Panel::None);   // Help or Palette: close without opening Menu
+        } else if (w == VK_F1) open(Panel::None);
         else if (g_panel == Panel::Help && (w == VK_LEFT || w == VK_PRIOR || w == VK_UP)) turn_page(-1);
         else if (g_panel == Panel::Help && (w == VK_RIGHT || w == VK_NEXT || w == VK_DOWN)) turn_page(1);
         else if (g_panel == Panel::Palette && (w == VK_UP || w == VK_DOWN)) {

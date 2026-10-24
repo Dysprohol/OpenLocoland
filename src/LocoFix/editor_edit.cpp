@@ -4589,6 +4589,8 @@ void draw_context() {
     char title[128];
     const char* name = ui_unit_name(nvid) ? ui_unit_name(nvid) : object_name(nvid);
     std::snprintf(title, sizeof title, "%s (VID %d)", name ? name : "", nvid);
+    // Convert title to uppercase for visual consistency
+    for (char* p = title; *p; ++p) *p = static_cast<char>(std::toupper(static_cast<unsigned char>(*p)));
     for (size_t r = 0; r <= rows.size(); ++r) {   // the title's row, then the rows
         const float ry = y + r * CONTEXT_ROW;
         draw_screen(VID_STRIP, 0, x + CONTEXT_WIDTH / 2, ry + CONTEXT_ROW / 2, CONTEXT_STEP);
