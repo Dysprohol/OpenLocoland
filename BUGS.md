@@ -24,6 +24,7 @@ end; they are not bugs of the game itself.
 
 | # | What | Where | Fix |
 |---|---|---|---|
+| F21 | Mission 11 (l11) at 745,2100: rail 10467264 (745,2075, z 83, direction 83 - frame 12, a ramp whose end 0 is 11 higher) is a ramp the wrong way up. Its high end meets the line at x 745 coming from the north (rail points at 104), its low end (93) the same line going on south (104), so the two do not link (`map_tool.py check-track`: "rail ends (0, 1) at height 93 meet the opposite ends at height 104"; the editor's `D` shows the point 745,2087 at 93 with one link). A ramp curve at the same place (rail 10460128) joins the line going south to the lower fort-gate line, and the line from the north ended in the stub. A locomotive sent from the north line (745,1967) to 620,2212 went north, reversed and came round through the fort gate (arrived after about 19 s). The rail is also drawn lower than the line, which shows as a gap | `maps\l11\l11.map` | `game/maps.override/l11/objects.tsv`: the rail laid flat (z 94, direction 0 - the same shape, points at 104 at both ends). check-track then lists only the doubled rails; the same trip goes straight down the x 745 line (about 6 s), the fort-gate line still joins it through the ramp curve (driven from 883,1968 to 620,2212), and the line is drawn without the gap. What changes in play: trains - the player's and the AI's - can now go between the north line and the south-west corner at x 745 instead of round through the fort gate. Nothing else of the map changes (2 values of one object) |
 | F20 | `ResFile_CopyChunk`, which `Level_Save` uses to copy the OBJ chunk (the level's own VIDs) from the loaded map, copies the chunk as one record of `chunkSize` bytes read from the first record's data on - but `chunkSize` also counts the 12-byte chunk header and the 4-byte record size, so it takes 16 bytes too many: every save appends the pad byte and the header of the next chunk (`\0GRPH...`) to the OBJ record, and a map saved again and again grows by 16 bytes each time (harmless to the loader, which stops after the image file name). A chunk of several records would come out as one record holding them all | `ResFile_CopyChunk` 0x4370b0 (`size = source->chunkSize` after `ResFile_FindFirst`) | LocoFix `level_save.cpp`: the function is rewritten to copy record by record with the game's `ResFile_FindFirst`/`NextRecord`/`BeginRecord`/`EndRecord`; a saved sandbox or mission 1 keeps the size of the original byte for byte |
 | F19 | A ground the engine made itself (`World_CreateEmptyGround`: a map without VID 1024 that has decals) carries the level flag 0x200 like the VIDs read from the map (imageFlags 0x225), so `Level_Save` copies OBJ from the loaded map, which does not describe that ground | `GroundVid_ConstructEmpty` 0x452f00, the loop at 0x41e2bc | LocoFix `level_save.cpp`: the self-made ground (its name "Self Created Hardware Prerendered Ground") loses the flag for the save |
 | F18 | `Level_Save` creates the target first (`ResFile_Create` at 0x41e23b truncates it) and then copies OBJ from the loaded map; a save that fails on the way leaves a broken map, and when the loaded map cannot be opened it shows "Can't open file ... needed for ..." and writes the map without its VIDs | `Level_Save` 0x41e0b0 | LocoFix `level_save.cpp`: every save goes to `<target>.saving` next to the target and replaces it (`MoveFileEx`) only when it was written - a read-only target stays as it was (checked); a level whose VIDs come from a map file that is gone is not saved (checked) |
@@ -118,7 +119,8 @@ Engine:
   same map comes back object for object and with the same GRID.
 - The rails of the missions, as the engine links them (`map_tool.py check-track`, which models
   `Rail_Action` with the ramps and the point heights - DEVELOPERS.md "Trains and rails"; its links are those
-  the game logs with the editor's test command `D` on l11, l12 and l15). The maps are not changed.
+  the game logs with the editor's test command `D` on l11, l12 and l15). The maps are not changed,
+  except l11 745,2100 (F21).
   Checked in the game by driving a locomotive (army 0, enemy trains off) across each place
   (`ACT_MOVE` from a test copy of the mission script, positions in `error.log`); the load logs of
   l11, l12 and l15 have no `R_MAP`, `R_DOT`, `RAIL` or "Too many links" line.
@@ -142,12 +144,8 @@ Engine:
     (from line A's leg along y 825 and down to its far side) and arrived - over an enemy mine
     (VID 86 at 1033,878) that destroyed the first locomotive and broke the rail, which the next
     one crawled over at the broken-rail speed. Intentional.
-  - l11 745,2100: rail 2128 (745,2075, z 83, direction 83) is a ramp the wrong way up - its low
-    end (point at 93) meets the south line at 104, so the north line (104) does not continue south
-    there; a ramp curve at the same place (rail 2159) joins the south line to the fort-gate line.
-    Driven from the north line to the south (620,2212): the train reversed twice and came round
-    through the fort gate (15 s instead of about 3). An authoring error worth fixing: the rail laid
-    flat (direction 0, z 94) links at both ends.
+  - l11 745,2100: a rail laid as a ramp the wrong way up, so the line at x 745 ended there -
+    fixed by a map override, F21.
   - l15 1881,350: rail 552 (1881,325, z 132, flat) lies 11 below rail 576 at the same place and
     links to nothing - a stray copy. Harmless: a train drove along the track there (1756,275 to
     1881,462) as if it were not there.

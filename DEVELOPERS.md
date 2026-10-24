@@ -134,7 +134,7 @@ For working on the engine, generate the local reverse-engineering output (not in
 
 | Folder | Contents |
 |---|---|
-| `game/` | Our files for the game folder (`Locoland.cfg`, `dgVoodoo.conf`, `maps/custom.lst` - the custom maps of the menu) and changes to original files as `<file>.patch` (`maps/logo.lgc.patch`, `maps/menu.lgc.patch`) - same structure as the game folder; `maps/script/cheats.lgc`, `unlock.lgc` and their `_on` variants are the launcher's options (LocoFix fix 30). `objects.override/` would hold changed values of `objects.res` (see "Editing objects.res"), `maps.override/<map>/` changed objects of a map and `maps.new/<map>/` whole new maps (see "Editing maps and images"); `maps.new/template` (the empty template) and `maps.new/sandbox` (the one to play) at the moment, and `run_map.cmd` - a double-click at the game starts the sample map, `run_map <map>` any map; `edit_map.cmd` the same in editor mode (see "Editor mode"). |
+| `game/` | Our files for the game folder (`Locoland.cfg`, `dgVoodoo.conf`, `maps/custom.lst` - the custom maps of the menu) and changes to original files as `<file>.patch` (`maps/logo.lgc.patch`, `maps/menu.lgc.patch`) - same structure as the game folder; `maps/script/cheats.lgc`, `unlock.lgc` and their `_on` variants are the launcher's options (LocoFix fix 30). `objects.override/` would hold changed values of `objects.res` (see "Editing objects.res"), `maps.override/<map>/` changed objects of a map (`l11`: a rail of mission 11, `BUGS.md` F21) and `maps.new/<map>/` whole new maps (see "Editing maps and images"); `maps.new/template` (the empty template) and `maps.new/sandbox` (the one to play) at the moment, and `run_map.cmd` - a double-click at the game starts the sample map, `run_map <map>` any map; `edit_map.cmd` the same in editor mode (see "Editor mode"). |
 | `docs/` | The player's guide for the release, in Polish and English only (the German, Hungarian and Russian players get the English one): `PRZEWODNIK.md` (Polish) and `GUIDE.md` (English) - installing, what is new in the game, the custom maps page, the map editor with a tutorial and its keys - and a few screenshots of the game in `docs/img/`. Version 0.1; keep the guides in step with the in-game help pages (`maps/edithelp*.txt`) and "Editor mode" below. |
 | `lang/<code>/` | Our part of the language packs, `cs`, `de`, `en`, `hu`, `pl` and `ru`: `language.ini` (name, code page, `base` for a translation Steam does not ship, and launcher labels), `strings.override.ini` (our keys for `strings.ini`: the custom maps page, the mine VID 165, the map editor's `[Editor]`; `pl` and `en` also complete the original's gaps), `maps/edithelp*.txt` (the editor's help pages; English at the root, `game/maps/`), `maps/sandbox/` and `maps/template/` (the maps' texts in the language; English at the root) and, for `pl` and `en`, `*.patch` for the developer mode files (`maps/shiftb.txt`, four `maps/script/*.lgc`). Each in the pack's code page. Format in `tools/patch_text.py`. |
 | `external/dgVoodoo2/` | dgVoodoo2 2.87.5 (`DDraw.dll`, `D3DImm.dll`, unmodified; credit in `NOTICE.md`). |
@@ -2002,6 +2002,9 @@ mode above) are not tested in full screen.
   Dragon).
 - Intros disabled (`game/maps/logo.lgc.patch`); the outro is a scene in `maps\outro` and
   stays.
+- Mission 11 (`maps\l11\l11.map`): a rail at 745,2075 laid as a ramp the wrong way up
+  is laid flat (`game/maps.override/l11/objects.tsv`, `BUGS.md` F21), so the line at x 745
+  goes on south there instead of ending; trains no longer go round through the fort gate.
 - The strategic map of the menu has a second page with the custom maps (`maps\custom.lst`:
   the sandbox "POLIGON") and the map editor entry (`game/maps/menu.lgc.patch`; "The custom
   maps page" above).
