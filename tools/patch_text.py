@@ -178,12 +178,15 @@ def write_if_changed(path, data):
     return True
 
 
-def changed_file(change_file, original_file):
-    """Content of the game file that `change_file` (.patch or .override.ini) describes."""
+def changed_file(change_file, original_file, original=None):
+    """Content of the game file that `change_file` (.patch or .override.ini) describes; the
+    original is read from `original_file` unless its content is given."""
     name = os.path.basename(change_file)
+    if original is None:
+        original = read(original_file)
     if name.endswith(".patch"):
-        return apply_patch(read(original_file), read(change_file), change_file)
-    return merge_ini(read(original_file), read(change_file), change_file)
+        return apply_patch(original, read(change_file), change_file)
+    return merge_ini(original, read(change_file), change_file)
 
 
 def target_name(rel_path):

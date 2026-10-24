@@ -9,10 +9,14 @@ tools/release.py), --captured keeps the language captures in another folder than
 
 The Steam copy has to be the original: Steam.exe must be the Steam version of 2003-10-07 (its
 SHA-256, the exe LocoFix is made for) - a changed or replaced exe stops the build with a request
-to verify the game files in Steam. Only the game's own files and folders of the Steam folder's
-root are used: anything else there (a DirectDraw wrapper such as dgVoodoo2, DDrawCompat or
-cnc-ddraw, DxWnd, config files) is ignored and listed, and such a file copied into the target
-by an older build is removed.
+to verify the game files in Steam - and so must every file our patches change (scripts and
+menus: game/**/*.patch and the scripts of lang/<code>/; their SHA-256, the same in every
+language), checked before anything is built. One edit players made is undone instead: a
+`#define KEYS_ENABLE` line added to maps\script\constants.lgc to turn on the developer keys (the
+launcher's Cheats option now), when without it the file is the original byte for byte. Only the
+game's own files and folders of the Steam folder's root are used: anything else there (a
+DirectDraw wrapper such as dgVoodoo2, DDrawCompat or cnc-ddraw, DxWnd, config files) is ignored
+and listed, and such a file copied into the target by an older build is removed.
 
 Order:
   1. game files from Steam (without Steam.exe, steam.cfg and the movies in video/); the
@@ -43,6 +47,7 @@ folder. Other files in the target folder are left alone.
 import argparse
 import hashlib
 import os
+import re
 import shutil
 import sys
 
@@ -72,6 +77,27 @@ GAME_ROOT_DIRS = {"cursores", "fonts", "maps", "music", "vid", "video", "wav"}
 # Steam.exe of the Steam version (2003-10-07, the same exe for every language): the one LocoFix
 # and patch_exe.py are made for
 STEAM_EXE_SHA256 = "a31e9e512968d52352cb06c7e2a6c34e2a088175d86b38de6dd15e454f076020"
+# The files of the Steam version our patches change (the same in every language): a file that
+# differs was changed by the player, and the build stops before anything is written. A patch of
+# a file missing here is checked by applying it.
+ORIGINAL_SHA256 = {
+    os.path.join("maps", "logo.lgc"): "6b055bf8124832bd334dc2f28d2566cc35a16876b80791c3c1d27c109196dce9",
+    os.path.join("maps", "menu.lgc"): "0d1058f31ca2904660acc69e2e8fad7a433e5d2d93f5158884e5267dfb95fc39",
+    os.path.join("maps", "script", "basefunctions.lgc"): "a0ee8eb3865434c423a71b0df701ab8ec142ff0515cdafe05415f243dbd41397",
+    os.path.join("maps", "script", "constants.lgc"): "4313d929e4ea9c082c246cc9dc0e5b75eb687deb8f9c4df9cad6913d27a3d72c",
+    os.path.join("maps", "script", "debug_functions.lgc"): "c425230d5851b7c776cfaa2e025e8f498d20c88f1dea1b49daa9b0b2725f8c0f",
+    os.path.join("maps", "script", "initdefault.lgc"): "779bde2e9aa2606818647da9a1de590ad14b8d10a4b35afaaa49871779fb0f04",
+    os.path.join("maps", "script", "menuend.lgc"): "618e3a9df1e68af3a18b985e9c3bfa7601904de80be73cdd5dafb2925910d367",
+    os.path.join("maps", "script", "menutact.lgc"): "ca2479c2ab512fe112ea937c9c9225d4649f3c80e3550ce3a7768c05ff366bda",
+    os.path.join("maps", "script", "trainstactfunctions.lgc"): "c6454480a5738d0af28dc7fa8df9967710e496752a869bd9e9b81038deceb5fb",
+}
+# A player's edit of a Steam script that is undone: the `#define KEYS_ENABLE` lines added to
+# constants.lgc for the developer keys, when the file without them is the original.
+CONSTANTS_LGC = os.path.join("maps", "script", "constants.lgc")
+KEYS_ENABLE_LINE = re.compile(rb"^[ \t]*#define[ \t]+KEYS_ENABLE\b[^\r\n]*(\r?\n|$)", re.M)
+MODIFIED_FILES = ("Locoland's files in {path} are modified: {files}. Restore them in Steam: Locoland > "
+                  "Properties > Installed Files > Verify integrity of game files, then build again "
+                  "(OpenLocoland has its own Cheats option for the developer keys).")
 MODIFIED_STEAM = ("Steam.exe in {path} is not the original file of the game (it was changed or replaced). "
                   "Restore the original in Steam: Locoland > Properties > Installed Files > Verify integrity "
                   "of game files, then build again.")
@@ -191,6 +217,59 @@ def steam_exe_original(steam):
     return hashlib.sha256(data).hexdigest() == STEAM_EXE_SHA256
 
 
+_told = set()
+
+
+def known_sha256(rel):
+    return {os.path.normcase(k): v for k, v in ORIGINAL_SHA256.items()}.get(os.path.normcase(rel))
+
+
+def steam_original(steam, path):
+    """The content of a Steam file our changes apply to; maps\\script\\constants.lgc with the
+    `#define KEYS_ENABLE` lines of a player left out when that gives the original exactly."""
+    data = patch_text.read(path)
+    rel = os.path.relpath(path, steam)
+    if os.path.normcase(rel) != os.path.normcase(CONSTANTS_LGC):
+        return data
+    if hashlib.sha256(data).hexdigest() != known_sha256(rel):
+        undone = KEYS_ENABLE_LINE.sub(b"", data)
+        if hashlib.sha256(undone).hexdigest() == known_sha256(rel):
+            if path not in _told:
+                print(f"{CONSTANTS_LGC}: the Steam file's #define KEYS_ENABLE left out "
+                      "(the developer keys are the launcher's Cheats option)")
+                _told.add(path)
+            return undone
+    return data
+
+
+def modified_steam_files(steam):
+    """The files of the Steam folder our patches change that differ from the original - changed
+    by the player (relative paths, sorted): the targets of the patches of game/ and of the script
+    patches of the language packs (the language texts' patches apply to the captured files)."""
+    changes = [(os.path.join(REPO, "game", rel), patch_text.target_name(rel))
+               for rel in game_files(os.path.join(REPO, "game")) if rel.endswith(".patch")]
+    for code in languages.packs():
+        folder = os.path.join(languages.LANG, code)
+        for directory, _, files in os.walk(folder):
+            for f in files:
+                rel = os.path.relpath(os.path.join(directory, f), folder)
+                if rel.endswith(".patch") and not languages.is_language_file(patch_text.target_name(rel)):
+                    changes.append((os.path.join(folder, rel), patch_text.target_name(rel)))
+    bad = set()
+    for change, name in changes:
+        path = os.path.join(steam, name)
+        try:
+            data = steam_original(steam, path)
+            if known_sha256(name):
+                if hashlib.sha256(data).hexdigest() != known_sha256(name):
+                    bad.add(name)
+            else:
+                patch_text.changed_file(change, path, data)
+        except (OSError, ValueError):
+            bad.add(name)
+    return sorted(bad, key=str.lower)
+
+
 def foreign_root_entries(steam):
     """The files and folders of the Steam folder's root that are not the game's own (sorted)."""
     found = []
@@ -229,6 +308,9 @@ def build(steam, target, locofix=None, captured=None, progress=None):
         sys.exit("The target is the Steam game folder itself - the game is built next to it")
     if not steam_exe_original(a.steam):
         sys.exit(MODIFIED_STEAM.format(path=a.steam))
+    modified = modified_steam_files(a.steam)
+    if modified:
+        sys.exit(MODIFIED_FILES.format(path=a.steam, files=", ".join(modified)))
     foreign = foreign_root_entries(a.steam)
     if foreign:
         print(f"Steam folder: not the game's, not used: {', '.join(foreign)}")
@@ -276,7 +358,8 @@ def build(steam, target, locofix=None, captured=None, progress=None):
         else:
             copied[0] += patch_text.write_if_changed(
                 os.path.join(a.target, name),
-                patch_text.changed_file(os.path.join(game, rel), os.path.join(a.steam, name)))
+                patch_text.changed_file(os.path.join(game, rel), os.path.join(a.steam, name),
+                                        steam_original(a.steam, os.path.join(a.steam, name))))
 
     done(0.62)
     depots = {code: depot for depot, code in languages.DEPOT_LANGUAGES.items()}
@@ -285,7 +368,8 @@ def build(steam, target, locofix=None, captured=None, progress=None):
             print(f"lang/{code}: skipped - not downloaded yet (Steam console: "
                   f"download_depot {languages.STEAM_APP_ID} {depots.get(languages.pack_base(code), '?')})")
             continue
-        written = languages.install(code, a.steam, a.target, lambda src, dst: copy(src, dst, copied))
+        written = languages.install(code, a.steam, a.target, lambda src, dst: copy(src, dst, copied),
+                                    lambda path: steam_original(a.steam, path))
         copied[0] += written
 
     done(0.75)

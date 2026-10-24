@@ -87,7 +87,13 @@ can be run after every change in the repo.
 The Steam copy has to be the original. `build.py` (and so Setup) stops when `Steam.exe` is not
 the exe of 2003-10-07 that LocoFix is made for (its SHA-256 in `build.py`; the same exe for every
 language) and asks to restore it in Steam (Properties > Installed Files > Verify integrity of
-game files; Setup says it in its own languages). Of the Steam folder's root only the game's own
+game files; Setup says it in its own languages). So it does, before anything is built, when a
+file our patches change differs from the original (the targets of `game/**/*.patch` and of the
+script patches of `lang/<code>/`, by their SHA-256 in `build.py`, the same in every language):
+an old way to turn on the developer keys was to edit `maps\script\constants.lgc` in the Steam
+folder, and the patch then stopped Setup with a Python error. A `#define KEYS_ENABLE` line added
+there is left out by itself when the file without it is the original exactly - the launcher's
+Cheats option does that job now. Of the Steam folder's root only the game's own
 files and folders are used (`Steam.exe`, `objects.res`, `strings.ini`, `steam.cfg`, `cursores`,
 `fonts`, `maps`, `music`, `vid`, `video`, `wav`): anything a player added there - another
 DirectDraw wrapper (dgVoodoo2, DDrawCompat, cnc-ddraw), DxWnd, their settings - is ignored and

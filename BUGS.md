@@ -246,6 +246,16 @@ Harmless log errors:
   folders (DEVELOPERS.md "Quick start"); checked with a copy of the Steam folder with a wrapper's
   files added (ignored, the game runs) and with a changed `Steam.exe` (stopped, Polish and German
   texts of Setup).
+- A player's Setup of 0.1.1 stopped with "ValueError: ...constants.lgc.patch: line 37 differs from
+  the original the patch was made for": `maps\script\constants.lgc` of the Steam folder had a
+  line added after line 36 - most likely `#define KEYS_ENABLE 1`, the old way to turn on the
+  developer keys. `build.py` and Setup now compare every Steam file our patches change with the
+  original (SHA-256) before building and stop with a request to verify the game files (Setup's
+  languages, naming the files); the `#define KEYS_ENABLE` lines alone are left out instead, when
+  that gives the original exactly. Checked on a copy of the Steam folder: the define added after
+  line 36 - built, the scripts the same as from the clean copy; another change of
+  `constants.lgc` and a line added to `maps\menu.lgc` - stopped (`build.py`, and Setup's
+  `--silent` with the Polish text, nothing installed).
 - Reported by a player of the original game on Windows 10: Alt+Tab spoils the game, and the
   train icons of the factory panel do not show. Neither happens in OpenLocoland (checked with
   `test_game.ps1`'s Alt+Tab step, `A`): in a window (1024x768, 1920x1080) and in full screen at
