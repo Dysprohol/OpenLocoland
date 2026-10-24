@@ -2312,8 +2312,8 @@ mode above) are not tested in full screen.
   in a 16:9 window), so the points are scaled and moved the same way. The logs it watches
   are the game's own and `LocoFix.log`, where test mode also lists every file the game
   opens. The game only runs while its window is in front, so the test keeps bringing
-  it forward while waiting. Full screen is not tested automatically - switching the mode
-  breaks the redrawing of other windows. `-Map maps\l01\l01.map` starts straight into that
+  it forward while waiting. Full screen is not part of the automatic tests - switching the mode
+  breaks the redrawing of other windows; `-SetFull 1` runs a single test in it. `-Map maps\l01\l01.map` starts straight into that
   map (LocoFix `--test-map`: no intro, no menu) and `-LogWait` sets how long `-WaitFor` may
   take (60 s). `-Editor` starts the game in editor mode (`--editor`); there the steps
   `S<file>` and `L<file>` save and load a map without the file dialog (sent as
@@ -2329,7 +2329,9 @@ mode above) are not tested in full screen.
   New would with the dialog's ground line (test mode), `Z<w>:<h>` resizes the map as File > Map size (test mode), `^<code>` / `+<code>` press a key with
   Ctrl / Shift (`^90` = Ctrl+Z), `K<code>` / `U<code>` only press / only let go a key (`K16`
   before a drag holds Shift), `C<code>` sends a character (`WM_CHAR`, which the scripts'
-  `GetKey()` reads - a posted key gives the lower case letter: `C77` is the developer key M),
+  `GetKey()` reads - a posted key gives the lower case letter: `C77` is the developer key M), `A<seconds>`
+  presses Alt+Tab (real keys) and after that many seconds Alt+Tab again, with a screenshot of the
+  game window while it is away (`<Shot>_<n>_away.png`),
   `l<x>:<y>-<x>:<y>` drags with the left button, and `x<seconds>` follows the game when it
   starts again (`StartEditorMode`, Play the map, Back to the menu) - the test goes on with the
   new process of the same exe; when a step ends with the old game gone the test looks for a

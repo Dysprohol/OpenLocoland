@@ -228,3 +228,14 @@ Harmless log errors:
   1024x768, whole objects missing above 2048x1024 (`view_culling.cpp`).
 - No frame limit: 180-600 fps and a whole CPU core busy (`frame_limit.cpp`).
 - Dated logs left behind after every crash pile up (LocoFix keeps the 3 newest).
+- Reported by a player of the original game on Windows 10: Alt+Tab spoils the game, and the
+  train icons of the factory panel do not show. Neither happens in OpenLocoland (checked with
+  `test_game.ps1`'s Alt+Tab step, `A`): in a window (1024x768, 1920x1080) and in full screen at
+  the desktop's resolution (2560x1440) and below it (1024x768 and 1920x1080, where the window is
+  minimised while away and the engine restores its lost surfaces - "Restore surface" in the
+  log - when it is back), the game pauses while away and comes back drawing the map, the bar
+  and the factory panel; the panel shows both rows of icons (all 14 units of the sandbox
+  factory) at 800x600, 1024x768, 1920x1080 and in full screen, before and after Alt+Tab. The
+  original was not run
+  (full screen without dgVoodoo2 switches the display mode); the likely cause there is the
+  system DirectDraw, which OpenLocoland replaces with dgVoodoo2 (first entry of this list).

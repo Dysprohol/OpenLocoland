@@ -34,6 +34,8 @@
 #           N<name>:<line>[:<w>:<h>] makes a new map (editor test mode: File > New, line = the dialog's ground);
 #           K<code> / U<code> only press / only let go a key (K16,l...,U16 drags with Shift held);
 #           C<code> the character with that code (WM_CHAR: C77 = 'M', a developer key);
+#           A<seconds> Alt+Tab away from the game (real keys), a screenshot of its window
+#           (<Shot>_<n>_away.png), and Alt+Tab back after that many seconds;
 #           ^<code> a key with Ctrl (^90 = Ctrl+Z), +<code> with Shift, l<x>:<y>-<x>:<y> a drag with the left
 #           button (moving an object in the editor), x<seconds> follows the game when it starts
 #           again (LocoFix restart.cpp: StartEditorMode, File > Play the map / Back to the
@@ -70,6 +72,9 @@ public class W {
   [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr h, int id);
   [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr h);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
+  [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, IntPtr extra);
   [DllImport("kernel32.dll")] public static extern IntPtr OpenProcess(int a, bool i, int pid);
   [DllImport("kernel32.dll")] public static extern bool ReadProcessMemory(IntPtr h, IntPtr addr, byte[] buf, int n, out int r);
   public static int Rd(int pid, long addr) { IntPtr h = OpenProcess(0x10, false, pid); byte[] b = new byte[4]; int r; ReadProcessMemory(h, new IntPtr(addr), b, 4, out r); return BitConverter.ToInt32(b, 0); }
@@ -351,6 +356,20 @@ if ($Steps) {
       # one (the Shift of a posted key is not in the keyboard state) - C77 is the developer key M
       [void][W]::PostMessage($game, 0x0102, [IntPtr][int]$Matches[1], [IntPtr]1)
       "Character $($Matches[1])"
+    } elseif ($vk -cmatch '^A(\d+)$') {
+      # Alt+Tab away from the game (real keys, as a player would press them), a screenshot of
+      # the game window while another one is in front, and after that many seconds Alt+Tab back
+      $alttab = { [W]::keybd_event(0x12, 0, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds 100; [W]::keybd_event(0x09, 0, 0, [IntPtr]::Zero)
+        Start-Sleep -Milliseconds 50; [W]::keybd_event(0x09, 0, 2, [IntPtr]::Zero); Start-Sleep -Milliseconds 300; [W]::keybd_event(0x12, 0, 2, [IntPtr]::Zero) }
+      & $alttab; Start-Sleep -Seconds 2
+      "Alt+Tab away: game in front = $([W]::GetForegroundWindow() -eq $game), minimised = $([W]::IsIconic($game))"
+      if ($Shot) {
+        $r = New-Object W+RECT; [void][W]::GetWindowRect($game, [ref]$r); $file = $Shot -replace '\.png$', "_${n}_away.png"
+        if ($r.R -gt $r.L) { $bmp = New-Object Drawing.Bitmap ($r.R - $r.L), ($r.B - $r.T); $g = [Drawing.Graphics]::FromImage($bmp)
+          $hdc = $g.GetHdc(); [void][W]::PrintWindow($game, $hdc, 2); $g.ReleaseHdc($hdc); $bmp.Save($file); $g.Dispose(); $bmp.Dispose(); "Screenshot: $file" }
+      }
+      Start-Sleep -Seconds ([Math]::Max(0, [int]$Matches[1] - 2)); & $alttab; Start-Sleep -Seconds 1
+      "Alt+Tab back: game in front = $([W]::GetForegroundWindow() -eq $game), minimised = $([W]::IsIconic($game))"
     } elseif ($vk -cmatch '^c(\d+)$') {
       [void][W]::PostMessage($game, 0x0111, [IntPtr][int]$Matches[1], [IntPtr]::Zero)
       "Command $($Matches[1])"
