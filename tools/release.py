@@ -55,7 +55,7 @@ def version():
 def collect(dll, ver):
     if os.path.isdir(PAYLOAD):
         shutil.rmtree(PAYLOAD)
-    for folder in ("game", "lang"):
+    for folder in ("game", "lang", "tools"):
         shutil.copytree(os.path.join(REPO, folder), os.path.join(PAYLOAD, folder))
     os.makedirs(os.path.join(PAYLOAD, "external", "dgVoodoo2"))
     for f in DGVOODOO:
@@ -64,12 +64,12 @@ def collect(dll, ver):
     open(os.path.join(PAYLOAD, "version.txt"), "w", encoding="utf-8").write(ver + "\n")
 
     # only files git knows (no local test output) and no game file
-    tracked = {os.path.normcase(os.path.normpath(p)) for p in git("ls-files", "game", "lang").splitlines()}
+    tracked = {os.path.normcase(os.path.normpath(p)) for p in git("ls-files", "game", "lang", "tools").splitlines()}
     for directory, _, files in os.walk(PAYLOAD):
         for f in files:
             rel = safe_relpath(os.path.join(directory, f), PAYLOAD)
             top = rel.split(os.sep)[0].lower()
-            if top in ("game", "lang") and os.path.normcase(rel) not in tracked:
+            if top in ("game", "lang", "tools") and os.path.normcase(rel) not in tracked:
                 os.remove(os.path.join(directory, f))
                 print(f"left out (not in git): {rel}")
             elif os.path.splitext(f)[1].lower() in GAME_KINDS:

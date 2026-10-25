@@ -560,7 +560,10 @@ def logo_file(steam):
         if code not in ("en", "pt"):   # Steam's Portuguese is the English game
             return path
     # Fallback: our custom OpenLocoland logo (for installer header when no Steam logo found)
-    custom_logo = os.path.join(os.path.dirname(__file__), "icon", "openlocoland_logo.png")
+    if BUNDLE:
+        custom_logo = os.path.join(BUNDLE, "tools", "icon", "openlocoland_logo.png")
+    else:
+        custom_logo = os.path.join(os.path.dirname(__file__), "icon", "openlocoland_logo.png")
     if os.path.isfile(custom_logo):
         return custom_logo
     return found[0][1] if found else None
@@ -680,6 +683,28 @@ def remove_shortcuts(manifest):
             os.rmdir(folder)
 
 
+def remove_old_shortcuts():
+    """Remove old Locoland shortcuts from Desktop and Start Menu (from pre-v0.1.8 installs)."""
+    old_names = ["Locoland.lnk", "Locoland - map editor.lnk", "Locoland - edytor map.lnk",
+                 "Locoland - Karteneditor.lnk", "Locoland - pályaszerkesztő.lnk",
+                 "Locoland - editor de mapas.lnk", "Locoland - редактор карт.lnk",
+                 "Locoland - editor map.lnk"]
+    for base in (special_folder(0x10), os.path.join(special_folder(0x02), APP)):
+        if os.path.isdir(base):
+            for name in old_names:
+                path = os.path.join(base, name)
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+            # Clean up empty OpenLocoland folder in Start Menu
+            if os.path.basename(base) == APP and os.path.isdir(base) and not os.listdir(base):
+                try:
+                    os.rmdir(base)
+                except OSError:
+                    pass
+
+
 def install(steam, target, choices, ver, progress=None):
     """Assembles the game into `target`, writes the options (and the game's language when one is
     given), the shortcuts and the record of the install. `choices`: cheats, unlock, desktop,
@@ -695,7 +720,17 @@ def install(steam, target, choices, ver, progress=None):
     if modified:
         sys.exit(TEXTS[choices["lang"]]["modified_files"].format(path=steam, files=", ".join(modified)))
     if game_running(target):
-        sys.exit("Locoland is running from the install folder - close it first")
+        sys.exit("OpenLocoland is running from the install folder - close it first")
+    # Remove old Locoland.exe if present (pre-v0.1.8)
+    old_exe = os.path.join(target, "Locoland.exe")
+    if os.path.isfile(old_exe):
+        try:
+            os.remove(old_exe)
+            print("Removed old Locoland.exe")
+        except OSError:
+            pass
+    # Remove old shortcuts from previous versions
+    remove_old_shortcuts()
     locofix = os.path.join(BUNDLE, "LocoFix.dll") if BUNDLE else None
     os.makedirs(CAPTURED, exist_ok=True)
     print(f"OpenLocoland {ver}: {steam} -> {target}")
