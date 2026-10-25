@@ -106,7 +106,7 @@ TEXTS = {
         "modified_files": "Your Locoland files in Steam are modified ({files}):\n{path}\n\nRestore them in Steam: right-click Locoland > Properties > Installed Files > Verify integrity of game files. Then run Setup again. OpenLocoland has its own option for the developer keys: Cheats, below.",
         "not_empty": "The folder is not empty and has no OpenLocoland install:\n{path}\n\n"
                      "Install there anyway? Its other files are left alone.",
-        "running": "Locoland is running from this folder. Close the game first.",
+        "running": "OpenLocoland is running from this folder. Close the game first.",
         "working": "Installing...",
         "done": "Done. OpenLocoland {version} is in {path}",
         "failed": "Installation failed: {error}",
@@ -115,8 +115,8 @@ TEXTS = {
                          "language files kept in {captured}.\nYour profiles, progress and settings in the "
                          "registry stay (the Steam game uses them too).",
         "uninstalled": "OpenLocoland was removed from {path}",
-        "game_name": "Locoland",
-        "editor_name": "Locoland - map editor",
+        "game_name": "OpenLocoland",
+        "editor_name": "OpenLocoland - Map Editor",
         "editor_desc": "The map editor of OpenLocoland",
     },
     "de": {
@@ -155,7 +155,7 @@ TEXTS = {
         "modified_files": "Deine Locoland-Dateien in Steam sind verändert ({files}):\n{path}\n\nStelle sie in Steam wieder her: Rechtsklick auf Locoland > Eigenschaften > Installierte Dateien > Dateien auf Fehler überprüfen. Dann Setup erneut starten. OpenLocoland hat für die Entwicklertasten eine eigene Option: Cheats, unten.",
         "not_empty": "Der Ordner ist nicht leer und enthält keine OpenLocoland-Installation:\n{path}\n\n"
                      "Trotzdem dort installieren? Seine anderen Dateien bleiben unberührt.",
-        "running": "Locoland läuft aus diesem Ordner. Beende zuerst das Spiel.",
+        "running": "OpenLocoland läuft aus diesem Ordner. Beende zuerst das Spiel.",
         "working": "Installation läuft...",
         "done": "Fertig. OpenLocoland {version} ist in {path}",
         "failed": "Die Installation ist fehlgeschlagen: {error}",
@@ -203,7 +203,7 @@ TEXTS = {
         "modified_files": "A Locoland Steames fájljai módosítva vannak ({files}):\n{path}\n\nÁllítsd vissza őket a Steamben: jobb klikk a Locolandon > Tulajdonságok > Telepített fájlok > Játékfájlok sértetlenségének ellenőrzése. Utána futtasd újra a Setupot. Az OpenLocolandnak saját beállítása van a fejlesztői billentyűkhöz: Csalások, lent.",
         "not_empty": "A mappa nem üres, és nincs benne OpenLocoland:\n{path}\n\n"
                      "Mégis ide telepítsem? A többi fájlja érintetlen marad.",
-        "running": "A Locoland ebből a mappából fut. Előbb zárd be a játékot.",
+        "running": "Az OpenLocoland ebből a mappából fut. Előbb zárd be a játékot.",
         "working": "Telepítés...",
         "done": "Kész. Az OpenLocoland {version} itt van: {path}",
         "failed": "A telepítés nem sikerült: {error}",
@@ -212,8 +212,8 @@ TEXTS = {
                          "{captured} mappában tárolt nyelvi fájlokkal együtt.\nA profilok, az előrehaladás és a "
                          "beállítások a rendszerleíró adatbázisban maradnak (a Steames játék is használja őket).",
         "uninstalled": "Az OpenLocoland eltávolítva innen: {path}",
-        "game_name": "Locoland",
-        "editor_name": "Locoland - pályaszerkesztő",
+        "game_name": "OpenLocoland",
+        "editor_name": "OpenLocoland - Pályaszerkesztő",
         "editor_desc": "Az OpenLocoland pályaszerkesztője",
     },
     "pl": {
@@ -251,7 +251,7 @@ TEXTS = {
         "modified_files": "Twoje pliki Locoland w Steamie są zmienione ({files}):\n{path}\n\nPrzywróć je w Steamie: prawy klik na Locoland > Właściwości > Zainstalowane pliki > Sprawdź spójność plików gry. Potem uruchom Setup jeszcze raz. OpenLocoland ma własną opcję klawiszy twórców: Kody, poniżej.",
         "not_empty": "Folder nie jest pusty i nie ma w nim OpenLocoland:\n{path}\n\n"
                      "Zainstalować mimo to? Pozostałe pliki zostaną nietknięte.",
-        "running": "Locoland jest uruchomiony z tego folderu. Najpierw zamknij grę.",
+        "running": "OpenLocoland jest uruchomiony z tego folderu. Najpierw zamknij grę.",
         "working": "Instalowanie...",
         "done": "Gotowe. OpenLocoland {version} jest w {path}",
         "failed": "Instalacja nie powiodła się: {error}",
@@ -260,9 +260,9 @@ TEXTS = {
                          "w {captured}.\nProfile, postępy i ustawienia w rejestrze zostają (używa ich też gra "
                          "ze Steama).",
         "uninstalled": "Usunięto OpenLocoland z {path}",
-        "game_name": "Locoland",
-        "editor_name": "Locoland - edytor map",
-        "editor_desc": "Edytor map OpenLocoland",
+        "game_name": "OpenLocoland",
+        "editor_name": "OpenLocoland - Edytor Map",
+        "editor_desc": "Edytor Map OpenLocoland",
     },
     "pt": {
         "name": "Português",
@@ -299,7 +299,7 @@ TEXTS = {
         "modified_files": "Os seus ficheiros do Locoland no Steam foram alterados ({files}):\n{path}\n\nReponha-os no Steam: clique com o botão direito em Locoland > Propriedades > Ficheiros instalados > Verificar a integridade dos ficheiros do jogo. Depois execute o Setup outra vez. O OpenLocoland tem uma opção própria para as teclas de programador: Batotas, abaixo.",
         "not_empty": "A pasta não está vazia e não tem uma instalação do OpenLocoland:\n{path}\n\n"
                      "Instalar mesmo assim? Os outros ficheiros ficam intactos.",
-        "running": "O Locoland está a correr a partir desta pasta. Fecha primeiro o jogo.",
+        "running": "O OpenLocoland está a correr a partir desta pasta. Fecha primeiro o jogo.",
         "working": "A instalar...",
         "done": "Concluído. O OpenLocoland {version} está em {path}",
         "failed": "A instalação falhou: {error}",
@@ -308,9 +308,9 @@ TEXTS = {
                          "guardados em {captured}.\nOs perfis, o progresso e as definições no registo ficam (o "
                          "jogo do Steam também os usa).",
         "uninstalled": "O OpenLocoland foi removido de {path}",
-        "game_name": "Locoland",
-        "editor_name": "Locoland - editor de mapas",
-        "editor_desc": "O editor de mapas do OpenLocoland",
+        "game_name": "OpenLocoland",
+        "editor_name": "OpenLocoland - Editor de Mapas",
+        "editor_desc": "O Editor de Mapas do OpenLocoland",
     },
     "ru": {
         "name": "Русский",
@@ -347,7 +347,7 @@ TEXTS = {
         "modified_files": "Ваши файлы Locoland в Steam изменены ({files}):\n{path}\n\nВосстановите их в Steam: правый щелчок по Locoland > Свойства > Установленные файлы > Проверить целостность файлов игры. Затем снова запустите Setup. У OpenLocoland есть своя настройка для клавиш разработчиков: Читы, ниже.",
         "not_empty": "Папка не пуста, и в ней нет OpenLocoland:\n{path}\n\n"
                      "Всё равно установить туда? Остальные файлы останутся нетронутыми.",
-        "running": "Locoland запущена из этой папки. Сначала закройте игру.",
+        "running": "OpenLocoland запущена из этой папки. Сначала закройте игру.",
         "working": "Установка...",
         "done": "Готово. OpenLocoland {version} находится в {path}",
         "failed": "Установка не удалась: {error}",
@@ -356,9 +356,9 @@ TEXTS = {
                          "в {captured}.\nПрофили, прогресс и настройки в реестре останутся (их использует и игра "
                          "из Steam).",
         "uninstalled": "OpenLocoland удалена из {path}",
-        "game_name": "Locoland",
-        "editor_name": "Locoland - редактор карт",
-        "editor_desc": "Редактор карт OpenLocoland",
+        "game_name": "OpenLocoland",
+        "editor_name": "OpenLocoland - Редактор Карт",
+        "editor_desc": "Редактор Карт OpenLocoland",
     },
     "cs": {
         "name": "Čeština",
@@ -395,7 +395,7 @@ TEXTS = {
         "modified_files": "Vaše soubory Locoland ve Steamu jsou změněné ({files}):\n{path}\n\nObnovte je ve Steamu: pravým tlačítkem na Locoland > Vlastnosti > Nainstalované soubory > Ověřit integritu herních souborů. Pak spusťte Setup znovu. OpenLocoland má pro klávesy vývojářů vlastní volbu: Cheaty, níže.",
         "not_empty": "Složka není prázdná a není v ní OpenLocoland:\n{path}\n\n"
                      "Přesto do ní instalovat? Ostatní soubory zůstanou nedotčené.",
-        "running": "Locoland běží z této složky. Nejdřív hru ukonči.",
+        "running": "OpenLocoland běží z této složky. Nejdřív hru ukonči.",
         "working": "Instalace...",
         "done": "Hotovo. OpenLocoland {version} je v {path}",
         "failed": "Instalace se nezdařila: {error}",
@@ -403,9 +403,9 @@ TEXTS = {
                          "z editoru a tabulkami výsledků), spolu se zástupci a jazykovými soubory v {captured}.\n"
                          "Profily, postup a nastavení v registru zůstanou (používá je i hra ze Steamu).",
         "uninstalled": "OpenLocoland byl odebrán ze složky {path}",
-        "game_name": "Locoland",
-        "editor_name": "Locoland - editor map",
-        "editor_desc": "Editor map OpenLocoland",
+        "game_name": "OpenLocoland",
+        "editor_name": "OpenLocoland - Editor Map",
+        "editor_desc": "Editor Map OpenLocoland",
     },
 }
 UI_LANGUAGES = [("en", TEXTS["en"]["name"])] + sorted(((c, t["name"]) for c, t in TEXTS.items() if c != "en"),
@@ -463,8 +463,10 @@ def libraries(steam):
 
 
 def is_game(folder):
-    """True if folder contains Steam.exe (original) or Locoland.exe (patched)."""
-    return bool(folder) and (os.path.isfile(os.path.join(folder, "Steam.exe")) or os.path.isfile(os.path.join(folder, "Locoland.exe")))
+    """True if folder contains Steam.exe (original), Locoland.exe (patched) or OpenLocoland.exe (our build)."""
+    return bool(folder) and (os.path.isfile(os.path.join(folder, "Steam.exe"))
+                             or os.path.isfile(os.path.join(folder, "Locoland.exe"))
+                             or os.path.isfile(os.path.join(folder, "OpenLocoland.exe")))
 
 
 def true_case(path):
@@ -547,7 +549,8 @@ def depot_lines(codes):
 
 def logo_file(steam):
     """The game's logo (vid\\logo.bmp): the Steam copy's, unless it is the English one, which says
-    "Steamland" - then that of another captured or downloaded language, if there is one."""
+    "Steamland" - then that of another captured or downloaded language, if there is one.
+    Falls back to our custom OpenLocoland logo."""
     found = [(languages.steam_language(steam), os.path.join(steam, "vid", "logo.bmp"))]
     if os.path.isdir(CAPTURED):
         found += [(c, os.path.join(CAPTURED, c, "vid", "logo.bmp")) for c in sorted(os.listdir(CAPTURED))]
@@ -556,21 +559,29 @@ def logo_file(steam):
     for code, path in found:
         if code not in ("en", "pt"):   # Steam's Portuguese is the English game
             return path
+    # Fallback: our custom OpenLocoland logo (for installer header when no Steam logo found)
+    custom_logo = os.path.join(os.path.dirname(__file__), "icon", "openlocoland_logo.png")
+    if os.path.isfile(custom_logo):
+        return custom_logo
     return found[0][1] if found else None
 
 
 def logo_image(steam, height=56):
-    """The logo cropped to its letters (the picture is 640x480 with the word on black), or None."""
+    """The logo cropped to its letters (the picture is 640x480 with the word on black), or None.
+    For our custom OpenLocoland logo, use it as-is (no cropping)."""
     path = logo_file(steam) if is_game(steam) else None
     if not path:
         return None
     try:
         from PIL import Image, ImageTk
         picture = Image.open(path).convert("RGB")
-        box = picture.convert("L").point(lambda v: 255 if v > 40 else 0).getbbox()
-        if not box:
-            return None
-        picture = picture.crop((box[0] - 6, box[1] - 6, box[2] + 6, box[3] + 6))
+        # Check if it's our custom logo (PNG in tools/icon)
+        is_custom = path.lower().endswith("openlocoland_logo.png")
+        if not is_custom:
+            box = picture.convert("L").point(lambda v: 255 if v > 40 else 0).getbbox()
+            if not box:
+                return None
+            picture = picture.crop((box[0] - 6, box[1] - 6, box[2] + 6, box[3] + 6))
         width = picture.width * height // picture.height
         return ImageTk.PhotoImage(picture.resize((width, height), Image.LANCZOS))
     except Exception:   # an unreadable picture only costs the header its logo
@@ -647,13 +658,13 @@ def read_manifest(target):
 
 
 def game_running(target):
-    """Whether a Locoland.exe of this folder runs (tasklist does not give paths: PowerShell does)."""
-    exe = os.path.join(target, "Locoland.exe")
+    """Whether OpenLocoland.exe of this folder runs (tasklist does not give paths: PowerShell does)."""
+    exe = os.path.join(target, "OpenLocoland.exe")
     if not os.path.isfile(exe):
         return False
     result = subprocess.run(
         ["powershell", "-NoProfile", "-NonInteractive", "-Command",
-         "Get-Process Locoland -ErrorAction SilentlyContinue | ForEach-Object { $_.Path }"],
+         "Get-Process OpenLocoland -ErrorAction SilentlyContinue | ForEach-Object { $_.Path }"],
         capture_output=True, text=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     return any(os.path.normcase(line.strip()) == os.path.normcase(exe) for line in result.stdout.splitlines())
 
@@ -703,7 +714,7 @@ def install(steam, target, choices, ver, progress=None):
 
 def make_shortcuts(target, choices, ver):
     texts = TEXTS[choices["lang"]]
-    exe = os.path.join(target, "Locoland.exe")
+    exe = os.path.join(target, "OpenLocoland.exe")
     folders = []
     if choices["desktop"]:
         folders.append(special_folder(0x10))   # CSIDL_DESKTOPDIRECTORY
@@ -711,9 +722,9 @@ def make_shortcuts(target, choices, ver):
         folders.append(os.path.join(special_folder(0x02), APP))   # CSIDL_PROGRAMS
     made = []
     for folder in folders:
-        game = os.path.join(folder, texts["game_name"] + ".lnk")
-        make_shortcut(game, exe, "", target, exe, APP + " " + ver)
-        editor = os.path.join(folder, texts["editor_name"] + ".lnk")
+        game = os.path.join(folder, "OpenLocoland.lnk")
+        make_shortcut(game, exe, "", target, exe, "OpenLocoland " + ver)
+        editor = os.path.join(folder, "OpenLocoland - Map Editor.lnk")
         make_shortcut(editor, os.path.join(target, "edit_map.cmd"), EDITOR_MAP, target, exe, texts["editor_desc"],
                       minimized=True)
         made += [game, editor]
@@ -915,7 +926,7 @@ class Installer:
         w["button_install"].configure(text=self.t("update" if installed else "install"),
                                       state="disabled" if self.busy else "normal")
         w["button_uninstall"].configure(state="normal" if installed and not self.busy else "disabled")
-        w["button_run"].configure(state="normal" if target and os.path.isfile(os.path.join(target, "Locoland.exe"))
+        w["button_run"].configure(state="normal" if target and os.path.isfile(os.path.join(target, "OpenLocoland.exe"))
                                   and installed and not self.busy else "disabled")
 
     def browse_steam(self):
@@ -1028,7 +1039,7 @@ class Installer:
 
     def run_game(self):
         target = self.target.get().strip()
-        subprocess.Popen([os.path.join(target, "Locoland.exe")], cwd=target)
+        subprocess.Popen([os.path.join(target, "OpenLocoland.exe")], cwd=target)
 
     def poll(self):
         try:

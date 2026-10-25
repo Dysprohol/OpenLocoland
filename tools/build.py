@@ -115,13 +115,17 @@ MODIFIED_STEAM = ("Steam.exe in {path} is not the original file of the game (it 
                   "of game files, then build again.")
 DGVOODOO = ["DDraw.dll", "D3DImm.dll"]  # the game only uses DirectDraw/Direct3D 7
 # files from earlier versions of this folder that are no longer needed
-OBSOLETE = ["Steam.exe", "steam.cfg", "steam_appid.txt", "D3D8.dll", "D3D9.dll", "dgVoodooCpl.exe"]
+OBSOLETE = ["Steam.exe", "steam.cfg", "steam_appid.txt", "D3D8.dll", "D3D9.dll", "dgVoodooCpl.exe",
+            "Locoland.exe"]   # old output name
 OBJECTS_OVERRIDE = "objects.override"   # in game/: changed values of objects.res (res_tool.py)
 MAPS_OVERRIDE = "maps.override"         # in game/: changed objects of maps (map_tool.py)
 MAPS_NEW = "maps.new"                   # in game/: whole new maps (map_tool.py new)
 EDITOR_DATA = "editor"                  # in game/: the editor's palette (patch_data.make_editor_palette)
 MAP_MODEL = {"map.json", "objects.tsv", "groups.txt", "grid.txt", "vids.tsv",
              "vid_animations.tsv"}      # an unpacked .map, packed as <name>.map
+
+# Output exe name
+OUTPUT_EXE = "OpenLocoland.exe"
 
 
 def player_data(rel_path):
@@ -409,14 +413,11 @@ def build(steam, target, locofix=None, captured=None, progress=None):
 
     copy(locofix or build_locofix.build(), os.path.join(a.target, "LocoFix.dll"), copied)
     steam_exe = os.path.join(a.steam, "Steam.exe")
-    locoland_exe = os.path.join(a.steam, "Locoland.exe")
-    target_exe = os.path.join(a.target, "Locoland.exe")
+    target_exe = os.path.join(a.target, OUTPUT_EXE)
     if os.path.isfile(steam_exe):
         patch_exe.build(steam_exe, target_exe)
-    elif os.path.isfile(locoland_exe):
-        copy(locoland_exe, target_exe)
     else:
-        sys.exit(f"No game executable found in {a.steam}")
+        sys.exit(f"No Steam.exe found in {a.steam}")
     done(0.8)
     # only now, when the target folder has all game and repo files: the patch checks
     # which sounds are really missing in the assembled game
@@ -476,7 +477,7 @@ def build(steam, target, locofix=None, captured=None, progress=None):
             removed += 1
     # a foreign file of the Steam folder that an older build copied into the target (the same
     # size), unless the build writes a file of that name itself
-    ours = {f.lower() for f in DGVOODOO + ["LocoFix.dll", "Locoland.exe"] + os.listdir(game)}
+    ours = {f.lower() for f in DGVOODOO + ["LocoFix.dll", OUTPUT_EXE] + os.listdir(game)}
     for f in foreign:
         path = os.path.join(a.target, f)
         if (f.lower() not in ours and os.path.isfile(path) and os.path.isfile(os.path.join(a.steam, f))

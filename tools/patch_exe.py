@@ -130,5 +130,5 @@ def build(original, output):
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        sys.exit("usage: patch_exe.py <Steam.exe> <Locoland.exe>")
+        sys.exit("usage: patch_exe.py <Steam.exe> <OpenLocoland.exe>")
     build(sys.argv[1], sys.argv[2])
