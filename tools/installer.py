@@ -463,8 +463,8 @@ def libraries(steam):
 
 
 def is_game(folder):
-    """True if folder contains Locoland.exe (the game executable)."""
-    return bool(folder) and os.path.isfile(os.path.join(folder, "Locoland.exe"))
+    """True if folder contains Steam.exe (original) or Locoland.exe (patched)."""
+    return bool(folder) and (os.path.isfile(os.path.join(folder, "Steam.exe")) or os.path.isfile(os.path.join(folder, "Locoland.exe")))
 
 
 def true_case(path):
@@ -963,8 +963,15 @@ class Installer:
         if not target or inside(target, steam):
             self.error(self.t("inside_steam"))
             return
-        if not build.steam_exe_original(steam):
+        steam_exe = os.path.join(steam, "Steam.exe")
+        locoland_exe = os.path.join(steam, "Locoland.exe")
+        has_steam = os.path.isfile(steam_exe)
+        has_locoland = os.path.isfile(locoland_exe)
+        if has_steam and not build.steam_exe_original(steam):
             self.error(self.t("modified_steam", path=steam))
+            return
+        if has_locoland and has_steam:
+            self.error(self.t("modified_steam", path=steam) + " (both Steam.exe and Locoland.exe present)")
             return
         modified = build.modified_steam_files(steam)
         if modified:

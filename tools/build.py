@@ -302,12 +302,16 @@ def build(steam, target, locofix=None, captured=None, progress=None):
     a = argparse.Namespace(steam=steam, target=target)
     if captured:
         languages.CAPTURED = captured
-    if not os.path.isfile(os.path.join(a.steam, "Steam.exe")):
+    if not os.path.isfile(os.path.join(a.steam, "Steam.exe")) and not os.path.isfile(os.path.join(a.steam, "Locoland.exe")):
         sys.exit(f"No game in {a.steam}")
     if os.path.normcase(os.path.abspath(a.target)) == os.path.normcase(os.path.abspath(a.steam)):
         sys.exit("The target is the Steam game folder itself - the game is built next to it")
-    if not steam_exe_original(a.steam):
+    has_steam = os.path.isfile(os.path.join(a.steam, "Steam.exe"))
+    has_locoland = os.path.isfile(os.path.join(a.steam, "Locoland.exe"))
+    if has_steam and not steam_exe_original(a.steam):
         sys.exit(MODIFIED_STEAM.format(path=a.steam))
+    if has_locoland and has_steam:
+        sys.exit(MODIFIED_STEAM.format(path=a.steam) + " (both Steam.exe and Locoland.exe present)")
     modified = modified_steam_files(a.steam)
     if modified:
         sys.exit(MODIFIED_FILES.format(path=a.steam, files=", ".join(modified)))
@@ -392,7 +396,15 @@ def build(steam, target, locofix=None, captured=None, progress=None):
         copy(os.path.join(REPO, "external", "dgVoodoo2", f), os.path.join(a.target, f), copied)
 
     copy(locofix or build_locofix.build(), os.path.join(a.target, "LocoFix.dll"), copied)
-    patch_exe.build(os.path.join(a.steam, "Steam.exe"), os.path.join(a.target, "Locoland.exe"))
+    steam_exe = os.path.join(a.steam, "Steam.exe")
+    locoland_exe = os.path.join(a.steam, "Locoland.exe")
+    target_exe = os.path.join(a.target, "Locoland.exe")
+    if os.path.isfile(steam_exe):
+        patch_exe.build(steam_exe, target_exe)
+    elif os.path.isfile(locoland_exe):
+        copy(locoland_exe, target_exe)
+    else:
+        sys.exit(f"No game executable found in {a.steam}")
     done(0.8)
     # only now, when the target folder has all game and repo files: the patch checks
     # which sounds are really missing in the assembled game
