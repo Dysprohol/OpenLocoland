@@ -32,17 +32,9 @@ import sys
 
 REPO = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-
-def safe_relpath(path, start):
-    """os.path.relpath that works across drives on Windows.
-    If paths are on different drives, returns the absolute path (since no relative path exists)."""
-    try:
-        return os.path.relpath(path, start)
-    except ValueError:
-        # Different drives on Windows - return absolute path
-        return os.path.abspath(path)
 sys.path.insert(0, os.path.join(REPO, "tools"))
 import patch_text  # noqa: E402
+from safe_path import safe_relpath  # noqa: E402
 
 LANG = os.path.join(REPO, "lang")
 CAPTURED = os.path.join(REPO, "captured")
@@ -81,6 +73,30 @@ def packs():
 
 def captured(code):
     return os.path.isdir(os.path.join(CAPTURED, code))
+
+
+def local_languages(game_folder):
+    """Codes of languages found in a non-Steam game folder (looks for strings.ini with language info)."""
+    codes = set()
+    # Look for lang/<code>/strings.ini or similar structure
+    lang_dir = os.path.join(game_folder, "lang")
+    if os.path.isdir(lang_dir):
+        for d in os.listdir(lang_dir):
+            ini = os.path.join(lang_dir, d, "language.ini")
+            if os.path.isfile(ini):
+                codes.add(d)
+    # Also check root for strings.ini (single language install)
+    root_ini = os.path.join(game_folder, "strings.ini")
+    if os.path.isfile(root_ini):
+        try:
+            import configparser
+            cp = configparser.ConfigParser(interpolation=None)
+            cp.read(root_ini, encoding="utf-8", errors="replace")
+            # Try to guess language from content or use 'en' as default
+            codes.add("en")
+        except Exception:
+            pass
+    return codes
 
 
 def pack_base(code):
@@ -131,25 +147,33 @@ def downloaded_depots(game_folder):
     return found
 
 
-def available(game_folder):
+def available(game_folder, local=False):
     """Codes of the languages that can be captured or are captured: the one Steam installed,
-    the downloaded depots and the captures already made."""
+    the downloaded depots and the captures already made. If local=True, also look for
+    languages in the game folder itself (for CD/beta-demo versions)."""
     codes = {code for code, _ in downloaded_depots(game_folder)}
     if steam_language(game_folder):
         codes.add(steam_language(game_folder))
+    if local:
+        codes |= local_languages(game_folder)
     if os.path.isdir(CAPTURED):
         codes |= {d for d in os.listdir(CAPTURED) if captured(d)}
     return codes
 
 
-def capture_all(game_folder):
+def capture_all(game_folder, local=False):
     """Captures the installed language and every downloaded depot that is not captured yet.
+    If local=True, also captures languages found in the game folder itself.
     Returns {code: number of files}."""
     sources = []
     installed = steam_language(game_folder)
     if installed:
         sources.append((installed, game_folder))
     sources += downloaded_depots(game_folder)
+    if local:
+        for code in local_languages(game_folder):
+            if code not in [c for c, _ in sources]:
+                sources.append((code, game_folder))
     done = {}
     for code, folder in sources:
         if code not in done and not captured(code):

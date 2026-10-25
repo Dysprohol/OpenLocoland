@@ -2,7 +2,7 @@
 
 The fixes to how the game works are in C++ (src/LocoFix, loaded as LocoFix.dll). The exe
 only gets what cannot be done from the library: loading it, and the look of the launcher
-window (the dialog resource).
+window (the dialog resource and its picture).
 
 Every patch first checks that the expected bytes are in place, so running it on
 a different exe version ends with an error instead of a broken file.
@@ -14,6 +14,7 @@ the same file offset as their RVA, so file offset = VA - 0x400000. The exception
 The loader code goes into the zeros at the end of .text (from 0x474830). For the system
 to map it, the section's VirtualSize is raised to SizeOfRawData.
 """
+import os
 import struct
 import sys
 
@@ -21,6 +22,8 @@ BASE = 0x400000
 IAT_LOAD_LIBRARY_A = 0x475104
 NEW_CODE = 0x474830          # start of the free space at the end of .text
 START_DIALOG = 0x8ADB8       # file offset of the START_DIALOG template
+START_BITMAP = 0x8B430       # file offset of START_BITMAP (the launcher's picture, 256x256x24)
+LOGO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon", "openlocoland_logo.png")
 
 
 class Exe:
@@ -108,6 +111,45 @@ def patch_start_dialog(exe):
     d[cancel:cancel + 12] = "Anuluj".encode("utf-16-le")
 
 
+def patch_start_bitmap(exe):
+    """The launcher's picture: our OpenLocoland wordmark over the original START_BITMAP.
+
+    The bitmap (256x256, 24-bit) keeps its size, so only its pixels change in place. The
+    transparent PNG is cut to its letters and drawn at the top over a soft black gradient,
+    which keeps the red letters readable on the bright sky without a box around them.
+    """
+    from PIL import Image, ImageDraw, ImageFilter
+    d = exe.d
+    width, height, depth = 256, 256, 24
+    assert struct.unpack_from("<IiiHH", d, START_BITMAP) == (40, width, height, 1, depth)
+    assert os.path.isfile(LOGO), f"no logo: {LOGO}"
+    start = START_BITMAP + 40
+    row = width * 3
+    pixels = bytes(d[start:start + row * height])
+    picture = Image.frombytes("RGB", (width, height), b"".join(
+        pixels[y * row:(y + 1) * row] for y in reversed(range(height))))
+
+    logo = Image.open(LOGO).convert("RGBA")
+    logo = logo.crop(logo.getbbox())
+    logo = logo.resize((228, round(logo.height * 228 / logo.width)), Image.LANCZOS)
+
+    band = Image.new("RGBA", picture.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(band)
+    for y in range(56):   # fades out downwards
+        draw.line([(0, y), (width, y)], fill=(0, 0, 0, round(110 * (1 - y / 56) ** 1.5)))
+    picture = Image.alpha_composite(picture.convert("RGBA"), band)
+
+    x, y = (width - logo.width) // 2, 8
+    shadow = Image.new("RGBA", logo.size, (0, 0, 0, 0))
+    shadow.putalpha(logo.split()[3].filter(ImageFilter.GaussianBlur(3)).point(lambda v: round(v * 0.9)))
+    picture.alpha_composite(shadow, (x, y + 2))
+    picture.alpha_composite(logo, (x, y))
+
+    bgr = picture.convert("RGB").tobytes("raw", "BGR")
+    d[start:start + row * height] = b"".join(
+        bgr[y * row:(y + 1) * row] for y in reversed(range(height)))
+
+
 def grow_text_section(exe, code_end):
     d = exe.d
     pe = struct.unpack_from("<I", d, 0x3C)[0]
@@ -125,10 +167,11 @@ def build(original, output):
     end = patch_load_locofix(exe, NEW_CODE)
     grow_text_section(exe, end)
     patch_start_dialog(exe)
+    patch_start_bitmap(exe)
     open(output, "wb").write(exe.d)
 
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        sys.exit("usage: patch_exe.py <Steam.exe> <OpenLocoland.exe>")
+        sys.exit("usage: patch_exe.py <Steam.exe> <Locoland.exe>")
     build(sys.argv[1], sys.argv[2])

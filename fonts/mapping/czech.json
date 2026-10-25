@@ -1,0 +1,41 @@
+{
+  "description": "Czech (CP1250) extended character mapping for font generation",
+  "codepage": 1250,
+  "fonts": {
+    "font8x13.bmp": {
+      "description": "Main game font 8x13",
+      "glyphs": {
+        "0x80": "U+010A",  // Ċ (unused in Czech, placeholder)
+        "0x8A": "U+0160",  // Š
+        "0x8C": "U+010C",  // Č
+        "0x8E": "U+017D",  // Ž
+        "0x98": "U+0158",  // Ř
+        "0x9A": "U+0161",  // š
+        "0x9C": "U+010D",  // č
+        "0x9E": "U+017E",  // ž
+        "0x9F": "U+016E",  // Ů
+        "0xCA": "U+011A",  // Ě
+        "0xEA": "U+011B",  // ě
+        "0xDD": "U+00DD",  // Ý
+        "0xFD": "U+00FD"   // ý
+      }
+    },
+    "font-MainMenuTitles.bmp": {
+      "description": "Main menu titles font",
+      "glyphs": {}
+    },
+    "font-Mousetips.bmp": {
+      "description": "Mouse tooltips font",
+      "glyphs": {}
+    },
+    "font8x13light.bmp": {
+      "description": "Light variant 8x13",
+      "glyphs": {}
+    },
+    "font-Objectives.bmp": {
+      "description": "Objectives font",
+      "glyphs": {}
+    }
+  },
+  "notes": "Slots shown are CP1250 positions. Only modify 'glyphs' mapping. Run tools/fonts/generate.py to regenerate BMPs."
+}

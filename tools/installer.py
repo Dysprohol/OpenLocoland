@@ -16,7 +16,8 @@ steamapps\libraryfolders.vdf, or a folder chosen by hand), proposes an install f
 own (%USERPROFILE%\Games\OpenLocoland - never the Steam folder, which is only read) and runs
 build.build() into it with the prebuilt LocoFix.dll packed in Setup.exe: nothing of the game
 is in the installer, the game is assembled from the player's files on their machine - the
-logo of the window's header too, read from the Steam copy once it is found. The language
+logo of the window's header is our own OpenLocoland wordmark (the game's, read from the Steam
+copy, only without it). The language
 captures go to %LOCALAPPDATA%\OpenLocoland\captured; every language Steam has (the installed
 one and the depots downloaded next to it) is captured, and the game languages offered are those
 with a capture and a pack in lang\<code>\.
@@ -85,10 +86,12 @@ TEXTS = {
         "depots": "The game's other languages come from Steam: open the Steam console (type "
                   "steam://open/console into the browser's address bar or Win+R), enter the line of each "
                   "language you want, wait until Steam has downloaded it and run Setup again:",
+        "depots_local": "The game's other languages are not found (no Steam depots in skip-verify mode):",
         "no_language": "No language of the game can be built - is Locoland installed through Steam?",
         "options": "Options (they can be changed later in the game's launcher window)",
         "cheats": "Cheats (developer keys: h, W, B, A, K, M, #, x)",
         "unlock": "All missions unlocked (your progress stays as it is)",
+        "skip_verify": "Skip version verification (for CD/beta-demo exes; patches may break)",
         "shortcuts": "Shortcuts",
         "desktop": "On the desktop",
         "start_menu": "In the Start menu",
@@ -115,8 +118,8 @@ TEXTS = {
                          "language files kept in {captured}.\nYour profiles, progress and settings in the "
                          "registry stay (the Steam game uses them too).",
         "uninstalled": "OpenLocoland was removed from {path}",
-        "game_name": "OpenLocoland",
-        "editor_name": "OpenLocoland - Map Editor",
+        "game_name": "Locoland",
+        "editor_name": "Locoland - map editor",
         "editor_desc": "The map editor of OpenLocoland",
     },
     "de": {
@@ -138,6 +141,7 @@ TEXTS = {
         "options": "Optionen (später im Startfenster des Spiels änderbar)",
         "cheats": "Cheats (Entwicklertasten: h, W, B, A, K, M, #, x)",
         "unlock": "Alle Missionen freigeschaltet (dein Fortschritt bleibt erhalten)",
+        "skip_verify": "Versionsprüfung überspringen (für CD/beta-demo exes; Patches können brechen)",
         "shortcuts": "Verknüpfungen",
         "desktop": "Auf dem Desktop",
         "start_menu": "Im Startmenü",
@@ -186,6 +190,7 @@ TEXTS = {
         "options": "Beállítások (később a játék indítóablakában is módosíthatók)",
         "cheats": "Csalások (fejlesztői billentyűk: h, W, B, A, K, M, #, x)",
         "unlock": "Minden küldetés elérhető (az előrehaladásod nem változik)",
+        "skip_verify": "Verzióellenőrzés kihagyása (CD/beta-demo exekhez; javítások megszakadhatnak)",
         "shortcuts": "Parancsikonok",
         "desktop": "Az asztalon",
         "start_menu": "A Start menüben",
@@ -212,8 +217,8 @@ TEXTS = {
                          "{captured} mappában tárolt nyelvi fájlokkal együtt.\nA profilok, az előrehaladás és a "
                          "beállítások a rendszerleíró adatbázisban maradnak (a Steames játék is használja őket).",
         "uninstalled": "Az OpenLocoland eltávolítva innen: {path}",
-        "game_name": "OpenLocoland",
-        "editor_name": "OpenLocoland - Pályaszerkesztő",
+        "game_name": "Locoland",
+        "editor_name": "Locoland - pályaszerkesztő",
         "editor_desc": "Az OpenLocoland pályaszerkesztője",
     },
     "pl": {
@@ -234,6 +239,7 @@ TEXTS = {
         "options": "Opcje (można je później zmienić w oknie startowym gry)",
         "cheats": "Kody (klawisze twórców: h, W, B, A, K, M, #, x)",
         "unlock": "Wszystkie misje odblokowane (Twoje postępy pozostają bez zmian)",
+        "skip_verify": "Pomiń weryfikację wersji (dla CD/beta-demo exe; poprawki mogą nie zadziałać)",
         "shortcuts": "Skróty",
         "desktop": "Na pulpicie",
         "start_menu": "W menu Start",
@@ -260,8 +266,8 @@ TEXTS = {
                          "w {captured}.\nProfile, postępy i ustawienia w rejestrze zostają (używa ich też gra "
                          "ze Steama).",
         "uninstalled": "Usunięto OpenLocoland z {path}",
-        "game_name": "OpenLocoland",
-        "editor_name": "OpenLocoland - Edytor Map",
+        "game_name": "Locoland",
+        "editor_name": "Locoland - edytor map",
         "editor_desc": "Edytor Map OpenLocoland",
     },
     "pt": {
@@ -282,6 +288,7 @@ TEXTS = {
         "options": "Opções (podem ser alteradas mais tarde na janela inicial do jogo)",
         "cheats": "Batotas (teclas de programador: h, W, B, A, K, M, #, x)",
         "unlock": "Todas as missões desbloqueadas (o teu progresso fica como está)",
+        "skip_verify": "Ignorar verificação de versão (para exes CD/beta-demo; patches podem falhar)",
         "shortcuts": "Atalhos",
         "desktop": "No ambiente de trabalho",
         "start_menu": "No menu Iniciar",
@@ -308,8 +315,8 @@ TEXTS = {
                          "guardados em {captured}.\nOs perfis, o progresso e as definições no registo ficam (o "
                          "jogo do Steam também os usa).",
         "uninstalled": "O OpenLocoland foi removido de {path}",
-        "game_name": "OpenLocoland",
-        "editor_name": "OpenLocoland - Editor de Mapas",
+        "game_name": "Locoland",
+        "editor_name": "Locoland - editor de mapas",
         "editor_desc": "O Editor de Mapas do OpenLocoland",
     },
     "ru": {
@@ -330,6 +337,7 @@ TEXTS = {
         "options": "Параметры (их можно изменить позже в окне запуска игры)",
         "cheats": "Читы (клавиши разработчиков: h, W, B, A, K, M, #, x)",
         "unlock": "Все миссии открыты (ваш прогресс не меняется)",
+        "skip_verify": "Пропустить проверку версии (для CD/beta-demo exe; патчи могут не работать)",
         "shortcuts": "Ярлыки",
         "desktop": "На рабочем столе",
         "start_menu": "В меню «Пуск»",
@@ -356,8 +364,8 @@ TEXTS = {
                          "в {captured}.\nПрофили, прогресс и настройки в реестре останутся (их использует и игра "
                          "из Steam).",
         "uninstalled": "OpenLocoland удалена из {path}",
-        "game_name": "OpenLocoland",
-        "editor_name": "OpenLocoland - Редактор Карт",
+        "game_name": "Locoland",
+        "editor_name": "Locoland - редактор карт",
         "editor_desc": "Редактор Карт OpenLocoland",
     },
     "cs": {
@@ -378,6 +386,7 @@ TEXTS = {
         "options": "Volby (lze je později změnit v úvodním okně hry)",
         "cheats": "Cheaty (klávesy vývojářů: h, W, B, A, K, M, #, x)",
         "unlock": "Všechny mise odemčené (tvůj postup zůstane, jak je)",
+        "skip_verify": "Přeskočit kontrolu verze (pro CD/beta-demo exe; opravy mohou nefungovat)",
         "shortcuts": "Zástupci",
         "desktop": "Na ploše",
         "start_menu": "V nabídce Start",
@@ -403,8 +412,8 @@ TEXTS = {
                          "z editoru a tabulkami výsledků), spolu se zástupci a jazykovými soubory v {captured}.\n"
                          "Profily, postup a nastavení v registru zůstanou (používá je i hra ze Steamu).",
         "uninstalled": "OpenLocoland byl odebrán ze složky {path}",
-        "game_name": "OpenLocoland",
-        "editor_name": "OpenLocoland - Editor Map",
+        "game_name": "Locoland",
+        "editor_name": "Locoland - editor map",
         "editor_desc": "Editor Map OpenLocoland",
     },
 }
@@ -463,10 +472,9 @@ def libraries(steam):
 
 
 def is_game(folder):
-    """True if folder contains Steam.exe (original), Locoland.exe (patched) or OpenLocoland.exe (our build)."""
+    """True if folder contains Steam.exe (original) or Locoland.exe (patched)."""
     return bool(folder) and (os.path.isfile(os.path.join(folder, "Steam.exe"))
-                             or os.path.isfile(os.path.join(folder, "Locoland.exe"))
-                             or os.path.isfile(os.path.join(folder, "OpenLocoland.exe")))
+                             or os.path.isfile(os.path.join(folder, "Locoland.exe")))
 
 
 def true_case(path):
@@ -527,11 +535,12 @@ def pack_base(code):
     return pack_value(code, "base") or code
 
 
-def game_languages(steam):
+def game_languages(steam, skip_verify=False):
     """(buildable, missing): the codes of the packs of lang\\ that can be built from the captures
-    and Steam's languages, and of those whose language Steam still has to download."""
+    and Steam's languages, and of those whose language Steam still has to download.
+    If skip_verify=True (for CD/beta-demo), also look for languages in the game folder."""
     packs = languages.packs()
-    have = languages.available(steam) if is_game(steam) else set()
+    have = languages.available(steam, local=skip_verify) if is_game(steam) else set()
     return [c for c in packs if pack_base(c) in have], [c for c in packs if pack_base(c) not in have]
 
 
@@ -547,10 +556,18 @@ def depot_lines(codes):
     return lines
 
 
+def custom_logo_file():
+    """Our own OpenLocoland wordmark (tools\\icon\\openlocoland_logo.png), or None."""
+    if BUNDLE:
+        path = os.path.join(BUNDLE, "tools", "icon", "openlocoland_logo.png")
+    else:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon", "openlocoland_logo.png")
+    return path if os.path.isfile(path) else None
+
+
 def logo_file(steam):
     """The game's logo (vid\\logo.bmp): the Steam copy's, unless it is the English one, which says
-    "Steamland" - then that of another captured or downloaded language, if there is one.
-    Falls back to our custom OpenLocoland logo."""
+    "Steamland" - then that of another captured or downloaded language, if there is one."""
     found = [(languages.steam_language(steam), os.path.join(steam, "vid", "logo.bmp"))]
     if os.path.isdir(CAPTURED):
         found += [(c, os.path.join(CAPTURED, c, "vid", "logo.bmp")) for c in sorted(os.listdir(CAPTURED))]
@@ -559,33 +576,43 @@ def logo_file(steam):
     for code, path in found:
         if code not in ("en", "pt"):   # Steam's Portuguese is the English game
             return path
-    # Fallback: our custom OpenLocoland logo (for installer header when no Steam logo found)
-    if BUNDLE:
-        custom_logo = os.path.join(BUNDLE, "tools", "icon", "openlocoland_logo.png")
-    else:
-        custom_logo = os.path.join(os.path.dirname(__file__), "icon", "openlocoland_logo.png")
-    if os.path.isfile(custom_logo):
-        return custom_logo
     return found[0][1] if found else None
 
 
 def logo_image(steam, height=56):
-    """The logo cropped to its letters (the picture is 640x480 with the word on black), or None.
-    For our custom OpenLocoland logo, use it as-is (no cropping)."""
+    """The game's logo cropped to its letters (the picture is 640x480 with the word on black), or None."""
     path = logo_file(steam) if is_game(steam) else None
     if not path:
         return None
     try:
         from PIL import Image, ImageTk
         picture = Image.open(path).convert("RGB")
-        # Check if it's our custom logo (PNG in tools/icon)
-        is_custom = path.lower().endswith("openlocoland_logo.png")
-        if not is_custom:
-            box = picture.convert("L").point(lambda v: 255 if v > 40 else 0).getbbox()
-            if not box:
-                return None
-            picture = picture.crop((box[0] - 6, box[1] - 6, box[2] + 6, box[3] + 6))
+        box = picture.convert("L").point(lambda v: 255 if v > 40 else 0).getbbox()
+        if not box:
+            return None
+        picture = picture.crop((box[0] - 6, box[1] - 6, box[2] + 6, box[3] + 6))
         width = picture.width * height // picture.height
+        return ImageTk.PhotoImage(picture.resize((width, height), Image.LANCZOS))
+    except Exception:   # an unreadable picture only costs the header its logo
+        return None
+
+
+def logo_banner(width):
+    """Our wordmark as the header's banner: the transparent margins cut, black behind it (the
+    header's colour) and scaled to the whole width of the window, so it fills the header."""
+    path = custom_logo_file()
+    if not path or width < 64:
+        return None
+    try:
+        from PIL import Image, ImageOps, ImageTk
+        picture = Image.open(path).convert("RGBA")
+        box = picture.getbbox()   # the transparent 1920x1080 canvas around the word
+        if not box:
+            return None
+        picture = ImageOps.expand(picture.crop(box), border=(10, 12, 10, 12), fill=(0, 0, 0, 255))
+        black = Image.new("RGBA", picture.size, (0, 0, 0, 255))
+        picture = Image.alpha_composite(black, picture).convert("RGB")
+        height = max(1, round(picture.height * width / picture.width))
         return ImageTk.PhotoImage(picture.resize((width, height), Image.LANCZOS))
     except Exception:   # an unreadable picture only costs the header its logo
         return None
@@ -661,13 +688,13 @@ def read_manifest(target):
 
 
 def game_running(target):
-    """Whether OpenLocoland.exe of this folder runs (tasklist does not give paths: PowerShell does)."""
-    exe = os.path.join(target, "OpenLocoland.exe")
+    """Whether Locoland.exe of this folder runs (tasklist does not give paths: PowerShell does)."""
+    exe = os.path.join(target, "Locoland.exe")
     if not os.path.isfile(exe):
         return False
     result = subprocess.run(
         ["powershell", "-NoProfile", "-NonInteractive", "-Command",
-         "Get-Process OpenLocoland -ErrorAction SilentlyContinue | ForEach-Object { $_.Path }"],
+         "Get-Process Locoland -ErrorAction SilentlyContinue | ForEach-Object { $_.Path }"],
         capture_output=True, text=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     return any(os.path.normcase(line.strip()) == os.path.normcase(exe) for line in result.stdout.splitlines())
 
@@ -683,58 +710,30 @@ def remove_shortcuts(manifest):
             os.rmdir(folder)
 
 
-def remove_old_shortcuts():
-    """Remove old Locoland shortcuts from Desktop and Start Menu (from pre-v0.1.8 installs)."""
-    old_names = ["Locoland.lnk", "Locoland - map editor.lnk", "Locoland - edytor map.lnk",
-                 "Locoland - Karteneditor.lnk", "Locoland - pályaszerkesztő.lnk",
-                 "Locoland - editor de mapas.lnk", "Locoland - редактор карт.lnk",
-                 "Locoland - editor map.lnk"]
-    for base in (special_folder(0x10), os.path.join(special_folder(0x02), APP)):
-        if os.path.isdir(base):
-            for name in old_names:
-                path = os.path.join(base, name)
-                try:
-                    os.remove(path)
-                except OSError:
-                    pass
-            # Clean up empty OpenLocoland folder in Start Menu
-            if os.path.basename(base) == APP and os.path.isdir(base) and not os.listdir(base):
-                try:
-                    os.rmdir(base)
-                except OSError:
-                    pass
-
-
-def install(steam, target, choices, ver, progress=None):
+def install(steam, target, choices, ver, progress=None, skip_verify=False):
     """Assembles the game into `target`, writes the options (and the game's language when one is
     given), the shortcuts and the record of the install. `choices`: cheats, unlock, desktop,
     start_menu (bool), game_language (a code or None: keep the saved one) and lang (the language
-    of the shortcuts' names). Prints its log; stops with SystemExit and the reason."""
+    of the shortcuts' names). `skip_verify`: bypass Steam.exe version check. Prints its log; stops
+    with SystemExit and the reason."""
     if not is_game(steam):
         sys.exit(f"No Locoland from Steam in {steam}")
     if inside(target, steam):
         sys.exit("The install folder must not be the Steam folder of the game or inside it")
-    if not build.steam_exe_original(steam):
-        sys.exit(TEXTS[choices["lang"]]["modified_steam"].format(path=steam))
+    if not build.steam_exe_original(steam, skip_verify=skip_verify):
+        if skip_verify:
+            print(f"Warning: Steam.exe in {steam} does not match a known version (continuing with --skip-verify)")
+        else:
+            sys.exit(TEXTS[choices["lang"]]["modified_steam"].format(path=steam))
     modified = build.modified_steam_files(steam)
     if modified:
         sys.exit(TEXTS[choices["lang"]]["modified_files"].format(path=steam, files=", ".join(modified)))
     if game_running(target):
-        sys.exit("OpenLocoland is running from the install folder - close it first")
-    # Remove old Locoland.exe if present (pre-v0.1.8)
-    old_exe = os.path.join(target, "Locoland.exe")
-    if os.path.isfile(old_exe):
-        try:
-            os.remove(old_exe)
-            print("Removed old Locoland.exe")
-        except OSError:
-            pass
-    # Remove old shortcuts from previous versions
-    remove_old_shortcuts()
+        sys.exit("Locoland is running from the install folder - close it first")
     locofix = os.path.join(BUNDLE, "LocoFix.dll") if BUNDLE else None
     os.makedirs(CAPTURED, exist_ok=True)
     print(f"OpenLocoland {ver}: {steam} -> {target}")
-    build.build(steam, target, locofix=locofix, captured=CAPTURED, progress=progress)
+    build.build(steam, target, locofix=locofix, captured=CAPTURED, progress=progress, skip_verify=skip_verify)
     write_setting("Cheats", choices["cheats"])
     write_setting("UnlockMissions", choices["unlock"])
     print(f"Options: Cheats {int(choices['cheats'])}, UnlockMissions {int(choices['unlock'])}")
@@ -749,7 +748,7 @@ def install(steam, target, choices, ver, progress=None):
 
 def make_shortcuts(target, choices, ver):
     texts = TEXTS[choices["lang"]]
-    exe = os.path.join(target, "OpenLocoland.exe")
+    exe = os.path.join(target, "Locoland.exe")   # actual exe name (for config/registry)
     folders = []
     if choices["desktop"]:
         folders.append(special_folder(0x10))   # CSIDL_DESKTOPDIRECTORY
@@ -757,9 +756,9 @@ def make_shortcuts(target, choices, ver):
         folders.append(os.path.join(special_folder(0x02), APP))   # CSIDL_PROGRAMS
     made = []
     for folder in folders:
-        game = os.path.join(folder, "OpenLocoland.lnk")
-        make_shortcut(game, exe, "", target, exe, "OpenLocoland " + ver)
-        editor = os.path.join(folder, "OpenLocoland - Map Editor.lnk")
+        game = os.path.join(folder, texts["game_name"] + ".lnk")
+        make_shortcut(game, exe, "", target, exe, APP + " " + ver)
+        editor = os.path.join(folder, texts["editor_name"] + ".lnk")
         make_shortcut(editor, os.path.join(target, "edit_map.cmd"), EDITOR_MAP, target, exe, texts["editor_desc"],
                       minimized=True)
         made += [game, editor]
@@ -793,12 +792,15 @@ class Installer:
         self.result = None
         self.widgets = {}
         self.logo = None
+        self.banner = False        # our wordmark as the header, scaled to the window's width
+        self.banner_width = 0
         self.buildable, self.missing = [], []
         self.first_language = None   # the game language shown first: written only when changed
         self.steam = tk.StringVar(value=steam or find_game() or "")
         self.target = tk.StringVar(value=target or DEFAULT_TARGET)
         self.cheats = tk.BooleanVar(value=read_option("Cheats"))
         self.unlock = tk.BooleanVar(value=read_option("UnlockMissions"))
+        self.skip_verify = tk.BooleanVar(value=False)
         self.desktop = tk.BooleanVar(value=True)
         self.start_menu = tk.BooleanVar(value=True)
         self.ui_language = tk.StringVar(value=TEXTS[self.lang]["name"])
@@ -822,10 +824,13 @@ class Installer:
         r = self.root
         r.resizable(True, True)
         w = self.widgets
-        # the header: the game's logo on black once the game is found, else the name in text
-        w["header"] = tk.Label(r, text=APP, font=("Segoe UI", 18, "bold"), pady=10)
+        # the header: our wordmark across the whole width, else the game's logo, else the name
+        # (a canvas, so the picture drawn for the current width does not fix the window's size)
+        w["header"] = tk.Canvas(r, height=84, background="black", bd=0, highlightthickness=0)
         w["header"].grid(row=0, column=0, sticky="ew")
-        self.header_colours = (w["header"].cget("background"), w["header"].cget("foreground"))
+        w["header"].bind("<Configure>", self.header_resized)
+        self.header_item = w["header"].create_text(0, 42, text=APP, font=("Segoe UI", 18, "bold"),
+                                                   fill="white", anchor="center")
         frame = ttk.Frame(r, padding=12)
         frame.grid(row=1, column=0, sticky="nsew")
         r.columnconfigure(0, weight=1)
@@ -872,6 +877,8 @@ class Installer:
         w["cheats"].grid(row=0, column=0, sticky="w")
         w["unlock"] = ttk.Checkbutton(w["options"], variable=self.unlock)
         w["unlock"].grid(row=1, column=0, sticky="w")
+        w["skip_verify"] = ttk.Checkbutton(w["options"], variable=self.skip_verify)
+        w["skip_verify"].grid(row=2, column=0, sticky="w")
 
         w["shortcuts"] = ttk.LabelFrame(frame, padding=6)
         w["shortcuts"].grid(row=5, column=0, columnspan=3, sticky="ew", pady=(6, 0))
@@ -901,7 +908,7 @@ class Installer:
         w = self.widgets
         self.root.title(self.t("title"))
         for key in ["intro", "language", "steam", "target", "game_language", "options", "cheats", "unlock",
-                    "shortcuts", "desktop", "start_menu"]:
+                    "skip_verify", "shortcuts", "desktop", "start_menu"]:
             w[key].configure(text=self.t(key))
         w["more_languages"].configure(text=self.t("more_languages") if self.missing else "")
         w["browse_steam"].configure(text=self.t("browse"))
@@ -915,16 +922,59 @@ class Installer:
         self.lang = next(c for c, n in UI_LANGUAGES if n == self.ui_language.get())
         self.apply_texts()
 
-    def steam_changed(self):
-        """The header's logo and the game languages come from the Steam copy."""
-        steam = self.steam.get().strip()
-        self.logo = logo_image(steam)
-        header = self.widgets["header"]
-        if self.logo:
-            header.configure(image=self.logo, text="", background="black")
+    def header_resized(self, event):
+        """Our banner follows the width of the window; the rest of the header stays centred."""
+        if self.banner:
+            self.show_banner(event.width)
         else:
-            header.configure(image="", text=APP, background=self.header_colours[0])
-        self.buildable, self.missing = game_languages(steam)
+            self.widgets["header"].coords(self.header_item, event.width // 2, event.height // 2)
+
+    def show_banner(self, width):
+        if width < 64 or width == self.banner_width:
+            return
+        image = logo_banner(width)
+        if not image:
+            return
+        header = self.widgets["header"]
+        self.banner_width = width
+        self.logo = image
+        if self.header_item is not None:
+            header.delete(self.header_item)
+        header.configure(height=image.height())
+        self.header_item = header.create_image(0, 0, image=image, anchor="nw")
+
+    def show_header_image(self, image):
+        header = self.widgets["header"]
+        self.logo = image
+        if self.header_item is not None:
+            header.delete(self.header_item)
+        header.configure(height=max(image.height(), 84))
+        self.header_item = header.create_image(0, 0, image=image, anchor="center")
+        header.coords(self.header_item, header.winfo_width() // 2, header.winfo_height() // 2)
+
+    def show_header_text(self):
+        header = self.widgets["header"]
+        if self.header_item is not None:
+            header.delete(self.header_item)
+        header.configure(height=84)
+        self.header_item = header.create_text(0, 0, text=APP, font=("Segoe UI", 18, "bold"),
+                                              fill="white", anchor="center")
+        header.coords(self.header_item, header.winfo_width() // 2, header.winfo_height() // 2)
+
+    def steam_changed(self):
+        """The header's logo (ours, else the game's) and the game languages."""
+        steam = self.steam.get().strip()
+        self.banner = custom_logo_file() is not None
+        if self.banner:
+            self.banner_width = 0
+            self.show_banner(self.widgets["header"].winfo_width())
+        else:
+            image = logo_image(steam)
+            if image:
+                self.show_header_image(image)
+            else:
+                self.show_header_text()
+        self.buildable, self.missing = game_languages(steam, skip_verify=self.skip_verify.get())
         self.widgets["game_language_choice"].configure(values=[pack_name(c) for c in self.buildable])
         self.target_changed()
         self.apply_texts()
@@ -942,7 +992,10 @@ class Installer:
         if not self.buildable and is_game(self.steam.get().strip()):
             lines.append(self.t("no_language"))
         if self.missing:
-            lines += [self.t("depots"), ""] + depot_lines(self.missing)
+            if self.skip_verify.get():
+                lines += [self.t("depots_local"), ""] + [f"  {pack_name(c)} (ensure files in game folder)" for c in self.missing]
+            else:
+                lines += [self.t("depots"), ""] + depot_lines(self.missing)
         if not self.busy and self.progress["value"] == 0:
             self.log.configure(state="normal")
             self.log.delete("1.0", "end")
@@ -961,7 +1014,7 @@ class Installer:
         w["button_install"].configure(text=self.t("update" if installed else "install"),
                                       state="disabled" if self.busy else "normal")
         w["button_uninstall"].configure(state="normal" if installed and not self.busy else "disabled")
-        w["button_run"].configure(state="normal" if target and os.path.isfile(os.path.join(target, "OpenLocoland.exe"))
+        w["button_run"].configure(state="normal" if target and os.path.isfile(os.path.join(target, "Locoland.exe"))
                                   and installed and not self.busy else "disabled")
 
     def browse_steam(self):
@@ -1013,9 +1066,13 @@ class Installer:
         locoland_exe = os.path.join(steam, "Locoland.exe")
         has_steam = os.path.isfile(steam_exe)
         has_locoland = os.path.isfile(locoland_exe)
-        if has_steam and not build.steam_exe_original(steam):
-            self.error(self.t("modified_steam", path=steam))
-            return
+        skip_verify = self.skip_verify.get()
+        if has_steam and not build.steam_exe_original(steam, skip_verify=skip_verify):
+            if skip_verify:
+                self.say(f"Warning: Steam.exe in {steam} does not match a known version (continuing with skip verification)\n")
+            else:
+                self.error(self.t("modified_steam", path=steam))
+                return
         if has_locoland and has_steam:
             self.error(self.t("modified_steam", path=steam) + " (both Steam.exe and Locoland.exe present)")
             return
@@ -1038,7 +1095,7 @@ class Installer:
         self.say(self.t("working") + "\n")
         language = self.chosen_game_language()
         choices = {"cheats": self.cheats.get(), "unlock": self.unlock.get(), "desktop": self.desktop.get(),
-                   "start_menu": self.start_menu.get(), "lang": self.lang,
+                   "start_menu": self.start_menu.get(), "lang": self.lang, "skip_verify": self.skip_verify.get(),
                    # a new install sets the game's language; an update only when it was changed here
                    "game_language": language if not update or language != self.first_language else None}
         threading.Thread(target=self.work, args=(steam, target, choices), daemon=True).start()
@@ -1047,7 +1104,9 @@ class Installer:
         out, err = sys.stdout, sys.stderr
         sys.stdout = sys.stderr = LogWriter(self.events)
         try:
-            install(steam, target, choices, self.version, lambda f: self.events.put(("progress", f)))
+            install(steam, target, choices, self.version,
+                    lambda f: self.events.put(("progress", f)),
+                    skip_verify=choices.get("skip_verify", False))
             self.events.put(("done", self.t("done", path=target)))
         except SystemExit as e:
             self.events.put(("failed", str(e.code)))
@@ -1074,7 +1133,7 @@ class Installer:
 
     def run_game(self):
         target = self.target.get().strip()
-        subprocess.Popen([os.path.join(target, "OpenLocoland.exe")], cwd=target)
+        subprocess.Popen([os.path.join(target, "Locoland.exe")], cwd=target)
 
     def poll(self):
         try:
@@ -1111,19 +1170,23 @@ def silent(a):
     os.makedirs(target, exist_ok=True)
     steam = a.steam or find_game() or ""
     update = read_manifest(target) is not None
-    buildable, missing = game_languages(steam)
+    skip_verify = getattr(a, "skip_verify", False)
+    buildable, missing = game_languages(steam, skip_verify=skip_verify)
     language = a.game_lang or (None if update else first_game_language(buildable, False))
     choices = {"cheats": a.cheats == "1", "unlock": a.unlock == "1", "desktop": not a.no_shortcuts,
-               "start_menu": not a.no_shortcuts, "lang": a.lang or first_ui_language(), "game_language": language}
+               "start_menu": not a.no_shortcuts, "lang": a.lang or first_ui_language(), "game_language": language, "skip_verify": skip_verify}
     with open(os.path.join(target, "install.log"), "w", encoding="utf-8") as log:
         sys.stdout = sys.stderr = log
         try:
             if a.game_lang and a.game_lang not in buildable:
                 sys.exit(f"Game language {a.game_lang} cannot be built (it can: {', '.join(buildable) or 'none'})")
             if missing:
-                print("Not available yet (download_depot in the Steam console, then run Setup again):")
-                print("\n".join(depot_lines(missing)))
-            install(steam, target, choices, version())
+                if skip_verify:
+                    print("Not available yet (no Steam depots in skip-verify mode; ensure language files are in the game folder):")
+                else:
+                    print("Not available yet (download_depot in the Steam console, then run Setup again):")
+                    print("\n".join(depot_lines(missing)))
+            install(steam, target, choices, version(), skip_verify=getattr(a, "skip_verify", False))
         except SystemExit as e:
             print(f"FAILED: {e.code}")
             return 1
@@ -1148,6 +1211,8 @@ def main():
     p.add_argument("--game-lang", help="the game's language (default for a new install: the system's if there is a pack, else English; kept on an update)")
     p.add_argument("--no-shortcuts", action="store_true")
     p.add_argument("--lang", choices=codes, help="the language of the shortcuts' names (default: the system's, else en)")
+    p.add_argument("--skip-verify", action="store_true",
+                   help="skip Steam.exe version verification (for CD/beta-demo exes; may break patches)")
     a = p.parse_args()
     if a.silent:
         a.cheats = a.cheats or ("1" if read_option("Cheats") else "0")

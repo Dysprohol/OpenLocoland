@@ -21,20 +21,10 @@ import shutil
 import subprocess
 import sys
 
-
-def safe_relpath(path, start):
-    """os.path.relpath that works across drives on Windows.
-    If paths are on different drives, returns the absolute path (since no relative path exists)."""
-    try:
-        return os.path.relpath(path, start)
-    except ValueError:
-        # Different drives on Windows - return absolute path
-        return os.path.abspath(path)
-
-
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "tools"))
 import build_locofix  # noqa: E402
+from safe_path import safe_relpath  # noqa: E402
 
 OUT = os.path.join(REPO, "build", "release")
 PAYLOAD = os.path.join(OUT, "payload")

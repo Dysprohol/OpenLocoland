@@ -35,16 +35,7 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "tools"))
 import languages  # noqa: E402
-
-
-def safe_relpath(path, start):
-    """os.path.relpath that works across drives on Windows.
-    If paths are on different drives, returns the absolute path (since no relative path exists)."""
-    try:
-        return os.path.relpath(path, start)
-    except ValueError:
-        # Different drives on Windows - return absolute path
-        return os.path.abspath(path)
+from safe_path import safe_relpath  # noqa: E402
 
 FONT_FILES = {2: "font8x13.bmp", 3: "font-MainMenuTitles.bmp", 6: "font-Mousetips.bmp",
               7: "font8x13light.bmp", 14: "font-Objectives.bmp"}
@@ -138,12 +129,43 @@ def texts(code):
     override = os.path.join(folder, "strings.override.ini")
     if os.path.exists(override):
         out += ini_texts(override)
-    files = glob.glob(os.path.join(folder, "maps", "**", "*.txt"), recursive=True)
+
+    # New structure: game/briefings, game/menus, game/editor, game/scripts
+    new_briefings = glob.glob(os.path.join(folder, "game", "briefings", "**", "*.txt"), recursive=True)
+    new_menus = glob.glob(os.path.join(folder, "game", "menus", "*.txt"))
+    new_editor = glob.glob(os.path.join(folder, "game", "editor", "*.txt"))
+    new_scripts = glob.glob(os.path.join(folder, "game", "scripts", "*.patch"))
+
+    # Legacy structure: maps/
+    legacy_files = glob.glob(os.path.join(folder, "maps", "**", "*.txt"), recursive=True)
+
+    files = sorted(new_briefings + new_menus + new_editor + new_scripts + legacy_files)
+
     if code == "en":   # the root texts are English and every pack's fallback
         files += glob.glob(os.path.join(REPO, "game", "maps", "*.txt"))
         files += glob.glob(os.path.join(REPO, "game", "maps.new", "*", "*.txt"))
-    for path in sorted(files):
-        out += map_texts(path)
+    for path in files:
+        if path.endswith(".patch"):
+            # Script patches: check only quoted text
+            out += patch_texts(path)
+        else:
+            out += map_texts(path)
+    return out
+
+
+def patch_texts(path):
+    """Extract translatable strings from a .lgc.patch file (only text in quotes)."""
+    out = []
+    try:
+        data = open(path, "rb").read()
+        # Find quoted strings in the patch
+        import re
+        for m in re.finditer(rb'"([^"]*)"', data):
+            text = m.group(1)
+            if text:
+                out.append((f"{safe_relpath(path, REPO)}:patch", text, MAP_TEXT_FONTS))
+    except Exception:
+        pass
     return out
 
 

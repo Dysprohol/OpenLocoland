@@ -55,17 +55,6 @@ import sys
 # into sys._MEIPASS with the same layout.
 REPO = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-
-def safe_relpath(path, start):
-    """os.path.relpath that works across drives on Windows.
-    If paths are on different drives, returns the absolute path (since no relative path exists)."""
-    try:
-        return os.path.relpath(path, start)
-    except ValueError:
-        # Different drives on Windows - return absolute path
-        return os.path.abspath(path)
-
-
 sys.path.insert(0, os.path.join(REPO, "tools"))
 import build_locofix  # noqa: E402
 import languages  # noqa: E402
@@ -74,6 +63,7 @@ import patch_data  # noqa: E402
 import patch_exe  # noqa: E402
 import patch_text  # noqa: E402
 import res_tool  # noqa: E402
+from safe_path import safe_relpath  # noqa: E402
 
 STEAM = languages.STEAM
 TARGET = os.path.join(os.path.dirname(REPO), "Locoland")
@@ -86,15 +76,38 @@ SKIPPED_DIRS = {"video"}                # intros (the outro is a scene in maps/o
 # added by the player (a DirectDraw wrapper, its settings...) and is not used
 GAME_ROOT_FILES = {"steam.exe", "steam.cfg", "steam_appid.txt", "objects.res", "strings.ini"}
 GAME_ROOT_DIRS = {"cursores", "fonts", "maps", "music", "vid", "video", "wav"}
-# Steam.exe of the Steam version (2003-10-07, the same exe for every language): the one LocoFix
-# and patch_exe.py are made for
-STEAM_EXE_SHA256 = "a31e9e512968d52352cb06c7e2a6c34e2a088175d86b38de6dd15e454f076020"
+
+# Known game versions. Each entry: {name, exe_sha256, patch_addresses?, notes}.
+# - Steam: the official Steam release (2003-10-07), fully supported.
+# - CD / beta-demo (Steamland): not yet in the table; add their SHA-256 and addresses when available.
+#   The installer can run with --skip-hash on unknown exes; it will warn but try to proceed.
+VERSIONS = {
+    "steam": {
+        "name": "Steam (2003-10-07)",
+        "exe_sha256": "a31e9e512968d52352cb06c7e2a6c34e2a088175d86b38de6dd15e454f076020",
+        "addresses": {
+            "BASE": 0x400000,
+            "IAT_LOAD_LIBRARY_A": 0x475104,
+            "NEW_CODE": 0x474830,
+            "START_DIALOG": 0x8ADB8,
+            "START_BITMAP": 0x8B430,
+            "call_site": 0x45952b,
+            "winmain": 0x4186f0,
+        },
+        "notes": "Official Steam release. All patches verified."
+    },
+    # Future: add "cd", "beta-demo" entries here when their exes are analysed.
+}
+
+STEAM_VERSION = VERSIONS["steam"]
+STEAM_EXE_SHA256 = STEAM_VERSION["exe_sha256"]
+
 # The files of the Steam version our patches change (the same in every language): a file that
 # differs was changed by the player, and the build stops before anything is written. A patch of
 # a file missing here is checked by applying it.
 ORIGINAL_SHA256 = {
     os.path.join("maps", "logo.lgc"): "6b055bf8124832bd334dc2f28d2566cc35a16876b80791c3c1d27c109196dce9",
-    os.path.join("maps", "menu.lgc"): "0d1058f31ca2904660acc69e2e8fad7a433e5d2d93f5158884e5267dfb95fc39",
+    os.path.join("maps", "menu.lgc"): "0d1058f31ca29004660acc69e2e8fad7a433e5d2d93f5158884e5267dfb95fc39",
     os.path.join("maps", "script", "basefunctions.lgc"): "a0ee8eb3865434c423a71b0df701ab8ec142ff0515cdafe05415f243dbd41397",
     os.path.join("maps", "script", "constants.lgc"): "4313d929e4ea9c082c246cc9dc0e5b75eb687deb8f9c4df9cad6913d27a3d72c",
     os.path.join("maps", "script", "debug_functions.lgc"): "c425230d5851b7c776cfaa2e025e8f498d20c88f1dea1b49daa9b0b2725f8c0f",
@@ -115,8 +128,7 @@ MODIFIED_STEAM = ("Steam.exe in {path} is not the original file of the game (it 
                   "of game files, then build again.")
 DGVOODOO = ["DDraw.dll", "D3DImm.dll"]  # the game only uses DirectDraw/Direct3D 7
 # files from earlier versions of this folder that are no longer needed
-OBSOLETE = ["Steam.exe", "steam.cfg", "steam_appid.txt", "D3D8.dll", "D3D9.dll", "dgVoodooCpl.exe",
-            "Locoland.exe"]   # old output name
+OBSOLETE = ["Steam.exe", "steam.cfg", "steam_appid.txt", "D3D8.dll", "D3D9.dll", "dgVoodooCpl.exe"]
 OBJECTS_OVERRIDE = "objects.override"   # in game/: changed values of objects.res (res_tool.py)
 MAPS_OVERRIDE = "maps.override"         # in game/: changed objects of maps (map_tool.py)
 MAPS_NEW = "maps.new"                   # in game/: whole new maps (map_tool.py new)
@@ -124,8 +136,8 @@ EDITOR_DATA = "editor"                  # in game/: the editor's palette (patch_
 MAP_MODEL = {"map.json", "objects.tsv", "groups.txt", "grid.txt", "vids.tsv",
              "vid_animations.tsv"}      # an unpacked .map, packed as <name>.map
 
-# Output exe name
-OUTPUT_EXE = "OpenLocoland.exe"
+# Output exe name (must stay Locoland.exe for config/registry compatibility: <exe>.cfg -> Locoland.cfg)
+OUTPUT_EXE = "Locoland.exe"
 
 
 def player_data(rel_path):
@@ -224,12 +236,29 @@ def merge_custom_list(src, dst, target, counter):
         counter[0] += 1
 
 
-def steam_exe_original(steam):
-    """Whether Steam.exe of the Steam folder is the original exe of the game."""
+def identify_version(steam):
+    """Identify the game version by its Steam.exe SHA-256. Returns (version_key, version_info) or (None, None)."""
+    try:
+        data = open(os.path.join(steam, "Steam.exe"), "rb").read()
+    except OSError:
+        return None, None
+    sha = hashlib.sha256(data).hexdigest()
+    for key, info in VERSIONS.items():
+        if info["exe_sha256"] == sha:
+            return key, info
+    return None, None
+
+
+def steam_exe_original(steam, version=None, skip_verify=False):
+    """Whether Steam.exe of the folder matches a known version (or any exe if skip_verify)."""
     try:
         data = open(os.path.join(steam, "Steam.exe"), "rb").read()
     except OSError:
         return False
+    if skip_verify:
+        return True
+    if version:
+        return hashlib.sha256(data).hexdigest() == version["exe_sha256"]
     return hashlib.sha256(data).hexdigest() == STEAM_EXE_SHA256
 
 
@@ -306,10 +335,11 @@ def copy(src, dst, counter):
     counter[0] += 1
 
 
-def build(steam, target, locofix=None, captured=None, progress=None):
-    """Assembles the game from `steam` into `target`: see the module's description. `locofix`
-    is a prebuilt LocoFix.dll (None compiles src/LocoFix), `captured` the folder of the language
-    captures (None: captured/ of the repository) and `progress(fraction)` is told how far it is.
+def build(steam, target, locofix=None, captured=None, progress=None, version=None, skip_verify=False):
+    """Assembles the game from `steam` into `target`. `locofix` is a prebuilt LocoFix.dll
+    (None compiles src/LocoFix), `captured` the folder of language captures (None: captured/
+    of the repository), `progress(fraction)` is told how far it is.
+    `version` is a VERSIONS entry (or None to auto-detect); `skip_verify` bypasses exe checks.
     Stops with SystemExit and the reason when something is wrong."""
     def done(fraction):
         if progress:
@@ -324,8 +354,11 @@ def build(steam, target, locofix=None, captured=None, progress=None):
         sys.exit("The target is the Steam game folder itself - the game is built next to it")
     has_steam = os.path.isfile(os.path.join(a.steam, "Steam.exe"))
     has_locoland = os.path.isfile(os.path.join(a.steam, "Locoland.exe"))
-    if has_steam and not steam_exe_original(a.steam):
-        sys.exit(MODIFIED_STEAM.format(path=a.steam))
+    if has_steam and not steam_exe_original(a.steam, version, skip_verify):
+        if skip_verify:
+            print(f"Warning: Steam.exe in {a.steam} does not match a known version (continuing with --skip-verify)")
+        else:
+            sys.exit(MODIFIED_STEAM.format(path=a.steam))
     if has_locoland and has_steam:
         sys.exit(MODIFIED_STEAM.format(path=a.steam) + " (both Steam.exe and Locoland.exe present)")
     modified = modified_steam_files(a.steam)
@@ -413,11 +446,14 @@ def build(steam, target, locofix=None, captured=None, progress=None):
 
     copy(locofix or build_locofix.build(), os.path.join(a.target, "LocoFix.dll"), copied)
     steam_exe = os.path.join(a.steam, "Steam.exe")
+    locoland_exe = os.path.join(a.steam, "Locoland.exe")
     target_exe = os.path.join(a.target, OUTPUT_EXE)
     if os.path.isfile(steam_exe):
         patch_exe.build(steam_exe, target_exe)
+    elif os.path.isfile(locoland_exe):
+        copy(locoland_exe, target_exe)   # an already patched copy of the game
     else:
-        sys.exit(f"No Steam.exe found in {a.steam}")
+        sys.exit(f"No game executable found in {a.steam}")
     done(0.8)
     # only now, when the target folder has all game and repo files: the patch checks
     # which sounds are really missing in the assembled game

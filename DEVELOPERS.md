@@ -136,7 +136,17 @@ For working on the engine, generate the local reverse-engineering output (not in
 |---|---|
 | `game/` | Our files for the game folder (`Locoland.cfg`, `dgVoodoo.conf`, `maps/custom.lst` - the custom maps of the menu) and changes to original files as `<file>.patch` (`maps/logo.lgc.patch`, `maps/menu.lgc.patch`) - same structure as the game folder; `maps/script/cheats.lgc`, `unlock.lgc` and their `_on` variants are the launcher's options (LocoFix fix 30). `objects.override/` would hold changed values of `objects.res` (see "Editing objects.res"), `maps.override/<map>/` changed objects of a map (`l11`: a rail of mission 11, `BUGS.md` F21) and `maps.new/<map>/` whole new maps (see "Editing maps and images"); `maps.new/template` (the empty template) and `maps.new/sandbox` (the one to play) at the moment, and `run_map.cmd` - a double-click at the game starts the sample map, `run_map <map>` any map; `edit_map.cmd` the same in editor mode (see "Editor mode"). |
 | `docs/` | The player's guide for the release, in Polish and English only (the German, Hungarian and Russian players get the English one): `PRZEWODNIK.md` (Polish) and `GUIDE.md` (English) - installing, what is new in the game, the custom maps page, the map editor with a tutorial and its keys - and a few screenshots of the game in `docs/img/`. Version 0.1; keep the guides in step with the in-game help pages (`maps/edithelp*.txt`) and "Editor mode" below. |
-| `lang/<code>/` | Our part of the language packs, `cs`, `de`, `en`, `hu`, `pl` and `ru`: `language.ini` (name, code page, `base` for a translation Steam does not ship, and launcher labels), `strings.override.ini` (our keys for `strings.ini`: the custom maps page, the mine VID 165, the map editor's `[Editor]`; `pl` and `en` also complete the original's gaps), `maps/edithelp*.txt` (the editor's help pages; English at the root, `game/maps/`), `maps/sandbox/` and `maps/template/` (the maps' texts in the language; English at the root) and, for `pl` and `en`, `*.patch` for the developer mode files (`maps/shiftb.txt`, four `maps/script/*.lgc`). Each in the pack's code page. Format in `tools/patch_text.py`. |
+| `lang/<code>/` | Our translation work for each language (`cs`, `de`, `en`, `hu`, `pl`, `ru`, and new ones):
+  - `language.ini` - metadata: `name`, `code`, `codepage`, `base` (for fan translations using another language's Steam files)
+  - `installer/texts.ini` - installer UI texts (window titles, labels, options, errors, shortcut names)
+  - `game/` - all in-game texts:
+    - `strings.override.ini` - overrides for `strings.ini` (numeric key = value)
+    - `briefings/l01-l20/`, `sandbox/`, `template/` - mission texts (brief, objectives, win, scripts)
+    - `menus/menu*.txt` - in-game menu texts
+    - `editor/edithelp*.txt` - map editor help pages (F1)
+    - `scripts/*.lgc.patch` - developer mode script patches (only translate quoted text)
+  - Legacy (pre-migration): `maps/edithelp*.txt`, `maps/sandbox/`, `maps/template/`, `maps/script/*.lgc.patch`, `maps/shiftb.txt.patch` — will be migrated to `game/`.
+  Each pack uses its code page (CP1250/1251/1252). Format details in `docs/TRANSLATING.md` and `tools/patch_text.py`. |
 | `external/dgVoodoo2/` | dgVoodoo2 2.87.5 (`DDraw.dll`, `D3DImm.dll`, unmodified; credit in `NOTICE.md`). |
 | `src/LocoFix/` | Game fixes in C++ - a library loaded by the exe before WinMain. |
 | `tools/` | Game assembly, language capture, text/exe/data patches, LocoFix build, decompilation, data unpacking, editing of objects.res, maps and images, tests; the installer (`installer.py`) and the release (`release.py`, see "Release"). |
@@ -2000,6 +2010,8 @@ mode above) are not tested in full screen.
   for the unit bar, buttons, strategic map, unit names). English: the same developer mode
   texts and `strings.ini` gaps filled in, the duplicate key 251 fixed (250/251 = Water
   Dragon).
+- New languages use `lang/_template` as a starting point: copy to `lang/<code>/`, edit `language.ini`,
+  translate `installer/texts.ini` and `game/`, add font mapping if needed. See `docs/TRANSLATING.md`.
 - Intros disabled (`game/maps/logo.lgc.patch`); the outro is a scene in `maps\outro` and
   stays.
 - Mission 11 (`maps\l11\l11.map`): a rail at 745,2075 laid as a ramp the wrong way up
@@ -2057,7 +2069,9 @@ mode above) are not tested in full screen.
      0x474830: `LoadLibraryA`, then a jump to WinMain; without the library the game starts
      without the fixes),
   2. launcher: the "Pełny ekran" box under the picture, no device list (they are all
-     dgVoodoo) and no technical fields, "Anuluj".
+     dgVoodoo) and no technical fields, "Anuluj"; the picture (`START_BITMAP`) gets our
+     OpenLocoland wordmark over the original artwork (transparent PNG cut to its letters,
+     soft black gradient behind it, written in place - the bitmap keeps its size).
 - `LocoFix.dll` (`src/LocoFix`) - in-memory fixes applied on load:
   1. the launcher does not force full screen with dgVoodoo (test at 0x40d95e skipped),
   2. the window's game area equals the chosen resolution (AdjustWindowRectEx), and without
@@ -2328,11 +2342,12 @@ mode above) are not tested in full screen.
   tool.
 - Changing a game text file: edit the assembled file (e.g. `<game>\lang\pl\maps\shiftb.txt`)
   and turn it into a patch against the original: `python tools\patch_text.py diff
-  captured\pl\maps\shiftb.txt <edited file> lang\pl\maps\shiftb.txt.patch` (scripts:
+  captured\pl\maps\shiftb.txt <edited file> lang\pl\game\scripts\shiftb.txt.patch` (scripts:
   against the Steam file). `strings.ini` changes go straight into `strings.override.ini`.
-  A new language: capture it, add `lang/<code>/language.ini` (name, code page and launcher
-  labels), translate `lang/en/strings.override.ini`, the help pages and the maps' texts, and
-  run `tools\check_lang.py <code>`.
+  A new language: copy `lang/_template` to `lang/<code>/`, edit `language.ini` (name, code page,
+  base), translate `installer/texts.ini` and all files under `game/`, add font mapping if needed
+  (`fonts/mapping/<code>.json`), run `python tools/fonts/generate.py --lang <code> --all`,
+  then test with `python tools/installer.py --silent --lang <code> --target test`. See `docs/TRANSLATING.md`.
 - `tools\test_game.ps1` - starts the game (`-Language <code>` sets the language), clicks OK in
   the launcher, waits for a log entry (`-WaitFor "menu\.map"`), performs steps
   (`-Steps "k371:489@5,13@20"`: mouse `m`/`k`/`p` at a point of the game area, a middle
@@ -2569,12 +2584,14 @@ names as `base=` in `[language]` (Czech on the English files) - so a pack added 
 is picked up by the next release; for the others the log shows their `download_depot` lines. Steam's Portuguese depot is the English
 game byte for byte (checked on the captures), so it is captured but has no pack. The window
 itself has its texts in the languages of `TEXTS` (Steam's six and Czech; the list is made from it,
-English first, and the system's display language picks the first one), and its header is the
-game's `vid\logo.bmp` cropped to its letters - the Steam copy's, or another captured language's
-when Steam has the English one, which says "Steamland" (PIL at run time: nothing of the game is in
-Setup.exe); before a game is found it is the project's name in text. `Setup.exe --silent --target <folder> [--steam
+English first, and the system's display language picks the first one), and its header is our own
+OpenLocoland wordmark (`tools\icon\openlocoland_logo.png`, transparent, cut to the letters) drawn
+on black across the whole width of the window and redrawn when it is resized (PIL at run time:
+nothing of the game is in Setup.exe); without that file it is the game's `vid\logo.bmp` cropped to
+its letters - the Steam copy's, or another captured language's when Steam has the English one,
+which says "Steamland" - and before a game is found it is the project's name in text. `Setup.exe --silent --target <folder> [--steam
 <folder>] [--cheats 0|1] [--unlock 0|1] [--game-lang <code>] [--no-shortcuts] [--lang <code>]`
-(`--lang` names the shortcuts; both default as in the window) does the same without
+(`--lang` picks the language of the shortcuts' descriptions; both default as in the window) does the same without
 the window, with its log in `install.log` of the install folder and exit code 0 when it worked;
 `Setup.exe --auto [--target <folder>]` opens the window, which installs at once with what it
 shows and closes at the end (the same log and exit code - a test of the window

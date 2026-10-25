@@ -1,0 +1,2 @@
+﻿@ Translate template win.txt
+

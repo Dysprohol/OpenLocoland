@@ -82,19 +82,10 @@ from PIL import Image, ImageChops
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from res_tool import DataError, load_tsv, parse_int, save_tsv, show  # noqa: E402
 import res_tool  # noqa: E402
+from safe_path import safe_relpath  # noqa: E402
 
 CHUNK_FLAGS = 0x80000000        # header of every chunk in the shipped files: flags, extra 0
 END = -1                        # end marker of SPR, SPRD, GROU
-
-
-def safe_relpath(path, start):
-    """os.path.relpath that works across drives on Windows.
-    If paths are on different drives, returns the absolute path (since no relative path exists)."""
-    try:
-        return os.path.relpath(path, start)
-    except ValueError:
-        # Different drives on Windows - return absolute path
-        return os.path.abspath(path)
 
 
 # ------------------------------------------------------------------ common ----

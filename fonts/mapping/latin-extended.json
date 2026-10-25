@@ -1,0 +1,94 @@
+{
+  "description": "Common Latin Extended characters for Central/Eastern European languages (CP1250)",
+  "codepage": 1250,
+  "characters": {
+    "Aacute": "U+00C1", "aacute": "U+00E1",   // Á á
+    "Cacute": "U+0106", "cacute": "U+0107",   // Ć ć
+    "Ccaron": "U+010C", "ccaron": "U+010D",   // Č č
+    "Cdotaccent": "U+010A", "cdotaccent": "U+010B", // Ċ ċ
+    "Dcaron": "U+010E", "dcaron": "U+010F",   // Ď ď
+    "Eacute": "U+00C9", "eacute": "U+00E9",   // É é
+    "Ecaron": "U+011A", "ecaron": "U+011B",   // Ě ě
+    "Eogonek": "U+0118", "eogonek": "U+0119", // Ę ę
+    "Gcedilla": "U+0122", "gcedilla": "U+0123", // Ģ ģ
+    "Hstroke": "U+0126", "hstroke": "U+0127", // Ħ ħ
+    "Iacute": "U+00CD", "iacute": "U+00ED",   // Í í
+    "Iogonek": "U+012E", "iogonek": "U+012F", // Į į
+    "Lacute": "U+0139", "lacute": "U+013A",   // Ĺ ĺ
+    "Lcaron": "U+013D", "lcaron": "U+013E",   // Ľ ľ
+    "Lslash": "U+0141", "lslash": "U+0142",   // Ł ł
+    "Nacute": "U+0143", "nacute": "U+0144",   // Ń ń
+    "Ncaron": "U+0147", "ncaron": "U+0148",   // Ň ň
+    "Oacute": "U+00D3", "oacute": "U+00F3",   // Ó ó
+    "Odblacute": "U+0150", "odblacute": "U+0151", // Ő ő
+    "Rcaron": "U+0158", "rcaron": "U+0159",   // Ř ř
+    "Sacute": "U+015A", "sacute": "U+015B",   // Ś ś
+    "Scaron": "U+0160", "scaron": "U+0161",   // Š š
+    "Tcaron": "U+0164", "tcaron": "U+0165",   // Ť ť
+    "Uacute": "U+00DA", "uacute": "U+00FA",   // Ú ú
+    "Udblacute": "U+0170", "udblacute": "U+0171", // Ű ű
+    "Uring": "U+016E", "uring": "U+016F",     // Ů ů
+    "Yacute": "U+00DD", "yacute": "U+00FD",   // Ý ý
+    "Zacute": "U+0179", "zacute": "U+017A",   // Ź ź
+    "Zcaron": "U+017D", "zcaron": "U+017E",   // Ž ž
+    "Zdotaccent": "U+017B", "zdotaccent": "U+017C"  // Ż ż
+  },
+  "cp1250_slots": {
+    "0x8A": "Scaron",    // Š
+    "0x8C": "Ccaron",    // Č
+    "0x8E": "Zcaron",    // Ž
+    "0x98": "Rcaron",    // Ř
+    "0x9A": "scaron",    // š
+    "0x9C": "ccaron",    // č
+    "0x9E": "zcaron",    // ž
+    "0x9F": "Uring",     // Ů
+    "0xA5": "Lcaron",    // Ľ
+    "0xA9": "Scaron",    // Š (duplicate)
+    "0xAA": "Sacute",    // Ś
+    "0xAB": "Ccaron",    // Č (duplicate)
+    "0xAC": "Zcaron",    // Ž (duplicate)
+    "0xAE": "Zdotaccent",// Ż
+    "0xAF": "Tcaron",    // Ť
+    "0xB3": "lcaron",    // ľ
+    "0xB9": "scaron",    // š (duplicate)
+    "0xBA": "sacute",    // ś
+    "0xBB": "ccaron",    // č (duplicate)
+    "0xBC": "zcaron",    // ž (duplicate)
+    "0xBE": "zdotaccent",// ż
+    "0xBF": "tcaron",    // ť
+    "0xC0": "Rcaron",    // Ř (duplicate)
+    "0xC3": "Aacute",    // Á
+    "0xC5": "Lacute",    // Ĺ
+    "0xC6": "Cacute",    // Ć
+    "0xC8": "Ccaron",    // Č
+    "0xCA": "Ecaron",    // Ě
+    "0xCC": "Iacute",    // Í
+    "0xD0": "Dcaron",    // Ď
+    "0xD1": "Ncaron",    // Ň
+    "0xD3": "Oacute",    // Ó
+    "0xD5": "Odblacute", // Ő
+    "0xD8": "Rcaron",    // Ř
+    "0xDA": "Uacute",    // Ú
+    "0xDB": "Uring",     // Ů
+    "0xDC": "Udblacute", // Ű
+    "0xDD": "Yacute",    // Ý
+    "0xDE": "Tcaron",    // Ť
+    "0xE0": "rcaron",    // ř
+    "0xE3": "aacute",    // á
+    "0xE5": "lacute",    // ĺ
+    "0xE6": "cacute",    // ć
+    "0xE8": "ccaron",    // č
+    "0xEA": "ecaron",    // ě
+    "0xEC": "iacute",    // í
+    "0xF0": "dcaron",    // ď
+    "0xF1": "ncaron",    // ň
+    "0xF3": "oacute",    // ó
+    "0xF5": "odblacute", // ő
+    "0xF8": "rcaron",    // ř
+    "0xFA": "uacute",    // ú
+    "0xFB": "uring",     // ů
+    "0xFC": "udblacute", // ű
+    "0xFD": "yacute",    // ý
+    "0xFE": "tcaron"     // ť
+  }
+}

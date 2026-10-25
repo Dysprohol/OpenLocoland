@@ -50,7 +50,7 @@ and OpenLocoland is put together from it on your computer. Your Steam game stays
    it (Windows may warn about an unknown publisher: "More info" > "Run anyway"). It finds the
    Steam game and installs OpenLocoland into a folder of its own; you choose the language and the
    two extras there.
-3. Start **OpenLocoland** or **OpenLocoland - Map Editor** from the desktop or the Start menu.
+3. Start **Locoland** or **Locoland - map editor** from the desktop or the Start menu.
 
 Running a newer `Setup.exe` updates the game and keeps your maps, scores and progress. The
 player's guide tells the rest, the editor with a step-by-step first mission included:
@@ -94,6 +94,16 @@ rest around it: the bar, the tools and the help in the look of the game.
 
 Nothing of the game is in this repository: game files are taken from the player's own Steam copy
 when the game is put together, and our changes to them are kept as patches.
+
+## Thanks
+
+OpenLocoland is better thanks to the people who gave something of their own to it:
+
+- **[JohnVitoScaletta](https://steamcommunity.com/profiles/76561199078710882/)** (Steam) - the
+  Czech fan translation of the game.
+- **Danetry** (Discord) - support of the Czech fan translation of the game).
+- **just_Martin** (Discord) - the OpenLocoland logo (the installer's header and the launcher's
+  picture).
 
 ## Credits
 
