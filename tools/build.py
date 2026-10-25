@@ -54,6 +54,18 @@ import sys
 # In the installer (tools/release.py, frozen by PyInstaller) the repository's files are unpacked
 # into sys._MEIPASS with the same layout.
 REPO = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def safe_relpath(path, start):
+    """os.path.relpath that works across drives on Windows.
+    If paths are on different drives, returns the absolute path (since no relative path exists)."""
+    try:
+        return os.path.relpath(path, start)
+    except ValueError:
+        # Different drives on Windows - return absolute path
+        return os.path.abspath(path)
+
+
 sys.path.insert(0, os.path.join(REPO, "tools"))
 import build_locofix  # noqa: E402
 import languages  # noqa: E402
@@ -125,7 +137,7 @@ def english_files():
     out = {}
     for directory, _, files in os.walk(folder):
         for f in files:
-            rel = os.path.relpath(os.path.join(directory, f), folder)
+            rel = safe_relpath(os.path.join(directory, f), folder)
             if languages.is_language_file(rel):
                 out[os.path.normcase(rel)] = os.path.join(directory, f)
     return out
@@ -138,7 +150,7 @@ def game_files(game):
             subdirs[:] = [d for d in subdirs
                           if d.lower() not in (OBJECTS_OVERRIDE, MAPS_OVERRIDE, MAPS_NEW, EDITOR_DATA)]
         for f in files:
-            yield os.path.relpath(os.path.join(directory, f), game)
+            yield safe_relpath(os.path.join(directory, f), game)
 
 
 def map_overrides(game, steam):
@@ -173,14 +185,14 @@ def new_maps(game, target, counter):
         if os.path.isfile(os.path.join(vid, "vid.json")):
             map_tool.pack(vid, os.path.join(out, name + ".vid"))
         for directory, subdirs, files in os.walk(folder):
-            rel = os.path.relpath(directory, folder)
+            rel = safe_relpath(directory, folder)
             if rel == ".":
                 subdirs[:] = [d for d in subdirs if d.lower() != "vid"]
             for f in files:
                 if rel == "." and f.lower() in MAP_MODEL:
                     continue
                 dst = os.path.join(out, f) if rel == "." else os.path.join(out, rel, f)
-                if player_data(os.path.relpath(dst, target)) and os.path.exists(dst):
+                if player_data(safe_relpath(dst, target)) and os.path.exists(dst):
                     continue   # the high scores of a map: the game writes them
                 copy(os.path.join(directory, f), dst, counter)
         built.append(name)
@@ -228,7 +240,7 @@ def steam_original(steam, path):
     """The content of a Steam file our changes apply to; maps\\script\\constants.lgc with the
     `#define KEYS_ENABLE` lines of a player left out when that gives the original exactly."""
     data = patch_text.read(path)
-    rel = os.path.relpath(path, steam)
+    rel = safe_relpath(path, steam)
     if os.path.normcase(rel) != os.path.normcase(CONSTANTS_LGC):
         return data
     if hashlib.sha256(data).hexdigest() != known_sha256(rel):
@@ -252,7 +264,7 @@ def modified_steam_files(steam):
         folder = os.path.join(languages.LANG, code)
         for directory, _, files in os.walk(folder):
             for f in files:
-                rel = os.path.relpath(os.path.join(directory, f), folder)
+                rel = safe_relpath(os.path.join(directory, f), folder)
                 if rel.endswith(".patch") and not languages.is_language_file(patch_text.target_name(rel)):
                     changes.append((os.path.join(folder, rel), patch_text.target_name(rel)))
     bad = set()
@@ -338,7 +350,7 @@ def build(steam, target, locofix=None, captured=None, progress=None):
                      if rel.endswith(".patch")}
 
     for directory, subdirs, files in os.walk(a.steam):
-        rel = os.path.relpath(directory, a.steam)
+        rel = safe_relpath(directory, a.steam)
         if rel == ".":
             subdirs[:] = [d for d in subdirs if d.lower() in GAME_ROOT_DIRS - SKIPPED_DIRS]
         for f in files:

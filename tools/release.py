@@ -21,6 +21,17 @@ import shutil
 import subprocess
 import sys
 
+
+def safe_relpath(path, start):
+    """os.path.relpath that works across drives on Windows.
+    If paths are on different drives, returns the absolute path (since no relative path exists)."""
+    try:
+        return os.path.relpath(path, start)
+    except ValueError:
+        # Different drives on Windows - return absolute path
+        return os.path.abspath(path)
+
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "tools"))
 import build_locofix  # noqa: E402
@@ -56,7 +67,7 @@ def collect(dll, ver):
     tracked = {os.path.normcase(os.path.normpath(p)) for p in git("ls-files", "game", "lang").splitlines()}
     for directory, _, files in os.walk(PAYLOAD):
         for f in files:
-            rel = os.path.relpath(os.path.join(directory, f), PAYLOAD)
+            rel = safe_relpath(os.path.join(directory, f), PAYLOAD)
             top = rel.split(os.sep)[0].lower()
             if top in ("game", "lang") and os.path.normcase(rel) not in tracked:
                 os.remove(os.path.join(directory, f))

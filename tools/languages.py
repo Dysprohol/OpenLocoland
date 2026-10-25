@@ -31,6 +31,16 @@ import shutil
 import sys
 
 REPO = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def safe_relpath(path, start):
+    """os.path.relpath that works across drives on Windows.
+    If paths are on different drives, returns the absolute path (since no relative path exists)."""
+    try:
+        return os.path.relpath(path, start)
+    except ValueError:
+        # Different drives on Windows - return absolute path
+        return os.path.abspath(path)
 sys.path.insert(0, os.path.join(REPO, "tools"))
 import patch_text  # noqa: E402
 
@@ -159,7 +169,7 @@ def capture(code, game_folder, force=False):
     for directory, _, files in os.walk(game_folder):
         for f in files:
             src = os.path.join(directory, f)
-            rel = os.path.relpath(src, game_folder)
+            rel = safe_relpath(src, game_folder)
             if not is_language_file(rel):
                 continue
             dst = os.path.join(target, rel)
@@ -182,13 +192,13 @@ def install(code, game_folder, target, copy, read_original=None):
     ours = []
     for directory, _, files in os.walk(os.path.join(LANG, code)):
         for f in files:
-            rel = os.path.relpath(os.path.join(directory, f), os.path.join(LANG, code))
+            rel = safe_relpath(os.path.join(directory, f), os.path.join(LANG, code))
             ours.append(rel)
             changed_names.add(os.path.normcase(patch_text.target_name(rel) or rel))
 
     for directory, _, files in os.walk(source):
         for f in files:
-            rel = os.path.relpath(os.path.join(directory, f), source)
+            rel = safe_relpath(os.path.join(directory, f), source)
             if os.path.normcase(rel) not in changed_names:
                 copy(os.path.join(source, rel), os.path.join(pack, rel))
 

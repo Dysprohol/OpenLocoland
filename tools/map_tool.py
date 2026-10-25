@@ -86,6 +86,17 @@ import res_tool  # noqa: E402
 CHUNK_FLAGS = 0x80000000        # header of every chunk in the shipped files: flags, extra 0
 END = -1                        # end marker of SPR, SPRD, GROU
 
+
+def safe_relpath(path, start):
+    """os.path.relpath that works across drives on Windows.
+    If paths are on different drives, returns the absolute path (since no relative path exists)."""
+    try:
+        return os.path.relpath(path, start)
+    except ValueError:
+        # Different drives on Windows - return absolute path
+        return os.path.abspath(path)
+
+
 # ------------------------------------------------------------------ common ----
 
 
@@ -1981,7 +1992,7 @@ def check(game):
             for p, problem in zip(files, results):
                 if problem:
                     failed += 1
-                    print(f"FAILED {os.path.relpath(p, game)}: {problem}")
+                    print(f"FAILED {safe_relpath(p, game)}: {problem}")
     finally:
         shutil.rmtree(work, ignore_errors=True)
     maps = sum(f.lower().endswith(".map") for f in files)

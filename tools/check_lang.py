@@ -36,6 +36,16 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "tools"))
 import languages  # noqa: E402
 
+
+def safe_relpath(path, start):
+    """os.path.relpath that works across drives on Windows.
+    If paths are on different drives, returns the absolute path (since no relative path exists)."""
+    try:
+        return os.path.relpath(path, start)
+    except ValueError:
+        # Different drives on Windows - return absolute path
+        return os.path.abspath(path)
+
 FONT_FILES = {2: "font8x13.bmp", 3: "font-MainMenuTitles.bmp", 6: "font-Mousetips.bmp",
               7: "font8x13light.bmp", 14: "font-Objectives.bmp"}
 STRINGS_FONTS = (2, 6, 7)
@@ -98,7 +108,7 @@ def ini_texts(path):
             (section == "Editor" and (key in EDITOR_TITLES or key.startswith("Group")))
         fonts = STRINGS_FONTS + ((TITLE_FONT,) if header else ())
         # \n and \t of the editor's texts are escapes, not letters
-        out.append((f"{os.path.relpath(path, REPO)}:{n} [{section}] {key}",
+        out.append((f"{safe_relpath(path, REPO)}:{n} [{section}] {key}",
                     value.replace(b"\\n", b" ").replace(b"\\t", b" "), fonts))
     return out
 
@@ -118,7 +128,7 @@ def map_texts(path):
                 continue
             clean.append(line[i])
             i += 1
-        out.append((f"{os.path.relpath(path, REPO)}:{n}", bytes(clean), used))
+        out.append((f"{safe_relpath(path, REPO)}:{n}", bytes(clean), used))
     return out
 
 
