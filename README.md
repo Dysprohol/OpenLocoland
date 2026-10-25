@@ -1,4 +1,4 @@
-<img width="1920" height="1080" alt="logo" src="https://github.com/user-attachments/assets/0e846288-7e7f-4ad5-a072-19a4ae27bc90" />
+![OpenLocoland logo](docs/img/openlocoland_logo.png)
 
 ![A mission of Locoland on a wide screen](docs/img/widescreen.jpg)
 
@@ -50,7 +50,7 @@ and OpenLocoland is put together from it on your computer. Your Steam game stays
    it (Windows may warn about an unknown publisher: "More info" > "Run anyway"). It finds the
    Steam game and installs OpenLocoland into a folder of its own; you choose the language and the
    two extras there.
-3. Start **Locoland** or **Locoland - map editor** from the desktop or the Start menu.
+3. Start **OpenLocoland** or **OpenLocoland - Map Editor** from the desktop or the Start menu.
 
 Running a newer `Setup.exe` updates the game and keeps your maps, scores and progress. The
 player's guide tells the rest, the editor with a step-by-step first mission included:
