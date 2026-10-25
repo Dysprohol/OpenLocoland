@@ -1,5 +1,4 @@
-<img width="1920" height="1080" alt="obraz" src="https://github.com/user-attachments/assets/f71ef310-633d-4f64-a9bd-925f0cbd1905" />
-# OpenLocoland
+<img width="1920" height="1080" alt="logo" src="https://github.com/user-attachments/assets/0e846288-7e7f-4ad5-a072-19a4ae27bc90" />
 
 ![A mission of Locoland on a wide screen](docs/img/widescreen.jpg)
 
