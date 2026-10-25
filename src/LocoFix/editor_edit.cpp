@@ -73,6 +73,8 @@ const char* object_name(int nvid);  // editor_panel.cpp: the palette's names of 
 bool palette_state(int nvid, int& behave, std::vector<short>& items);   // editor_panel.cpp
 int palette_icon(int nvid);                                             // editor_panel.cpp
 void panel_open_palette(bool vehicles);   // editor_panel.cpp: All objects, or the vehicles
+void load_palette();                                                    // editor_panel.cpp
+extern "C" void reset_palette_cache();                                  // editor_panel.cpp
 bool editor_level_held();           // editor.cpp
 std::string map_ground_image(const std::string& map);   // editor_newmap.cpp: the image file of a map's ground
 void editor_mission_settings();     // editor.cpp: File > Mission settings...
@@ -5223,6 +5225,8 @@ void install_editor_edit() {
 // editor.cpp after a level is held: the decals it has, for the bar.
 void edit_level_held() {
     set_army_gammas();
+    // Reset palette cache so editor icons use correct frames after run mode
+    reset_palette_cache();
     find_decals();
     choose_default_decal();
     log_push_lines();

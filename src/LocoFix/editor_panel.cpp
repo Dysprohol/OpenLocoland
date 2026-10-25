@@ -191,6 +191,13 @@ void load_palette() {
                static_cast<unsigned>(g_all_groups.size()));
 }
 
+extern "C" void reset_palette_cache() {
+    g_palette.clear();
+    g_all_groups.clear();
+    g_groups.clear();
+    load_palette();
+}
+
 void show_groups(bool vehicles) {
     if (vehicles != g_vehicles || g_groups.empty()) {
         g_group = 0;
