@@ -1255,7 +1255,7 @@ front of the game's:
 - File > Load... (Alt+F3): a Windows open dialog in the folder of the current map; the map is
   then loaded the way script `Load()` does it (`World.nextLevelFile` and flags 0x40, loaded by
   `Game_Step`) and held,
-- File > Save... (Alt+F2): a save dialog, then `Level_Save` with the name as a String of the
+- File > Save... (Alt+F2, ctrl+s): a save dialog, then `Level_Save` with the name as a String of the
   game's heap (a new folder of the name is made), then the map's mission: its script, texts and
   its line on the custom maps page ("Mission settings and push lines" below),
 - File > New...: a new map in its own folder, on a campaign map's terrain or a meadow (below),
