@@ -2179,6 +2179,8 @@ elsewhere they are refused with the reason in the status line:
 | fort | the line of the straight rail nearest within 60 px (`rail_line_spot`: its two ends' segment), where the cursor falls on it, turned along it the way nearest to the direction chosen - all 20 forts of the missions stand 0-6 px from such a line (R / E turn it round there) | its guns |
 | Charybdis | the line of the straight rail nearest within 100 px through its middle - l06's diagonal passes 1 px from it, so what it pulls in comes within the 40 px it eats in | its pieces |
 | citadel | over the diagonal rail nearest within 80 px, the rail's line 8 px north of its middle - the three citadels of l04 and l18 stand over the crossing of two diagonal tracks, which cross there, a grate on each southern arm | its pieces and tower |
+| crusher | across the straight rail nearest within 60 px, its middle on the rail's line, the drums on both sides - its form (the stands' direction) by the track's way, as `Pirate_Crasher` puts the ten of l04 and l18 | its second stand and drums |
+| Scylla | on the diagonal rail nearest within 60 px, the stand on its line, the jaws across it - direction 0 on a track rising to the right, 128 on one falling, as l06's two | its jaws |
 
 Dragging one of them puts it at the place on the track nearest to where it is dropped (with a new
 line and posts for a factory or repair point; a fort, a citadel or Charybdis with all that goes with
@@ -2249,6 +2251,32 @@ runner does what the missions' scripts do: `CitadelTact` (l04 / l18 `GratesTact`
 whose tower stands, `CharybdisTact` (l06) for every Charybdis whose eye lives, `NestTact` (l06's two
 nests) for every nest - the panel's FLIES: GREEN, IN WAVES / GREY, ON GUARD, kept as the nest's
 direction (0 / 64), which a nest of one direction does not show.
+The crusher and Scylla, which l04 / l18 and l06 make by script, and the decorations' sets the
+missions always give their host (MAP_RULES.md 6b, 6c) are wholes the same way: a `Piece` may stand by
+the host's frame (`pieces_of_kind(host, direction)`, the engine's `((direction + 128 / nDir) & 255) *
+nDir >> 8`: a crusher's form, a chimney's height, a station's ridge) and a slot may hold one of
+several VIDs or nothing (`choices`, `optional`: the panel's row - CORKSCREW: WHOLE / BROKEN, ON TOP:
+CORKSCREW / STONE / NONE, FLAG:, SMOKE:, FOUNTAIN: -, `set_piece`, one step of the history); turning
+or a snap onto a track of another way puts the pieces at their new places (`arrange_pieces`). The
+crusher's host is its first stand (144): it snaps across the straight track nearest within 60 px,
+its form by the track's way; Scylla's stand (252) onto a diagonal track; the track turns both. The
+runner's `CrusherTact` bites as `Pirate_Crasher` (all the map's crushers together every 25 s, the
+units of other armies within 20 px, paused while one of its own is within 60 px; dead drums once
+its army's towers 117 are all gone - the map had some), `ScyllaTact` as `scillas.lgc` (every 15 s,
+every ground unit within 50 px; a Scylla given an army spares it), and `CitadelTact` breaks every
+corkscrew of the map once no tower stands, as `ReplaceUnit` in l04 and l18. A mission's own records
+are found by their offsets (10 px, the slot's height within 30), so editing l20 moves a flag with its
+pole. The survey of all 20 missions behind these - which sets are real, which only look so - is in
+MAP_RULES.md 6b / 6c. Checked in the game (a map of four straight tracks on the sandbox's ground):
+the crusher took form 1 across a track falling to the right, Scylla forms 0 and 1 on the two
+diagonals, every set came from the palette with its pieces, a border post's panel made its corkscrew
+broken and back with Ctrl+Z, dragging and Del took the whole (`deleted VID 145 ... and 1 more`), a
+station turned three steps kept its flag on its tower, records laid as the missions have them (a
+flagpole and flag of l20, an exit and stone of l09, chimneys and smoke of l14, a station and flag of
+l18) were each selected and deleted as one; played: the crusher and Scylla destroyed the locomotives
+of ours in their reach and spared one 40 px away, an enemy Scylla spared the enemy's two beside it
+(`ours 1 -> 0, enemy 2 -> 2` at its bite), and with the citadel's tower destroyed by a test line the
+corkscrews broke and the crusher of its army stopped (`CRUSHER 1 stops: no tower of its army left`).
 The explosive mine (86) snaps to the
 rail point nearest within 40 px, is placed in the army of the palette's row and is marked with its
 army by the editor (`draw_mines`: a square in the army's colour and MINE: ENEMY; the engine hides a
@@ -2468,11 +2496,11 @@ pictures (22 px right of the device's middle, 18 up), the title in the menu titl
 the text in the menu font (VID 2), the page arrows (VIDs 475/476) and the start button (VID 477)
 with "back to the map". **Help** (the ? button or F1) shows the editor's help pages the way the
 game shows its own (`maps\menu4.lst` -> `menu41.txt` ...): `maps\edithelp.lst` lists
-`maps\edithelp1.txt` ... `edithelp17.txt` - in the order a new user needs them: what the editor
+`maps\edithelp1.txt` ... `edithelp18.txt` - in the order a new user needs them: what the editor
 is (the bar, the status line, the two buttons), the bar's tools, selecting and placing (the mouse,
 undo), the keys, laying track, trains, the object's panel, all objects and decals, the mission,
 saving and playing, the ground (height, paint, water, regions, map size), the ground tools' rows,
-then the train arrivals and the orders (13, 14) turning (15) and the citadel, Charybdis, fly nests and mines (16; page 1 names 13-16), a factory's plan (17) - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
+then the train arrivals and the orders (13, 14) turning (15) and the citadel, Charybdis, fly nests and mines (16; page 1 names 13-16), a factory's plan (17), the crusher, Scylla and the decorations' sets (18) - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
 44 characters a line - the ESC pairs not counted, so a line with lit words is longer in the file - and 14
 lines, ESC 7 / ESC 2 switch to the lit font VID 7 and back to VID 2):
 English in `game/maps/` (the fallback of every pack) and the others in `lang/<code>/game/editor/`; the files are

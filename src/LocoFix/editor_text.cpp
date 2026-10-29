@@ -183,6 +183,11 @@ const char* ui_unit_name(int nvid) {
         char value[256];
         const auto get = *reinterpret_cast<GetString_t*>(IAT_GetPrivateProfileStringA);
         get("Units", std::to_string(nvid).c_str(), MISSING, value, sizeof value, ini_path().c_str());
+        int other = 0;   // "{Units:143}": the name of another one (the crusher's stand 144 is the crusher's)
+        if (std::sscanf(value, "{Units:%d}", &other) == 1 && other != nvid) {
+            const char* name = ui_unit_name(other);
+            std::snprintf(value, sizeof value, "%s", name ? name : MISSING);
+        }
         it = names.emplace(nvid, std::strcmp(value, MISSING) == 0 ? std::string() : std::string(value)).first;
     }
     return it->second.empty() ? nullptr : it->second.c_str();

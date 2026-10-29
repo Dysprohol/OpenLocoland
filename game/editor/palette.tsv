@@ -117,6 +117,7 @@ GroupSwamp	212	0	Obj212	Yellow swamp grass
 GroupSwamp	925	0	Obj925	Tussock
 GroupSwamp	911	0	Obj911	Swamp reeds
 GroupSwamp	254	1		
+GroupSwamp	252	2		
 GroupPark	923	0	Obj923	Round tree
 GroupPark	858	0	Obj858	Park teat tree
 GroupPark	932	0	Obj932	Yellow tree
@@ -143,6 +144,7 @@ GroupPirates	147	0	Obj147	Broken corkscrew
 GroupPirates	146	0	Obj146	Citadel grate
 GroupPirates	149	1		
 GroupPirates	148	1		
+GroupPirates	144	1		
 GroupCity	816	0	Obj816	Tall building 1
 GroupCity	808	0	Obj808	Tall building 2
 GroupCity	819	0	Obj819	Tall building 3

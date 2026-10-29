@@ -221,14 +221,16 @@ and (+36, +25), 33 below it (sunk: the gate open; directions 128 and 0), and fou
 army 0, the tower army 1. Nothing in the engine ties them: the kill system is the missions' script
 (`pirates.lgc` `GratesTact`): while the tower stands, the first unit of the player's within 100 px of
 the citadel is stopped and gets 300 damage, the grates rise 34 px in 1 s, stay up 1 s and sink in 1 s
-(SFX 45); when the tower is destroyed the grates stay down and the corkscrews break (142 -> 147). The
-crushers of `pirates.lgc` (143 / 144) are made by the script at points of the track far from the
-citadels and are not part of them. **[editor]** a citadel is placed with all its pieces as one object
+(SFX 45); when the tower is destroyed the grates stay down and every corkscrew of the map breaks
+(`ReplaceUnit(142,147)`: the citadel's, the border posts' and the level exits' alike; l18 waits until
+all its towers are down). The crushers of `pirates.lgc` (143 / 144, 6b) are made by the script at
+points of the track far from the citadels and are not part of them. **[editor]** a citadel is placed with all its pieces as one object
 (moved, raised and deleted with them; a click on a piece selects it; its panel puts missing pieces
 back); the faction is its tower's army (the missions' citadels are army 0 with an enemy tower): a new
 citadel is placed in its faction's army - the enemy's from the palette - and its panel's ARMY row shows
 and sets the faction; the runner's `CitadelTact` (8) works the gate of every citadel whose tower stands: the
-first unit within 100 px of another army than the tower's, the neutrals aside.
+first unit within 100 px of another army than the tower's, the neutrals aside; once no tower of the map
+stands, every corkscrew breaks.
 
 Measured over the 20 missions: all 37 factories and repair points stand on the track (the nearest
 rail 1-38 px, one at 68); a factory's exit line runs 100-175 px from inside it along its spur, a
@@ -285,7 +287,33 @@ all its pieces as one object, the line of the nearest straight track within 100 
 middle as in l06, in its faction's army - the enemy's from the palette, its ARMY row the faction; the
 runner's `CharybdisTact` (8) does what l06 does for every Charybdis: it pulls in every other army's
 units and eats the player's (a Charybdis of the player's eats the enemy's).
-Scylla (252 / 253, l06's `scillas.lgc`) is not made a whole: the script makes its jaws.
+
+**Crushers** (l04 2, l18 8; not in the maps). `pirates.lgc` `Pirate_Crasher` makes each one on a
+point of a straight track: two stands (144, turned 64 * its form) and two drums (143) on both sides of
+the track - from its middle the stands at +-S and the drums at +-C, S / C (0, 22) / (0, 30) across a
+horizontal track (form 0), (-22, 15) / (-30, 20) across one falling to the right (1, rails of
+direction 20), (-33, 0) / (-45, 0) across a vertical one (2), (-22, -15) / (-30, -20) across one rising
+(3, rails 13); the missions have forms 1 and 3 only, their middles 0-20 px from a rail point. All the
+map's crushers bite together: 25 s after the last bite the drums close half way in 300 ms (the units
+within 20 px are stopped, SFX 33, the drums SALUT), chew 2 s and open in 300 ms, 200 damage a frame
+to the units within 20 px meanwhile - of any army in l04, the player's in l18 -, and not while a unit of
+army 1 is within 60 px of a crusher (the pirates' own trains pass). When the towers (117) are down
+the drums die (143 -> 139) and the crushers stop. **[editor]** the crusher (pirates; its host is the
+first stand) is placed across the straight track nearest within 60 px, its form by the track's way
+(turned by its track), in its faction's army - the enemy's from the palette: the runner's
+`CrusherTact` (8) bites the units of other armies (the neutrals aside), pauses while a unit of its own
+army is within 60 px, and stops with dead drums once the map had towers of its army and none is left.
+
+**Scylla** (l06 2; `scillas.lgc`). The map holds the two stands (252) only - the designer's marks; the
+script makes a stand 20 below its point and two jaws (253) +-(15, 10) beside it across the swamp
+track: (-15, -10) direction 0 and (+15, +10) direction 128 on a track rising to the right (the stand's
+direction 0), (-15, +10) 64 and (+15, -10) 192 on one falling (128). Both bite together from 3.5 s
+into the mission, every 15 s: the jaws close in 300 ms (every ground unit within 50 px is stopped),
+chew 2 s (an earthquake, SFX 57; the jaws jitter) and open in 300 ms, 200 damage a frame to every
+ground unit within 50 px, of any army; it never dies. **[editor]** placed (swamp) on the diagonal
+track nearest within 60 px, the stand on its line and the jaws 20 above it, its form by the track's
+way, neutral (army 2) from the palette; the runner's `ScyllaTact` (8) bites as l06's - a neutral
+Scylla every army, one given an army by its ARMY row all but that army.
 
 **Fly nests** (265, l06). A nest (a unit, 225 hp, army 1) spawns nothing by itself; l06's script
 does: the eastern nest waves of green flies (263) - 2 for every AA gun (VID 30) on the map, less up
@@ -309,6 +337,30 @@ first five of a map an enemy mine one time in three and deletes them all. One mi
 on the rail point nearest within 40 px; every mine and marker is marked on the map with its army
 (MINE: ENEMY, MINE 1 IN 3: ENEMY), the editor's drawing only - in play the engine hides it from the
 other armies; a marker's panel makes it a mine. The palette has the mine, not the marker.
+
+## 6c. Sets of the decorations
+
+Some decorations are always placed with another object at a fixed offset (measured over the 20
+missions, `piece - host`, the stored y; the survey's table is in DEVELOPERS.md "Editor mode"):
+
+| host | piece | offset | how often |
+|---|---|---|---|
+| 145 border post | corkscrew 142 (l16: broken 147) | (+1, +1, +58) | 14 / 14 |
+| 100 level exit | corkscrew 142 / stone on a pedestal 411 / none | (+1, 0, +106) / (+1, -1, +100) | 10 / 4 / 1 of 15 |
+| 769 flagpole | flag 770 / 771, direction 32 (the wind) | (0, 0, +118) / (0, 0, +92) | 74 / 12 of 86 |
+| 170 station | flag 773 / 770 on its ridge, direction 32 | by its frame: (0, -4) (3, -2) (3, 1) (0, 3) (-3, 2) (-3, -2) at 0, 32, 96, 128, 160, 224; +121 / +127 | 23 / 6 / 2 none of 31 |
+| 631 oil derrick | orange glow 365 (the torch 883 is the engine's link) | (+1, -4, +150) | 30 / 32 |
+| 880 factory chimneys | smoke generator 291 | (0, +2..+4), by its frame (nDir 7): +100, +114, +128, +140, +100, +114, +128 | 81 / 114 |
+| 881 wide chimneys | chimney glow 555 | by its frame (nDir 3): (0, +4, +102), (0, +2, +102), (-1, +5, +82) | 29 / 29 |
+| 928 pool | water 930; fountain 903 | (+1, +1, +26); (0, -2, +24) | 3 / 3; 2 / 3 |
+
+A frame is the engine's: `((direction + 128 / nDir) & 255) * nDir >> 8`. Not sets (the authors
+dressed them by eye or on one map): the mine annex 168 with a glow (61 %, offsets wander 10 px), the
+ice houses' and the swamp chimney's smoke (under half), the pirate walls with fence posts (runs),
+storeys of a building stacked on copies of it, piles of crates. **[editor]** each is placed, moved,
+turned, raised and deleted as one object; a click on a piece selects the host; the panel has a row for
+a piece of several kinds (CORKSCREW: WHOLE / BROKEN, ON TOP:, FLAG:, SMOKE:, FOUNTAIN:) and puts back a
+missing one; a map's own records are found again by their offsets.
 
 ## 7. Semaphores (VID 152)
 
@@ -391,8 +443,9 @@ other armies; a marker's panel makes it a mine. The palette has the mine, not th
   the `LIMITxx` defines `InitDefault` reads would set the wrong slot), run by `ArrivalsTact()`
   of a block `// <editor arrivals>` after `header.lgc` and called from `// <editor tact>` after
   `TrainsTact();`. The same block's `PiecesTact()` (every frame, from `ArrivalsTact`) works the
-  citadels, Charybdis and the fly nests of the map (6, 6b); it finds them at the start by their
-  towers, eyes and nests and logs `CITADEL`, `CHARYBDIS` and `NEST` lines in `error.log`. The win and loss of the template wait for `ArrivalsLeft(army)`. Limits: the AI
+  citadels, Charybdis, the fly nests, the crushers and Scylla of the map (6, 6b); it finds them at
+  the start by their towers, eyes, nests and stands (the stands with `FirstSprite`, once) and logs
+  `CITADEL`, `CHARYBDIS`, `NEST`, `CRUSHER` and `SCYLLA` lines in `error.log`. The win and loss of the template wait for `ArrivalsLeft(army)`. Limits: the AI
   has 16 trains (`ai_trains`), 10 patrols and 10 posts for the start trains, the queue and the
   arrivals together; only army 1 has an AI.
 - **[editor]** The factories' plans (a factory's panel): `PLANS`, `plan_*[]` and `PRICES`,

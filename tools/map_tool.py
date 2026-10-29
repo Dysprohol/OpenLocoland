@@ -1188,10 +1188,29 @@ ArrivalOnPoint(int i)
 // guard): green flies (263) in waves of 2-4 (2 for every AA gun of the map, less up to as many)
 // 25 s after the last of them is gone, or grey flies (262) on guard: 1-2 while a unit of another
 // army (not a factory or repair point) is within 400 px and none is left, 3 s after, and 6-9 when
-// the nest is destroyed; the flies are of the nest's army.
+// the nest is destroyed; the flies are of the nest's army. When the pirates' towers (117) of the map
+// are all gone, every corkscrew (142) breaks, as ReplaceUnit in l04 and l18. A crusher (two stands
+// 144 and two drums 143 across the track; the first stand at +S from its middle, turned 64 * its
+// form) as l04 and l18's (pirates.lgc Pirate_Crasher): every 25 s the crushers bite together - the
+// drums close half way in 0.3 s (a unit of another army than the crusher's, the neutrals aside,
+// within 20 px is stopped), chew 2 s (SFX 33) and open in 0.3 s, 200 damage a frame to those units
+// meanwhile -, but not while a unit of a crusher's army is within 60 px of it; when the map had towers
+// of its army and none is left, its drums die (139) and it stops. Scylla (252 with its jaws 253) as
+// l06's (scillas.lgc): every 15 s the Scyllas bite together - the jaws close in 0.3 s (every ground
+// unit within 50 px is stopped), chew 2 s (an earthquake, SFX 57) and open in 0.3 s, 200 damage a
+// frame to every ground unit within 50 px meanwhile; a neutral Scylla (army 2, l06's) bites every
+// army, one of another army spares its own.
 int pc_n=-1,pc_x[8],pc_y[8],pc_z[8],pc_army[8],pc_g1[8],pc_g2[8],pc_mode[8],pc_time[8];
 int ch_n=-1,ch_x[4],ch_y[4],ch_army[4],ch_teeth[4],ch_guns[4],ch_peace[4],ch_ate[4],ch_time[4];
 int fn_n=-1,fn_x[8],fn_y[8],fn_army[8],fn_guard[8],fn_left[8],fn_vid[8],fn_time[8],fn_dead[8],fn_check=0;
+int pc_towers=0;
+int cr_n=-1,cr_x[16],cr_y[16],cr_z[16],cr_army[16],cr_d1[16],cr_d2[16],cr_cx[16],cr_cy[16],cr_tower[16];
+int cr_mode=0,cr_time=0,cr_bite=0,cr_check=0;
+int cr_sx[]={0,-22,-33,-22};
+int cr_sy[]={22,15,0,-15};
+int cr_dx[]={0,-30,-45,-30};
+int cr_dy[]={30,20,0,-20};
+int sc_n=-1,sc_x[8],sc_y[8],sc_z[8],sc_army[8],sc_j1[8],sc_j2[8],sc_cx[8],sc_cy[8],sc_mode=0,sc_time=0,sc_bite=0;
 PieceFoe(int u,int army)
 {
   int a;
@@ -1211,6 +1230,7 @@ CitadelTact()
   if( pc_n<0 )
   {
     pc_n=0;
+    pc_towers=GetVid(117,VID_COUNT);
     for( u=FirstUnit(u_monster); u; u=NextUnit() )
       if( GetUnitVid(u)==117 && pc_n<8 )
       {
@@ -1231,6 +1251,12 @@ CitadelTact()
       }
   }
   t=GetTime();
+  if( pc_towers>0 && !GetVid(117,VID_COUNT) )
+  {
+    ReplaceUnit(142,147);
+    pc_towers=0;
+    Log("CITADEL all towers down: the corkscrews break");
+  }
   for( i=0; i<pc_n; i++ )
   {
     if( pc_mode[i]>=0 && !FindNearestSprite(GETSPRITE_VID+117,pc_x[i],pc_y[i],20) )
@@ -1498,11 +1524,279 @@ NestTact()
   }
   return 1;
 }
+CrusherDrums(int i,int part)
+{
+  if( cr_d1[i] )
+    Action(cr_d1[i],ACT_CHANGE_COOR,cr_x[i]+cr_cx[i]*part/1000,cr_y[i]+cr_cy[i]*part/1000,cr_z[i]);
+  if( cr_d2[i] )
+    Action(cr_d2[i],ACT_CHANGE_COOR,cr_x[i]-cr_cx[i]*part/1000,cr_y[i]-cr_cy[i]*part/1000,cr_z[i]);
+}
+CrusherHits(int i,int damage)
+{
+  int u;
+  if( !cr_d1[i] || !cr_d2[i] )
+    return 0;
+  for( u=FirstUnit(u_monster); u; u=NextUnit() )
+    if( SizeTo(u,cr_x[i],cr_y[i])<20 && PieceFoe(u,cr_army[i]) )
+    {
+      if( damage )
+        Action(u,ACT_DAMAGE,damage);
+      else
+        Action(u,ACT_STOP,1);
+    }
+  return 1;
+}
+CrusherTact()
+{
+  int i,k,s,f,u,t,halt;
+  if( cr_n<0 )
+  {
+    cr_n=0;
+    k=0;
+    for( s=FirstSprite(); s; s=NextSprite() )
+      if( GetUnitVid(s)==144 && k<16 )
+      {
+        cr_d1[k]=s;
+        k++;
+      }
+    for( i=0; i<k; i++ )
+    {
+      s=cr_d1[i];
+      f=(GetDirection(s)/64)%4;
+      cr_x[cr_n]=GetX(s)-cr_sx[f];
+      cr_y[cr_n]=GetY(s)-cr_sy[f];
+      cr_z[cr_n]=GetZ(s);
+      cr_cx[cr_n]=cr_dx[f];
+      cr_cy[cr_n]=cr_dy[f];
+      cr_army[cr_n]=Action(s,ACT_GET_ARMY);
+      if( FindNearestSprite(GETSPRITE_VID+144,cr_x[cr_n]-cr_sx[f],cr_y[cr_n]-cr_sy[f],8) )
+      {
+        cr_d2[cr_n]=FindNearestSprite(GETSPRITE_VID+143,cr_x[cr_n]-cr_cx[cr_n],cr_y[cr_n]-cr_cy[cr_n],10);
+        cr_d1[cr_n]=FindNearestSprite(GETSPRITE_VID+143,cr_x[cr_n]+cr_cx[cr_n],cr_y[cr_n]+cr_cy[cr_n],10);
+        cr_tower[cr_n]=FindNearestSprite(GETSPRITE_VID+117+GETSPRITE_ARMY(cr_army[cr_n]),cr_x[cr_n],cr_y[cr_n],100000)!=0;
+        Log("CRUSHER "+itoa(cr_n+1)+" at "+itoa(cr_x[cr_n])+","+itoa(cr_y[cr_n])+" form "+itoa(f)+" army "+itoa(cr_army[cr_n])+" drums "+itoa((cr_d1[cr_n]!=0)+(cr_d2[cr_n]!=0)));
+        cr_n++;
+      }
+    }
+  }
+  if( !cr_n )
+    return 0;
+  t=GetTime();
+  if( t-cr_check>1000 )
+  {
+    cr_check=t;
+    for( i=0; i<cr_n; i++ )
+      if( cr_tower[i] && !FindNearestSprite(GETSPRITE_VID+117+GETSPRITE_ARMY(cr_army[i]),cr_x[i],cr_y[i],100000) )
+      {
+        cr_tower[i]=0;
+        CrusherDrums(i,1000);
+        if( cr_d1[i] )
+        {
+          CreateSprite(139,GetX(cr_d1[i]),GetY(cr_d1[i]),GetZ(cr_d1[i]));
+          Destroy(cr_d1[i]);
+        }
+        if( cr_d2[i] )
+        {
+          CreateSprite(139,GetX(cr_d2[i]),GetY(cr_d2[i]),GetZ(cr_d2[i]));
+          Destroy(cr_d2[i]);
+        }
+        cr_d1[i]=0;
+        cr_d2[i]=0;
+        Log("CRUSHER "+itoa(i+1)+" stops: no tower of its army left");
+      }
+  }
+  halt=0;
+  for( u=FirstUnit(u_monster); u; u=NextUnit() )
+    for( i=0; i<cr_n; i++ )
+      if( cr_d1[i] && Action(u,ACT_GET_ARMY)==cr_army[i] && SizeTo(u,cr_x[i],cr_y[i])<60 )
+        halt=1;
+  if( cr_mode==0 )
+  {
+    if( !halt && t-cr_bite>25000 )
+    {
+      cr_mode=1;
+      cr_bite=t;
+      cr_time=t;
+    }
+  }
+  else if( cr_mode==1 )
+  {
+    if( halt )
+    {
+      cr_mode=3;
+      cr_time=t;
+    }
+    else if( t-cr_time>300 )
+    {
+      cr_mode=2;
+      cr_time=t;
+      PlaySFX(33);
+      for( i=0; i<cr_n; i++ )
+        if( cr_d1[i] && cr_d2[i] )
+        {
+          CrusherDrums(i,500);
+          Action(cr_d1[i],ANI_SALUT);
+          Action(cr_d2[i],ANI_SALUT);
+        }
+      Log("CRUSHERS bite");
+    }
+    else
+      for( i=0; i<cr_n; i++ )
+        if( CrusherHits(i,0) )
+          CrusherDrums(i,1000-500*(t-cr_time)/300);
+  }
+  else if( cr_mode==2 )
+  {
+    if( halt || t-cr_time>2000 )
+    {
+      cr_mode=3;
+      cr_time=t;
+    }
+    else
+      for( i=0; i<cr_n; i++ )
+        CrusherHits(i,200);
+  }
+  else
+  {
+    if( t-cr_time>300 )
+    {
+      cr_mode=0;
+      for( i=0; i<cr_n; i++ )
+        CrusherDrums(i,1000);
+    }
+    else
+      for( i=0; i<cr_n; i++ )
+      {
+        if( !halt )
+          CrusherHits(i,200);
+        CrusherDrums(i,500+500*(t-cr_time)/300);
+      }
+  }
+  return 1;
+}
+ScyllaJaws(int i,int part)
+{
+  if( sc_j1[i] )
+    Action(sc_j1[i],ACT_CHANGE_COOR,sc_x[i]+sc_cx[i]*part/1000,sc_y[i]+sc_cy[i]*part/1000,sc_z[i]);
+  if( sc_j2[i] )
+    Action(sc_j2[i],ACT_CHANGE_COOR,sc_x[i]-sc_cx[i]*part/1000,sc_y[i]-sc_cy[i]*part/1000,sc_z[i]);
+}
+ScyllaHits(int i,int damage)
+{
+  int u;
+  for( u=FirstUnit(u_monster); u; u=NextUnit() )
+    if( SizeTo(u,sc_x[i],sc_y[i])<50 && (sc_army[i]==2 || Action(u,ACT_GET_ARMY)!=sc_army[i]) )
+    {
+      if( damage )
+        Action(u,ACT_DAMAGE,damage);
+      else
+        Action(u,ACT_STOP,1);
+    }
+}
+ScyllaTact()
+{
+  int i,k,s,t;
+  if( sc_n<0 )
+  {
+    sc_n=0;
+    k=0;
+    for( s=FirstSprite(); s; s=NextSprite() )
+      if( GetUnitVid(s)==252 && k<8 )
+      {
+        sc_j1[k]=s;
+        k++;
+      }
+    for( i=0; i<k; i++ )
+    {
+      s=sc_j1[i];
+      sc_x[sc_n]=GetX(s);
+      sc_y[sc_n]=GetY(s);
+      sc_z[sc_n]=GetZ(s)+20;
+      sc_army[sc_n]=Action(s,ACT_GET_ARMY);
+      sc_cx[sc_n]=-15;
+      sc_cy[sc_n]=-10;
+      if( GetDirection(s)>=64 && GetDirection(s)<192 )
+        sc_cy[sc_n]=10;
+      sc_j1[sc_n]=FindNearestSprite(GETSPRITE_VID+253,sc_x[sc_n]+sc_cx[sc_n],sc_y[sc_n]+sc_cy[sc_n],10);
+      sc_j2[sc_n]=FindNearestSprite(GETSPRITE_VID+253,sc_x[sc_n]-sc_cx[sc_n],sc_y[sc_n]-sc_cy[sc_n],10);
+      if( sc_j1[sc_n] && sc_j2[sc_n] )
+      {
+        Log("SCYLLA "+itoa(sc_n+1)+" at "+itoa(sc_x[sc_n])+","+itoa(sc_y[sc_n])+" army "+itoa(sc_army[sc_n]));
+        sc_n++;
+      }
+    }
+  }
+  if( !sc_n )
+    return 0;
+  t=GetTime();
+  if( sc_mode==0 )
+  {
+    if( t-sc_bite>15000 )
+    {
+      sc_mode=1;
+      sc_bite=t;
+      sc_time=t;
+    }
+  }
+  else if( sc_mode==1 )
+  {
+    if( t-sc_time>300 )
+    {
+      sc_mode=2;
+      sc_time=t;
+      SetEnvironment(ENV_EARTHQUAKE);
+      PlaySFX(57);
+      Log("SCYLLA bites");
+    }
+    else
+      for( i=0; i<sc_n; i++ )
+      {
+        ScyllaHits(i,0);
+        ScyllaJaws(i,1000-1000*(t-sc_time)/300);
+      }
+  }
+  else if( sc_mode==2 )
+  {
+    if( t-sc_time>2000 )
+    {
+      sc_mode=3;
+      sc_time=t;
+      SetEnvironment(ENV_EARTHQUAKE+ENV_STOP);
+      for( i=0; i<sc_n; i++ )
+        ScyllaJaws(i,0);
+    }
+    else
+      for( i=0; i<sc_n; i++ )
+      {
+        ScyllaHits(i,200);
+        Action(sc_j1[i],ACT_CHANGE_COOR,sc_x[i]+Random(3),sc_y[i]+Random(2),sc_z[i]);
+        Action(sc_j2[i],ACT_CHANGE_COOR,sc_x[i]+Random(3),sc_y[i]+Random(2),sc_z[i]);
+      }
+  }
+  else
+  {
+    if( t-sc_time>300 )
+    {
+      sc_mode=0;
+      for( i=0; i<sc_n; i++ )
+        ScyllaJaws(i,1000);
+    }
+    else
+      for( i=0; i<sc_n; i++ )
+      {
+        ScyllaHits(i,200);
+        ScyllaJaws(i,1000*(t-sc_time)/300);
+      }
+  }
+  return 1;
+}
 PiecesTact()
 {
   CitadelTact();
   CharybdisTact();
   NestTact();
+  CrusherTact();
+  ScyllaTact();
 }
 ArrivalsTact()
 {

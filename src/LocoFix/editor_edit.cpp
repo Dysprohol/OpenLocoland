@@ -932,54 +932,151 @@ std::vector<uint8_t*> guns_on(uint8_t* host) {
     return out;
 }
 
-// ---- wholes: the citadel, Charybdis ----
+// ---- wholes: the citadel, Charybdis, crushers, Scylla and the decorations' sets ----
 //
-// Two things of the missions are made of several objects that always stand the same way to each
-// other (measured on all three citadels of l04 and l18 and on l06's Charybdis, offsets rounded):
-// the citadel (149) with its two grates (146) on the two tracks through it, 33 below it (sunk: the
-// gate open), and four corkscrews (142) on its corners, 76-78 up - its tower in its socket above;
-// Charybdis's body (254) with its roots (266, a decal), teeth (255), eye (256), four mortars (258)
-// and two cannons (260). The editor places, moves, raises and deletes each as one object; the
-// runner's PiecesTact (editor_mission.cpp) makes them work in play as l04, l18 and l06 do. Their
-// faction is the army of what fights - the citadel's tower, Charybdis's teeth, eye and guns: the
-// enemy's on the missions' wholes, which are army 0 themselves (gun_army) -; the editor places a
-// whole in its faction's army and its ARMY row sets the faction. The other pieces are army 0, as in
-// the missions.
+// Some things of the missions are made of several objects that always stand the same way to each
+// other (measured over the 20 missions, offsets rounded; MAP_RULES.md 6, 6b and 6c have the
+// survey): the citadel (149) with its two grates (146) on the two tracks through it, 33 below it
+// (sunk: the gate open), and four corkscrews (142) on its corners, 76-78 up - its tower in its
+// socket above; Charybdis's body (254) with its roots (266, a decal), teeth (255), eye (256), four
+// mortars (258) and two cannons (260); the crusher of l04 and l18 - two stands (144) and two drums
+// (143) across the track, which their script makes (pirates.lgc Pirate_Crasher; the editor's host
+// is the first stand) - and l06's Scylla, a stand (252) with two jaws (253), which its script makes
+// too (scillas.lgc); and the decorations' sets: a border post (145) with its corkscrew (142, broken
+// 147), a level exit (100) with a corkscrew or a stone on a pedestal (411) on its top, a flagpole
+// (769) with its flag (770, 771), a station (170) with its flag on the roof (773, 770), an oil
+// derrick (631) with its orange glow (365), factory chimneys (880) with their smoke (291), wide
+// chimneys (881) with their glow (555), a pool (928) with its water (930) and fountain (903). A
+// piece can stand by the host's frame (its direction in the host's nDir: the crusher's form, a
+// chimney's height) and a slot can hold one of several VIDs or nothing (the panel's row for it).
+// The editor places, moves, turns, raises and deletes each as one object; the runner's PiecesTact
+// (editor_mission.cpp) makes the citadel, Charybdis, the crushers and Scylla work in play as l04,
+// l18 and l06 do. A whole's faction is the army of what fights or shows it - the citadel's tower,
+// Charybdis's teeth, eye and guns (the enemy's on the missions' wholes, which are army 0
+// themselves: gun_army), the crusher's stands and drums, Scylla's jaws (neutral as l06's: it bites
+// every army), a flag; the editor places a whole in its faction's army and its ARMY row sets the
+// faction. The other pieces are army 0, as in the missions.
+
+constexpr int VID_CRUSHER = 144, VID_CRUSHER_DRUM = 143, VID_SCYLLA = 252, VID_SCYLLA_JAW = 253;
+
+// A crusher's forms (Pirate_Crasher's dir: its stands turned 64 * form): from its middle, the first
+// stand at +S and the second at -S, the drums at +C and -C - across a horizontal track (0), one falling
+// to the right (1), a vertical one (2), one rising (3).
+const float CRUSHER_STAND[4][2] = {{0, 22}, {-22, 15}, {-33, 0}, {-22, -15}};
+const float CRUSHER_DRUM[4][2] = {{0, 30}, {-30, 20}, {-45, 0}, {-30, -20}};
+
+struct PieceChoice {
+    int nvid;
+    float dz;      // its height over the host
+    UiText name;   // in the slot's row of the panel
+};
 
 struct Piece {
     int nvid;
     float dx, dy, dz;
     int direction;
     bool faction;
+    UiText row = {};                          // a slot of several VIDs: its row in the panel
+    std::vector<PieceChoice> choices = {};    // those VIDs (the first is `nvid`)
+    bool optional = false;                    // or nothing (an empty slot is not missing)
+    UiText none = {"CtxPieceNone", "NONE"};   // the choice of nothing
 };
 
-const std::vector<Piece>& pieces_of_kind(int host) {
-    static const std::vector<Piece> none, citadel = {{146, -34, 23, -33, 128, false}, {146, 36, 25, -33, 0, false},
-                                                      {142, 0, -49, 77, 0, false},    {142, 2, 57, 77, 0, false},
-                                                      {142, -73, 3, 77, 0, false},    {142, 77, 5, 77, 0, false}};
-    static const std::vector<Piece> charybdis = {{266, -12, -4, -11, 0, false}, {255, -40, 27, 15, 0, true}, {256, -34, 22, 56, 0, true},
-                                                 {258, 5, 27, 64, 0, true},     {258, -6, -28, 61, 0, true}, {258, 38, 6, 61, 0, true},
-                                                 {258, -42, -7, 64, 0, true},   {260, -9, 44, 45, 0, true},  {260, -67, 4, 45, 0, true}};
-    return host == VID_CITADEL ? citadel : host == VID_CHARYBDIS ? charybdis : none;
+constexpr int WHOLES[] = {VID_CITADEL, VID_CHARYBDIS, VID_CRUSHER, VID_SCYLLA, 145, 100, 769, 170, 631, 880, 881, 928};
+
+// The frames of a whole's host (its nDir) and the frame of a direction, as the engine draws it.
+int whole_frames(int host) {
+    return host == VID_CRUSHER ? 4 : host == VID_SCYLLA || host == 631 ? 2 : host == 170 ? 8 : host == 880 ? 7 : host == 881 ? 3 : 1;
+}
+
+int frame_of(int frames, int direction) { return frames > 1 ? (((direction + 128 / frames) & 255) * frames) >> 8 : 0; }
+
+std::vector<Piece> make_pieces(int host, int frame) {
+    if (host == VID_CITADEL)
+        return {{146, -34, 23, -33, 128, false}, {146, 36, 25, -33, 0, false}, {142, 0, -49, 77, 0, false},
+                {142, 2, 57, 77, 0, false},      {142, -73, 3, 77, 0, false},  {142, 77, 5, 77, 0, false}};
+    if (host == VID_CHARYBDIS)
+        return {{266, -12, -4, -11, 0, false}, {255, -40, 27, 15, 0, true}, {256, -34, 22, 56, 0, true},
+                {258, 5, 27, 64, 0, true},     {258, -6, -28, 61, 0, true}, {258, 38, 6, 61, 0, true},
+                {258, -42, -7, 64, 0, true},   {260, -9, 44, 45, 0, true},  {260, -67, 4, 45, 0, true}};
+    if (host == VID_CRUSHER) {   // from the first stand: the second, the drums
+        const float sx = CRUSHER_STAND[frame][0], sy = CRUSHER_STAND[frame][1];
+        const float cx = CRUSHER_DRUM[frame][0], cy = CRUSHER_DRUM[frame][1];
+        return {{VID_CRUSHER, -2 * sx, -2 * sy, 0, 64 * frame, true},
+                {VID_CRUSHER_DRUM, cx - sx, cy - sy, 0, 0, true},
+                {VID_CRUSHER_DRUM, -cx - sx, -cy - sy, 0, 0, true}};
+    }
+    if (host == VID_SCYLLA)   // the jaws 20 over the stand, across the track
+        return frame == 0 ? std::vector<Piece>{{VID_SCYLLA_JAW, -15, -10, 20, 0, true}, {VID_SCYLLA_JAW, 15, 10, 20, 128, true}}
+                          : std::vector<Piece>{{VID_SCYLLA_JAW, -15, 10, 20, 64, true}, {VID_SCYLLA_JAW, 15, -10, 20, 192, true}};
+    if (host == 145)   // a border post's corkscrew (l16's broken)
+        return {{142, 1, 1, 58, 0, false, {"CtxCorkscrew", "CORKSCREW:"},
+                 {{142, 58, {"CtxCorkscrewWhole", "WHOLE"}}, {147, 58, {"CtxCorkscrewBroken", "BROKEN"}}}}};
+    if (host == 100)   // a level exit's top: a corkscrew (l04, l18), a stone on a pedestal (l01, l09, l20)
+        return {{142, 1, 0, 106, 0, false, {"CtxTop", "ON TOP:"},
+                 {{142, 106, {"CtxTopCorkscrew", "CORKSCREW"}}, {411, 100, {"CtxTopStone", "STONE"}}}, true}};
+    if (host == 769)   // the flag, turned with the wind as all of them
+        return {{770, 0, 0, 118, 32, true, {"CtxFlag", "FLAG:"}, {{770, 118, {"CtxFlag1", "1"}}, {771, 92, {"CtxFlag2", "2"}}}}};
+    if (host == 170) {   // the flag on the station's roof, on its ridge
+        const float ridge[8][2] = {{0, -4}, {3, -2}, {3, 0}, {3, 1}, {0, 3}, {-3, 2}, {-3, 0}, {-3, -2}};
+        return {{773, ridge[frame][0], ridge[frame][1], 121, 32, true, {"CtxFlag", "FLAG:"},
+                 {{773, 121, {"CtxFlag4", "4"}}, {770, 127, {"CtxFlag1", "1"}}}, true}};
+    }
+    if (host == 631) return {{365, 1, -4, 150, 0, false}};   // the derrick's glow under its torch
+    if (host == 880) {   // the smoke at the top of the frame's chimney
+        const float top[7][2] = {{4, 100}, {2, 114}, {3, 128}, {3, 140}, {4, 100}, {4, 114}, {4, 128}};
+        return {{291, 0, top[frame][0], top[frame][1], 0, false, {"CtxSmoke", "SMOKE:"},
+                 {{291, top[frame][1], {"CtxYes", "YES"}}}, true, {"CtxNo", "NO"}}};
+    }
+    if (host == 881) {   // the glow in the frame's wide chimney
+        const float top[3][3] = {{0, 4, 102}, {0, 2, 102}, {-1, 5, 82}};
+        return {{555, top[frame][0], top[frame][1], top[frame][2], 0, false}};
+    }
+    if (host == 928)
+        return {{930, 1, 1, 26, 0, false},
+                {903, 0, -2, 24, 0, false, {"CtxFountain", "FOUNTAIN:"}, {{903, 24, {"CtxYes", "YES"}}}, true, {"CtxNo", "NO"}}};
+    return {};
+}
+
+// The pieces of a whole's kind for the host's direction (none for the other VIDs).
+const std::vector<Piece>& pieces_of_kind(int host, int direction = 0) {
+    static std::map<std::pair<int, int>, std::vector<Piece>> table;
+    const std::pair<int, int> key{host, frame_of(whole_frames(host), direction)};
+    auto it = table.find(key);
+    if (it == table.end()) it = table.emplace(key, make_pieces(key.first, key.second)).first;
+    return it->second;
+}
+
+const std::vector<Piece>& kinds_of(uint8_t* host) { return pieces_of_kind(nvid_of(host), at<int>(host, O_DIRECTION)); }
+
+// The VIDs a slot holds and their heights over the host.
+std::vector<PieceChoice> slot_vids(const Piece& p) {
+    return p.choices.empty() ? std::vector<PieceChoice>{{p.nvid, p.dz, {}}} : p.choices;
 }
 
 bool is_piece(int nvid) {
-    for (int host : {VID_CITADEL, VID_CHARYBDIS})
-        for (const Piece& p : pieces_of_kind(host))
-            if (p.nvid == nvid) return true;
-    return false;
+    static std::set<int> vids;
+    if (vids.empty())
+        for (int host : WHOLES)
+            for (int frame = 0; frame < whole_frames(host); ++frame)
+                for (const Piece& p : make_pieces(host, frame))
+                    for (const PieceChoice& c : slot_vids(p)) vids.insert(c.nvid);
+    return vids.count(nvid) > 0;
 }
 
-// The pieces of a whole standing at their places (nullptr where one is missing).
+// The pieces of a whole standing at their places - one of the slot's VIDs at its height - (nullptr
+// where one is missing or the slot is empty).
 std::vector<uint8_t*> pieces_on(uint8_t* host) {
     std::vector<uint8_t*> out;
-    for (const Piece& p : pieces_of_kind(nvid_of(host))) {
+    for (const Piece& p : kinds_of(host)) {
         const float px = at<float>(host, O_X) + p.dx, py = at<float>(host, O_Y) + p.dy;
+        const std::vector<PieceChoice> vids = slot_vids(p);
         uint8_t* found = nullptr;
         for_each_object([&](uint8_t* o) {
-            if (!found && !removed(o) && nvid_of(o) == p.nvid && std::fabs(at<float>(o, O_X) - px) < 10 &&
-                std::fabs(at<float>(o, O_Y) - py) < 10)
-                found = o;
+            if (found || o == host || removed(o) || std::fabs(at<float>(o, O_X) - px) >= 10 || std::fabs(at<float>(o, O_Y) - py) >= 10)
+                return;
+            for (const PieceChoice& c : vids)
+                if (nvid_of(o) == c.nvid && std::fabs(at<float>(o, O_Z) - at<float>(host, O_Z) - c.dz) < 30) found = o;
         });
         out.push_back(found);
     }
@@ -989,17 +1086,42 @@ std::vector<uint8_t*> pieces_on(uint8_t* host) {
 // A piece's army in a whole of the faction `army`.
 int piece_army(const Piece& p, int army) { return p.faction ? army : 0; }
 
+// A whole's pieces (found before it was turned) to their places for its direction.
+void arrange_pieces(uint8_t* host, const std::vector<uint8_t*>& pieces) {
+    const std::vector<Piece>& kinds = kinds_of(host);
+    for (size_t i = 0; i < pieces.size() && i < kinds.size(); ++i) {
+        if (!pieces[i]) continue;
+        float dz = kinds[i].dz;
+        for (const PieceChoice& c : slot_vids(kinds[i]))
+            if (c.nvid == nvid_of(pieces[i])) dz = c.dz;
+        reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(pieces[i], nullptr, at<float>(host, O_X) + kinds[i].dx,
+                                                     at<float>(host, O_Y) + kinds[i].dy, at<float>(host, O_Z) + dz);
+        set_direction(pieces[i], kinds[i].direction);
+    }
+}
+
 // The army a host's guns and fighting pieces have: a whole's faction (its tower's, its eye's...; with
 // none of them, the enemy's on one of army 0 as the missions have it), the host's own for the others.
 int faction_of(uint8_t* host) {
     if (pieces_of_kind(nvid_of(host)).empty() && nvid_of(host) != VID_CITADEL) return army_of(host);
     for (uint8_t* g : guns_on(host))
         if (g) return army_of(g);
-    const std::vector<Piece>& kinds = pieces_of_kind(nvid_of(host));
+    const std::vector<Piece>& kinds = kinds_of(host);
     const std::vector<uint8_t*> pieces = pieces_on(host);
     for (size_t i = 0; i < kinds.size(); ++i)
         if (pieces[i] && kinds[i].faction) return army_of(pieces[i]);
     return gun_army(nvid_of(host), army_of(host));
+}
+
+uint8_t* create(int nvid, float x, float y, float z, int direction, int army);   // placing, below
+
+// A piece made at its place by the host (its height for the VID of the slot chosen).
+uint8_t* make_piece(uint8_t* host, const Piece& p, int nvid, int army) {
+    float dz = p.dz;
+    for (const PieceChoice& c : slot_vids(p))
+        if (c.nvid == nvid) dz = c.dz;
+    return create(nvid, at<float>(host, O_X) + p.dx, at<float>(host, O_Y) + p.dy, at<float>(host, O_Z) + dz, p.direction,
+                  piece_army(p, army));
 }
 
 // ---- train cars ----
@@ -1017,13 +1139,15 @@ std::vector<uint8_t*> train_of(uint8_t* c) {
     return out;
 }
 
-// The host (fort, mining plant, citadel, Charybdis) a gun stands in a socket of or a piece belongs
-// to, or nullptr.
+// The host (fort, mining plant, a whole) a gun stands in a socket of or a piece belongs to, or
+// nullptr.
 uint8_t* host_of(uint8_t* part) {
     if (!part || (!is_gun(nvid_of(part)) && !is_piece(nvid_of(part)))) return nullptr;
     uint8_t* found = nullptr;
     for_each_object([&](uint8_t* h) {
-        if (found || removed(h) || (sockets_of(nvid_of(h), 0).empty() && pieces_of_kind(nvid_of(h)).empty())) return;
+        if (found || h == part || removed(h) || (sockets_of(nvid_of(h), 0).empty() && pieces_of_kind(nvid_of(h)).empty()) ||
+            std::hypot(at<float>(h, O_X) - at<float>(part, O_X), at<float>(h, O_Y) - at<float>(part, O_Y)) > 200)   // pieces are near
+            return;
         for (uint8_t* g : guns_on(h))
             if (g == part) found = h;
         for (uint8_t* p : pieces_on(h))
@@ -1910,6 +2034,7 @@ void end_drag() {
                 reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(m, nullptr, mx, my, ground_z(vid_of(m), mx, my) + g_drag.lift[i]);
             }
             const std::vector<uint8_t*> guns = guns_on(o);   // in their sockets before the turn
+            const std::vector<uint8_t*> pieces = pieces_on(o);
             reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(o, nullptr, direction);
             const std::vector<Socket> sockets = sockets_of(nvid_of(o), direction);
             for (size_t i = 0; i < guns.size() && i < sockets.size(); ++i)
@@ -1918,6 +2043,7 @@ void end_drag() {
                                                                  at<float>(o, O_Z) + sockets[i].dz);
                     reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(guns[i], nullptr, direction);
                 }
+            arrange_pieces(o, pieces);   // a crusher on a track of another way takes its form
             commit({"OpMove", "move"}, g_drag.objects, g_drag.before);
             MESSAGE("MsgMovedTrack", "moved VID %d to %.0f,%.0f direction %d", nvid_of(o), x, y, direction);
         }
@@ -2074,7 +2200,7 @@ void turn(int steps) {
         resnap_on_track(o, at<float>(o, O_X), at<float>(o, O_Y), (at<int>(o, O_DIRECTION) + 128) & 255, {"OpTurn", "turn"});
         return;
     }
-    if (nvid_of(o) == VID_DEPOT || blocker_at_end(o)) {
+    if (nvid_of(o) == VID_DEPOT || nvid_of(o) == VID_CRUSHER || nvid_of(o) == VID_SCYLLA || blocker_at_end(o)) {
         MESSAGE("MsgTurnedByTrack", "VID %d is turned by its track (drag it to another place on the track)", nvid_of(o));
         return;
     }
@@ -2094,8 +2220,10 @@ void turn(int steps) {
     }
     const std::vector<State> before = states(g_selection);
     const std::vector<uint8_t*> guns = guns_on(o);   // in their sockets before the turn
+    const std::vector<uint8_t*> pieces = pieces_on(o);
     const int direction = (at<int>(o, O_DIRECTION) + steps * (256 / dirs) + 256) & 255;
     set_direction(o, direction);
+    arrange_pieces(o, pieces);   // a station's flag to its ridge, a chimney's smoke to its top
     const std::vector<Socket> sockets = sockets_of(nvid_of(o), direction);
     for (size_t i = 0; i < guns.size() && i < sockets.size(); ++i) {   // each gun to its socket's new place
         if (!guns[i]) continue;
@@ -2112,7 +2240,7 @@ void set_army(int army) {
     if (g_selection.empty() || class_of(g_selection[0]) == B_RAIL) return;
     const std::vector<State> before = states(g_selection);
     uint8_t* host = g_selection[0];
-    const std::vector<Piece>& kinds = pieces_of_kind(nvid_of(host));
+    const std::vector<Piece>& kinds = kinds_of(host);
     const std::vector<uint8_t*> pieces = pieces_on(host);
     for (uint8_t* o : g_selection) {
         const auto piece = std::find(pieces.begin(), pieces.end(), o);
@@ -2403,9 +2531,8 @@ void place(POINT p) {
     for (size_t i = 0; i < sockets.size() && i < fit.size(); ++i)
         if (fit[i])
             if (uint8_t* g = fit_gun(o, sockets[i], fit[i], army_of(o))) objects.push_back(g);
-    for (const Piece& p : pieces_of_kind(nvid))   // a whole: its pieces
-        if (uint8_t* q = create(p.nvid, x + p.dx, y + p.dy, z + p.dz, p.direction, piece_army(p, army_of(o))))
-            objects.push_back(q);
+    for (const Piece& p : pieces_of_kind(nvid, direction))   // a whole: its pieces
+        if (uint8_t* q = make_piece(o, p, p.nvid, army_of(o))) objects.push_back(q);
     std::vector<State> before = states(objects);
     for (State& s : before) s.present = false;
     commit({"OpPlace", "place"}, objects, before);
@@ -4243,7 +4370,7 @@ Snap snap_mine(float x, float y) {
     return s;
 }
 
-// ---- gates on the track: the fort, the citadel, Charybdis ----
+// ---- gates on the track: the fort, the citadel, Charybdis, the crusher, Scylla ----
 //
 // The missions stand these on the line of a straight track (measured): all 20 forts 0-6 px from it,
 // turned along it (rails of direction 0 - north-south - forts of 0 / 128, 6 of 64 / 192, the
@@ -4318,6 +4445,39 @@ Snap snap_charybdis(float x, float y) {
     return s;
 }
 
+// A crusher across a straight track as l04 and l18's script puts them (Pirate_Crasher): its middle on
+// the track's line (on a rail point there: 0-20 px), the drums on both sides - its form by the track's
+// way (l04 and l18 have the diagonal ones only: 1 on the tracks falling to the right, 3 on the rising
+// ones). Its host is the first stand.
+Snap snap_crusher(float x, float y) {
+    Snap s;
+    int along;
+    if (!rail_line_spot(x, y, 60, false, s.x, s.y, along)) {
+        s.reason = {"SnapCrusher", "a crusher closes its drums across a track - no straight track near"};
+        return s;
+    }
+    const int way = along % 128, form = way == 0 ? 2 : way == 32 ? 3 : way == 64 ? 0 : 1;
+    s.ok = true;
+    s.x += CRUSHER_STAND[form][0];
+    s.y += CRUSHER_STAND[form][1];
+    s.direction = 64 * form;
+    return s;
+}
+
+// Scylla on a diagonal track as l06's two (scillas.lgc): its stand on the track's line, the jaws on
+// both sides - its stand's direction 0 on a track rising to the right, 128 on one falling.
+Snap snap_scylla(float x, float y) {
+    Snap s;
+    int along;
+    if (!rail_line_spot(x, y, 60, true, s.x, s.y, along)) {
+        s.reason = {"SnapScylla", "Scylla closes its jaws across a diagonal track - none near"};
+        return s;
+    }
+    s.ok = true;
+    s.direction = along % 128 == 32 ? 0 : 128;
+    return s;
+}
+
 // A buffer stop at the dead end nearest to the cursor within 150 px - not a factory's -, 5 px past
 // it, across the track.
 constexpr float BLOCKER_PAST = 5;
@@ -4376,7 +4536,8 @@ bool blocker_at_end(uint8_t* o) {
 
 bool on_track_vid(int nvid) {
     return nvid == VID_DEPOT || nvid == VID_WORKSHOP || nvid == VID_SEMAPHORE || nvid == VID_CRATE || nvid == VID_BLOCKER ||
-           nvid == VID_MINE || nvid == VID_MINE_MARKER || nvid == VID_CHARYBDIS || nvid == VID_FORT || nvid == VID_CITADEL;
+           nvid == VID_MINE || nvid == VID_MINE_MARKER || nvid == VID_CHARYBDIS || nvid == VID_FORT || nvid == VID_CITADEL ||
+           nvid == VID_CRUSHER || nvid == VID_SCYLLA;
 }
 
 // Where a VID of these goes for the cursor's map point; the others stay where they are.
@@ -4391,6 +4552,8 @@ bool snap(int nvid, float& x, float& y, int& direction, UiText& reason) {
     else if (nvid == VID_CHARYBDIS) s = snap_charybdis(x, y);
     else if (nvid == VID_FORT) s = snap_fort(x, y, direction);
     else if (nvid == VID_CITADEL) s = snap_citadel(x, y);
+    else if (nvid == VID_CRUSHER) s = snap_crusher(x, y);
+    else if (nvid == VID_SCYLLA) s = snap_scylla(x, y);
     else return true;
     if (!s.ok) {
         reason = s.reason;
@@ -4398,7 +4561,8 @@ bool snap(int nvid, float& x, float& y, int& direction, UiText& reason) {
     }
     x = s.x;
     y = s.y;
-    if (nvid == VID_DEPOT || nvid == VID_WORKSHOP || nvid == VID_SEMAPHORE || nvid == VID_FORT) direction = s.direction;
+    if (nvid == VID_DEPOT || nvid == VID_WORKSHOP || nvid == VID_SEMAPHORE || nvid == VID_FORT || nvid == VID_CRUSHER || nvid == VID_SCYLLA)
+        direction = s.direction;
     return true;
 }
 
@@ -6122,18 +6286,43 @@ void set_socket(uint8_t* host, size_t i, int nvid) {
             nvid ? (ui_unit_name(nvid) ? ui_unit_name(nvid) : std::to_string(nvid).c_str()) : ui_text("WordEmpty", "empty"));
 }
 
+// The VID `nvid` (0: none) into slot `i` of a whole: the old piece goes, the new one comes.
+void set_piece(uint8_t* host, size_t i, int nvid) {
+    const std::vector<Piece>& kinds = kinds_of(host);
+    const std::vector<uint8_t*> pieces = pieces_on(host);
+    const int army = faction_of(host);   // before the old piece goes
+    if (i >= kinds.size()) return;
+    std::vector<uint8_t*> objects;
+    std::vector<State> before;
+    if (pieces[i]) {
+        if (nvid_of(pieces[i]) == nvid) return;
+        objects.push_back(pieces[i]);
+        before.push_back(state_of(pieces[i]));
+        State gone = before.back();
+        gone.present = false;
+        apply(pieces[i], gone);
+    }
+    if (nvid)
+        if (uint8_t* q = make_piece(host, kinds[i], nvid, army)) {
+            objects.push_back(q);
+            State none = state_of(q);
+            none.present = false;
+            before.push_back(none);
+        }
+    if (objects.empty()) return;
+    commit({"OpPiece", "piece"}, objects, before);
+    g_selection = group_of(host);
+    MESSAGE("MsgPiece", "VID %d: piece %d is VID %d now (0: none)", nvid_of(host), static_cast<int>(i + 1), nvid);
+}
+
 // The pieces a whole is missing (a map made before, a piece deleted elsewhere) put at their places.
 void complete_whole(uint8_t* host) {
-    const std::vector<Piece>& kinds = pieces_of_kind(nvid_of(host));
+    const std::vector<Piece>& kinds = kinds_of(host);
     const std::vector<uint8_t*> pieces = pieces_on(host);
     std::vector<uint8_t*> objects;
     for (size_t i = 0; i < kinds.size(); ++i)
-        if (!pieces[i]) {
-            const Piece& p = kinds[i];
-            if (uint8_t* q = create(p.nvid, at<float>(host, O_X) + p.dx, at<float>(host, O_Y) + p.dy, at<float>(host, O_Z) + p.dz,
-                                    p.direction, piece_army(p, faction_of(host))))
-                objects.push_back(q);
-        }
+        if (!pieces[i] && !kinds[i].optional)
+            if (uint8_t* q = make_piece(host, kinds[i], kinds[i].nvid, faction_of(host))) objects.push_back(q);
     if (objects.empty()) return;
     std::vector<State> before = states(objects);
     for (State& s : before) s.present = false;
@@ -6308,7 +6497,7 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
                          {{WAY_CAPS_KEYS[other], WAY_CAPS[other]}, false, [o] { turn_post(o); }}}});
     } else if (nvid == VID_WORKSHOP) {   // turned round on its leg
         rows.push_back({{"CtxTurn", "TURN:"}, {{{"CtxTurnRound", "ROUND (R / E)"}, false, [] { turn(1); }}}});
-    } else if (nvid == VID_DEPOT || blocker_at_end(o)) {
+    } else if (nvid == VID_DEPOT || nvid == VID_CRUSHER || nvid == VID_SCYLLA || blocker_at_end(o)) {
         rows.push_back({{"CtxTurn", "TURN:"}, {{{"CtxTurnByTrack", "BY ITS TRACK (DRAG IT)"}, true, [] {}}}});
     } else if (wreck_on_track(o)) {
         rows.push_back({{"CtxTurn", "TURN:"}, {{{"CtxTurnRound", "ROUND (R / E)"}, false, [] { turn(1); }}}});
@@ -6336,9 +6525,28 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
         rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxCitadelPlay", "KILLS ALL BUT ITS TOWER'S ARMY"}, true, [] {}}}});
     if (nvid == VID_CHARYBDIS)
         rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxCharybdisPlay", "PULLS IN OTHERS, EATS YOURS"}, true, [] {}}}});
-    if (!pieces_of_kind(nvid).empty()) {
+    if (nvid == VID_CRUSHER)
+        rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxCrusherPlay", "BITES ALL BUT ITS ARMY EVERY 25 S"}, true, [] {}}}});
+    if (nvid == VID_SCYLLA)   // l06's are neutral and bite every army, one of an army spares it
+        rows.push_back({{"CtxInPlay", "IN PLAY:"},
+                        {{faction_of(o) == 2 ? UiText{"CtxScyllaPlay", "BITES EVERYONE EVERY 15 S"}
+                                             : UiText{"CtxScyllaPlayArmy", "BITES ALL BUT ITS ARMY EVERY 15 S"},
+                          true, [] {}}}});
+    if (!pieces_of_kind(nvid).empty()) {   // a row for each slot of several VIDs, the missing put back
+        const std::vector<Piece>& kinds = kinds_of(o);
         const std::vector<uint8_t*> pieces = pieces_on(o);
-        const long missing = std::count(pieces.begin(), pieces.end(), nullptr);
+        bool missing = false;
+        for (size_t i = 0; i < kinds.size(); ++i) {
+            if (!kinds[i].optional) missing = missing || !pieces[i];
+            if (kinds[i].choices.empty()) continue;
+            ContextRow row{kinds[i].row, {}};
+            for (const PieceChoice& c : kinds[i].choices) {
+                const int n = c.nvid;
+                row.choices.push_back({c.name, pieces[i] && nvid_of(pieces[i]) == n, [o, i, n] { set_piece(o, i, n); }});
+            }
+            if (kinds[i].optional) row.choices.push_back({kinds[i].none, !pieces[i], [o, i] { set_piece(o, i, 0); }});
+            rows.push_back(row);
+        }
         if (missing)
             rows.push_back({{"CtxPieces", "PIECES:"},
                             {{{"CtxComplete", "PUT THE MISSING BACK"}, false, [o] { complete_whole(o); }}}});
@@ -6671,7 +6879,7 @@ void draw_overlay() {
                     if (uint8_t* gun = vid_by_number(fit[i]))
                         draw_vid(gun, frame_for(gun, direction), x + sockets[i].dx - cam_x, y + sockets[i].dy - cam_y,
                                  z + sockets[i].dz);
-                for (const Piece& piece : pieces_of_kind(place_nvid()))
+                for (const Piece& piece : pieces_of_kind(place_nvid(), direction))
                     if (uint8_t* pv = vid_by_number(piece.nvid); shown && pv)
                         draw_vid(pv, frame_for(pv, piece.direction), x + piece.dx - cam_x, y + piece.dy - cam_y, z + piece.dz);
             }
