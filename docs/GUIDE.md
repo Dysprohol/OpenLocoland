@@ -167,7 +167,7 @@ What you see:
   ![The help](img/editor-help-en.jpg)
 
   The **menu button** opens the editor's menu with every command - new, load, save, mission
-  settings, map size, play the map, undo, redo, run the level, back to the menu, exit.
+  settings, map size, play the saved map, undo, redo, quick test, back to the menu, exit.
 
   ![The editor's menu](img/editor-menu-en.jpg)
 
@@ -453,10 +453,12 @@ A **Region** (strip): drag its rectangle; its panel sets fog (mist, dust, haze, 
 
 ### 9. Look at it working
 
-Menu → **RUN THE LEVEL** (or `Ctrl+R`): the map is saved and runs in the editor as it will in the
-game - the trains drive, the guns shoot, the arrivals come. `Ctrl+R` brings back the map as it was
-saved, and so do the game's own `Esc` menu (ABORT GAME → BACK TO THE EDITOR or YES) and the end of the
-level (won or lost).
+Menu → **QUICK TEST, NO SAVE** (or `Ctrl+R`): the map runs in the editor as it is now, saved or not, as it
+will in the game - the trains drive, the guns shoot, the arrivals come. Nothing is asked: your own map
+is saved first, and POLIGON, the template, a campaign map or a new map without a name yet run from a
+hidden copy, so they stay as they were. `Ctrl+R` brings the editor back with the map as you left it -
+the edits not saved still not saved, `Ctrl+Z` undoing them as before -, and so do the game's own `Esc`
+menu (ABORT GAME → BACK TO THE EDITOR or YES) and the end of the level (won or lost).
 
 ### 10. Mission settings and texts
 
@@ -488,7 +490,7 @@ fort's guns), and **lost** when the player has no units left and no factory.
 
 ### 11. Play it
 
-Menu → **PLAY THE MAP**: the game starts again with your map as a mission - the briefing in the Esc
+Menu → **PLAY THE SAVED MAP**: the game starts again with your saved map as a mission - the briefing in the Esc
 menu, the reinforcement arriving, the enemy attacking. When it ends, the game comes back to the
 editor on your map; to go back at once, press Esc, the exit button (ABORT GAME) and **BACK TO THE
 EDITOR**. Unsaved changes are asked about first.

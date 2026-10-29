@@ -148,6 +148,7 @@ constexpr int TEST_RESIZE = 40044;    // test mode: WM_COPYDATA "<width> <height
 constexpr int TEST_EXPORT = 40045;    // test mode: WM_COPYDATA <zip> - File > Export map without the dialogs
 constexpr int TEST_IMPORT = 40046;    // test mode: WM_COPYDATA "<zip>|overwrite|rename|ask" - File > Import map
 constexpr int TEST_FACTORY = 40047;   // test mode: WM_COPYDATA "x y" - the panel of the factory there
+constexpr UINT WM_SAVE_AFTER_RUN = WM_APP + 0x52;   // Run the level's copy held again: save it (wParam 1: then end the game)
 constexpr uintptr_t SET_POSITION = 0x41c680;   // SetPosition: the centre of the view, clamped
 constexpr uintptr_t G_SOUND = 0x5d3a54;        // g_sound: the sound object
 constexpr uintptr_t STOP_MUSIC = 0x444e50;     // StopMusic(g_sound)
@@ -253,11 +254,20 @@ void stop_music() {
 }
 
 // Run the level: the level runs from its saved file - the mission's script with what the panels set
-// (arrivals, orders, the factories' options) is compiled when the level loads, so the map is saved
+// (arrivals, orders, the factories' options) is compiled when the level loads, so the map is written
 // first and loaded again, running. Back (Ctrl+R, BACK TO THE EDITOR in the Esc menu, or the level
-// ending: won, lost, ABORT GAME) loads it again, held - the state of the run does not stay.
+// ending: won, lost, ABORT GAME) loads it again, held - the state of the run does not stay. A map
+// that is not written in place - a campaign map, POLIGON or the template, and the start's new map,
+// which has no name yet - runs from a copy in a hidden scratch folder, maps\_run\ (marked as the new
+// map's, so it is never on the custom maps page and goes with the map); back, the copy is held again
+// with the editor on the original map: its name, its edits not saved, the history.
+constexpr const char* RUN_FOLDER = "maps\\_run";
+constexpr const char* RUN_MAP = "maps\\_run\\_run.map";
 std::string g_run_map;   // the map that runs (game path)
+std::string g_run_origin;   // the map the copy in maps\_run\ stands for (empty: the map runs from its own file)
+bool g_run_dirty = false;   // the copy holds edits not saved
 bool g_run_back = false;   // the next load is the way back: the view and the chosen object as they were
+bool g_save_on_back = false, g_close_on_back = false;   // the edits of the copy to be saved once it is held again
 float g_run_view_x = 0, g_run_view_y = 0;   // the view's top-left before the run
 
 void load_map(const std::string& path);
@@ -340,13 +350,16 @@ bool auto_folder(const std::string& folder) {
     return !folder.empty() && GetFileAttributesA((folder + "\\" + AUTO_MARK).c_str()) != INVALID_FILE_ATTRIBUTES;
 }
 
-// The new map written into its scratch folder after the mark was made (Run the level saves the map
-// it runs): its edits are there, so leaving it asks to save them even when the level is clean.
-bool auto_folder_written(const std::string& map) {
-    WIN32_FILE_ATTRIBUTE_DATA a, b;
-    return auto_folder(folder_of(map)) && GetFileAttributesExA(map.c_str(), GetFileExInfoStandard, &a) &&
-           GetFileAttributesExA((folder_of(map) + "\\" + AUTO_MARK).c_str(), GetFileExInfoStandard, &b) &&
-           CompareFileTime(&a.ftLastWriteTime, &b.ftLastWriteTime) > 0;
+// A scratch folder of maps\ made hidden and marked (`text` says what it is to whoever finds it).
+bool mark_folder(const std::string& folder, const char* text) {
+    CreateDirectoryA(folder.c_str(), nullptr);
+    SetFileAttributesA(folder.c_str(), FILE_ATTRIBUTE_HIDDEN);
+    HANDLE mark = CreateFileA((folder + "\\" + AUTO_MARK).c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, 0, nullptr);
+    if (mark == INVALID_HANDLE_VALUE) return false;
+    DWORD written = 0;
+    WriteFile(mark, text, static_cast<DWORD>(std::strlen(text)), &written, nullptr);
+    CloseHandle(mark);
+    return true;
 }
 
 // A marked folder of maps\ with its files (the editor made them all; it has no subfolders).
@@ -361,7 +374,8 @@ void remove_auto_folder(const std::string& folder) {
         FindClose(find);
     }
     const bool removed = RemoveDirectoryA(folder.c_str()) != 0;
-    patch::log("editor: the new map %s left unsaved - %s", folder.c_str(), removed ? "removed" : "could not be removed");
+    patch::log(lower_path(folder) == lower_path(RUN_FOLDER) ? "editor: the run's copy %s left - %s" : "editor: the new map %s left unsaved - %s",
+               folder.c_str(), removed ? "removed" : "could not be removed");
 }
 
 // The marked folders of maps\ left behind (but `keep`, the folder of the map being opened).
@@ -386,27 +400,23 @@ std::string start_map(const std::string& requested) {
     if (!fresh) return requested;
     const std::string map = make_start_map();
     if (map.empty()) return requested;
-    SetFileAttributesA(folder_of(map).c_str(), FILE_ATTRIBUTE_HIDDEN);
-    HANDLE mark = CreateFileA((folder_of(map) + "\\" + AUTO_MARK).c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, 0, nullptr);
-    if (mark != INVALID_HANDLE_VALUE) {
-        const char text[] = "The editor's new map, not saved yet; removed with this folder when the editor leaves it.\r\n";
-        DWORD written = 0;
-        WriteFile(mark, text, sizeof text - 1, &written, nullptr);
-        CloseHandle(mark);
-    }
+    mark_folder(folder_of(map), "The editor's new map, not saved yet; removed with this folder when the editor leaves it.\r\n");
     patch::log("editor: starts on a new empty map %s", map.c_str());
     return map;
 }
 
 // The current map is left for `next` (empty: the game ends or goes back to the menu): a new map of
-// the start that was never saved goes with its folder.
+// the start that was never saved goes with its folder, and so does Run the level's copy.
 // (the loaded level's folder, or the last saved map's: saved under another name, the level is still
-// the start's map)
+// the start's map - or the copy of a run, which stands for the map of g_run_origin)
 void leave_map(const std::string& next) {
     if (g_playing) return;
-    for (const std::string& map : {game_path(level_file()), game_path(current_map())}) {
+    const std::string to = next.empty() ? "" : lower_path(folder_of(game_path(next)));
+    for (const std::string& map : {game_path(level_file()), game_path(current_map()), g_run_origin}) {
         if (!auto_folder(folder_of(map))) continue;
-        if (!next.empty() && lower_path(folder_of(game_path(next))) == lower_path(folder_of(map))) continue;
+        if (!next.empty() && to == lower_path(folder_of(map))) continue;
+        // the map stays while its copy runs or is held again
+        if (to == lower_path(RUN_FOLDER) && lower_path(map) == lower_path(game_path(current_map()))) continue;
         remove_auto_folder(folder_of(map));
     }
 }
@@ -437,8 +447,8 @@ bool save_map(const std::string& path) {
     save(w, nullptr, name);   // Level_Save frees the name
     if (!level_save_succeeded()) return false;
     g_current = path;
-    // the new map written into its scratch folder (Run the level) still has no name: its edits are
-    // not saved for the user, and it stays off the custom maps page
+    // Run the level's copy in its scratch folder: nothing is saved for the user, and it stays off the
+    // custom maps page
     const bool scratch = auto_folder(folder_of(game_path(path)));
     if (!scratch) edit_saved();
     // a painted ground: its own image next to the map, the map pointing at it
@@ -454,7 +464,7 @@ bool save_map(const std::string& path) {
     // its mission: the script (a new map gets one), the texts, the custom maps page
     mission_save(game_path(path));
     if (!scratch) edit_message_saved(game_path(path));
-    panel_saved(scratch ? "" : game_path(path));   // SAVED in the middle of the view
+    if (!scratch) panel_saved(game_path(path));   // SAVED in the middle of the view
     return true;
 }
 
@@ -629,33 +639,39 @@ bool save_current(HWND window) {
     return !map.empty() && save_map(map);
 }
 
-// Before the level goes away: with edits not saved, asks whether to save them. False when the
-// user cancels (or the save fails). Tests are never asked.
 bool game_folder_map(const std::string& map);
 bool asks();
 
 bool run_level(HWND window) {
     if (!g_held) return false;
-    std::string map = game_path(current_map());
+    const std::string map = game_path(current_map());
+    // a map not written in place runs from a copy: the start's new map, a game's own map with edits
+    // or held again from its copy after a run (unchanged, the game's own map runs from its file)
+    const bool copy = auto_folder(folder_of(map)) ||
+                      (game_folder_map(map) && (edit_dirty() || lower_path(game_path(level_file())) != lower_path(map)));
+    const std::string run = copy ? RUN_MAP : map;
     // written as a save writes it, without asking - also when nothing changed, so the script has the
     // runner and the panels' settings of this version (an older map's script is brought up to date)
-    if (edit_dirty() || !game_folder_map(map)) {
-        if (game_folder_map(map)) {   // a campaign map, POLIGON or the template is not saved over
-            if (asks()) {
-                DialogScope scope;
-                ui_message_box(window,
-                               ui_text("RunCampaign", "Save the map under a name of its own first (File > Save): Run the level "
-                                                      "starts the saved map."),
-                               ui_text("RunTitle", "Run the level"), MB_OK | MB_ICONINFORMATION);
-            }
-            patch::log("editor: run: %s has changes and is the game's own map - not run", map.c_str());
-            return false;
+    if (copy || !game_folder_map(map)) {
+        bool written = true;
+        if (copy) {
+            // the copy's script is the map's own, its editor blocks written anew (a script without them
+            // runs as it is); the high scores page stays in its briefing
+            written = mark_folder(RUN_FOLDER, "Run the level's copy of the map the editor runs; written again for every run and "
+                                              "removed with this folder when the editor leaves the map.\r\n");
+            DeleteFileA(script_of(run).c_str());
+            CopyFileA(script_of(map).c_str(), script_of(run).c_str(), FALSE);
+            const std::string scores = folder_of(map) + "\\hiscores.txt";
+            if (GetFileAttributesA(scores.c_str()) != INVALID_FILE_ATTRIBUTES)
+                CopyFileA(scores.c_str(), (std::string(RUN_FOLDER) + "\\hiscores.txt").c_str(), FALSE);
         }
-        if (!save_map(map)) {
+        written = written && save_map(run);
+        g_current = map;   // the editor stays on its map (save_map took the copy's name)
+        if (!written) {
             if (asks()) {
                 DialogScope scope;
-                ui_message_box(window, ui_printf(ui_format("RunFailed", "The map could not be written (%s): it is not run."), map.c_str()).c_str(),
-                               ui_text("RunTitle", "Run the level"), MB_OK | MB_ICONWARNING);
+                ui_message_box(window, ui_printf(ui_format("RunFailed", "The map could not be written (%s): it is not run."), run.c_str()).c_str(),
+                               ui_text("RunTitle", "Quick test"), MB_OK | MB_ICONWARNING);
             }
             return false;
         }
@@ -667,15 +683,23 @@ bool run_level(HWND window) {
     edit_remember_selection();
     edit_keep_history();
     g_run_back = true;
-    g_run_map = map;
+    g_run_map = run;
+    g_run_dirty = edit_dirty();
     g_running = true;
-    patch::log("editor: run %s", map.c_str());
-    load_map(map);
+    patch::log("editor: run %s%s", run.c_str(), copy ? (" - a copy of " + map).c_str() : "");
+    load_map(run);
+    g_run_origin = copy ? map : "";
+    g_current = map;
     return true;
 }
 
-bool ask_save(HWND window) {
-    if ((!edit_dirty() && !auto_folder_written(game_path(current_map()))) || (g_test && !g_test_ask)) return true;
+// Before the level goes away: with edits not saved, asks whether to save them. False when the
+// user cancels (or the save fails). Tests are never asked. While Run the level's copy runs, its
+// edits are saved from the copy held again: Yes goes back to the editor and saves there, and the
+// game ends after that when it was ending (`ending`).
+bool ask_save(HWND window, bool ending = false) {
+    if (g_test && !g_test_ask) return true;
+    if (g_running ? g_run_origin.empty() || !g_run_dirty : !edit_dirty()) return true;
     int answer;
     {
         DialogScope scope;
@@ -686,9 +710,16 @@ bool ask_save(HWND window) {
     }
     if (answer == IDNO) {
         edit_saved();   // the changes are dropped: not asked again on the way out
+        g_run_dirty = false;
         return true;
     }
     if (answer != IDYES) return false;
+    if (g_running) {
+        g_save_on_back = true;
+        g_close_on_back = ending;
+        stop_running();
+        return false;
+    }
     return save_current(window);
 }
 
@@ -884,6 +915,9 @@ bool import_package(HWND window, const std::string& zip_given, Import mode) {
 
 void handle_command(HWND window, int id) {
     if (g_in_dialog) return;   // a dialog's message loop dispatches to the game window too
+    // while the level runs only Ctrl+R (the accelerators still post the rest): a load or a save would
+    // take the running state, and a load would leave Run the level's copy that the way back holds
+    if (g_running && id != ID_RUN && id != ID_ABOUT) return;
     if (id == ID_LOAD) {
         if (!ask_save(window)) return;
         const std::string map = choose_map(window, false);
@@ -961,11 +995,15 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
         if (g_held) save_current(window);
         return 0;
     }
+    if (m == WM_SAVE_AFTER_RUN) {
+        if (g_held && !g_in_dialog && save_current(window) && w) PostMessageA(window, WM_CLOSE, 0, 0);
+        return 0;
+    }
     if (g_held && !g_in_dialog && !g_in_menu && edit_message(window, m, w, l)) return 0;
     switch (m) {
     case WM_CLOSE:
         if (g_in_dialog) break;
-        if (!ask_save(window)) return 0;
+        if (!ask_save(window, true)) return 0;
         leave_map("");
         break;
     case WM_COMMAND:
@@ -976,7 +1014,7 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
             return 0;
         }
         if (HIWORD(w) <= 1 && LOWORD(w) == ID_EXIT) {
-            if (g_in_dialog || !ask_save(window)) return 0;
+            if (g_in_dialog || !ask_save(window, true)) return 0;
             leave_map("");
         }
         break;
@@ -1113,23 +1151,37 @@ void editor_level_loaded(void* w) {
     const char* map = *reinterpret_cast<const char**>(world + WORLD_LEVEL_FILE);
     if (g_enabled && !g_running && current_format(map)) {
         // the map Ctrl+S saves into is the one loaded, whichever way it came (File > Load, a mission
-        // picked in the game's menus, StartEditorMode); the new map of the start keeps its scratch path
+        // picked in the game's menus, StartEditorMode); the new map of the start keeps its scratch path,
+        // Run the level's copy held again the map it stands for (below)
         g_current = game_path(map);
         mission_load(game_path(map));
         hold_level(world, true);
-        if (g_run_back && graphics()) {   // back from Run the level: the view and the chosen object as they were
+        if (g_run_back) {   // back from Run the level: the view and the chosen object as they were
             g_run_back = false;
-            const float* screen = reinterpret_cast<const float*>(static_cast<uint8_t*>(graphics()) + 0x20c);
-            reinterpret_cast<SetPosition_t>(SET_POSITION)(world, nullptr, g_run_view_x + screen[0] / 2, g_run_view_y + screen[1] / 2, 0);
+            if (graphics()) {
+                const float* screen = reinterpret_cast<const float*>(static_cast<uint8_t*>(graphics()) + 0x20c);
+                reinterpret_cast<SetPosition_t>(SET_POSITION)(world, nullptr, g_run_view_x + screen[0] / 2, g_run_view_y + screen[1] / 2, 0);
+            }
             edit_restore_history();
             edit_restore_selection();
-        }
-        // the start's new map fills the view from its top-left corner (a new map's first view
-        // would show it 300 px into the void around it)
-        if (auto_folder(folder_of(game_path(map))) && graphics()) {
-            const float* screen = reinterpret_cast<const float*>(static_cast<uint8_t*>(graphics()) + 0x20c);
-            reinterpret_cast<SetPosition_t>(SET_POSITION)(world, nullptr, screen[0] / 2, screen[1] / 2, 0);
-            patch::log("editor: the view at %.0f,%.0f", *reinterpret_cast<float*>(world + 0x44), *reinterpret_cast<float*>(world + 0x48));
+            if (!g_run_origin.empty()) {   // the copy held again: the editor on the original map, its edits not saved
+                g_current = g_run_origin;
+                if (g_run_dirty) edit_touch();
+                patch::log("editor: %s held again for %s%s", g_run_map.c_str(), g_run_origin.c_str(), g_run_dirty ? " (not saved)" : "");
+            }
+            // the edits of the copy were to be saved while it ran (the game ending): saved now
+            HWND window = *reinterpret_cast<HWND*>(world + WORLD_HWND);
+            if (g_save_on_back && window) PostMessageA(window, WM_SAVE_AFTER_RUN, g_close_on_back, 0);
+            g_save_on_back = false;
+        } else {
+            g_run_origin.clear();
+            // the start's new map fills the view from its top-left corner (a new map's first view
+            // would show it 300 px into the void around it)
+            if (auto_folder(folder_of(game_path(map))) && graphics()) {
+                const float* screen = reinterpret_cast<const float*>(static_cast<uint8_t*>(graphics()) + 0x20c);
+                reinterpret_cast<SetPosition_t>(SET_POSITION)(world, nullptr, screen[0] / 2, screen[1] / 2, 0);
+                patch::log("editor: the view at %.0f,%.0f", *reinterpret_cast<float*>(world + 0x44), *reinterpret_cast<float*>(world + 0x48));
+            }
         }
     }
 }

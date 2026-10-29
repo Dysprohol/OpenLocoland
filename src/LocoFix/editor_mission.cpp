@@ -3205,8 +3205,8 @@ void mission_save(const std::string& map) {
     patch::log("mission: %s written - %u push lines, %u start trains, %u in the queue, %u briefing pages",
                script.c_str(), static_cast<unsigned>(g_lines.size()), static_cast<unsigned>(g_mission.start.size()),
                static_cast<unsigned>(g_mission.factories.queue.size()), static_cast<unsigned>(pages.size()));
-    // maps\<name>\<name>.map: the custom maps page (not the template itself, nor the editor's new map
-    // written into its scratch folder, as Run the level does)
+    // maps\<name>\<name>.map: the custom maps page (not the template itself, nor a map of a scratch
+    // folder: the editor's new map, Run the level's copy)
     const std::string name = folder_name(map);
     const size_t slash = map.find_last_of('\\'), dot = map.find_last_of('.');
     const std::string base = slash == std::string::npos ? map : map.substr(slash + 1, dot - slash - 1);

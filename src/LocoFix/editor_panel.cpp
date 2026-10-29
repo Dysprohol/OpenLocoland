@@ -111,9 +111,9 @@ const Command COMMANDS[] = {
     {"PanelNew", "NEW MAP", ID_NEW},          {"PanelLoad", "LOAD MAP", ID_LOAD},
     {"PanelSave", "SAVE MAP", ID_SAVE},       {"PanelExport", "EXPORT MAP", ID_EXPORT},
     {"PanelImport", "IMPORT MAP", ID_IMPORT}, {"PanelMission", "MISSION SETTINGS", ID_MISSION},
-    {"PanelMapSize", "MAP SIZE", ID_RESIZE},  {"PanelPlay", "PLAY THE MAP", ID_PLAY},
+    {"PanelMapSize", "MAP SIZE", ID_RESIZE},  {"PanelPlay", "PLAY THE SAVED MAP", ID_PLAY},
     {"PanelUndo", "UNDO", ID_UNDO},           {"PanelRedo", "REDO", ID_REDO},
-    {"PanelRun", "RUN THE LEVEL", ID_RUN},    {"PanelBack", "BACK TO THE MENU", ID_BACK},
+    {"PanelRun", "QUICK TEST, NO SAVE", ID_RUN}, {"PanelBack", "BACK TO THE MENU", ID_BACK},
     {"PanelExit", "EXIT THE GAME", ID_EXIT},
 };
 constexpr int COMMAND_COUNT = sizeof COMMANDS / sizeof COMMANDS[0];
@@ -767,10 +767,20 @@ void panel_draw(POINT m) {
     }
 }
 
-// The name of the button under the mouse for the status line, or nullptr.
+// The name of the button under the mouse for the status line, or nullptr; in the Menu panel, what the
+// two ways of trying the map do (Options > Run the level and File > Play the map).
 const char* panel_tip(POINT m) {
     if (on_circle(m, help_button(), HELP_R)) return ui_text("ButtonHelp", "Help (F1)");
     if (on_circle(m, menu_button(), MENU_R)) return ui_text("ButtonMenu", "Menu");
+    if (g_panel == Panel::Menu) {
+        const int row = row_at(m);
+        if (row >= 0 && COMMANDS[row].id == ID_RUN)
+            return ui_text("TipRun", "Quick test here (Ctrl+R): runs the map as it is now in this window and saves nothing; Ctrl+R comes "
+                                     "back to the edits");
+        if (row >= 0 && COMMANDS[row].id == ID_PLAY)
+            return ui_text("TipPlay", "Play the saved map: starts the game anew on the saved map (asks to save first) and comes back "
+                                      "to the editor");
+    }
     return nullptr;
 }
 
@@ -870,8 +880,8 @@ bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse) {
 
 // ---- the notice of a save ----
 //
-// After every save (Ctrl+S, Save map, the write of Run the level and Play the map, a Yes to "Save
-// the changes?") SAVED in the menu titles' font in the middle of the view, the map's file under it
+// After every save (Ctrl+S, Save map, the write of Run the level into the map's own file and Play the
+// map, a Yes to "Save the changes?") SAVED in the menu titles' font in the middle of the view, the map's file under it
 // in the menu font when it was saved under a name, on a dark box that fades (over the held level
 // only: a running level's lighting turns the box light); 1.5 s from the first frame drawn after the
 // save (Run the level loads the level first), in front of everything and taking no input. The
@@ -889,8 +899,8 @@ DWORD g_saved_at = 0;       // the frame it was first drawn, 0 when not shown
 std::string g_saved_file;
 }  // namespace
 
-// editor.cpp's save_map: the map was written - into `file` when it was saved under a name, empty for
-// the scratch folder of a new map (Run the level).
+// editor.cpp's save_map: the map was saved into `file` (not Run the level's copy in its scratch folder,
+// which saves nothing for the user).
 void panel_saved(const std::string& file) {
     g_saved_new = true;
     g_saved_file = file;

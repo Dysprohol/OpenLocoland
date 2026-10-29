@@ -1335,8 +1335,8 @@ front of the game's:
   opens in `maps\` with the first free `poligon<n>.map` (POLIGON) or `map<n>.map` and says why in
   its title and the status line ("POLIGON is a map of the release - save it under a name of its
   own, an update would overwrite it"), a release map chosen in it is not saved over (the same text
-  in a box), Run the level with edits not saved asks for the save first (`RunCampaign`) and an
-  unchanged one runs without being written, and Map size, Export and Import leave them alone.
+  in a box), Run the level runs them from a copy (below) and an unchanged one from its own file, and
+  Map size, Export and Import leave them alone.
   Checked in the game (Polish and English): POLIGON painted, Ctrl+R refused, Ctrl+S opening the
   dialog titled with the reason and `poligon1.map`, saved as `maps\poligon1\poligon1.map` (its
   ground, script and texts; on the custom maps page), then Ctrl+S there saving without the dialog
@@ -1425,9 +1425,22 @@ TO MAIN MENU -> the editor, `return` 1 too.
 A tester's way into a running map: Run the level (Ctrl+R) runs the level inside the editor's own game,
 with the game's interface and its Esc menu. The script is compiled when a level loads, so resuming the
 held level would run the script of the load - without what the panels changed since (an arrival set in
-the Arrivals panel never came). So Run the level writes the map as a save does (without asking; a
-campaign map or the template with changes is not run - it is saved under a name of its own first) and loads it again
-running (`run_level`: `g_running` on, `editor_level_loaded` does not hold it). Back - Ctrl+R, BACK TO
+the Arrivals panel never came). So Run the level (the Menu panel's QUICK TEST, NO SAVE / TEST BEZ ZAPISU) writes the
+map and loads it again running, never asking: a map of its own is written as a save writes it; a map
+not written in place - a campaign map, POLIGON or the template, and the start's new map without a
+name - is written with its script (its editor blocks anew; a script without them as it is), ground
+and texts into a hidden copy, `maps\_run\` (marked as `maps\_new\` is, written for every run, removed
+when the editor leaves the map and swept at the next start), which runs. Back, the copy is held again
+with the editor on the original map (Ctrl+S, the dialogs' names, "not saved" and the history as
+before the run; a close of the game during the run asks to save, and Yes saves from the copy held
+again); while a level runs, the menu's other commands are not taken. Checked in Polish and English:
+POLIGON with a semaphore placed, Ctrl+R at once, the semaphore in the running level, Ctrl+R and the
+Esc menu's way back - the semaphore there, "not saved", Ctrl+Z undoing it; a second run from the
+copy; Ctrl+S then asking for a name; the start map and mission 1 run the same way; a map of its own
+written in place; `maps\_run` gone after the game is closed. File > Play the map (PLAY THE SAVED MAP /
+ZAGRAJ ZAPISANA MAPE) needs the saved map for the separate game and asks to save first; in the Menu
+panel the status line says what each of the two does (`TipRun`, `TipPlay`). The run
+(`run_level`: `g_running` on, `editor_level_loaded` does not hold it). Back - Ctrl+R, BACK TO
 THE EDITOR in the Esc menu, or any level change while it runs: ABORT GAME's menu, a won or lost
 level's next map (`editor_level_redirect` in the Level_Load wrapper of `frame_limit.cpp` turns the
 name into the map's, in a string of the game's heap, which the load frees) - stops the music
@@ -1460,9 +1473,8 @@ capitals, as TEMPLATE does. A map is not saved outside the game folder ("A map i
 folder of this game."): its script and texts are found by game paths. The save dialog gets the
 folder in its file name box: since Windows 7 the dialog opens in the folder it remembers for the
 program - every `Locoland.exe`, another game folder's too - and not in `lpstrInitialDir`, so a save
-went into another installation of the game. Written into its scratch folder (the arrivals session's
-Run the level saves the map it runs), the map stays unnamed and off the custom maps page, and its
-changes still count as not saved (the map file is newer than the mark), so leaving it asks. The scratch
+went into another installation of the game. Run the level runs it from a copy in
+`maps\_run\` (above), so the map stays unnamed, its edits not saved, and leaving it asks. The scratch
 folder goes when the editor leaves the map - another map loaded, made or imported, Back to the menu,
 Exit, the window closed ("the new map maps\_new left unsaved - removed" in `LocoFix.log`). Play the map
 and Export ask for the name first, as a save does, so the played game never runs from the scratch

@@ -164,7 +164,7 @@ Co widać:
   tytuł i swój numer (5 / 17); strzałki, Page Up / Down i kółko zmieniają strony, a **SPIS TRESCI**,
   `Esc` albo prawy przycisk wracają do spisu. **Przycisk menu**
   otwiera menu edytora ze wszystkimi poleceniami - nowa mapa, wczytaj, zapisz, ustawienia misji,
-  rozmiar mapy, zagraj na mapie, cofnij, ponów, uruchom poziom, powrót do menu, wyjdź z gry.
+  rozmiar mapy, zagraj zapisaną mapę, cofnij, ponów, test bez zapisu, powrót do menu, wyjdź z gry.
 
   ![Pomoc](img/editor-help-pl.jpg)
 
@@ -448,10 +448,12 @@ opar, poświata) i rozpryski.
 
 ### 9. Zobacz, jak działa
 
-Menu → **URUCHOM POZIOM** (albo `Ctrl+R`): mapa zostaje zapisana i działa w edytorze tak jak w grze -
-pociągi jeżdżą, działa strzelają, przyjeżdżają pociągi z panelu Przyjazdy. `Ctrl+R` przywraca mapę taką,
-jaką zapisano, tak samo menu gry pod `Esc` (WYJDŹ Z GRY → WRÓĆ DO EDYTORA albo TAK) i koniec poziomu
-(wygrana albo przegrana).
+Menu → **TEST BEZ ZAPISU** (albo `Ctrl+R`; szybki test tutaj): mapa działa w edytorze taka, jaka jest teraz, zapisana czy
+nie, tak jak w grze - pociągi jeżdżą, działa strzelają, przyjeżdżają pociągi z panelu Przyjazdy. Nic
+nie pyta: twoja mapa zapisuje się najpierw, a POLIGON, szablon, mapa kampanii i nowa mapa bez nazwy
+działają z ukrytej kopii, więc zostają, jakie były. `Ctrl+R` wraca do edytora z mapą taką, jak przed
+uruchomieniem - niezapisane zmiany dalej niezapisane, `Ctrl+Z` cofa je jak przedtem -, tak samo menu gry
+pod `Esc` (WYJDŹ Z GRY → WRÓĆ DO EDYTORA albo TAK) i koniec poziomu (wygrana albo przegrana).
 
 ### 10. Ustawienia misji i teksty
 
@@ -482,7 +484,7 @@ fortyfikacji), a **przegrana**, gdy graczowi nie zostało żadnej jednostki ani 
 
 ### 11. Zagraj
 
-Menu → **ZAGRAJ NA MAPIE**: gra uruchamia się od nowa z twoją mapą jako misją - odprawa w menu Esc,
+Menu → **ZAGRAJ ZAPISANA MAPE**: gra uruchamia się od nowa z twoją zapisaną mapą jako misją - odprawa w menu Esc,
 przybywające posiłki, atakujący wróg. Gdy się skończy, gra wraca do edytora na twoją mapę; żeby
 wrócić od razu, naciśnij Esc, przycisk wyjścia (WYJDZ Z GRY) i **WROC DO EDYTORA**. O niezapisane
 zmiany najpierw pyta.
