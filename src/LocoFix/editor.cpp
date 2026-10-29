@@ -80,6 +80,9 @@ void edit_saved();
 void install_editor_edit();
 void edit_level_held();
 void edit_touch();
+void edit_assign_orders();   // editor_edit.cpp
+void edit_commit_mission(const ArrivalsState& arrivals_before, const FactoryState& factories_before);
+void panel_open_arrivals();   // editor_panel.cpp
 void new_map_dialog(HWND owner);                // editor_newmap.cpp
 bool new_map_for_test(const std::string& text);  // editor_newmap.cpp
 std::string make_start_map();                    // editor_newmap.cpp: maps\mapN\, empty grass
@@ -719,8 +722,17 @@ void handle_command(HWND window, int id) {
         resize_current(window, w, h);
     } else if (id == ID_MISSION) {
         if (!g_held) return;
-        DialogScope scope;
-        if (mission_dialog(window)) edit_touch();
+        bool arrivals = false;
+        const ArrivalsState arrivals_before = mission_arrivals();
+        const FactoryState factories_before = mission_factories();
+        {
+            DialogScope scope;
+            if (mission_dialog(window, &arrivals)) {
+                edit_touch();
+                edit_commit_mission(arrivals_before, factories_before);   // the queue is in the history too
+            }
+        }
+        if (arrivals) panel_open_arrivals();   // its Arrivals... button
     } else if (id == ID_EXPORT) {
         export_current(window, "");
     } else if (id == ID_IMPORT) {
@@ -818,7 +830,15 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
                 ui_english(english);
                 return done ? TRUE : FALSE;
             }
-            if (data->dwData == TEST_MISSION) return mission_settings_from_file(path) ? (edit_touch(), TRUE) : FALSE;
+            if (data->dwData == TEST_MISSION) {
+                const ArrivalsState arrivals_before = mission_arrivals();
+                const FactoryState factories_before = mission_factories();
+                if (!mission_settings_from_file(path)) return FALSE;
+                edit_touch();
+                edit_commit_mission(arrivals_before, factories_before);
+                edit_assign_orders();   // its order: lines
+                return TRUE;
+            }
             if (data->dwData == TEST_RAIL_POINTS) {   // "x y": the rail points there into the log
                 float x = 0, y = 0;
                 if (std::sscanf(path.c_str(), "%f %f", &x, &y) != 2 || !world()) return FALSE;

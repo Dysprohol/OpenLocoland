@@ -604,11 +604,225 @@ def unpack_map(path, folder, objects_res=None):
     return model
 
 
+# The runner of the arrivals: the block "// <editor arrivals>" of a mission script, as the map
+# editor writes it (ARRIVALS_RUNNER of src/LocoFix/editor_mission.cpp - keep the two the same).
+ARRIVALS_RUNNER = r"""// ArrivalsTact() brings the trains of the arrays arrival_*[] (the settings' block above), once a
+// second: a wave comes when its time is there (the first after arrival_first s, the next ones
+// arrival_every s after the one before, arrival_times of them or without end) and its condition
+// holds - or, with arrival_or, also earlier when the condition holds; a train the player pays for
+// comes only while the money is there and is paid once it is made. It waits while a train
+// stands at its entry (180 px) or the AI has its 16 trains. The cars are made on the entry's rail
+// point in the army; the enemy's train goes to the AI (TrainsTact) with its task, the others' last
+// car gets the order to drive to arrival_to. ArrivalsLeft(army): the waves of an army still to come.
+ArrivalTrains(int army)
+{
+  return GetVid(5,VID_COUNT0+army)+GetVid(10,VID_COUNT0+army)+GetVid(97,VID_COUNT0+army);
+}
+ArrivalIf(int i)
+{
+  int c,n,k,m;
+  c=arrival_if[i];
+  n=arrival_if_n[i];
+  if( c==1 )
+    return ArrivalTrains(0)==0;
+  if( c==2 )
+    return ArrivalTrains(0)<n;
+  if( c==3 )
+    return NoArmyUnits(0)<n;
+  if( c==4 )
+    return GetVid(102,VID_COUNT0)==0;
+  if( c==5 )
+    return GetVid(102,VID_COUNT2)>0;
+  if( c==6 )
+    return ArrivalTrains(1)<n;
+  if( c==7 )
+  {
+    m=0;
+    for( k=0; k<ARR_LENGTH; k++ )
+      if( ai_trains[k] && ai_trains_task[k]/10==1 )
+        m++;
+    return m<n;
+  }
+  if( c==8 )
+    return GetMoney(0)>=n;
+  if( c==9 )
+    return ArrivalTrains(0)==0 && GetVid(102,VID_COUNT2)>0;
+  return 1;
+}
+ArrivalsLeft(int army)
+{
+  int i,n;
+  n=0;
+  for( i=0; i<ARRIVALS; i++ )
+    if( arrival_army[i]==army )
+      if( !arrival_times[i] || arrival_done[i]<arrival_times[i] )
+        if( !arrival_if[i] || arrival_or[i] || ArrivalIf(i) )
+          n++;
+  return n;
+}
+ArrivalTry(int i,int t)
+{
+  int j,k,u,go;
+  string s;
+  if( arrival_times[i] && arrival_done[i]>=arrival_times[i] )
+    return 0;
+  if( arrival_done[i] )
+    go=t-arrival_last[i]>=arrival_every[i];
+  else
+    go=t>=arrival_first[i];
+  if( arrival_or[i] )
+  {
+    if( arrival_if[i] && ArrivalIf(i) )
+      go=1;
+  }
+  else if( !ArrivalIf(i) )
+    go=0;
+  if( !go )
+    return 0;
+  if( arrival_if[i]==8 && !ArrivalIf(i) )
+    return 0;
+  if( FindNearestSprite(GETSPRITE_CLASS+B_ENGINE,arrival_x[i],arrival_y[i]+arrival_z[i],180) )
+    return 0;
+  k=-1;
+  if( arrival_army[i]==1 )
+  {
+    k=find_num();
+    if( k<0 )
+      return 0;
+  }
+  arr_gettype(temp_array,arrival_type[i]);
+  u=0;
+  for( j=0; j<ARR_LENGTH && temp_array[j]; j++ )
+  {
+    u=Create(temp_array[j],arrival_x[i],arrival_y[i]+arrival_z[i],arrival_z[i]);
+    Action(u,ACT_SET_ARMY,arrival_army[i],0);
+    if( arrival_army[i] )
+      Action(u,ACT_SET_BEHAVE,Action(u,ACT_GET_BEHAVE)|1);
+  }
+  if( !u )
+    return 0;
+  if( arrival_if[i]==8 )
+    SetMoney(0,GetMoney(0)-arrival_if_n[i]);
+  if( k>=0 )
+  {
+    ai_trains[k]=u;
+    ai_trains_type[k]=arrival_type[i];
+    ai_trains_task[k]=arrival_task[i];
+    ai_trains_task2[k]=ATA_NONE;
+    ai_trains_task_backup[k]=ATA_NONE;
+    ai_trains_behave[k]=0;
+    ai_trains_time[k]=GetTime();
+    ai_trains_random_task[k]=arrival_raid[i];
+  }
+  else if( arrival_task[i]==-2 )
+    Action(u,ACT_MOVE,arrival_to_x[i],arrival_to_y[i]+arrival_to_z[i]);
+  if( arrival_msg[i] )
+  {
+    PlaySFX(100);
+    if( arrival_army[i]==1 )
+      Message("EnemyReinforcementArrived",GetX(u),GetY(u));
+    else
+      Message("ReinforcementArrived",GetX(u),GetY(u));
+  }
+  arrival_done[i]=arrival_done[i]+1;
+  arrival_last[i]=t;
+  s="ARRIVAL "+itoa(i+1)+" army "+itoa(arrival_army[i])+" wave "+itoa(arrival_done[i]);
+  Log(s+" at "+itoa(t)+" s task "+itoa(arrival_task[i])+" slot "+itoa(k));
+  return 1;
+}
+// FactoryTact(t): the unit limits at the start (AddUnitLimit takes the limit first and the army
+// last), the units the factories get into their lists later (unlock_*[], the factory by its place).
+FactoryTact(int t)
+{
+  int i,u;
+  iff(1)
+  {
+    for( i=0; i<UNIT_LIMITS; i++ )
+      AddUnitLimit(limit_max[i],limit_vid[i],limit_army[i]);
+  }
+  for( i=0; i<UNLOCKS; i++ )
+    if( unlock_time[i]>=0 && t>=unlock_time[i] )
+    {
+      u=FindNearestSprite(GETSPRITE_VID+102,unlock_x[i],unlock_y[i],30);
+      if( u )
+        Action(u,ACT_ADD_ITEM,unlock_vid[i]);
+      Log("UNLOCK vid "+itoa(unlock_vid[i])+" at "+itoa(t)+" s, factory "+itoa(u!=0));
+      unlock_time[i]=-1;
+    }
+}
+// CaptureTact(): a neutral factory or repair point becomes the player's when a train of the player's
+// comes within 100 px of it (the missions call LDepoCapture / LMasterCapture of Captures.lgc for
+// their one such building; forts and mining plants are captured by F162_0 of ai_default_event.lgc).
+CaptureTact()
+{
+  int b,v;
+  for( b=FirstUnit(u_monster); b; b=NextUnit() )
+  {
+    v=GetUnitVid(b);
+    if( (v==102 || v==104) && Action(b,act_getarmy,0,0)==2 )
+      if( FindNearestSprite(GETSPRITE_UNIT+GETSPRITE_CLASS+B_ENGINE+GETSPRITE_ARMY0,GetX(b),GetY(b),100) )
+      {
+        PlaySFX(25);
+        Effect(eff_nuke,0x006000);
+        Action(b,act_setarmy,0,0);
+        BuildingCapture(b);
+        Log("CAPTURE vid "+itoa(v)+" at "+itoa(GetX(b))+","+itoa(GetY(b)));
+      }
+  }
+}
+// OrdersTact(): the orders of the map's trains (order_*[]), once at the start: each train found by its
+// first car's VID and place, then driven or patrolling (-2, -3), the enemy's given to the AI with its task.
+OrdersTact()
+{
+  int i,u,k;
+  for( i=0; i<ORDERS; i++ )
+  {
+    u=FindNearestSprite(GETSPRITE_VID+order_vid[i],order_x[i],order_y[i],20);
+    k=-1;
+    if( u && order_task[i]==-2 )
+      Action(u,ACT_MOVE,order_to_x[i],order_to_y[i]+order_to_z[i]);
+    if( u && order_task[i]==-3 )
+      PatrolEngine(u,order_to_x[i],order_to_y[i]);
+    if( u && order_task[i]>=0 )
+    {
+      k=find_num();
+      if( k>=0 )
+      {
+        ai_trains[k]=u;
+        ai_trains_type[k]=order_type[i];
+        ai_trains_task[k]=order_task[i];
+        ai_trains_task2[k]=ATA_NONE;
+        ai_trains_task_backup[k]=ATA_NONE;
+        ai_trains_behave[k]=0;
+        ai_trains_time[k]=GetTime();
+        ai_trains_random_task[k]=0;
+      }
+    }
+    Log("ORDER "+itoa(i+1)+" task "+itoa(order_task[i])+" train "+itoa(u!=0)+" slot "+itoa(k));
+  }
+}
+ArrivalsTact()
+{
+  int i,t;
+  if( !OneTimeInSecond() )
+    return 0;
+  t=(GetTime()-time_game_total)/1000;
+  iff(1)
+    OrdersTact();
+  FactoryTact(t);
+  CaptureTact();
+  for( i=0; i<ARRIVALS; i++ )
+    ArrivalTry(i,t);
+  return 1;
+}
+"""
+
 MISSION_SCRIPT = r"""// Mission script of a map: the map, its ground image and this script make a level.
-// The two blocks between "// <editor>" and "// </editor>" and between "// <editor main>" and
-// "// </editor main>" belong to the map editor of the game (LocoFix, DEVELOPERS.md "Editor mode"):
-// File > Mission settings... and the Push line tool change them and the editor writes them anew
-// when the map is saved. The rest of the file stays as it is - the mission's own code goes there.
+// The blocks between "// <editor>" and "// </editor>", "// <editor main>" and "// </editor main>",
+// "// <editor arrivals>" and "// </editor arrivals>", "// <editor tact>" and "// </editor tact>"
+// belong to the map editor of the game (LocoFix, DEVELOPERS.md "Editor mode"): File > Mission
+// settings..., the Push line tool and the Arrivals panel change them and the editor writes them
+// anew when the map is saved. The rest of the file stays as it is - the mission's own code goes there.
 // main() runs every frame; iff(...) runs its block once. The scripts in maps\script\ read the
 // settings of the first block (MAP_RULES.md 8).
 // <editor> the mission's settings - written by the map editor when the map is saved
@@ -649,9 +863,13 @@ MISSION_SCRIPT = r"""// Mission script of a map: the map, its ground image and t
 #define BRIEF_LIST "maps\\@NAME@\\brief.lst"
 #define BRIEF_HEADER "@TITLE@"
 #define HISCORES_FILE "maps\\@NAME@\\hiscores"
-#define PLAYER_REINFORCEMENT 1
+#define PLAYER_REINFORCEMENT 0
 int player_reinforcement_train[]={5,0};
 #define LIMIT_ATACKERS 2
+#define ARRIVALS 0
+#define ORDERS 0
+#define UNLOCKS 0
+#define UNIT_LIMITS 0
 #include "maps\script\TrainsTactDeclares.lgc"
 int start_trains[]={-1};
 int start_trains_task[]={0};
@@ -662,6 +880,40 @@ int start_trains_random_task[]={0};
 int level_queue_times[]={0};
 int level_queue_trains[]={-1};
 int level_queue_task[]={0};
+int arrival_army[]={0};
+int arrival_type[]={0};
+int arrival_x[]={0};
+int arrival_y[]={0};
+int arrival_z[]={0};
+int arrival_first[]={0};
+int arrival_every[]={0};
+int arrival_times[]={0};
+int arrival_if[]={0};
+int arrival_if_n[]={0};
+int arrival_or[]={0};
+int arrival_task[]={0};
+int arrival_to_x[]={0};
+int arrival_to_y[]={0};
+int arrival_to_z[]={0};
+int arrival_raid[]={0};
+int arrival_msg[]={0};
+int arrival_done[]={0};
+int arrival_last[]={0};
+int order_vid[]={0};
+int order_x[]={0};
+int order_y[]={0};
+int order_task[]={0};
+int order_type[]={0};
+int order_to_x[]={0};
+int order_to_y[]={0};
+int order_to_z[]={0};
+int unlock_x[]={0};
+int unlock_y[]={0};
+int unlock_vid[]={0};
+int unlock_time[]={0};
+int limit_army[]={0};
+int limit_vid[]={0};
+int limit_max[]={0};
 // </editor>
 // What the settings mean: LEVEL the mission number (from 0), CUSTOM_MAP marks a map that is not
 // a campaign mission (no campaign progress or scores, the Esc menu's restart loads this map, the
@@ -673,8 +925,13 @@ int level_queue_task[]={0};
 // LIMIT_ATACKERS the enemy trains attacking at once, start_trains* the enemy's trains at the start
 // (TrainsTactDeclares.lgc: ATT_... types, ATA_FIGHT or ATA_PATROLn with the points ATA_PATROLn_X1
 // ... _Y2, screen coordinates; -1 ends the list - without the arrays TrainsTact() puts a train at
-// (0, 0), BUGS.md F10) and level_queue_* the trains its depot builds later (the earliest times, s).
+// (0, 0), BUGS.md F10), level_queue_* the trains its depot builds later (the earliest times, s)
+// and ARRIVALS, arrival_*[] the trains that arrive from the entries of the map (the Arrivals panel),
+// ORDERS, order_*[] the trains' orders (a train's panel), UNLOCKS, unlock_*[] the units a factory
+// gets later, UNIT_LIMITS, limit_*[] the unit limits (a factory's panel; the next block runs them).
 #include "maps\script\header.lgc"
+// <editor arrivals> the trains that arrive (the Arrivals panel) - written by the map editor when the map is saved
+@RUNNER@// </editor arrivals>
 
 int script_status=0;   // stage of the mission (for the mission's own code)
 int map_enemy=0;       // the enemy had units (the win waits for them)
@@ -703,8 +960,9 @@ main()
   iff(1)
   {
     InitDefault();
-    // The player's train arrives where the map has its point locomotive (VID 5, army 3):
-    // InitDefault takes that locomotive away and keeps its place in player_x/y/z
+    // The authors' reinforcement (the trains of the Arrivals panel come in its place): with
+    // PLAYER_REINFORCEMENT waves the player's train arrives where the map has its point locomotive
+    // (VID 5, army 3) - InitDefault takes that locomotive away and keeps its place in player_x/y/z
     // (reinforcement.lgc). A map without one has no place, so nothing arrives.
     if(player_x || player_y)
       AddReinforcement();
@@ -717,6 +975,9 @@ main()
     {
       GameTact();
       TrainsTact();
+      // <editor tact> the arrivals - written by the map editor when the map is saved
+      ArrivalsTact();
+      // </editor tact>
 #ifdef MAP_WIN_TEST
       MapWinTest();
 #endif
@@ -727,15 +988,16 @@ main()
         if( (GetVid(5,VID_COUNT0)+GetVid(10,VID_COUNT0))==0 && GetVid(102,VID_COUNT0) )
           AddReinforcement();
         // won when the enemy had units and has none left (NoArmyUnits counts them,
-        // ARMY1_NVID_ARRAY of constants.lgc: the trains, the depot, the fort's guns)
+        // ARMY1_NVID_ARRAY of constants.lgc: the trains, the depot, the fort's guns) and no
+        // more of its trains are to arrive
         if( NoArmyUnits(1) )
           map_enemy=1;
-        else if( map_enemy )
+        else if( map_enemy && !ArrivalsLeft(1) )
           Win();
-        // lost when the player had units and has none left, nor a depot
+        // lost when the player had units and has none left, nor a depot, nor trains to arrive
         if( NoArmyUnits(0) )
           map_player=1;
-        else if( map_player && IsNoDepo() )
+        else if( map_player && IsNoDepo() && !ArrivalsLeft(0) )
           Loose();
       }
     }
@@ -743,6 +1005,8 @@ main()
 """
 
 # the texts of a new map (map_tool.py new --script), CP1250 in capitals as the game's
+MISSION_SCRIPT = MISSION_SCRIPT.replace("@RUNNER@", ARRIVALS_RUNNER)
+
 MISSION_TEXTS = {
     "objectives.txt": "DESTROY THE ENEMY TRAINS AND FACTORY\r\n",
     "win.txt": "THE ENEMY IS BEATEN. VICTORY!\r\n",

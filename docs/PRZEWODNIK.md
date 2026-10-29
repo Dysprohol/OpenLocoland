@@ -243,11 +243,27 @@ bagienne. `PgUp` / `PgDn` sprawiają, że następna szyna wznosi się albo opada
 teren: każda rampa to 11 poziomów). Linię na wzgórze najpierw wprowadź po rampach, potem podnieś teren
 wokół jej końca i wyrównaj go, zaczynając na torze. `B` wybiera podsypkę pod nowe szyny. Del albo narzędzie **Usun odcinek toru** usuwa szyny.
 
-### 5. Punkt przybycia posiłków
+### 5. Przyjazdy pociągów
 
-**Punkt przybycia posilkow** (klawisz 0): kliknij na głównej linii **za zachodnią krawędzią**. Tu
-na początku misji przyjeżdża pociąg gracza (a później kolejne fale, zob. krok 10). Sam staje na
-najbliższym torze.
+**Przyjazdy pociagow** (klawisz 0) otwiera panel z pociągami, które w czasie misji wjeżdżają na mapę -
+pociąg gracza na start, posiłki, fale wroga. **+ DODAJ** podsuwa przepis (pierwszy to pociąg gracza na
+start). Dla przyjazdu wybranego w górnym wierszu:
+
+- **KTO** - nasi, wróg, neutralni albo piraci;
+- **POCIAG** - jego wagony: kliknięcie wagonu go usuwa, **+ WAGON** dodaje z palety Pojazdy,
+  **SZABLON** wstawia skład autorów;
+- **SKAD** - **WSKAZ**, potem kliknij główną linię **za zachodnią krawędzią**: tam powstaje pociąg.
+  **+ LINIA WJAZDU** kładzie linię jednokierunkową, która wpycha go na mapę, z semaforami;
+- **NAJPIERW**, **CO**, **ILE RAZY** - kiedy przyjeżdża, jak często i ile razy (albo bez końca);
+- **WARUNEK** - np. gracz nie ma pociągu, wróg ma mniej pociągów niż ..., gracz płaci ...; przełącznik na
+  końcu wiersza **ILE RAZY** mówi, czy pociąg przyjeżdża **TYLKO WTEDY**, czy **TAKZE WCZESNIEJ**;
+- **POTEM** - pociąg wroga atakuje, pilnuje punktu albo patroluje między dwoma punktami
+  (robi to AI gry; punkty **WSKAZ** na mapie), nasi, neutralni i piraci jadą do punktu - wskaż go poza główną linią, bo pociąg stojący na wjeździe zatrzymuje następne;
+- **KOMUNIKAT** („przybyły posiłki”, dla naszych i wroga).
+
+Wiersz na dole ostrzega, czego brakuje. Fala czeka, gdy na wjeździe stoi pociąg. Każdą zmianę cofa
+Ctrl+Z. Mapy ze starszej wersji zachowują swoje posiłki, dopóki w panelu nie wybierzesz **PRZESTAW NA
+PRZYJAZDY**.
 
 ### 6. Fabryka, punkt naprawczy, linie jednokierunkowe i semafory
 
@@ -276,6 +292,25 @@ pchanie, `R` ją odwraca, `S` stawia jej semafory, Del ją usuwa. Zrób dwie:
 jednokierunkowych i stoją obok toru; `T` zmienia kolor. Na zaznaczonym semaforze `L` robi przy nim
 linię, która wpuszcza pociągi, na które patrzy (zielony), a `Shift+L` taką, która je zatrzymuje
 (czerwony).
+
+**Co buduje fabryka**: prawy przycisk na fabryce, **CO BUDUJE...**. Dla twojej fabryki (i neutralnej,
+której lista będzie twoja po jej zdobyciu) kliknij jednostki, które może budować - zachowują kolejność i
+klawisze gry F1-F12, [ i ]; dla ostatnio klikniętej **NA LISCIE** ustawia, od kiedy (od początku albo po
+czasie), a **NAJWYZEJ** - ile ich gracz może mieć. Dla fabryki wroga pokazuje kolejkę, którą buduje jego
+AI (AI ma tylko wróg): każdy pociąg, **NIE PRZED** - kiedy najwcześniej - i czy atakuje, pilnuje punktu, czy
+patroluje.
+
+**Rozkazy pociągu**: prawy przycisk na pociągu, **ROZKAZY**: twoje, neutralne i pirackie **JEDZ DO...**
+punktu albo **PATROL...** między miejscem, gdzie stoją, a punktem; wroga (z wagonem z działem - jego AI z
+samej lokomotywy robi taran) **ATAK**, **PILNUJ...** punktu albo **PATROL...**. Punkt to kliknięcie na torze.
+ROZKAZY są tylko w mapie z przyjazdami; mapa ze starszej wersji ma sam **PATROL**, dopóki w panelu
+Przyjazdy nie wybierzesz **PRZESTAW NA PRZYJAZDY**.
+
+**Zdobywanie**: neutralna fabryka albo punkt naprawczy staje się twój, gdy podjedzie do niego twój pociąg
+(fort albo kopalnia - gdy nie ma już ich dział).
+
+**Neutralni** (armia 2): nikt sam do nich nie strzela. W panelu neutralnego działa, fortu albo pociągu
+**STRZELA: DO WSZYSTKICH** sprawia, że strzela do gracza, wroga i piratów, **NIE** - że milczy.
 
 ### 7. Wróg
 
@@ -329,9 +364,8 @@ Menu → **USTAWIENIA MISJI** (albo zębatka na listwie):
 - **Tytuł** na stronie własnych map i **nagłówek odprawy**;
 - **pieniądze** na początku, **pora startu** (dzień, wieczór, noc, ranek), **deszcz**, **błyskawice**;
 - **atakujących naraz** - ile pociągów wroga atakuje jednocześnie;
-- **fale posiłków gracza** i **ich pociąg** (rodzaje wagonów jako numery, np. `5,20` - lokomotywa i
-  działo; numery są w palecie Pojazdy obok nazw). Pierwsza fala przywozi pociąg gracza na początku;
-  następna przychodzi, gdy pociągu gracza już nie ma, a fabryka stoi;
+- **przyjazdy pociągów** - ich liczba i przycisk do ich panelu (krok 5); mapa ze starszej wersji ma tu
+  **fale posiłków gracza** i **ich pociąg** (numery, np. `5,20`), dopóki nie zostanie przestawiona;
 - **pociągi wroga na początku**, jeden w linii: `typ x y` (walczy stamtąd) albo `typ x1 y1 x2 y2`
   (patroluje między dwoma punktami toru). Typy to `light_`, `medium_`, `hard_`, `very_hard_`, `diff_`
   albo `defence_` z `gun`, `mortair`, `rocket`, `air`, `fire` albo `desant`, np. `light_gun`. Punkty są
@@ -388,7 +422,7 @@ MOST BEZ POWROTU
 | 6 | Fortyfikacja | na torze, uzbrojona |
 | 7 | Wszystkie obiekty | paleta |
 | 8 / 9 | Semafor zielony / czerwony | obok toru |
-| 0 | Punkt przybycia posilkow | tu przyjeżdża pociąg gracza |
+| 0 | Przyjazdy pociagow | panel pociągów, które przyjeżdżają |
 
 **Listwa** (nad paskiem, od lewej): Usun odcinek toru, Dekoracje, Linia jednokierunkowa, Ustawienia
 misji, Wysokosc terenu, Skrzynka z pieniedzmi, Pojazdy, Malowanie terenu, Woda i lawa, Region.

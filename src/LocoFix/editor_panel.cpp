@@ -28,7 +28,12 @@
 // railway, flags and crates, wrecks, units and creatures), a page of 16 icons on the right, the name
 // of the one under the mouse below them, the page arrows when a group has more. A click on an icon
 // picks the object - the bar's entry places it, in the army the palette gives it - and closes the
-// panel.
+// panel. Opened for the Arrivals panel's train (panel_open_vehicles_for_train), the Vehicles
+// palette adds the car picked to it and goes back there.
+//
+// The Arrivals panel (the bar's entry 0) and a factory's panel are drawn and clicked by
+// editor_arrivals.cpp and editor_factory.cpp in this frame; Ctrl+Z / Ctrl+Y reach the editor's
+// history while one is open.
 #include "patch.h"
 #include "editor_text.h"
 
@@ -47,6 +52,16 @@ bool edit_font_size(int font, float& w, float& h);
 void edit_view_box(float& l, float& t, float& r, float& b);
 void edit_bar_box(float& l, float& t, float& r, float& b);
 void edit_pick_object(int nvid, int army);
+// editor_arrivals.cpp: the Arrivals panel
+void arrivals_draw(POINT mouse);
+bool arrivals_click(POINT mouse);
+void arrivals_add_car(int nvid);
+// editor_factory.cpp: a factory's panel
+void factory_draw(POINT mouse);
+bool factory_click(POINT mouse);
+void factory_add_car(int nvid);
+void factory_open(void* factory);
+bool edit_arrival_picking();   // editor_edit.cpp: a point for the Arrivals panel is being picked
 
 namespace {
 
@@ -89,8 +104,10 @@ const Command COMMANDS[] = {
 constexpr int COMMAND_COUNT = sizeof COMMANDS / sizeof COMMANDS[0];
 constexpr int ROWS = 7;
 
-enum class Panel { None, Help, Menu, Palette };
+enum class Panel { None, Help, Menu, Palette, Arrivals, Factory };
 Panel g_panel = Panel::None;
+// the Vehicles palette adds a car to the train of this panel (Arrivals, Factory) and goes back there
+Panel g_for_train = Panel::None;
 int g_page = 0;
 std::vector<std::vector<std::string>> g_pages;   // the help's pages, their lines (CP1250)
 
@@ -456,7 +473,9 @@ void draw_palette(POINT m) {
 void open(Panel panel) {
     g_panel = panel;
     if (panel == Panel::Help) load_pages();
-    patch::log("panel: %s", panel == Panel::Help ? "help" : panel == Panel::Menu ? "menu" : "closed");
+    if (panel != Panel::Palette) g_for_train = Panel::None;
+    patch::log("panel: %s", panel == Panel::Help ? "help" : panel == Panel::Menu ? "menu" : panel == Panel::Palette ? "palette"
+                            : panel == Panel::Arrivals ? "arrivals" : panel == Panel::Factory ? "factory" : "closed");
 }
 
 void turn_page(int by) {
@@ -485,6 +504,13 @@ void panel_draw(POINT m) {
     if (g_panel == Panel::Help) draw_help(m);
     else if (g_panel == Panel::Menu) draw_menu(m);
     else if (g_panel == Panel::Palette) draw_palette(m);
+    else if (g_panel == Panel::Arrivals) {
+        arrivals_draw(m);
+        draw_close(m);
+    } else if (g_panel == Panel::Factory) {
+        factory_draw(m);
+        draw_close(m);
+    }
 }
 
 // The name of the button under the mouse for the status line, or nullptr.
@@ -501,18 +527,24 @@ bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse) {
         if (m == WM_LBUTTONDOWN && on_circle(mouse, help_button(), HELP_R)) open(Panel::Help);
         else if (m == WM_LBUTTONDOWN && on_circle(mouse, menu_button(), MENU_R)) open(Panel::Menu);
         else if (m == WM_KEYDOWN && w == VK_F1) open(Panel::Help);
-        else if (m == WM_KEYDOWN && w == VK_ESCAPE) open(Panel::Menu);   // Esc opens Menu when no panel is open
+        else if (m == WM_KEYDOWN && w == VK_ESCAPE && !edit_arrival_picking()) open(Panel::Menu);   // Esc opens Menu when no panel is open
         else return false;
         return true;
     }
+    // the Arrivals panel's changes are steps of the editor's history: Ctrl+Z / Ctrl+Y go there
+    if ((g_panel == Panel::Arrivals || g_panel == Panel::Factory) && (m == WM_KEYDOWN || m == WM_KEYUP) &&
+        (w == VK_CONTROL || ((w == 'Z' || w == 'Y') && GetKeyState(VK_CONTROL) < 0)))
+        return false;
     switch (m) {
     case WM_LBUTTONDOWN:
         if (on_circle(mouse, help_button(), HELP_R)) open(g_panel == Panel::Help ? Panel::None : Panel::Help);
         else if (on_circle(mouse, menu_button(), MENU_R)) open(g_panel == Panel::Menu ? Panel::None : Panel::Menu);
-        else if (on_close(mouse)) open(Panel::None);
+        else if (on_close(mouse)) open(g_for_train);
         else if (on_previous(mouse)) turn_page(-1);
         else if (on_next(mouse)) turn_page(1);
         else if (g_panel == Panel::Menu && row_at(mouse) >= 0) run(window, row_at(mouse));
+        else if (g_panel == Panel::Arrivals) arrivals_click(mouse);
+        else if (g_panel == Panel::Factory) factory_click(mouse);
         else if (g_panel == Panel::Palette) {
             if (on_palette_previous(mouse)) --g_palette_page;
             else if (on_palette_next(mouse)) ++g_palette_page;
@@ -520,14 +552,21 @@ bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse) {
                 g_group = group_at(mouse);
                 g_palette_page = 0;
             } else if (const PaletteObject* o = object_at(mouse)) {
-                open(Panel::None);
                 patch::log("panel: palette picks VID %d", o->nvid);
-                edit_pick_object(o->nvid, o->army);
+                if (g_for_train != Panel::None) {   // a car for the train of the panel it came from
+                    const Panel back = g_for_train;
+                    open(back);
+                    if (back == Panel::Arrivals) arrivals_add_car(o->nvid);
+                    else factory_add_car(o->nvid);
+                } else {
+                    open(Panel::None);
+                    edit_pick_object(o->nvid, o->army);
+                }
             }
         }
         return true;
     case WM_RBUTTONDOWN:
-        open(Panel::None);
+        open(g_for_train);
         return true;
     case WM_MOUSEWHEEL:
         if (g_panel == Panel::Help) turn_page(GET_WHEEL_DELTA_WPARAM(w) > 0 ? -1 : 1);
@@ -540,7 +579,7 @@ bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse) {
             // closes Help/Palette without opening Menu
             if (g_panel == Panel::None) open(Panel::Menu);
             else if (g_panel == Panel::Menu) open(Panel::None);
-            else open(Panel::None);   // Help or Palette: close without opening Menu
+            else open(g_for_train);   // Help, Palette, Arrivals, Factory: close without opening Menu
         } else if (w == VK_F1) open(Panel::None);
         else if (g_panel == Panel::Help && (w == VK_LEFT || w == VK_PRIOR || w == VK_UP)) turn_page(-1);
         else if (g_panel == Panel::Help && (w == VK_RIGHT || w == VK_NEXT || w == VK_DOWN)) turn_page(1);
@@ -567,9 +606,34 @@ void panel_reset() { g_panel = Panel::None; }
 // The palette (the bar's "All objects", editor_edit.cpp), or with `vehicles` the cars' (the bar's
 // "Vehicles": the groups GroupTrain...).
 void panel_open_palette(bool vehicles) {
+    g_for_train = Panel::None;
     load_palette();
     show_groups(vehicles);
     open(Panel::Palette);
+}
+
+// The Vehicles palette for a car of the Arrivals panel's train: its pick goes there, and closing it
+// goes back to that panel.
+void panel_open_vehicles_for_train(bool factory) {
+    panel_open_palette(true);
+    g_for_train = factory ? Panel::Factory : Panel::Arrivals;
+}
+
+// The Arrivals panel (editor_arrivals.cpp): the bar's entry 0, a reinforcement's panel, Mission settings.
+void panel_open_arrivals() { open(Panel::Arrivals); }
+
+// A factory's panel (editor_factory.cpp): the factory's object panel.
+void panel_open_factory(void* factory) {
+    factory_open(factory);
+    open(Panel::Factory);
+}
+
+// editor_arrivals.cpp's frame: the device and the picture with the title, the picture's middle.
+void panel_frame(int picture_vid, const char* title) { draw_frame(picture_vid, title); }
+void panel_picture(float& x, float& y) {
+    const Place p = picture();
+    x = p.x;
+    y = p.y;
 }
 
 // The palette's name of an object (the game's [Units] name first), or nullptr when it has none.

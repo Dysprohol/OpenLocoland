@@ -246,11 +246,27 @@ swamp. `PgUp` / `PgDn` make the next rail climb or descend (a ramp onto higher g
 11 levels). For a line on a hill, lay it up its ramps first, then raise the ground around the top and
 flatten it starting on the track. `B` picks the gravel bed under new rails. Del or the **Delete a section of track** tool removes rails.
 
-### 5. The reinforcement point
+### 5. Train arrivals
 
-**Reinforcement point** (key 0): click on the main line **past the west edge**. Here the player's
-train arrives at the start of the mission (and further waves later, see step 10). It stands on
-the nearest track by itself.
+**Train arrivals** (key 0) opens a panel with the trains that come onto the map during the mission -
+the player's train at the start, reinforcements, enemy waves. **+ ADD** offers a recipe (the player's
+train at the start is the first one). For the arrival chosen in the top row:
+
+- **WHO** - ours, the enemy, the neutrals or the pirates;
+- **TRAIN** - its cars: a click on a car takes it away, **+ CAR** adds one from the Vehicles palette,
+  **TEMPLATE** puts one of the authors' trains in;
+- **FROM** - **PICK**, then click the main line **past the west edge**: the train is made there.
+  **+ ENTRY LINE** lays the one-way line that pushes it onto the map, with its semaphores;
+- **FIRST**, **EVERY**, **TIMES** - when it comes, how often and how many times (or without end);
+- **IF** - a condition (the player has no train, the enemy has fewer trains than ..., the player pays
+  ...); the switch at the end of the **TIMES** row says whether it comes **ONLY THEN** or **ALSO EARLIER**;
+- **THEN** - the enemy's train attacks, guards a point or patrols between two points
+  (the game's AI does it; **PICK** the points), ours, the neutrals' and the pirates' drive to a point - pick one off the main line, a train standing at the entry holds the next ones;
+- the **MESSAGE** ("reinforcements have arrived", for ours and the enemy's).
+
+The line at the bottom warns about what is missing. A wave waits while a train stands at its entry.
+Every change is undone with Ctrl+Z. Maps made with an older version keep their reinforcement until
+**CONVERT TO ARRIVALS** in the panel.
 
 ### 6. The factory, the repair point, one-way lines and semaphores
 
@@ -278,6 +294,26 @@ pushing on or off, `R` turns it round, `S` puts its semaphores, Del deletes it. 
 **Semaphores** (keys 8 green, 9 red) are signs only - they show the way of the one-way lines and
 stand beside the track; `T` switches the colour. On a selected semaphore `L` makes a line at it that
 lets in the trains it faces (green), `Shift+L` one that keeps them out (red).
+
+**What a factory builds**: the right button on a factory, **WHAT IT BUILDS...**. For your factory
+(and a neutral one, whose list is yours once you capture it) click the units it may build - they keep
+the game's order and keys F1-F12, [ and ]; for the unit clicked last **IN THE LIST** sets from when (at
+the start or after a time) and **AT MOST** how many of them the player may have. For the enemy's
+factory it shows the queue its AI builds (only the enemy has an AI): each train, **NOT BEFORE** when,
+and whether it attacks, guards a point or patrols.
+
+**Orders of a train**: the right button on a train, **ORDERS**: yours, the neutrals' and the pirates'
+**DRIVE TO...** a point or **PATROL...** between where they stand and a point; the enemy's (with a gun car -
+its AI makes a bare locomotive a ram) **ATTACK**, **GUARD...** a point or **PATROL...**. The point is a click
+on the track. ORDERS are there only in a map that runs arrivals; a map made with an older version has
+**PATROL** only, until **CONVERT TO ARRIVALS** in the Arrivals panel.
+
+**Capturing**: a neutral factory or repair point becomes yours when one of your trains comes close to it
+(a fort or a mining plant once its guns are gone).
+
+**Neutrals** (army 2): no one fires at them on their own. In the panel of a neutral gun, fort or train,
+**IT FIRES: AT ALL IN RANGE** makes it fire at the player, the enemy and the pirates alike, **NO** keeps
+it quiet.
 
 ### 7. The enemy
 
@@ -332,9 +368,9 @@ Menu → **MISSION SETTINGS** (or the gear in the strip):
 - **Money** at the start, the **time of day** (day, evening, night, morning), **rain**,
   **lightning**;
 - **Enemy attackers at once** - how many enemy trains attack together;
-- **Player's reinforcement waves** and **their train** (the car kinds by number, e.g. `5,20` - an
-  engine and a gun car; the numbers are in the Vehicles palette next to the names). The first wave brings the player's
-  train at the start; the next comes when the player's train is gone and the factory still stands;
+- **Train arrivals** - their count and the button to their panel (step 5); a map made with an older
+  version has the **player's reinforcement waves** and **their train** (VIDs, e.g. `5,20`) here
+  until it is converted;
 - **Enemy trains at the start**, one a line: `type x y` (it fights from there) or `type x1 y1 x2 y2`
   (it patrols between two points of the track). The types are `light_`, `medium_`, `hard_`,
   `very_hard_`, `diff_` or `defence_` with `gun`, `mortair`, `rocket`, `air`, `fire` or `desant`, e.g.
@@ -391,7 +427,7 @@ BRIDGE OF NO RETURN
 | 6 | Fort | on the track, armed |
 | 7 | All objects | the palette |
 | 8 / 9 | Semaphore green / red | beside the track |
-| 0 | Reinforcement point | the player's train arrives here |
+| 0 | Train arrivals | the panel of the trains that arrive |
 
 **The strip** (above the bar, left to right): Delete a section of track, Decals, Push line,
 Mission settings, Ground height, Money crate, Vehicles, Paint the ground, Water and lava, Region.

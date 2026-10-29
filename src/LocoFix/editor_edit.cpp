@@ -84,6 +84,13 @@ const char* panel_tip(POINT mouse);
 bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse);
 bool panel_open();
 void panel_reset();
+void panel_open_arrivals();         // editor_panel.cpp: the Arrivals panel (editor_arrivals.cpp)
+void arrivals_reset();
+void factory_reset();   // editor_factory.cpp
+int arrivals_selected();
+void panel_open_factory(void* factory);   // editor_panel.cpp: a factory's panel (editor_factory.cpp)
+void edit_commit_arrivals(const UiText& what, const ArrivalsState& before);   // below
+void edit_commit_factories(const UiText& what, const FactoryState& before);
 
 namespace {
 
@@ -306,13 +313,19 @@ struct State {
     uint8_t* next = nullptr;
     uint32_t car_flags = 0;
     int front[4] = {}, rear[4] = {};
-    bool patrol = false;
-    int patrol_x = 0, patrol_y = 0;
+    bool patrol = false;   // an order (a patrol, a drive, the enemy's AI task)
+    int patrol_x = 0, patrol_y = 0, patrol_z = 0, order = 0;
     // a region: its size, flags, fog and what it turns explosions into (regions, below)
     bool region = false;
     float region_w = 0, region_h = 0;
     uint32_t region_flags = 0, fog_colour = 0;
     int fog_low = 0, fog_high = 0, splash = 0;
+    // a unit: its behave (BEH_..., bit 1 BEH_AGGRESSIVE: it fires on its own)
+    bool unit = false;
+    int behave = 0;
+    // a factory: its build list (Unit.items, the order of its F keys)
+    bool factory = false;
+    std::vector<short> items;
 };
 
 // ---- regions ----
@@ -390,21 +403,26 @@ void set_region_fog(uint8_t* o, int low, int high, uint32_t colour) {
     reinterpret_cast<InitFog_t>(REGION_INIT_FOG)(o, nullptr, low, high, static_cast<int>(colour));
 }
 
-// A train's patrol, kept with one of its cars: the rail point at the far end (its screen position,
-// as Engine_CommandToPoint takes it). Engine_Action has no case for ACT_PATROL, so a command kept
-// in the map would do nothing: the patrol is the script's PatrolEngine (editor_mission.h).
-std::map<uint8_t*, std::pair<int, int>> g_patrols;
+// A train's order for the map, kept with one of its cars: its task (ArrivalTask of editor_mission.h:
+// a patrol or a drive for any army, the enemy's attack, post or patrol for the AI) and its rail point
+// (the screen position, as Engine_CommandToPoint takes it, and the point's height). Engine_Action has
+// no case for ACT_PATROL, so a command kept in the map would do nothing: the orders are the script's
+// (PatrolEngine lines in main(), or the runner's arrays - editor_mission.cpp "orders").
+struct Order {
+    int task = TASK_PATROL;
+    int x = 0, y = 0, z = 0;
+};
+std::map<uint8_t*, Order> g_patrols;
 
-bool patrol_of(uint8_t* o, int& x, int& y) {
+bool order_of(uint8_t* o, Order& out) {
     const auto it = g_patrols.find(o);
     if (it == g_patrols.end()) return false;
-    x = it->second.first;
-    y = it->second.second;
+    out = it->second;
     return true;
 }
 
-void set_patrol(uint8_t* o, bool on, int x, int y) {
-    if (on) g_patrols[o] = {x, y};
+void set_order(uint8_t* o, bool on, const Order& order) {
+    if (on) g_patrols[o] = order;
     else g_patrols.erase(o);
 }
 
@@ -418,7 +436,9 @@ State state_of(uint8_t* o) {
         s.car_flags = at<uint32_t>(o, E_FLAGS);
         std::memcpy(s.front, o + E_FRONT_DOT, sizeof s.front);
         std::memcpy(s.rear, o + E_REAR_DOT, sizeof s.rear);
-        s.patrol = patrol_of(o, s.patrol_x, s.patrol_y);
+        Order order;
+        s.patrol = order_of(o, order);
+        s.patrol_x = order.x, s.patrol_y = order.y, s.patrol_z = order.z, s.order = s.patrol ? order.task : 0;
     }
     if (is_region(o)) {
         s.region = true;
@@ -429,6 +449,15 @@ State state_of(uint8_t* o) {
         s.fog_high = at<int>(o, RG_HIGH);
         s.fog_colour = at<uint32_t>(o, RG_COLOUR);
         s.splash = region_splash(o);
+    }
+    if (is_unit_class(class_of(o))) {
+        s.unit = true;
+        s.behave = at<int>(o, O_BEHAVE);
+    }
+    if (nvid_of(o) == VID_DEPOT) {
+        s.factory = true;
+        const short* items = at<short*>(o, O_ITEMS);
+        for (int i = 0; items && i < at<int>(o, O_ITEMS_COUNT); ++i) s.items.push_back(items[i]);
     }
     return s;
 }
@@ -519,8 +548,10 @@ void restore_car(uint8_t* o, const State& s) {
     at<uint32_t>(o, E_FLAGS) = s.car_flags;
     std::memcpy(o + E_FRONT_DOT, s.front, sizeof s.front);
     std::memcpy(o + E_REAR_DOT, s.rear, sizeof s.rear);
-    int x = 0, y = 0;
-    if (patrol_of(o, x, y) != s.patrol || x != s.patrol_x || y != s.patrol_y) set_patrol(o, s.patrol, s.patrol_x, s.patrol_y);
+    Order now;
+    const bool has = order_of(o, now);
+    if (has != s.patrol || now.x != s.patrol_x || now.y != s.patrol_y || now.z != s.patrol_z || (has && now.task != s.order))
+        set_order(o, s.patrol, {s.order, s.patrol_x, s.patrol_y, s.patrol_z});
     if (at<uint8_t*>(o, E_FRONT_DOT) && at<uint8_t*>(o, E_REAR_DOT)) car_call(ENGINE_UPDATE_POSITION, o);
     car_call(ENGINE_OCCUPY_DOTS, o);
 }
@@ -538,6 +569,11 @@ void apply(uint8_t* o, const State& s) {
     if (s.red != red(o)) set_red(o, s.red);
     if (car && s.present && s.car) restore_car(o, s);
     if (s.present && s.region && is_region(o)) restore_region(o, s);
+    if (s.present && s.unit && at<int>(o, O_BEHAVE) != s.behave) act(o, ACT_SET_BEHAVE, s.behave);
+    if (s.present && s.factory && state_of(o).items != s.items) {
+        act(o, ACT_DELETE_ALL_ITEM);
+        for (short n : s.items) act(o, ACT_ADD_ITEM, n);
+    }
     if (!s.present && !removed(o)) {
         if (rail) rail_take_out(o);
         act(o, ACT_UNDO_REMOVE);
@@ -574,6 +610,10 @@ struct Operation {
     bool lines = false;             // the push lines changed (editor_mission.cpp)
     std::vector<PushLine> lines_before, lines_after;
     std::shared_ptr<PaintPatch> paint;   // the ground's picture a stroke changed (editor_ground.cpp)
+    bool arrivals = false;               // the arrivals changed (the Arrivals panel)
+    ArrivalsState arrivals_before, arrivals_after;
+    bool factories = false;              // the factories' queue, later units and limits changed
+    FactoryState factories_before, factories_after;
 };
 
 std::vector<Operation> g_undo, g_redo;
@@ -649,6 +689,8 @@ void undo(bool redo) {
     for (const GridChange& g : op.grid) set_ground_cell(g.cx, g.cy, redo ? g.after : g.before);
     if (op.paint) ground_apply(*op.paint, redo);
     if (op.lines) mission_push_lines() = redo ? op.lines_after : op.lines_before;
+    if (op.arrivals) mission_arrivals() = redo ? op.arrivals_after : op.arrivals_before;
+    if (op.factories) mission_factories() = redo ? op.factories_after : op.factories_before;
     to.push_back(op);
     g_dirty = true;
     select(nullptr);
@@ -852,7 +894,7 @@ bool deletable(uint8_t* o) { return class_of(o) != B_RAIL || !rail_held_by_train
 
 // ---- the bar ----
 
-enum class Tool { Select, Delete, Section, Place, Track, PushLine, Settings, Height, Decals, Paint, Water, Region };
+enum class Tool { Select, Delete, Section, Place, Track, PushLine, Settings, Height, Decals, Paint, Water, Region, Arrivals };
 constexpr int PALETTE_NVID = -2;   // the entry that places what the palette panel picked (editor_panel.cpp)
 constexpr int VEHICLES_NVID = -3;  // the same for the vehicles' palette (the cars, below "trains")
 
@@ -880,7 +922,7 @@ const Entry ENTRIES[] = {
     {"ToolPalette", "All objects", "7", Tool::Place, PALETTE_NVID, VID_EDITOR_ICONS, 10, 0, false},
     {"ToolSemaphoreGreen", "Semaphore green", "8", Tool::Place, VID_SEMAPHORE, VID_EDITOR_ICONS, 4, 0, false},
     {"ToolSemaphoreRed", "Semaphore red", "9", Tool::Place, VID_SEMAPHORE, VID_EDITOR_ICONS, 5, 0, true},
-    {"ToolReinforcement", "Reinforcement point", "0", Tool::Place, VID_LOCOMOTIVE, VID_ICONS, 11, 3, false},
+    {"ToolArrivals", "Train arrivals", "0", Tool::Arrivals, -1, VID_ICONS, 11, 0, false},
     {"ToolSection", "Delete a section of track", "", Tool::Section, -1, VID_EDITOR_ICONS, 2, 0, false},
     {"ToolDecals", "Decals", "[ ]", Tool::Decals, 0, VID_EDITOR_ICONS, 6, 0, false},
     {"ToolPushLine", "Push line", "", Tool::PushLine, -1, VID_EDITOR_ICONS, 7, 0, false},
@@ -1004,6 +1046,10 @@ void end_strokes();   // a stroke under way ends first (the mouse, below)
 
 void choose_entry(int i) {
     if (i < 0 || i >= ENTRY_COUNT) return;
+    if (ENTRIES[i].tool == Tool::Arrivals) {   // a panel, not a tool
+        panel_open_arrivals();
+        return;
+    }
     end_strokes();
     end_line();
     g_push_started = false;
@@ -1079,8 +1125,17 @@ void map_point(POINT p, uint8_t* vid, float& x, float& y, float& z) {
 bool liftable(uint8_t* o);   // the height of an object, below
 float lift_of(uint8_t* o);
 
+bool is_marker(uint8_t* o);   // the context panel, below
+
 void select(uint8_t* o) {
     g_selection = o ? group_of(o) : std::vector<uint8_t*>();
+    if (o && is_marker(o)) {   // its parking army 3 is not what it is in play
+        MESSAGE("MsgSelectedMarker", "selected the reinforcement's point locomotive at %.0f,%.0f - in play: %s", at<float>(o, O_X),
+                at<float>(o, O_Y),
+                mission_reinforcement_waves() > 0 ? ui_text("CtxArrivesOurs", "OURS ARRIVE HERE (THE AUTHORS' REINFORCEMENT)")
+                                                  : ui_text("CtxTakenAway", "TAKEN AWAY AT THE START (NO WAVES)"));
+        return;
+    }
     if (o)
         message_by([&] {
             std::string text = ui_printf(ui_format("MsgSelected", "selected VID %d at %.0f,%.0f direction %d army %d (%s)%s"), nvid_of(o),
@@ -1453,33 +1508,55 @@ bool move_train(uint8_t* c, float sx, float sy) {
 
 // The train's patrol: kept in its first car, to the rail point under the cursor.
 uint8_t* g_patrol_train = nullptr;   // a car whose train gets the next click's point
+int g_order_task = TASK_PATROL;      // and the order it gets
 
-void set_train_patrol(uint8_t* c, bool on, float sx, float sy) {
-    int x = 0, y = 0;
-    if (on) {
+// The train's order: `task` (0 none; the attack needs no point), its point the rail point at the
+// screen point sx, sy.
+void set_train_order(uint8_t* c, int task, float sx, float sy) {
+    Order order{task, 0, 0, 0};
+    if (task && task != TASK_ATTACK) {
         const TrackSpot spot = track_spot(sx, sy, CAR_REACH);
         if (!spot.found || !spot.dot) {
             MESSAGE("MsgPatrolTrack", "patrol: click a point of the track");
             return;
         }
-        x = at<int>(spot.dot, DOT_X);
-        y = at<int>(spot.dot, DOT_Y) - at<int>(spot.dot, DOT_Z);
+        order.x = at<int>(spot.dot, DOT_X);
+        order.y = at<int>(spot.dot, DOT_Y) - at<int>(spot.dot, DOT_Z);
+        order.z = at<int>(spot.dot, DOT_Z);
     }
     const std::vector<uint8_t*> cars = all_cars();
     const std::vector<State> before = states(cars);
-    for (uint8_t* k : train_of(c)) set_patrol(k, false, 0, 0);
-    if (on) set_patrol(train_of(c).front(), true, x, y);
+    for (uint8_t* k : train_of(c)) set_order(k, false, {});
+    if (task) set_order(train_of(c).front(), true, order);
     commit_cars({"OpPatrol", "patrol"}, cars, before);
     g_selection = group_of(c);
-    if (on) MESSAGE("MsgPatrol", "patrol: the train goes to and fro between where it stands and %d,%d", x, y);
+    if (task == TASK_PATROL) MESSAGE("MsgPatrol", "patrol: the train goes to and fro between where it stands and %d,%d", order.x, order.y);
+    else if (task == TASK_DRIVE) MESSAGE("MsgOrderDrive", "orders: the train drives to %d,%d at the start", order.x, order.y);
+    else if (task == TASK_GUARD) MESSAGE("MsgOrderGuard", "orders: the enemy's AI keeps the train at %d,%d", order.x, order.y);
+    else if (task == TASK_ATTACK) MESSAGE("MsgOrderAttack", "orders: the enemy's AI sends the train to attack");
     else MESSAGE("MsgPatrolNone", "patrol: none");
+    int patrols, posts, start, queue;
+    mission_ai_use(patrols, posts, start, queue);
+    if (army_of(c) == 1 && mission_arrivals().on &&
+        ((task == TASK_PATROL && patrols > 10) || (task == TASK_GUARD && posts > 10)))
+        MESSAGE("MsgOrderOver", "orders: over 10 patrols or posts - the AI makes the rest attack");
 }
 
-// The train's patrol point, if it has one.
-bool train_patrol(uint8_t* c, int& x, int& y) {
+void set_train_patrol(uint8_t* c, bool on, float sx, float sy) { set_train_order(c, on ? g_order_task : 0, sx, sy); }
+
+// The train's order, if it has one.
+bool train_order(uint8_t* c, Order& out) {
     for (uint8_t* k : train_of(c))
-        if (patrol_of(k, x, y)) return true;
+        if (order_of(k, out)) return true;
     return false;
+}
+
+bool train_patrol(uint8_t* c, int& x, int& y) {
+    Order o;
+    if (!train_order(c, o) || o.task == TASK_ATTACK) return false;
+    x = o.x;
+    y = o.y;
+    return true;
 }
 
 void start_drag(POINT p) {
@@ -4446,6 +4523,194 @@ bool options_click(POINT m) {
     return true;
 }
 
+// ---- arrivals on the map ----
+//
+// The Arrivals panel's points are picked here: its PICK buttons close the panel and the next click
+// on the map takes the rail point nearest to the cursor - shown in cyan with its screen coordinates,
+// as the Push line tool shows it - as the chosen arrival's entry, its task's point or, for a patrol,
+// its two ends one after the other; the right button or Esc go back to the panel without one. The
+// entries are drawn over the map (a square and "ENTRY n"), the chosen arrival's task points too,
+// joined to its entry by a dashed line. "+ ENTRY LINE" lays the entry's push line - from the entry
+// along the track to the first rail point 50 px inside the map, push_flag 1 - with its semaphores
+// as S of the Push line tool puts them (MAP_RULES.md 5 and 7).
+
+enum class ArrivalPick { None, Entry, Point, Second };
+ArrivalPick g_arrival_pick = ArrivalPick::None;
+int g_pick_queue = -1;            // the pick is for this train of the enemy's factory queue
+uint8_t* g_pick_factory = nullptr;   // whose panel comes back after it
+std::string g_arrival_status;
+constexpr float ENTRY_INSIDE = 50;   // the entry line ends this far inside the map
+
+bool outside_map(int x, int y) { return x < 0 || y < 0 || x >= grid_width() * 8 || y >= grid_height() * 8; }
+
+float inside_by(int x, int y) {   // how far inside the map a point is (< 0 outside)
+    return static_cast<float>((std::min)((std::min)(x, grid_width() * 8 - 1 - x), (std::min)(y, grid_height() * 8 - 1 - y)));
+}
+
+uint8_t* cursor_dot() {
+    float x, y;
+    mouse_on_map(x, y);
+    return nearest_dot(static_cast<int>(x), static_cast<int>(y));
+}
+
+// Back to the panel the pick was made for.
+void back_to_panel() {
+    if (g_pick_queue >= 0 && g_pick_factory && !removed(g_pick_factory)) panel_open_factory(g_pick_factory);
+    else panel_open_arrivals();
+    g_pick_queue = -1;
+}
+
+// The point of a train of the enemy's factory queue: a post, or a patrol's two ends.
+void pick_queue_at(uint8_t* d) {
+    const ArrivalPick what = g_arrival_pick;
+    g_arrival_pick = ArrivalPick::None;
+    FactoryState& f = mission_factories();
+    const int i = g_pick_queue;
+    if (!d || i < 0 || i >= static_cast<int>(f.queue.size())) {
+        back_to_panel();
+        return;
+    }
+    const FactoryState before = f;
+    FactoryTrain& t = f.queue[i];
+    const POINT p = dot_screen(d);
+    if (what == ArrivalPick::Second) t.tx2 = p.x, t.ty2 = p.y;
+    else t.tx = p.x, t.ty = p.y;
+    edit_commit_factories({"OpQueuePoint", "factory queue point"}, before);
+    if (what == ArrivalPick::Point && t.task == TASK_PATROL) {
+        g_arrival_pick = ArrivalPick::Second;
+        MESSAGE("MsgQueueSecond", "factory train %d: its patrol from %d,%d - click the other end", i + 1, p.x, p.y);
+        return;
+    }
+    back_to_panel();
+}
+
+void pick_arrival_at(uint8_t* d) {
+    if (g_pick_queue >= 0) {
+        pick_queue_at(d);
+        return;
+    }
+    const ArrivalPick what = g_arrival_pick;
+    g_arrival_pick = ArrivalPick::None;
+    ArrivalsState& s = mission_arrivals();
+    const int i = arrivals_selected();
+    if (!d || i < 0 || i >= static_cast<int>(s.list.size())) {
+        if (!d) MESSAGE("MsgPushNoTrack", "push line: the map has no track");
+        panel_open_arrivals();
+        return;
+    }
+    const ArrivalsState before = s;
+    Arrival& a = s.list[i];
+    const POINT p = dot_screen(d);
+    if (what == ArrivalPick::Entry) {
+        a.x = p.x, a.y = p.y, a.z = at<int>(d, DOT_Z), a.entry = true;
+    } else if (what == ArrivalPick::Point) {
+        a.tx = p.x, a.ty = p.y, a.tz = at<int>(d, DOT_Z);
+    } else {
+        a.tx2 = p.x, a.ty2 = p.y;
+    }
+    const bool second = what == ArrivalPick::Point && a.task == TASK_PATROL;
+    edit_commit_arrivals(what == ArrivalPick::Entry ? UiText{"OpArrivalEntry", "arrival entry"} : UiText{"OpArrivalPoint", "arrival point"},
+                         before);
+    if (second) {   // the patrol's other end next
+        g_arrival_pick = ArrivalPick::Second;
+        MESSAGE("MsgArrivalSecond", "arrival %d: its patrol from %d,%d - click the other end", i + 1, p.x, p.y);
+        return;
+    }
+    MESSAGE("MsgArrivalPicked", "arrival %d: %s %d,%d", i + 1,
+            what == ArrivalPick::Entry ? ui_text("WordEntry", "entry") : ui_text("WordPoint", "point"), p.x, p.y);
+    panel_open_arrivals();
+}
+
+// The entry's push line: a line with push_flag 1 (the editor's or the script's) that begins at the
+// entry's rail point or runs through it.
+bool has_entry_line(uint8_t* entry) {
+    const std::vector<PushLine>* lists[] = {&mission_push_lines(), &mission_script_push_lines()};
+    for (const auto* lines : lists)
+        for (const PushLine& l : *lines) {
+            if (!l.flag) continue;
+            const Trace t = trace(l);
+            if (!t.error && std::find(t.path.begin(), t.path.end(), entry) != t.path.end() && t.path.back() != entry) return true;
+        }
+    return false;
+}
+
+// The way from the entry into the map: from its rail point along the track (the fewest points)
+// to the first one ENTRY_INSIDE inside.
+Trace entry_way(uint8_t* begin) {
+    Trace t;
+    std::map<uint8_t*, uint8_t*> from{{begin, nullptr}};
+    std::vector<uint8_t*> queue{begin};
+    uint8_t* end = nullptr;
+    for (size_t i = 0; i < queue.size() && !end; ++i)
+        for (int k = 0; k < dot_links(queue[i]) && !end; ++k) {
+            uint8_t* o = dot_link(queue[i], k);
+            if (!o || from.count(o)) continue;
+            from[o] = queue[i];
+            queue.push_back(o);
+            const POINT p = dot_screen(o);
+            if (inside_by(p.x, p.y) >= ENTRY_INSIDE) end = o;
+        }
+    if (!end) {
+        t.error = "Can't PushLineFindDot";
+        return t;
+    }
+    for (uint8_t* d = end; d; d = from[d]) t.path.insert(t.path.begin(), d);
+    return t;
+}
+
+void draw_arrivals() {
+    const ArrivalsState& s = mission_arrivals();
+    uint8_t* w = world();
+    const float cx = at<float>(w, W_CAMERA_X), cy = at<float>(w, W_CAMERA_Y);
+    auto square = [&](int x, int y, float size, uint32_t argb) {
+        reinterpret_cast<FillRect_t>(FILL_RECT)(graphics(), nullptr, x - cx - size, y - cy - size, x - cx + size, y - cy + size, argb);
+    };
+    auto dashes = [&](int x0, int y0, int x1, int y1, uint32_t argb) {
+        const float len = std::hypot(static_cast<float>(x1 - x0), static_cast<float>(y1 - y0));
+        for (float d = 12; d < len - 8; d += 16)
+            square(static_cast<int>(x0 + (x1 - x0) * d / len), static_cast<int>(y0 + (y1 - y0) * d / len), 2, argb);
+    };
+    const int i = arrivals_selected();
+    if (g_arrival_pick != ArrivalPick::None) {   // the rail point a click takes
+        if (uint8_t* d = cursor_dot()) {
+            const POINT p = dot_screen(d);
+            square(p.x, p.y, 5, 0xe000ffff);
+            g_arrival_status = g_pick_queue >= 0
+                                   ? ui_printf(ui_format("StatusQueuePick", "Factory train %d: rail point %d,%d - click it; the right "
+                                                                            "button or Esc go back to the panel"),
+                                               g_pick_queue + 1, p.x, p.y)
+                                   : ui_printf(ui_format("StatusArrivalPick", "Arrival %d: rail point %d,%d (height %d) - click it; "
+                                                                              "the right button or Esc go back to the panel"),
+                                               i + 1, p.x, p.y, at<int>(d, DOT_Z));
+        } else {
+            g_arrival_status = ui_text("StatusPushNoTrack", "Push line: no track on the map");
+        }
+    }
+    if (!s.on) return;
+    std::vector<POINT> entries;
+    for (const Arrival& a : s.list)
+        if (a.entry && std::none_of(entries.begin(), entries.end(), [&](const POINT& e) { return e.x == a.x && e.y == a.y; })) {
+            entries.push_back({a.x, a.y});
+            square(a.x, a.y, 7, 0xe0ff9020);
+            square(a.x, a.y, 3, 0xe0000000);
+            draw_text(FONT_TIPS, a.x - cx + 10, a.y - cy - 7,
+                      ui_printf(ui_format("MapEntry", "ENTRY %d"), static_cast<int>(entries.size())).c_str(), false, 3);
+        }
+    if (i >= 0 && i < static_cast<int>(s.list.size())) {
+        const Arrival& a = s.list[i];
+        if ((a.task == TASK_GUARD || a.task == TASK_PATROL || a.task == TASK_DRIVE) && (a.tx || a.ty)) {
+            square(a.tx, a.ty, 6, 0xe020e0ff);
+            if (a.entry) dashes(a.x, a.y, a.tx, a.ty, 0xc0ff9020);
+            draw_text(FONT_TIPS, a.tx - cx + 9, a.ty - cy - 7, ui_printf(ui_format("MapArrivalPoint", "ARRIVAL %d"), i + 1).c_str(),
+                      false, 3);
+            if (a.task == TASK_PATROL && (a.tx2 || a.ty2)) {
+                square(a.tx2, a.ty2, 6, 0xe020e0ff);
+                dashes(a.tx, a.ty, a.tx2, a.ty2, 0xc020e0ff);
+            }
+        }
+    }
+}
+
 // ---- the context panel ----
 //
 // A right click on an object with the Select tool selects it and opens its panel, drawn in the
@@ -4471,6 +4736,10 @@ struct ContextRow {
 };
 
 uint8_t* g_context = nullptr;   // the object of the open panel
+
+// The point locomotive of the authors' reinforcement (reinforcement.lgc): VID 5 in army 3, which
+// ReinforcementInit takes away at the start, keeping its place and its commands for the waves.
+bool is_marker(uint8_t* o) { return o && is_car(o) && nvid_of(o) == VID_LOCOMOTIVE && army_of(o) == 3; }
 struct Hit {
     float l, t, r, b;
     int row, choice;
@@ -4478,6 +4747,58 @@ struct Hit {
 std::vector<Hit> g_context_hits;   // the choices where the last frame drew them
 constexpr int CONTEXT_FONT = 2, CONTEXT_LIT = 7, CONTEXT_STEP = 6;
 constexpr float CONTEXT_ROW = 41, CONTEXT_WIDTH = 409, CONTEXT_LABEL = 15;   // the label's characters
+
+// ---- the neutrals (army 2) in a fight ----
+//
+// What Object_FindTarget (0x449ea0) lets a unit aim at: anything of another army - except army 2,
+// which no one fires at on its own (a weapon with flag 0x80 aside; the enemy at neutral trains after
+// script SetEnemyCanAttackNeutralTrains, which no map of the editor calls) -, so a neutral unit
+// itself fires at the player, the enemy and the pirates alike when it fires on its own: BEH_AGGRESSIVE
+// (behave bit 1) - the missions' neutrals (civil trains and robots) have it clear and never fire.
+
+// An object that has a weapon, or whose linked turret has one (a combat car).
+bool armed(uint8_t* o) {
+    uint8_t* w = world();
+    auto weapon_of = [&](uint8_t* v) {
+        if (!v) return false;
+        const int index = at<int>(v, 0x40), count = at<int>(w, 0x288);
+        uint8_t* weapons = at<uint8_t*>(w, 0x28c);
+        if (index <= 0 || index >= count || !weapons) return false;
+        uint8_t* wp = weapons + index * 0x44;
+        return at<uint32_t>(wp, 0x00) != 0 && at<float>(wp, 0x14) != 0;
+    };
+    uint8_t* v = vid_of(o);
+    return weapon_of(v) || (v && at<int>(v, 0x58) > 0 && weapon_of(vid_by_number(at<int>(v, 0x58))));
+}
+
+// The armed members of an object's group (a fort's guns, a train's cars).
+std::vector<uint8_t*> armed_of(uint8_t* o) {
+    std::vector<uint8_t*> out;
+    for (uint8_t* m : group_of(o))
+        if (is_unit_class(class_of(m)) && armed(m)) out.push_back(m);
+    return out;
+}
+
+void set_fires(uint8_t* o, bool on) {
+    const std::vector<uint8_t*> members = armed_of(o);
+    const std::vector<State> before = states(members);
+    for (uint8_t* m : members) act(m, ACT_SET_BEHAVE, on ? (at<int>(m, O_BEHAVE) | 1) : (at<int>(m, O_BEHAVE) & ~1));
+    commit({"OpFires", "fires on its own"}, members, before);
+    MESSAGE("MsgFires", "%u armed units of VID %d fire on their own: %s", static_cast<unsigned>(members.size()), nvid_of(o),
+            on ? ui_text("WordYes", "YES") : ui_text("WordNo", "NO"));
+}
+
+// A neutral object's rows: no one fires at it on its own; armed, whether it fires on its own.
+void neutral_rows(uint8_t* o, std::vector<ContextRow>& rows) {
+    if (army_of(o) != 2) return;
+    rows.push_back({{"CtxNeutralFight", "IN A FIGHT:"}, {{{"CtxNobodyFires", "NO ONE FIRES AT IT"}, true, [] {}}}});
+    const std::vector<uint8_t*> members = armed_of(o);
+    if (members.empty()) return;
+    const bool on = std::any_of(members.begin(), members.end(), [](uint8_t* m) { return (at<int>(m, O_BEHAVE) & 1) != 0; });
+    rows.push_back({{"CtxFires", "IT FIRES:"},
+                    {{{"CtxFiresYes", "AT ALL IN RANGE"}, on, [o] { set_fires(o, true); }},
+                     {{"CtxFiresNo", "NO"}, !on, [o] { set_fires(o, false); }}}});
+}
 
 // The gun `nvid` (0: none) into socket `i` of the host: the old one goes, the new one comes.
 void set_socket(uint8_t* host, size_t i, int nvid) {
@@ -4511,7 +4832,20 @@ void set_socket(uint8_t* host, size_t i, int nvid) {
 std::vector<ContextRow> context_rows(uint8_t* o) {
     std::vector<ContextRow> rows;
     const int nvid = nvid_of(o);
-    if (class_of(o) != B_RAIL) {
+    if (is_marker(o)) {
+        // the authors' reinforcement point: the army it gets in play (never its parking army 3, which
+        // ReinforcementInit takes it away by), and the panel that makes such trains now
+        const bool arrives = mission_reinforcement_waves() > 0;
+        rows.push_back({{"CtxInPlay", "IN PLAY:"},
+                        {{arrives ? UiText{"CtxArrivesOurs", "OURS ARRIVE HERE (THE AUTHORS' REINFORCEMENT)"}
+                                  : UiText{"CtxTakenAway", "TAKEN AWAY AT THE START (NO WAVES)"},
+                          true, [] {}}}});
+        rows.push_back({{"CtxArrivals", "ARRIVALS:"},
+                        {{{"CtxOpenArrivals", "OPEN THE PANEL (0)"}, false, [] {
+                              g_context = nullptr;
+                              panel_open_arrivals();
+                          }}}});
+    } else if (class_of(o) != B_RAIL) {
         ContextRow army{{"CtxArmy", "ARMY:"}, {}};
         for (int a = 0; a < 4; ++a)
             army.choices.push_back({{ARMY_CHOICE_KEYS[a], ARMY_CHOICES[a]}, army_of(o) == a, [a] { set_army(a); }});
@@ -4557,23 +4891,41 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
                           }}}});
         return rows;
     }
+    neutral_rows(o, rows);
     if (is_car(o)) {   // its train
         ContextRow train{{"CtxTrain", "TRAIN:"}, {{{"CtxReverse", "TURN ROUND (R)"}, false, [o] { reverse_train(o); }}}};
         if (car_prev(o)) train.choices.push_back({{"CtxUncouple", "UNCOUPLE (U)"}, false, [o] { uncouple(o); }});
         if (coupling_partner(o)) train.choices.push_back({{"CtxCouple", "COUPLE (C)"}, false, [o] { couple(o); }});
         rows.push_back(train);
-        int px = 0, py = 0;
-        const bool patrol = train_patrol(o, px, py);
-        rows.push_back({{"CtxPatrol", "PATROL:"},
-                        {{{"CtxPatrolNone", "NONE"}, !patrol && g_patrol_train != o, [o] {
-                              g_patrol_train = nullptr;
-                              set_train_patrol(o, false, 0, 0);
-                          }},
-                         {{"CtxPatrolTo", "TO A POINT..."}, patrol || g_patrol_train == o, [o] {
-                              g_patrol_train = o;
-                              g_context = nullptr;
-                              MESSAGE("MsgPatrolPick", "patrol: click the point of the track the train goes to and fro to");
-                          }}}});
+        Order order;
+        const bool has = train_order(o, order);
+        auto pick = [o](int task) {
+            return [o, task] {
+                g_patrol_train = o;
+                g_order_task = task;
+                g_context = nullptr;
+                MESSAGE("MsgPatrolPick", "patrol: click the point of the track the train goes to and fro to");
+            };
+        };
+        auto current = [&](int task) { return (has && order.task == task) || (g_patrol_train == o && g_order_task == task); };
+        ContextRow orders{{"CtxPatrol", "PATROL:"},
+                          {{{"CtxPatrolNone", "NONE"}, !has && g_patrol_train != o, [o] {
+                                g_patrol_train = nullptr;
+                                set_train_order(o, 0, 0, 0);
+                            }}}};
+        if (!mission_arrivals().on) {   // the script's PatrolEngine alone
+            orders.choices.push_back({{"CtxPatrolTo", "TO A POINT..."}, current(TASK_PATROL), pick(TASK_PATROL)});
+        } else {   // the runner's orders: the enemy's for its AI
+            orders.label = {"CtxOrders", "ORDERS:"};
+            if (army_of(o) == 1) {
+                orders.choices.push_back({{"CtxOrderAttack", "ATTACK"}, current(TASK_ATTACK), [o] { set_train_order(o, TASK_ATTACK, 0, 0); }});
+                orders.choices.push_back({{"CtxOrderGuard", "GUARD..."}, current(TASK_GUARD), pick(TASK_GUARD)});
+            } else {
+                orders.choices.push_back({{"CtxOrderDrive", "DRIVE TO..."}, current(TASK_DRIVE), pick(TASK_DRIVE)});
+            }
+            orders.choices.push_back({{"CtxOrderPatrol", "PATROL..."}, current(TASK_PATROL), pick(TASK_PATROL)});
+        }
+        rows.push_back(orders);
         rows.push_back({{"CtxDelete", "DELETE (DEL):"},
                         {{{"CtxDeleteCar", "CAR"}, false, [o] {
                               delete_objects({o});
@@ -4603,6 +4955,12 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
                         {{{"CtxLetIn", "LET IN"}, false, [] { post_line(false); }},
                          {{"CtxKeepOut", "KEEP OUT"}, false, [] { post_line(true); }}}});
     }
+    if (nvid == VID_DEPOT)
+        rows.push_back({{"CtxFactory", "FACTORY:"},
+                        {{{"CtxFactoryOpen", "WHAT IT BUILDS..."}, false, [o] {
+                              g_context = nullptr;
+                              panel_open_factory(o);
+                          }}}});
     const std::vector<Socket> sockets = sockets_of(nvid, at<int>(o, O_DIRECTION));
     const std::vector<uint8_t*> guns = guns_on(o);
     for (size_t i = 0; i < sockets.size(); ++i) {
@@ -4733,7 +5091,12 @@ void draw_overlay() {
     if (!g_selection.empty() && is_car(g_selection[0]) && train_patrol(g_selection[0], px, py)) {
         const float sx = px - cam_x, sy = py - cam_y;
         reinterpret_cast<FillRect_t>(FILL_RECT)(g, nullptr, sx - 5, sy - 5, sx + 5, sy + 5, 0xe0f0d020);
-        draw_text(FONT_TIPS, sx + 8, sy - 6, ui_text("WordPatrol", "patrol"), false, 3);
+        Order o;
+        train_order(g_selection[0], o);
+        draw_text(FONT_TIPS, sx + 8, sy - 6,
+                  o.task == TASK_DRIVE ? ui_text("WordDrive", "drive") : o.task == TASK_GUARD ? ui_text("WordGuard", "guard")
+                                                                                         : ui_text("WordPatrol", "patrol"),
+                  false, 3);
     }
     if (g_patrol_train && !removed(g_patrol_train)) {   // picking it: the rail point under the cursor
         const TrackSpot spot = track_spot(mx, my, CAR_REACH);
@@ -4817,6 +5180,7 @@ void draw_overlay() {
     draw_regions();
     draw_push_lines(entry().tool == Tool::PushLine);
     draw_enemy_trains();
+    draw_arrivals();
 
     began = ground_clock();
     draw_bar();
@@ -4848,6 +5212,7 @@ void draw_overlay() {
     status_line(v.l, v.t, status);
     if (entry().tool == Tool::Track) status_line(v.l, v.t + LINE_HEIGHT, g_track_status.c_str());
     if (entry().tool == Tool::PushLine) status_line(v.l, v.t + LINE_HEIGHT, g_push_status.c_str());
+    if (g_arrival_pick != ArrivalPick::None) status_line(v.l, v.t + LINE_HEIGHT, g_arrival_status.c_str());
     if (entry().tool == Tool::Height || entry().tool == Tool::Decals || entry().tool == Tool::Paint || entry().tool == Tool::Water)
         status_line(v.l, v.t + LINE_HEIGHT, g_ground_status.c_str());
     if (entry().tool == Tool::Region)
@@ -4945,6 +5310,10 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         if (options_click(g_mouse)) return true;   // the rows of the ground's tools
         if (on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)))
             return true;   // the plates of the bar: nothing under them is picked or placed
+        if (g_arrival_pick != ArrivalPick::None) {   // a point for the Arrivals panel
+            pick_arrival_at(cursor_dot());
+            return true;
+        }
         uint8_t* w0 = world();
         const float x = at<float>(w0, W_CAMERA_X) + g_mouse.x, y = at<float>(w0, W_CAMERA_Y) + g_mouse.y;
         if (entry().tool == Tool::Place) {
@@ -5031,6 +5400,11 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         if (LOWORD(w) == WA_INACTIVE) end_strokes();
         return false;
     case WM_RBUTTONDOWN:
+        if (g_arrival_pick != ArrivalPick::None) {   // no point for the panel after all
+            g_arrival_pick = ArrivalPick::None;
+            back_to_panel();
+            return true;
+        }
         if (g_patrol_train) {   // no patrol point after all
             g_patrol_train = nullptr;
             return true;
@@ -5151,7 +5525,10 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         else if (w == 'A') next_army();
         else if (w == 'T') toggle_semaphore();
         else if (w == VK_ESCAPE) {
-            if (g_patrol_train) {
+            if (g_arrival_pick != ArrivalPick::None) {
+                g_arrival_pick = ArrivalPick::None;
+                back_to_panel();
+            } else if (g_patrol_train) {
                 g_patrol_train = nullptr;
             } else if (entry().tool == Tool::Track && !g_line.empty()) {
                 end_line();
@@ -5201,6 +5578,8 @@ void edit_command(int id) {
 // A level goes away (or comes): its objects with it.
 void edit_reset() {
     panel_reset();
+    arrivals_reset();
+    factory_reset();
     g_undo.clear();
     g_redo.clear();
     g_selection.clear();
@@ -5214,6 +5593,9 @@ void edit_reset() {
     g_patrols.clear();
     g_patrol_train = nullptr;
     g_context = nullptr;
+    g_arrival_pick = ArrivalPick::None;
+    g_pick_queue = -1;
+    g_pick_factory = nullptr;
     ground_reset();
     g_grid_original.clear();
     g_gstroke = GroundStroke();
@@ -5228,8 +5610,17 @@ std::vector<TrainPatrol> edit_train_patrols() {
         if (removed(p.first)) continue;
         uint8_t* first = train_of(p.first).front();
         if (!done.insert(first).second) continue;
-        out.push_back({nvid_of(first), static_cast<int>(std::lround(at<float>(first, O_X))),
-                       static_cast<int>(std::lround(at<float>(first, O_Y))), p.second.first, p.second.second});
+        TrainPatrol t{nvid_of(first), static_cast<int>(std::lround(at<float>(first, O_X))),
+                      static_cast<int>(std::lround(at<float>(first, O_Y))), p.second.x, p.second.y};
+        t.task = p.second.task;
+        t.to_z = p.second.z;
+        t.army = army_of(first);
+        // the rail point it stands on (screen), the other end of the enemy's patrol
+        uint8_t* dot = nearest_dot(t.x, static_cast<int>(std::lround(at<float>(first, O_Y) - at<float>(first, O_Z))));
+        t.from_x = dot ? at<int>(dot, DOT_X) : t.x;
+        t.from_y = dot ? screen_y(dot) : static_cast<int>(std::lround(at<float>(first, O_Y) - at<float>(first, O_Z)));
+        for (uint8_t* k : train_of(first)) t.cars.push_back(nvid_of(k));
+        out.push_back(t);
     }
     return out;
 }
@@ -5281,6 +5672,9 @@ void edit_bar_box(float& l, float& t, float& r, float& b) {
 }
 void edit_saved() { g_dirty = false; }
 
+// editor_mission.cpp: a message of the status line (a save that could not write everything).
+void edit_message_text(const char* key, const char* english) { message_by([&] { return ui_text(key, english); }); }
+
 void install_editor_edit() {
     char value[8] = {};
     g_test = GetEnvironmentVariableA("LOCOFIX_TEST", value, sizeof value) && value[0] == '1';
@@ -5291,15 +5685,38 @@ void install_editor_edit() {
                                                              "Graphics_DrawScene"));
 }
 
-// editor.cpp after a level is held: the decals it has, for the bar.
-void edit_level_held() {
-    set_army_gammas();
-    // Reset palette cache so editor icons use correct frames after run mode
-    reset_palette_cache();
-    find_decals();
-    choose_default_decal();
-    log_push_lines();
-    // the trains' patrols of the mission's script: to the car of that VID standing there
+// The units the factories get later: each to the factory standing at its place (editor_mission.cpp
+// reads them with the place only).
+static void find_unlock_factory(UnitUnlock& u) {
+    float best = 30;
+    for_each_object([&](uint8_t* o) {
+        const float d = std::hypot(at<float>(o, O_X) - u.x, at<float>(o, O_Y) - u.y);
+        if (nvid_of(o) == VID_DEPOT && d <= best) {
+            best = d;
+            u.factory = o;
+        }
+    });
+    if (!u.factory) patch::log("edit: no factory at %d,%d for its unit %d after %d s", u.x, u.y, u.nvid, u.time);
+}
+
+// editor_mission.cpp, writing the settings: the factories' places as they stand now, and the units
+// to write - a deleted factory's are not written, but they stay in the list (an undo brings the
+// factory back with them).
+std::vector<UnitUnlock> edit_place_unlocks(std::vector<UnitUnlock>& unlocks) {
+    std::vector<UnitUnlock> placed;
+    for (UnitUnlock& u : unlocks) {
+        if (!u.factory) find_unlock_factory(u);
+        if (!u.factory || removed(static_cast<uint8_t*>(u.factory))) continue;
+        u.x = static_cast<int>(std::lround(at<float>(u.factory, O_X)));
+        u.y = static_cast<int>(std::lround(at<float>(u.factory, O_Y)));
+        placed.push_back(u);
+    }
+    return placed;
+}
+
+// The trains' orders of the mission's script (and of a test file): each to the car of that VID
+// standing at its place.
+void edit_assign_orders() {
     g_patrols.clear();
     for (const TrainPatrol& p : mission_patrols()) {
         uint8_t* best = nullptr;
@@ -5311,9 +5728,21 @@ void edit_level_held() {
                 best = c;
             }
         }
-        if (best) g_patrols[best] = {p.to_x, p.to_y};
+        if (best) g_patrols[best] = {p.task, p.to_x, p.to_y, p.to_z};
         else patch::log("edit: no train of VID %d at %d,%d for its patrol", p.nvid, p.x, p.y);
     }
+}
+
+// editor.cpp after a level is held: the decals it has, for the bar.
+void edit_level_held() {
+    for (UnitUnlock& u : mission_factories().unlocks) find_unlock_factory(u);
+    set_army_gammas();
+    // Reset palette cache so editor icons use correct frames after run mode
+    reset_palette_cache();
+    find_decals();
+    choose_default_decal();
+    log_push_lines();
+    edit_assign_orders();   // the trains' orders of the mission's script
     // the gravel bed of new track: the one the map has most of, else the usual one
     std::map<int, int> beds;
     for_each_object([&](uint8_t* o) {
@@ -5358,6 +5787,236 @@ int edit_outside(int w, int h, bool remove) {
     });
     if (remove && !out.empty()) delete_objects(out);
     return static_cast<int>(out.size());
+}
+
+// ---- a factory's panel's side (editor_factory.cpp) ----
+
+void edit_commit_factories(const UiText& what, const FactoryState& before) {
+    Operation op{what, {}, {}, false, {}, {}};
+    op.factories = true;
+    op.factories_before = before;
+    op.factories_after = mission_factories();
+    g_undo.push_back(op);
+    g_redo.clear();
+    g_dirty = true;
+    MESSAGE("MsgFactories", "factory: %s", what.get());
+}
+
+// Mission settings (the dialog, a test file) changed the arrivals or the factories' queue, later units
+// or limits, which the panels keep in the history too: one step of it, so an undo after it does not
+// bring an older state back.
+void edit_commit_mission(const ArrivalsState& arrivals_before, const FactoryState& factories_before) {
+    const bool arrivals = !(mission_arrivals() == arrivals_before), factories = !(mission_factories() == factories_before);
+    if (!arrivals && !factories) return;
+    Operation op{{"OpMissionSettings", "mission settings"}, {}, {}, false, {}, {}};
+    op.arrivals = arrivals;
+    op.arrivals_before = arrivals_before;
+    op.arrivals_after = mission_arrivals();
+    op.factories = factories;
+    op.factories_before = factories_before;
+    op.factories_after = mission_factories();
+    g_undo.push_back(op);
+    g_redo.clear();
+    g_dirty = true;
+}
+
+int edit_object_army(void* o) { return army_of(static_cast<uint8_t*>(o)); }
+bool edit_object_gone(void* o) { return !o || removed(static_cast<uint8_t*>(o)); }
+void edit_object_place(void* o, int& x, int& y) {
+    x = static_cast<int>(std::lround(at<float>(o, O_X)));
+    y = static_cast<int>(std::lround(at<float>(o, O_Y)));
+}
+
+std::vector<int> edit_factory_items(void* o) {
+    std::vector<int> out;
+    for (short n : state_of(static_cast<uint8_t*>(o)).items) out.push_back(n);
+    return out;
+}
+
+// A factory's build list `items` and the factories' state as they are now (they were `before`), one
+// step of the history.
+void edit_factory_change(void* factory, const std::vector<int>& items, const FactoryState& before, const UiText& what) {
+    uint8_t* o = static_cast<uint8_t*>(factory);
+    const State was = state_of(o);
+    State now = was;
+    now.items.assign(items.begin(), items.end());
+    apply(o, now);
+    if (state_of(o).items == was.items && mission_factories() == before) return;
+    commit(what, {o}, {was});
+    Operation& op = g_undo.back();
+    op.factories = true;
+    op.factories_before = before;
+    op.factories_after = mission_factories();
+    MESSAGE("MsgFactories", "factory: %s", what.get());
+}
+
+// A point of a train of the enemy's factory queue picked on the map, then the factory's panel again.
+void edit_pick_queue_point(void* factory, int train) {
+    panel_reset();
+    g_context = nullptr;
+    g_pick_queue = train;
+    g_pick_factory = static_cast<uint8_t*>(factory);
+    g_arrival_pick = ArrivalPick::Point;
+    MESSAGE("MsgQueuePick", "factory train %d: click the rail point of its task", train + 1);
+}
+
+// ---- the Arrivals panel's side (editor_arrivals.cpp) ----
+
+void edit_fill(float l, float t, float r, float b, uint32_t argb) {
+    reinterpret_cast<FillRect_t>(FILL_RECT)(graphics(), nullptr, l, t, r, b, argb);
+}
+
+// A change of the arrivals as one step of the history (they were `before`).
+void edit_commit_arrivals(const UiText& what, const ArrivalsState& before) {
+    Operation op{what, {}, {}, false, {}, {}};
+    op.arrivals = true;
+    op.arrivals_before = before;
+    op.arrivals_after = mission_arrivals();
+    g_undo.push_back(op);
+    g_redo.clear();
+    g_dirty = true;
+    MESSAGE("MsgArrivals", "arrivals: %s", what.get());
+}
+
+// The panel's PICK buttons: the next click on the map takes the point (1 the entry, 2 the task's).
+void edit_pick_arrival(int what) {
+    panel_reset();
+    g_context = nullptr;
+    g_pick_queue = -1;
+    g_arrival_pick = what == 1 ? ArrivalPick::Entry : ArrivalPick::Point;
+    MESSAGE("MsgArrivalPick", "arrival %d: click the rail point of its %s", arrivals_selected() + 1,
+            what == 1 ? ui_text("WordEntry", "entry") : ui_text("WordPoint", "point"));
+}
+
+bool edit_arrival_picking() { return g_arrival_pick != ArrivalPick::None; }
+
+// The entry of an arrival: 0 on the map (no line needed), 1 its entry line is there, 2 none yet,
+// -1 no track there.
+int edit_entry_state(int i) {
+    const ArrivalsState& s = mission_arrivals();
+    if (i < 0 || i >= static_cast<int>(s.list.size()) || !s.list[i].entry) return -1;
+    const Arrival& a = s.list[i];
+    uint8_t* d = nearest_dot(a.x, a.y);
+    if (!d || std::abs(dot_screen(d).x - a.x) > 4 || std::abs(dot_screen(d).y - a.y) > 4) return -1;
+    if (!outside_map(a.x, a.y)) return 0;
+    return has_entry_line(d) ? 1 : 2;
+}
+
+// "+ ENTRY LINE": the entry's push line into the map and its semaphores, one step of the history.
+void edit_add_entry_line(int i) {
+    const ArrivalsState& s = mission_arrivals();
+    if (edit_entry_state(i) != 2) return;
+    uint8_t* begin = nearest_dot(s.list[i].x, s.list[i].y);
+    const Trace way = entry_way(begin);
+    if (way.error || way.path.size() < 2) {
+        MESSAGE("MsgEntryNoWay", "arrival %d: no track from its entry into the map", i + 1);
+        return;
+    }
+    const POINT b = dot_screen(way.path.front()), e = dot_screen(way.path.back());
+    const PushLine line{b.x, b.y, e.x, e.y, 1};
+    const Trace t = trace(line);
+    if (t.error || t.path.size() < 2) {
+        MESSAGE("MsgPushBad", "push line %d,%d -> %d,%d: %s", line.bx, line.by, line.ex, line.ey,
+                t.error ? push_error(t.error) : ui_text("WordSamePoint", "the same point"));
+        return;
+    }
+    const std::vector<PushLine> lines_before = mission_push_lines();
+    mission_push_lines().push_back(line);
+    std::vector<uint8_t*> objects;
+    std::vector<State> before;
+    put_posts(line_posts(t), objects, before);
+    commit({"OpEntryLine", "entry line"}, objects, before);
+    Operation& op = g_undo.back();
+    op.lines = true;
+    op.lines_before = lines_before;
+    op.lines_after = mission_push_lines();
+    MESSAGE("MsgEntryLine", "arrival %d: entry line %d,%d -> %d,%d, flag 1, %u semaphores", i + 1, line.bx, line.by, line.ex, line.ey,
+            static_cast<unsigned>(objects.size()));
+}
+
+// The rail point nearest to a map point (world x, y), as an entry or a task's point: its screen x
+// and y and its height.
+static bool dot_near_world(float x, float y, int& sx, int& sy, int& z) {
+    uint8_t* best = nullptr;
+    float best_d = 1e9f;
+    for (uint8_t* d : rail_dots()) {
+        if (at<int>(d, DOT_LINK_COUNT) < 1) continue;
+        const float dd = std::hypot(at<int>(d, DOT_X) - x, at<int>(d, DOT_Y) - y);
+        if (dd < best_d) {
+            best_d = dd;
+            best = d;
+        }
+    }
+    if (!best) return false;
+    sx = at<int>(best, DOT_X);
+    sy = screen_y(best);
+    z = at<int>(best, DOT_Z);
+    return true;
+}
+
+// The authors' reinforcement point of the map (the first one, as ReinforcementInit takes it): the
+// rail point under it.
+bool edit_reinforcement_marker(int& x, int& y, int& z) {
+    uint8_t* found = nullptr;
+    for_each_object([&](uint8_t* o) {
+        if (!found && is_marker(o)) found = o;
+    });
+    return found && dot_near_world(at<float>(found, O_X), at<float>(found, O_Y), x, y, z);
+}
+
+// The panel's CONVERT: the map's script runs arrivals from its next save; the authors' reinforcement
+// becomes arrivals at its point - the first wave at the start, the others when the player has no
+// train - driving where its point locomotive's order (33, ACT_MOVE) sends it, and the point
+// locomotives go (they would stand on the entry). One step of the history.
+void edit_convert_arrivals() {
+    const std::string refusal = mission_arrivals_refusal();
+    if (!refusal.empty()) {
+        MESSAGE("MsgArrivalsRefused", "arrivals: %s", refusal.c_str());
+        return;
+    }
+    const ArrivalsState before = mission_arrivals();
+    ArrivalsState& s = mission_arrivals();
+    std::vector<uint8_t*> markers;
+    for_each_object([&](uint8_t* o) {
+        if (is_marker(o))
+            for (uint8_t* c : group_of(o))
+                if (std::find(markers.begin(), markers.end(), c) == markers.end()) markers.push_back(c);
+    });
+    Arrival a;
+    if (s.waves > 0 && edit_reinforcement_marker(a.x, a.y, a.z)) {
+        a.entry = true;
+        a.cars = mission_reinforcement_train();
+        if (a.cars.empty()) a.cars = {VID_LOCOMOTIVE};
+        uint8_t* m = nullptr;
+        for (uint8_t* o : markers)
+            if (!m && nvid_of(o) == VID_LOCOMOTIVE) m = o;
+        const int count = m ? at<int>(m + O_COMMANDS, LIST_COMMANDS_COUNT) : 0;
+        const int* items = m ? at<int*>(m + O_COMMANDS, LIST_COMMANDS_ITEMS) : nullptr;
+        for (int i = 0; i < count && items; ++i)
+            if (items[4 * i] == 33 && dot_near_world(static_cast<float>(items[4 * i + 1]), static_cast<float>(items[4 * i + 2]), a.tx, a.ty, a.tz))
+                a.task = TASK_DRIVE;
+        s.list.push_back(a);
+        if (s.waves > 1) {
+            a.cond = IF_NO_TRAIN;
+            a.times = s.waves - 1;
+            s.list.push_back(a);
+        }
+    }
+    s.on = true;
+    s.waves = 0;
+    const std::vector<State> was = states(markers);
+    for (size_t i = 0; i < markers.size(); ++i) {
+        State gone = was[i];
+        gone.present = false;
+        apply(markers[i], gone);
+    }
+    commit({"OpArrivalsConvert", "convert to arrivals"}, markers, was);
+    Operation& op = g_undo.back();
+    op.arrivals = true;
+    op.arrivals_before = before;
+    op.arrivals_after = s;
+    MESSAGE("MsgArrivalsConverted", "arrivals: converted - %u arrivals, %u point locomotive cars taken away (saved with the map)",
+            static_cast<unsigned>(s.list.size()), static_cast<unsigned>(markers.size()));
 }
 
 // editor_panel.cpp's palette: an object picked - the bar's "All objects" entry (a car: the

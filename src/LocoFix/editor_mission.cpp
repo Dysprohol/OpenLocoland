@@ -10,8 +10,12 @@
 //    settings of the template (music, weather, gammas, AI timings) as they were,
 //  - "// <editor main>" ... "// </editor main>" in main()'s iff(1): the SetPushLine calls and the
 //    trains' patrols (PatrolEngine on the train found by its first car - TrainPatrol).
-// Both are written anew when the map is saved; the rest of the file is the mission's own code
-// and stays as it is. A new map gets the script of the map it was saved from when that one has
+// and, in a map whose arrivals the editor runs (the Arrivals panel, below "arrivals"):
+//  - "// <editor arrivals>" ... "// </editor arrivals>" after #include "maps\script\header.lgc":
+//    ArrivalsTact(), which brings the trains, and ArrivalsLeft(army), the waves still to come,
+//  - "// <editor tact>" ... "// </editor tact>" after main()'s TrainsTact(): ArrivalsTact();
+// All of them are written anew when the map is saved; the rest of the file is the mission's own
+// code and stays as it is. A new map gets the script of the map it was saved from when that one has
 // the blocks, otherwise the template's (maps\template\template.lgc, map_tool.py new --script) -
 // the settings and the SetPushLine calls read from the old script go into the new blocks. A
 // script without the blocks (the campaign) is not changed: its settings are shown and its push
@@ -38,9 +42,13 @@
 #include <cstdio>
 #include <cstring>
 #include <cwchar>
+#include <functional>
 #include <map>
+#include <set>
 
 std::vector<TrainPatrol> edit_train_patrols();   // editor_edit.cpp: the trains' patrols of the held level
+void edit_message_text(const char* key, const char* english);   // editor_edit.cpp: a message of the status line
+std::vector<UnitUnlock> edit_place_unlocks(std::vector<UnitUnlock>& unlocks);   // editor_edit.cpp: the factories' places now, the units to write
 std::string language_file(const std::string& path);   // language.cpp: the pack's copy of a file
 
 namespace {
@@ -81,7 +89,8 @@ const char* const SETTINGS[][2] = {
 // the ones the editor makes itself
 const char* const OWN[] = {"CUSTOM_MAP", "MONEY", "START_DAYNIGHT", "RAIN", "NUKE", "OBJECTIVES_FILE",
                            "WIN_FILE", "LOOSE_FILE", "BRIEF_LIST", "BRIEF_HEADER", "HISCORES_FILE",
-                           "PLAYER_REINFORCEMENT", "LIMIT_ATACKERS"};
+                           "PLAYER_REINFORCEMENT", "LIMIT_ATACKERS", "ARRIVALS", "UNLOCKS", "UNIT_LIMITS", "ORDERS"};
+constexpr int POSTS = 10;               // ATA_STAND0 ... ATA_STAND9
 
 // the train types of TrainsTactDeclares.lgc (ATT_<size>_<kind>)
 const char* const SIZES[] = {"LIGHT", "MEDIUM", "HARD", "VERY_HARD", "DIFF", "DEFENCE"};
@@ -99,7 +108,8 @@ struct Mission {
     int money = 0, daytime = 1, reinforcements = 1, limit = 2;
     bool rain = false, nuke = false;
     std::string train = "5";   // the reinforcement's VIDs
-    std::vector<EnemyTrain> start, queue;
+    std::vector<EnemyTrain> start;
+    FactoryState factories;   // the enemy's queue (level_queue_*), the units that come later, the unit limits
     std::wstring objectives, win, lose;
     std::vector<std::wstring> brief;
     bool scores_page = false;   // brief.lst ends with the high scores page (hiscores.txt)
@@ -112,6 +122,8 @@ std::vector<PushLine> g_lines, g_script_lines;
 std::vector<TrainPatrol> g_patrols;   // read from main()'s block; written from the held level's trains
 bool g_managed = false;
 std::string g_map;   // the map the mission was read from or saved with
+ArrivalsState g_arrivals;
+int g_arrivals_refusal = 0;   // why the script cannot run arrivals: 0 it can, 1 no editor blocks, 2 no TrainsTact();
 
 // ---- text ----
 
@@ -331,7 +343,10 @@ bool parse_push_line(const std::string& raw, PushLine& out) {
 
 struct Blocks {
     int open = -1, close = -1, main_open = -1, main_close = -1;
+    int arrivals_open = -1, arrivals_close = -1, tact_open = -1, tact_close = -1;
+    int header = -1, trains_tact = -1;   // #include "maps\script\header.lgc", the first TrainsTact(); after it
     bool found() const { return open >= 0 && close > open && main_open >= 0 && main_close > main_open; }
+    bool arrivals() const { return arrivals_open >= 0 && arrivals_close > arrivals_open && tact_open >= 0 && tact_close > tact_open; }
 };
 
 Blocks find_blocks(const std::vector<std::string>& lines) {
@@ -342,6 +357,14 @@ Blocks find_blocks(const std::vector<std::string>& lines) {
         else if (starts_with(t, "// </editor>")) b.close = i;
         else if (starts_with(t, "// <editor main>")) b.main_open = i;
         else if (starts_with(t, "// </editor main>")) b.main_close = i;
+        else if (starts_with(t, "// <editor arrivals>")) b.arrivals_open = i;
+        else if (starts_with(t, "// </editor arrivals>")) b.arrivals_close = i;
+        else if (starts_with(t, "// <editor tact>")) b.tact_open = i;
+        else if (starts_with(t, "// </editor tact>")) b.tact_close = i;
+        const std::string code = trim(code_of(t));
+        if (b.header < 0 && starts_with(code, "#include") && lstrcmpiA(code.c_str(), "#include \"maps\\script\\header.lgc\"") == 0)
+            b.header = i;
+        else if (b.header >= 0 && b.trains_tact < 0 && code == "TrainsTact();") b.trains_tact = i;
     }
     return b;
 }
@@ -405,13 +428,500 @@ void read_trains(const Parsed& p, Mission& m) {
         if (i < tasks.size()) patrol(t, tasks[i]);
         m.start.push_back(t);
     }
-    const auto times = array("level_queue_times"), trains = array("level_queue_trains"), queue_tasks = array("level_queue_task");
+}
+
+// ---- arrivals ----
+//
+// The Arrivals panel's trains (editor_mission.h), in the settings' block as a column each:
+//   before TrainsTactDeclares.lgc  #define ARRIVALS <n>, a train of its own cars as the authors
+//                                  redefine a template (int this_trainNN[]={...,0}; NN a type no
+//                                  template has: the ones digit 4, 6, 7 or 8 - 5 depends on the
+//                                  difficulty, 9 is a defence train -, the tens digit the kind the
+//                                  AI treats it as: 1x mortars, 2x rockets, 3x airships, 5x flame,
+//                                  6x landing, 7x the super weapons, 0x the rest), the posts and
+//                                  patrols of the enemy's ones (ATA_STANDn_X/Y, ATA_PATROLn_X1 ...
+//                                  _Y2, numbered after the start trains' and the queue's patrols)
+//   after it                       int arrival_army[]  0-3
+//                                      arrival_type[]  the train type (arr_gettype)
+//                                      arrival_x/y/z[] the entry: a rail point, screen x, y, its z
+//                                      arrival_first[], arrival_every[], arrival_times[]  s, s, waves
+//                                      arrival_if[], arrival_if_n[]  the condition (ArrivalIf),
+//                                      arrival_or[]  1: it brings the wave earlier, 0: only then
+//                                      arrival_task[]  the enemy's ATA_..., -1 none, -2 drive to:
+//                                      arrival_to_x/y/z[]  the point (screen, its height)
+//                                      arrival_raid[]  the enemy's raids, s; arrival_msg[]  0/1
+//                                      arrival_done[], arrival_last[]  the waves that came, when
+// each with a 0 after the last column (an array is never empty). The runner is the script's block
+// "// <editor arrivals>" (ARRIVALS_RUNNER: the same in every map, so a map exported to another game
+// runs as it is), called from the block "// <editor tact>" after main()'s TrainsTact().
+
+const char* const ARRIVALS_RUNNER[] = {
+    "// ArrivalsTact() brings the trains of the arrays arrival_*[] (the settings' block above), once a",
+    "// second: a wave comes when its time is there (the first after arrival_first s, the next ones",
+    "// arrival_every s after the one before, arrival_times of them or without end) and its condition",
+    "// holds - or, with arrival_or, also earlier when the condition holds; a train the player pays for",
+    "// comes only while the money is there and is paid once it is made. It waits while a train",
+    "// stands at its entry (180 px) or the AI has its 16 trains. The cars are made on the entry's rail",
+    "// point in the army; the enemy's train goes to the AI (TrainsTact) with its task, the others' last",
+    "// car gets the order to drive to arrival_to. ArrivalsLeft(army): the waves of an army still to come.",
+    "ArrivalTrains(int army)",
+    "{",
+    "  return GetVid(5,VID_COUNT0+army)+GetVid(10,VID_COUNT0+army)+GetVid(97,VID_COUNT0+army);",
+    "}",
+    "ArrivalIf(int i)",
+    "{",
+    "  int c,n,k,m;",
+    "  c=arrival_if[i];",
+    "  n=arrival_if_n[i];",
+    "  if( c==1 )",
+    "    return ArrivalTrains(0)==0;",
+    "  if( c==2 )",
+    "    return ArrivalTrains(0)<n;",
+    "  if( c==3 )",
+    "    return NoArmyUnits(0)<n;",
+    "  if( c==4 )",
+    "    return GetVid(102,VID_COUNT0)==0;",
+    "  if( c==5 )",
+    "    return GetVid(102,VID_COUNT2)>0;",
+    "  if( c==6 )",
+    "    return ArrivalTrains(1)<n;",
+    "  if( c==7 )",
+    "  {",
+    "    m=0;",
+    "    for( k=0; k<ARR_LENGTH; k++ )",
+    "      if( ai_trains[k] && ai_trains_task[k]/10==1 )",
+    "        m++;",
+    "    return m<n;",
+    "  }",
+    "  if( c==8 )",
+    "    return GetMoney(0)>=n;",
+    "  if( c==9 )",
+    "    return ArrivalTrains(0)==0 && GetVid(102,VID_COUNT2)>0;",
+    "  return 1;",
+    "}",
+    "ArrivalsLeft(int army)",
+    "{",
+    "  int i,n;",
+    "  n=0;",
+    "  for( i=0; i<ARRIVALS; i++ )",
+    "    if( arrival_army[i]==army )",
+    "      if( !arrival_times[i] || arrival_done[i]<arrival_times[i] )",
+    "        if( !arrival_if[i] || arrival_or[i] || ArrivalIf(i) )",
+    "          n++;",
+    "  return n;",
+    "}",
+    "ArrivalTry(int i,int t)",
+    "{",
+    "  int j,k,u,go;",
+    "  string s;",
+    "  if( arrival_times[i] && arrival_done[i]>=arrival_times[i] )",
+    "    return 0;",
+    "  if( arrival_done[i] )",
+    "    go=t-arrival_last[i]>=arrival_every[i];",
+    "  else",
+    "    go=t>=arrival_first[i];",
+    "  if( arrival_or[i] )",
+    "  {",
+    "    if( arrival_if[i] && ArrivalIf(i) )",
+    "      go=1;",
+    "  }",
+    "  else if( !ArrivalIf(i) )",
+    "    go=0;",
+    "  if( !go )",
+    "    return 0;",
+    "  if( arrival_if[i]==8 && !ArrivalIf(i) )",
+    "    return 0;",
+    "  if( FindNearestSprite(GETSPRITE_CLASS+B_ENGINE,arrival_x[i],arrival_y[i]+arrival_z[i],180) )",
+    "    return 0;",
+    "  k=-1;",
+    "  if( arrival_army[i]==1 )",
+    "  {",
+    "    k=find_num();",
+    "    if( k<0 )",
+    "      return 0;",
+    "  }",
+    "  arr_gettype(temp_array,arrival_type[i]);",
+    "  u=0;",
+    "  for( j=0; j<ARR_LENGTH && temp_array[j]; j++ )",
+    "  {",
+    "    u=Create(temp_array[j],arrival_x[i],arrival_y[i]+arrival_z[i],arrival_z[i]);",
+    "    Action(u,ACT_SET_ARMY,arrival_army[i],0);",
+    "    if( arrival_army[i] )",
+    "      Action(u,ACT_SET_BEHAVE,Action(u,ACT_GET_BEHAVE)|1);",
+    "  }",
+    "  if( !u )",
+    "    return 0;",
+    "  if( arrival_if[i]==8 )",
+    "    SetMoney(0,GetMoney(0)-arrival_if_n[i]);",
+    "  if( k>=0 )",
+    "  {",
+    "    ai_trains[k]=u;",
+    "    ai_trains_type[k]=arrival_type[i];",
+    "    ai_trains_task[k]=arrival_task[i];",
+    "    ai_trains_task2[k]=ATA_NONE;",
+    "    ai_trains_task_backup[k]=ATA_NONE;",
+    "    ai_trains_behave[k]=0;",
+    "    ai_trains_time[k]=GetTime();",
+    "    ai_trains_random_task[k]=arrival_raid[i];",
+    "  }",
+    "  else if( arrival_task[i]==-2 )",
+    "    Action(u,ACT_MOVE,arrival_to_x[i],arrival_to_y[i]+arrival_to_z[i]);",
+    "  if( arrival_msg[i] )",
+    "  {",
+    "    PlaySFX(100);",
+    "    if( arrival_army[i]==1 )",
+    "      Message(\"EnemyReinforcementArrived\",GetX(u),GetY(u));",
+    "    else",
+    "      Message(\"ReinforcementArrived\",GetX(u),GetY(u));",
+    "  }",
+    "  arrival_done[i]=arrival_done[i]+1;",
+    "  arrival_last[i]=t;",
+    "  s=\"ARRIVAL \"+itoa(i+1)+\" army \"+itoa(arrival_army[i])+\" wave \"+itoa(arrival_done[i]);",
+    "  Log(s+\" at \"+itoa(t)+\" s task \"+itoa(arrival_task[i])+\" slot \"+itoa(k));",
+    "  return 1;",
+    "}",
+    "// FactoryTact(t): the unit limits at the start (AddUnitLimit takes the limit first and the army",
+    "// last), the units the factories get into their lists later (unlock_*[], the factory by its place).",
+    "FactoryTact(int t)",
+    "{",
+    "  int i,u;",
+    "  iff(1)",
+    "  {",
+    "    for( i=0; i<UNIT_LIMITS; i++ )",
+    "      AddUnitLimit(limit_max[i],limit_vid[i],limit_army[i]);",
+    "  }",
+    "  for( i=0; i<UNLOCKS; i++ )",
+    "    if( unlock_time[i]>=0 && t>=unlock_time[i] )",
+    "    {",
+    "      u=FindNearestSprite(GETSPRITE_VID+102,unlock_x[i],unlock_y[i],30);",
+    "      if( u )",
+    "        Action(u,ACT_ADD_ITEM,unlock_vid[i]);",
+    "      Log(\"UNLOCK vid \"+itoa(unlock_vid[i])+\" at \"+itoa(t)+\" s, factory \"+itoa(u!=0));",
+    "      unlock_time[i]=-1;",
+    "    }",
+    "}",
+    "// CaptureTact(): a neutral factory or repair point becomes the player's when a train of the player's",
+    "// comes within 100 px of it (the missions call LDepoCapture / LMasterCapture of Captures.lgc for",
+    "// their one such building; forts and mining plants are captured by F162_0 of ai_default_event.lgc).",
+    "CaptureTact()",
+    "{",
+    "  int b,v;",
+    "  for( b=FirstUnit(u_monster); b; b=NextUnit() )",
+    "  {",
+    "    v=GetUnitVid(b);",
+    "    if( (v==102 || v==104) && Action(b,act_getarmy,0,0)==2 )",
+    "      if( FindNearestSprite(GETSPRITE_UNIT+GETSPRITE_CLASS+B_ENGINE+GETSPRITE_ARMY0,GetX(b),GetY(b),100) )",
+    "      {",
+    "        PlaySFX(25);",
+    "        Effect(eff_nuke,0x006000);",
+    "        Action(b,act_setarmy,0,0);",
+    "        BuildingCapture(b);",
+    "        Log(\"CAPTURE vid \"+itoa(v)+\" at \"+itoa(GetX(b))+\",\"+itoa(GetY(b)));",
+    "      }",
+    "  }",
+    "}",
+    "// OrdersTact(): the orders of the map's trains (order_*[]), once at the start: each train found by its",
+    "// first car's VID and place, then driven or patrolling (-2, -3), the enemy's given to the AI with its task.",
+    "OrdersTact()",
+    "{",
+    "  int i,u,k;",
+    "  for( i=0; i<ORDERS; i++ )",
+    "  {",
+    "    u=FindNearestSprite(GETSPRITE_VID+order_vid[i],order_x[i],order_y[i],20);",
+    "    k=-1;",
+    "    if( u && order_task[i]==-2 )",
+    "      Action(u,ACT_MOVE,order_to_x[i],order_to_y[i]+order_to_z[i]);",
+    "    if( u && order_task[i]==-3 )",
+    "      PatrolEngine(u,order_to_x[i],order_to_y[i]);",
+    "    if( u && order_task[i]>=0 )",
+    "    {",
+    "      k=find_num();",
+    "      if( k>=0 )",
+    "      {",
+    "        ai_trains[k]=u;",
+    "        ai_trains_type[k]=order_type[i];",
+    "        ai_trains_task[k]=order_task[i];",
+    "        ai_trains_task2[k]=ATA_NONE;",
+    "        ai_trains_task_backup[k]=ATA_NONE;",
+    "        ai_trains_behave[k]=0;",
+    "        ai_trains_time[k]=GetTime();",
+    "        ai_trains_random_task[k]=0;",
+    "      }",
+    "    }",
+    "    Log(\"ORDER \"+itoa(i+1)+\" task \"+itoa(order_task[i])+\" train \"+itoa(u!=0)+\" slot \"+itoa(k));",
+    "  }",
+    "}",
+    "ArrivalsTact()",
+    "{",
+    "  int i,t;",
+    "  if( !OneTimeInSecond() )",
+    "    return 0;",
+    "  t=(GetTime()-time_game_total)/1000;",
+    "  iff(1)",
+    "    OrdersTact();",
+    "  FactoryTact(t);",
+    "  CaptureTact();",
+    "  for( i=0; i<ARRIVALS; i++ )",
+    "    ArrivalTry(i,t);",
+    "  return 1;",
+    "}",
+};
+
+const char ARRIVALS_OPEN[] = "// <editor arrivals> the trains that arrive (the Arrivals panel) - written by the map editor when the map is saved";
+const char ARRIVALS_CLOSE[] = "// </editor arrivals>";
+const char TACT_OPEN[] = "// <editor tact> the arrivals - written by the map editor when the map is saved";
+const char TACT_CLOSE[] = "// </editor tact>";
+
+// The authors' templates (TrainsTactDeclares.lgc, the normal difficulty), the defence trains aside
+// (they have no locomotive and do not drive in).
+const std::vector<TrainTemplate>& templates() {
+    static const std::vector<TrainTemplate> list = {
+        {0, "TplLightGun", "LIGHT GUN", {5, 20, 20}},
+        {1, "TplMediumGun", "MEDIUM GUN", {5, 20, 20, 20}},
+        {2, "TplHardGun", "HEAVY GUN", {5, 20, 20, 85, 20}},
+        {3, "TplVeryHardGun", "VERY HEAVY GUN", {10, 10, 20, 85, 20, 20, 20, 45, 20}},
+        {10, "TplLightMortar", "LIGHT MORTAR", {5, 25, 25}},
+        {11, "TplMediumMortar", "MEDIUM MORTAR", {10, 25, 25, 25}},
+        {12, "TplHardMortar", "HEAVY MORTAR", {10, 25, 25, 85, 25}},
+        {13, "TplVeryHardMortar", "VERY HEAVY MORTAR", {10, 10, 25, 45, 25, 25, 85, 25}},
+        {20, "TplLightRocket", "LIGHT ROCKETS", {5, 80, 80}},
+        {21, "TplMediumRocket", "MEDIUM ROCKETS", {10, 80, 80, 80}},
+        {22, "TplHardRocket", "HEAVY ROCKETS", {10, 80, 80, 85, 80}},
+        {23, "TplVeryHardRocket", "VERY HEAVY ROCKETS", {10, 10, 45, 80, 80, 80, 85, 80}},
+        {30, "TplLightAir", "LIGHT AIRSHIPS", {5, 35, 35}},
+        {31, "TplMediumAir", "MEDIUM AIRSHIPS", {10, 35, 35, 35}},
+        {32, "TplHardAir", "HEAVY AIRSHIPS", {10, 35, 35, 85, 35}},
+        {33, "TplVeryHardAir", "VERY HEAVY AIRSHIPS", {10, 10, 35, 35, 35, 85, 35}},
+        {50, "TplLightFire", "LIGHT FLAME", {5, 90, 90}},
+        {51, "TplMediumFire", "MEDIUM FLAME", {10, 90, 90, 90}},
+        {52, "TplHardFire", "HEAVY FLAME", {10, 90, 90, 85, 90}},
+        {53, "TplVeryHardFire", "VERY HEAVY FLAME", {10, 10, 90, 90, 90, 85, 90}},
+        {60, "TplLightDesant", "LIGHT LANDING", {5, 82, 82}},
+        {61, "TplMediumDesant", "MEDIUM LANDING", {10, 82, 82, 82}},
+        {62, "TplHardDesant", "HEAVY LANDING", {10, 82, 82, 85, 82}},
+        {63, "TplVeryHardDesant", "VERY HEAVY LANDING", {10, 10, 82, 82, 82, 85, 82}},
+        {46, "TplBrander", "BRANDER", {97}},
+        {70, "TplSuperRocket", "BIG ROCKET", {5, 45, 62}},
+        {71, "TplSuperMortar", "BIG MORTAR", {5, 75, 45}},
+    };
+    return list;
+}
+
+std::vector<int> declared_cars(int type);   // below
+
+// The cars of a train type the block has no this_trainNN for: a template's (x5: the normal
+// difficulty's, a locomotive and two of its car), else a locomotive.
+std::vector<int> template_cars(int type, const Parsed& p) {
+    auto own = p.arrays.find("this_train" + std::to_string(type));
+    std::vector<int> cars;
+    if (own != p.arrays.end()) {
+        for (const std::string& v : own->second) {
+            if (to_int(v) <= 0) break;
+            cars.push_back(to_int(v));
+        }
+        if (!cars.empty() && type % 10 != 5) return cars;
+    }
+    for (const TrainTemplate& t : templates())
+        if (t.type == type) return t.cars;
+    if (type % 10 == 5 && !cars.empty()) return {5, cars[0], cars[0]};
+    if (!declared_cars(type).empty()) return declared_cars(type);
+    return {5};
+}
+
+// The ATT_ name of a train type (ATT_<size>_<kind> and the special ones), else its number.
+std::string type_token_of(int type) {
+    static const char* const ONES[] = {"LIGHT", "MEDIUM", "HARD", "VERY_HARD", nullptr, "DIFF", nullptr, nullptr, nullptr, "DEFENCE"};
+    static const char* const TENS[] = {"GUN", "MORTAIR", "ROCKET", "AIR", nullptr, "FIRE", "DESANT", nullptr, nullptr, nullptr};
+    if (type == 46) return "ATT_KAMIKAZE_UNIT";
+    if (type == 70 || type == 71) return "ATT_HUYACHILO" + std::to_string(type - 70);
+    if (type >= 0 && type < 100 && ONES[type % 10] && TENS[type / 10])
+        return std::string("ATT_") + ONES[type % 10] + "_" + TENS[type / 10];
+    return std::to_string(type);
+}
+
+// A type of the script: an ATT_ name or a number; -1 when it is neither.
+int type_number_of(const std::string& token) {
+    const std::string t = trim(token);
+    for (int n = 0; n < 100; ++n)
+        if (type_token_of(n) == t) return n;
+    return to_int(t, -1);
+}
+
+// The cars of TrainsTactDeclares.lgc's types the panel does not offer: the defence trains (no
+// locomotive) and the difficulty's (x5: a locomotive and one, two or three of its car - the
+// normal difficulty's two here).
+std::vector<int> declared_cars(int type) {
+    switch (type) {
+    case 9: return {20, 20, 85, 20, 45, 20, 20};
+    case 19: return {25, 25, 25, 45, 25};
+    case 29: return {80, 80, 45, 80};
+    case 39: return {35, 35, 35, 85, 35};
+    case 59: return {90, 90, 45, 90, 90};
+    case 69: return {82, 82, 45, 82, 82};
+    case 5: return {5, 20, 20};
+    case 15: return {5, 25, 25};
+    case 25: return {5, 80, 80};
+    case 35: return {5, 35, 35};
+    case 55: return {5, 90, 90};
+    case 65: return {5, 82, 82};
+    default: return {};
+    }
+}
+
+// The tens of a train's type: the kind the AI treats it as (its cars' weapons, most of them).
+int kind_of(const std::vector<int>& cars) {
+    std::map<int, int> count;
+    for (int c : cars) {
+        const int kind = c == 25 ? 1 : c == 80 ? 2 : c == 35 ? 3 : c == 90 ? 5 : c == 82 ? 6 : c == 75 || c == 62 ? 7 : c == 20 ? 0 : -1;
+        if (kind >= 0) ++count[kind];
+    }
+    int best = 0, most = 0;
+    for (const auto& k : count)
+        if (k.second > most) {
+            most = k.second;
+            best = k.first;
+        }
+    return best;
+}
+
+// The task of the script's arrays: ATA_FIGHT, ATA_FIGHT_FORT, ATA_STANDn, ATA_PATROLn or a number.
+int task_number(const std::string& token) {
+    const std::string t = trim(token);
+    if (t == "ATA_FIGHT") return 10;
+    if (t == "ATA_FIGHT_FORT") return 11;
+    if (t == "ATA_NONE") return -1;
+    if (starts_with(t, "ATA_STAND") && t.size() == 10 && std::isdigit(static_cast<unsigned char>(t[9]))) return t[9] - '0';
+    if (starts_with(t, "ATA_PATROL") && t.size() == 11 && std::isdigit(static_cast<unsigned char>(t[10]))) return 20 + t[10] - '0';
+    return to_int(t, -1);
+}
+
+// The enemy's queue (level_queue_*), the units the factories get later and the unit limits.
+void read_factories(const Parsed& p, FactoryState& f) {
+    auto array = [&](const char* name) {
+        auto it = p.arrays.find(name);
+        return it == p.arrays.end() ? std::vector<std::string>() : it->second;
+    };
+    auto define_int = [&](const std::string& name) {
+        auto it = p.defines.find(name);
+        return it == p.defines.end() ? 0 : to_int(it->second);
+    };
+    const auto times = array("level_queue_times"), trains = array("level_queue_trains"), tasks = array("level_queue_task");
     for (size_t i = 0; i < times.size() && i < trains.size() && to_int(times[i]) > 0 && to_int(trains[i], 0) != -1; ++i) {
-        EnemyTrain t;
+        FactoryTrain t;
         t.time = to_int(times[i]);
-        t.type = trains[i];
-        if (i < queue_tasks.size()) patrol(t, queue_tasks[i]);
-        m.queue.push_back(t);
+        t.type = type_number_of(trains[i]);
+        t.cars = t.type_cars = template_cars(t.type, p);
+        const int task = i < tasks.size() ? task_number(tasks[i]) : 10;
+        if (task >= 0 && task < POSTS) {
+            t.task = TASK_GUARD;
+            t.tx = define_int("ATA_STAND" + std::to_string(task) + "_X");
+            t.ty = define_int("ATA_STAND" + std::to_string(task) + "_Y");
+        } else if (task >= 20 && task < 20 + PATROLS) {
+            t.task = TASK_PATROL;
+            const std::string k = "ATA_PATROL" + std::to_string(task - 20) + "_";
+            t.tx = define_int(k + "X1");
+            t.ty = define_int(k + "Y1");
+            t.tx2 = define_int(k + "X2");
+            t.ty2 = define_int(k + "Y2");
+        }
+        f.queue.push_back(t);
+    }
+    const auto ux = array("unlock_x"), uy = array("unlock_y"), uv = array("unlock_vid"), ut = array("unlock_time");
+    for (int i = 0; i < define_int("UNLOCKS") && i < static_cast<int>((std::min)({ux.size(), uy.size(), uv.size(), ut.size()})); ++i)
+        f.unlocks.push_back({to_int(ux[i]), to_int(uy[i]), to_int(uv[i]), to_int(ut[i]), nullptr});
+    const auto la = array("limit_army"), lv = array("limit_vid"), lm = array("limit_max");
+    for (int i = 0; i < define_int("UNIT_LIMITS") && i < static_cast<int>((std::min)({la.size(), lv.size(), lm.size()})); ++i)
+        f.limits.push_back({to_int(la[i]), to_int(lv[i]), to_int(lm[i])});
+}
+
+// The trains' orders of the arrays order_*[] (written by settings_block), beside the patrols' lines.
+void read_orders(const Parsed& p, std::vector<TrainPatrol>& out) {
+    auto define = p.defines.find("ORDERS");
+    const int n = define == p.defines.end() ? 0 : to_int(define->second);
+    auto column = [&](const char* name, int i) -> std::string {
+        auto it = p.arrays.find(name);
+        return it == p.arrays.end() || i >= static_cast<int>(it->second.size()) ? "0" : it->second[i];
+    };
+    auto define_int = [&](const std::string& name) {
+        auto it = p.defines.find(name);
+        return it == p.defines.end() ? 0 : to_int(it->second);
+    };
+    for (int i = 0; i < n && i < 256; ++i) {
+        TrainPatrol t{to_int(column("order_vid", i)), to_int(column("order_x", i)), to_int(column("order_y", i)),
+                      to_int(column("order_to_x", i)), to_int(column("order_to_y", i))};
+        t.to_z = to_int(column("order_to_z", i));
+        const int task = task_number(column("order_task", i));
+        t.army = task >= 0 ? 1 : 0;
+        if (task == -2) t.task = TASK_DRIVE;
+        else if (task == -3) t.task = TASK_PATROL;
+        else if (task == 10 || task == 11) t.task = TASK_ATTACK;
+        else if (task >= 0 && task < POSTS) {
+            t.task = TASK_GUARD;
+            t.to_x = define_int("ATA_STAND" + std::to_string(task) + "_X");
+            t.to_y = define_int("ATA_STAND" + std::to_string(task) + "_Y");
+        } else if (task >= 20 && task < 20 + PATROLS) {
+            t.task = TASK_PATROL;
+            t.to_x = define_int("ATA_PATROL" + std::to_string(task - 20) + "_X2");
+            t.to_y = define_int("ATA_PATROL" + std::to_string(task - 20) + "_Y2");
+        } else {
+            continue;
+        }
+        out.push_back(t);
+    }
+}
+
+void read_arrivals(const Parsed& p, ArrivalsState& s) {
+    s.list.clear();
+    auto define = p.defines.find("ARRIVALS");
+    const int n = define == p.defines.end() ? 0 : to_int(define->second);
+    auto column = [&](const char* name, int i) -> std::string {
+        auto it = p.arrays.find(name);
+        return it == p.arrays.end() || i >= static_cast<int>(it->second.size()) ? "0" : it->second[i];
+    };
+    auto value = [&](const char* name, int i) { return to_int(column(name, i)); };
+    auto define_int = [&](const std::string& name) {
+        auto it = p.defines.find(name);
+        return it == p.defines.end() ? 0 : to_int(it->second);
+    };
+    for (int i = 0; i < n && i < 64; ++i) {
+        Arrival a;
+        a.army = (std::max)(0, (std::min)(3, value("arrival_army", i)));
+        a.cars = template_cars(type_number_of(column("arrival_type", i)), p);
+        a.x = value("arrival_x", i);
+        a.y = value("arrival_y", i);
+        a.z = value("arrival_z", i);
+        a.entry = true;
+        a.first = value("arrival_first", i);
+        a.every = value("arrival_every", i);
+        a.times = value("arrival_times", i);
+        a.cond = (std::max)(0, (std::min)(IF_COUNT - 1, value("arrival_if", i)));
+        a.cond_n = value("arrival_if_n", i);
+        a.earlier = value("arrival_or", i) != 0;
+        a.raid = value("arrival_raid", i);
+        a.message = value("arrival_msg", i) != 0;
+        a.tx = value("arrival_to_x", i);
+        a.ty = value("arrival_to_y", i);
+        a.tz = value("arrival_to_z", i);
+        const int task = task_number(column("arrival_task", i));
+        if (task == -2) a.task = TASK_DRIVE;
+        else if (a.army != 1 || task == -1) a.task = TASK_NONE;
+        else if (task == 10) a.task = TASK_ATTACK;
+        else if (task == 11) a.task = TASK_FORTS;
+        else if (task >= 0 && task < POSTS) {
+            a.task = TASK_GUARD;
+            a.tx = define_int("ATA_STAND" + std::to_string(task) + "_X");
+            a.ty = define_int("ATA_STAND" + std::to_string(task) + "_Y");
+        } else if (task >= 20 && task < 20 + PATROLS) {
+            a.task = TASK_PATROL;
+            const std::string k = "ATA_PATROL" + std::to_string(task - 20) + "_";
+            a.tx = define_int(k + "X1");
+            a.ty = define_int(k + "Y1");
+            a.tx2 = define_int(k + "X2");
+            a.ty2 = define_int(k + "Y2");
+        } else {
+            a.task = TASK_ATTACK;
+        }
+        s.list.push_back(a);
     }
 }
 
@@ -461,9 +971,11 @@ Mission read_mission(const Parsed& p, bool block, const std::string& map) {
         }
     }
     read_trains(p, m);
+    read_factories(p, m.factories);
     if (block)   // the block's own other defines stay; outside a block only the known settings count
         for (const std::string& name : p.define_order) {
-            bool known = std::find(std::begin(OWN), std::end(OWN), name) != std::end(OWN) || starts_with(name, "ATA_PATROL");
+            bool known = std::find(std::begin(OWN), std::end(OWN), name) != std::end(OWN) || starts_with(name, "ATA_PATROL") ||
+                         starts_with(name, "ATA_STAND");
             for (const auto& s : SETTINGS) known = known || name == s[0];
             if (!known) m.extra.push_back({name, p.defines.at(name)});
         }
@@ -495,7 +1007,7 @@ Mission read_mission(const Parsed& p, bool block, const std::string& map) {
 }
 
 // The block of the settings for the map `map` (a game path).
-std::vector<std::string> settings_block(const Mission& m, const std::string& map) {
+std::vector<std::string> settings_block(const Mission& m, const ArrivalsState& arrivals, const std::string& map) {
     std::vector<std::string> out;
     const std::string folder = folder_of(map);
     auto define = [&](const std::string& name, const std::string& value) { out.push_back("#define " + name + " " + value); };
@@ -519,7 +1031,7 @@ std::vector<std::string> settings_block(const Mission& m, const std::string& map
     define("BRIEF_LIST", quoted_path(folder + "\\brief.lst"));
     define("BRIEF_HEADER", "\"" + ascii_upper(m.header.empty() ? m.title : m.header, 32) + "\"");
     define("HISCORES_FILE", quoted_path(folder + "\\hiscores"));
-    define("PLAYER_REINFORCEMENT", std::to_string(m.reinforcements));
+    define("PLAYER_REINFORCEMENT", std::to_string(arrivals.on ? arrivals.waves : m.reinforcements));
     std::vector<std::string> train;
     for (size_t a = 0; a <= m.train.size();) {
         const size_t b = m.train.find(',', a);
@@ -542,6 +1054,46 @@ std::vector<std::string> settings_block(const Mission& m, const std::string& map
         define(n + "_Y2", std::to_string(t.y2));
         return n;
     };
+    // the trains' types: a template's as it is, else a type of the map's own (int this_trainNN[])
+    std::map<std::vector<int>, int> own;
+    std::set<int> used;
+    auto type_of = [&](const std::vector<int>& cars) -> std::string {
+        for (const TrainTemplate& t : templates())
+            if (t.cars == cars) return type_token_of(t.type);
+        if (own.count(cars)) return std::to_string(own[cars]);
+        int type = -1;
+        const int tens = kind_of(cars);
+        for (int k = 0; k < 10 && type < 0; ++k)   // its kind first, then the others'
+            for (int ones : {4, 6, 7, 8}) {
+                const int t = ((tens + k) % 10) * 10 + ones;
+                if ((tens + k) % 10 == 4 || used.count(t)) continue;   // 4x: the AI's helpers
+                type = t;
+                break;
+            }
+        if (type < 0) type = 0;
+        used.insert(type);
+        own[cars] = type;
+        std::vector<std::string> list;
+        for (int c : cars) list.push_back(std::to_string(c));
+        list.push_back("0");
+        array("this_train" + std::to_string(type), list);
+        return std::to_string(type);
+    };
+    // the enemy's posts, numbered over the queue and the arrivals
+    int posts = 0;
+    auto post = [&](int x, int y) -> std::string {
+        if (posts >= POSTS) return "ATA_FIGHT";
+        const std::string n = "ATA_STAND" + std::to_string(posts++);
+        define(n + "_X", std::to_string(x));
+        define(n + "_Y", std::to_string(y));
+        return n;
+    };
+    auto patrol = [&](int x1, int y1, int x2, int y2) {
+        EnemyTrain t;
+        t.patrol = true;
+        t.x1 = x1, t.y1 = y1, t.x2 = x2, t.y2 = y2;
+        return task(t);
+    };
     std::vector<std::string> types, tasks, xs, ys, renew, random, times, queue_types, queue_tasks;
     for (const EnemyTrain& t : m.start) {
         types.push_back(t.type);
@@ -551,10 +1103,46 @@ std::vector<std::string> settings_block(const Mission& m, const std::string& map
         renew.push_back("1");
         random.push_back("0");
     }
-    for (const EnemyTrain& t : m.queue) {
+    for (const FactoryTrain& t : m.factories.queue) {
         times.push_back(std::to_string(t.time));
-        queue_types.push_back(t.type);
-        queue_tasks.push_back(task(t));
+        // an authors' type as it was read while its cars are the ones it gives (a difficulty's train);
+        // the map's own types are made anew from the cars
+        const bool authors = t.type >= 0 && t.cars == t.type_cars && starts_with(type_token_of(t.type), "ATT_");
+        queue_types.push_back(authors ? type_token_of(t.type) : type_of(t.cars));
+        queue_tasks.push_back(t.task == TASK_PATROL ? patrol(t.tx, t.ty, t.tx2, t.ty2) : t.task == TASK_GUARD ? post(t.tx, t.ty) : "ATA_FIGHT");
+    }
+    // the arrivals' trains, posts and patrols; the trains' orders
+    std::vector<std::string> a_type, a_task;
+    struct Ordered {
+        TrainPatrol order;
+        std::string task, type;
+    };
+    std::vector<Ordered> orders;
+    if (arrivals.on) {
+        define("ARRIVALS", std::to_string(arrivals.list.size()));
+        for (const Arrival& a : arrivals.list) {
+            a_type.push_back(type_of(a.cars));
+            if (a.army != 1) a_task.push_back(a.task == TASK_DRIVE && (a.tx || a.ty) ? "-2" : "-1");   // no point: no order
+            else if (a.task == TASK_GUARD) a_task.push_back(post(a.tx, a.ty));
+            else if (a.task == TASK_PATROL) a_task.push_back(patrol(a.tx, a.ty, a.tx2, a.ty2));
+            else a_task.push_back(a.task == TASK_FORTS ? "ATA_FIGHT_FORT" : "ATA_FIGHT");
+        }
+        // the trains' orders (OrdersTact of the runner)
+        for (const TrainPatrol& o : edit_train_patrols()) {
+            std::string task;
+            if (o.army == 1 && o.task == TASK_ATTACK) task = "ATA_FIGHT";
+            else if (o.army == 1 && o.task == TASK_GUARD) task = post(o.to_x, o.to_y);
+            else if (o.army == 1 && o.task == TASK_PATROL) task = patrol(o.from_x, o.from_y, o.to_x, o.to_y);
+            else if (o.army != 1 && o.task == TASK_DRIVE) task = "-2";
+            else if (o.army != 1 && o.task == TASK_PATROL) task = "-3";
+            else continue;   // an order of another army (the train's army changed since)
+            orders.push_back({o, task, o.army == 1 ? type_of(o.cars) : "0"});
+        }
+        define("ORDERS", std::to_string(orders.size()));
+        // the factories: units that come later, unit limits (FactoryTact of the runner)
+        const FactoryState& f = m.factories;
+        define("UNLOCKS", std::to_string(f.unlocks.size()));
+        define("UNIT_LIMITS", std::to_string(f.limits.size()));
     }
     for (const auto& e : m.extra) define(e.first, e.second);
     out.push_back("#include \"maps\\script\\TrainsTactDeclares.lgc\"");
@@ -570,6 +1158,65 @@ std::vector<std::string> settings_block(const Mission& m, const std::string& map
     array("level_queue_times", times);
     array("level_queue_trains", queue_types);
     array("level_queue_task", queue_tasks);
+    if (arrivals.on) {
+        auto column = [&](const char* name, const std::function<std::string(size_t)>& of) {
+            std::vector<std::string> items;
+            for (size_t i = 0; i < arrivals.list.size(); ++i) items.push_back(of(i));
+            items.push_back("0");
+            array(name, items);
+        };
+        const std::vector<Arrival>& l = arrivals.list;
+        auto number = [&](int Arrival::*field) { return [&, field](size_t i) { return std::to_string(l[i].*field); }; };
+        column("arrival_army", number(&Arrival::army));
+        column("arrival_type", [&](size_t i) { return a_type[i]; });
+        column("arrival_x", number(&Arrival::x));
+        column("arrival_y", number(&Arrival::y));
+        column("arrival_z", number(&Arrival::z));
+        column("arrival_first", number(&Arrival::first));
+        column("arrival_every", number(&Arrival::every));
+        column("arrival_times", number(&Arrival::times));
+        column("arrival_if", number(&Arrival::cond));
+        column("arrival_if_n", number(&Arrival::cond_n));
+        column("arrival_or", [&](size_t i) { return std::string(l[i].earlier ? "1" : "0"); });
+        column("arrival_task", [&](size_t i) { return a_task[i]; });
+        // the point the task drives to (the enemy's posts and patrols are the AI's, above)
+        auto drive = [&](size_t i) { return l[i].army != 1 && l[i].task == TASK_DRIVE; };
+        column("arrival_to_x", [&](size_t i) { return std::to_string(drive(i) ? l[i].tx : 0); });
+        column("arrival_to_y", [&](size_t i) { return std::to_string(drive(i) ? l[i].ty : 0); });
+        column("arrival_to_z", [&](size_t i) { return std::to_string(drive(i) ? l[i].tz : 0); });
+        column("arrival_raid", [&](size_t i) { return std::to_string(l[i].army == 1 ? l[i].raid : 0); });
+        column("arrival_msg", [&](size_t i) { return std::string(l[i].message && l[i].army < 2 ? "1" : "0"); });
+        column("arrival_done", [](size_t) { return std::string("0"); });
+        column("arrival_last", [](size_t) { return std::string("0"); });
+        auto texts = [&](const char* name, const std::function<std::string(const Ordered&)>& of) {
+            std::vector<std::string> items;
+            for (const Ordered& o : orders) items.push_back(of(o));
+            items.push_back("0");
+            array(name, items);
+        };
+        texts("order_vid", [](const Ordered& o) { return std::to_string(o.order.nvid); });
+        texts("order_x", [](const Ordered& o) { return std::to_string(o.order.x); });
+        texts("order_y", [](const Ordered& o) { return std::to_string(o.order.y); });
+        texts("order_task", [](const Ordered& o) { return o.task; });
+        texts("order_type", [](const Ordered& o) { return o.type; });
+        texts("order_to_x", [](const Ordered& o) { return std::to_string(o.order.to_x); });
+        texts("order_to_y", [](const Ordered& o) { return std::to_string(o.order.to_y); });
+        texts("order_to_z", [](const Ordered& o) { return std::to_string(o.order.to_z); });
+        const FactoryState& f = m.factories;
+        auto columns = [&](const char* name, size_t n, const std::function<int(size_t)>& of) {
+            std::vector<std::string> items;
+            for (size_t i = 0; i < n; ++i) items.push_back(std::to_string(of(i)));
+            items.push_back("0");
+            array(name, items);
+        };
+        columns("unlock_x", f.unlocks.size(), [&](size_t i) { return f.unlocks[i].x; });
+        columns("unlock_y", f.unlocks.size(), [&](size_t i) { return f.unlocks[i].y; });
+        columns("unlock_vid", f.unlocks.size(), [&](size_t i) { return f.unlocks[i].nvid; });
+        columns("unlock_time", f.unlocks.size(), [&](size_t i) { return f.unlocks[i].time; });
+        columns("limit_army", f.limits.size(), [&](size_t i) { return f.limits[i].army; });
+        columns("limit_vid", f.limits.size(), [&](size_t i) { return f.limits[i].nvid; });
+        columns("limit_max", f.limits.size(), [&](size_t i) { return f.limits[i].max; });
+    }
     return out;
 }
 
@@ -581,6 +1228,7 @@ std::vector<std::string> push_block(const std::string& indent) {
         out.push_back(indent + line);
     }
     for (const TrainPatrol& p : edit_train_patrols()) {   // the trains' patrols, as the held level has them
+        if (g_arrivals.on || p.task != TASK_PATROL) continue;   // the runner's arrays have them
         char line[160];
         std::snprintf(line, sizeof line, "PatrolEngine(FindNearestSprite(GETSPRITE_VID+%d, %d, %d, 20), %d, %d);", p.nvid, p.x,
                       p.y, p.to_x, p.to_y);
@@ -623,57 +1271,53 @@ void add_to_custom_list(const std::string& folder, const std::string& title) {
 
 enum : int {
     IDC_TITLE = 100, IDC_HEADER, IDC_MONEY, IDC_TIME, IDC_RAIN, IDC_NUKE, IDC_LIMIT, IDC_WAVES, IDC_TRAIN, IDC_START,
-    IDC_QUEUE, IDC_OBJECTIVES, IDC_WIN, IDC_LOSE, IDC_BRIEF
+    IDC_QUEUE, IDC_OBJECTIVES, IDC_WIN, IDC_LOSE, IDC_BRIEF, IDC_ARRIVALS
 };
+bool g_open_arrivals = false;   // the dialog ended with its Arrivals... button
 
 
 std::wstring widen(const std::string& s) { return from_pack(s); }
 
-std::wstring train_lines(const std::vector<EnemyTrain>& trains, bool queue) {
+std::wstring train_lines(const std::vector<EnemyTrain>& trains) {
     std::wstring out;
     for (const EnemyTrain& t : trains) {
         char line[128];
         const std::string type = type_name(t.type);
-        if (queue && t.patrol) std::snprintf(line, sizeof line, "%d %s %d %d %d %d", t.time, type.c_str(), t.x1, t.y1, t.x2, t.y2);
-        else if (queue) std::snprintf(line, sizeof line, "%d %s", t.time, type.c_str());
-        else if (t.patrol) std::snprintf(line, sizeof line, "%s %d %d %d %d", type.c_str(), t.x1, t.y1, t.x2, t.y2);
+        if (t.patrol) std::snprintf(line, sizeof line, "%s %d %d %d %d", type.c_str(), t.x1, t.y1, t.x2, t.y2);
         else std::snprintf(line, sizeof line, "%s %d %d", type.c_str(), t.x1, t.y1);
         out += (out.empty() ? L"" : L"\r\n") + widen(line);
     }
     return out;
 }
 
-// The trains of an edit box; false with the line in `error` when one cannot be read.
-bool parse_trains(const std::wstring& text, bool queue, std::vector<EnemyTrain>& out, std::string& error) {
+std::vector<std::string> words_of(const std::string& line) {
+    std::vector<std::string> words;
+    for (size_t a = 0; a < line.size();) {
+        const size_t b = line.find_first_of(" \t,", a);
+        const std::string w = line.substr(a, b == std::string::npos ? std::string::npos : b - a);
+        if (!w.empty()) words.push_back(w);
+        if (b == std::string::npos) break;
+        a = b + 1;
+    }
+    return words;
+}
+
+// The trains at the start of an edit box (type x y, or type x1 y1 x2 y2); false with the line in
+// `error` when one cannot be read.
+bool parse_trains(const std::wstring& text, std::vector<EnemyTrain>& out, std::string& error) {
     out.clear();
     int number = 0;
     for (const std::string& raw : split_lines(to_pack(text))) {
         ++number;
-        const std::string line = trim(raw);
-        if (line.empty()) continue;
-        std::vector<std::string> words;
-        for (size_t a = 0; a < line.size();) {
-            const size_t b = line.find_first_of(" \t,", a);
-            const std::string w = line.substr(a, b == std::string::npos ? std::string::npos : b - a);
-            if (!w.empty()) words.push_back(w);
-            if (b == std::string::npos) break;
-            a = b + 1;
-        }
+        const std::vector<std::string> words = words_of(trim(raw));
+        if (words.empty()) continue;
         EnemyTrain t;
-        size_t i = 0;
-        if (queue) {
-            t.time = to_int(words[i++], -1);
-            if (t.time <= 0) {
-                error = ui_printf(ui_format("ErrLineSeconds", "line %d: the time in seconds first"), number);
-                return false;
-            }
-        }
-        if (i >= words.size() || !type_token(words[i++], t.type)) {
+        if (!type_token(words[0], t.type)) {
             error = ui_printf(ui_format("ErrLineType", "line %d: an unknown train type"), number);
             return false;
         }
         std::vector<int> v;
-        for (; i < words.size(); ++i) {
+        for (size_t i = 1; i < words.size(); ++i) {
             const int n = to_int(words[i], INT_MIN);
             if (n == INT_MIN) {
                 error = ui_printf(ui_format("ErrLineNumber", "line %d: \"%s\" is not a number"), number, words[i].c_str());
@@ -687,12 +1331,111 @@ bool parse_trains(const std::wstring& text, bool queue, std::vector<EnemyTrain>&
             t.y1 = v[1];
             t.x2 = v[2];
             t.y2 = v[3];
-        } else if (v.size() == 2 && !queue) {
+        } else if (v.size() == 2) {
             t.x1 = v[0];
             t.y1 = v[1];
-        } else if (!(v.empty() && queue)) {
-            error = queue ? ui_printf(ui_format("ErrLineQueue", "line %d: seconds type, or seconds type x1 y1 x2 y2"), number)
-                          : ui_printf(ui_format("ErrLineStart", "line %d: type x y, or type x1 y1 x2 y2"), number);
+        } else {
+            error = ui_printf(ui_format("ErrLineStart", "line %d: type x y, or type x1 y1 x2 y2"), number);
+            return false;
+        }
+        out.push_back(t);
+    }
+    return true;
+}
+
+// The enemy's queue in the dialog: a line a train, "seconds train" with the train a type's name
+// (light_gun ...) or its cars (5+20+20), then "x1 y1 x2 y2" for a patrol or "guard x y" for a post.
+std::string cars_text(const std::vector<int>& cars) {
+    std::string out;
+    for (int c : cars) out += (out.empty() ? "" : "+") + std::to_string(c);
+    return out;
+}
+
+std::string queue_train_name(const FactoryTrain& t) {   // as the dialog's line names it: a type or its cars
+    std::string train = cars_text(t.cars);
+    const std::string token = t.type >= 0 && t.cars == t.type_cars ? type_token_of(t.type) : "";
+    if (starts_with(token, "ATT_")) train = type_name(token);
+    for (const TrainTemplate& m : templates())
+        if (token.empty() && m.cars == t.cars) train = type_name(type_token_of(m.type));
+    return train;
+}
+
+std::wstring queue_lines(const std::vector<FactoryTrain>& queue) {
+    std::wstring out;
+    for (const FactoryTrain& t : queue) {
+        const std::string train = queue_train_name(t);
+        char line[160];
+        if (t.task == TASK_PATROL) std::snprintf(line, sizeof line, "%d %s %d %d %d %d", t.time, train.c_str(), t.tx, t.ty, t.tx2, t.ty2);
+        else if (t.task == TASK_GUARD) std::snprintf(line, sizeof line, "%d %s guard %d %d", t.time, train.c_str(), t.tx, t.ty);
+        else std::snprintf(line, sizeof line, "%d %s", t.time, train.c_str());
+        out += (out.empty() ? L"" : L"\r\n") + widen(line);
+    }
+    return out;
+}
+
+bool parse_queue(const std::wstring& text, const std::vector<FactoryTrain>& was, std::vector<FactoryTrain>& out, std::string& error) {
+    out.clear();
+    int number = 0;
+    for (const std::string& raw : split_lines(to_pack(text))) {
+        ++number;
+        const std::vector<std::string> words = words_of(trim(raw));
+        if (words.empty()) continue;
+        FactoryTrain t;
+        t.time = to_int(words[0], -1);
+        if (t.time <= 0) {
+            error = ui_printf(ui_format("ErrLineSeconds", "line %d: the time in seconds first"), number);
+            return false;
+        }
+        std::string token;
+        if (words.size() > 1 && words[1].find('+') != std::string::npos) {   // its cars
+            t.cars.clear();
+            for (size_t a = 0; a <= words[1].size();) {
+                const size_t b = words[1].find('+', a);
+                const int v = to_int(words[1].substr(a, b == std::string::npos ? std::string::npos : b - a), -1);
+                if (v <= 0) {
+                    error = ui_printf(ui_format("ErrLineType", "line %d: an unknown train type"), number);
+                    return false;
+                }
+                t.cars.push_back(v);
+                if (b == std::string::npos) break;
+                a = b + 1;
+            }
+        } else if (words.size() > 1 && type_token(words[1], token)) {
+            t.type = type_number_of(token);
+            Parsed none;
+            t.cars = t.type_cars = template_cars(t.type, none);
+            for (const FactoryTrain& w : was)   // a type of the map's own keeps its cars
+                if (w.type == t.type && !w.type_cars.empty()) t.cars = t.type_cars = w.type_cars;
+        } else {
+            error = ui_printf(ui_format("ErrLineType", "line %d: an unknown train type"), number);
+            return false;
+        }
+        size_t i = 2;
+        if (i < words.size() && lstrcmpiA(words[i].c_str(), "guard") == 0) {
+            t.task = TASK_GUARD;
+            ++i;
+        }
+        std::vector<int> v;
+        for (; i < words.size(); ++i) {
+            const int n = to_int(words[i], INT_MIN);
+            if (n == INT_MIN) {
+                error = ui_printf(ui_format("ErrLineNumber", "line %d: \"%s\" is not a number"), number, words[i].c_str());
+                return false;
+            }
+            v.push_back(n);
+        }
+        if (t.task == TASK_GUARD && v.size() == 2) {
+            t.tx = v[0];
+            t.ty = v[1];
+        } else if (t.task != TASK_GUARD && v.size() == 4) {
+            t.task = TASK_PATROL;
+            t.tx = v[0];
+            t.ty = v[1];
+            t.tx2 = v[2];
+            t.ty2 = v[3];
+        } else if (!(t.task != TASK_GUARD && v.empty())) {
+            error = ui_printf(ui_format("ErrLineQueue2", "line %d: seconds train, seconds train x1 y1 x2 y2 or seconds train guard x y"),
+                              number);
             return false;
         }
         out.push_back(t);
@@ -752,15 +1495,18 @@ std::string apply_fields(const Fields& f, Mission& n) {
     n.rain = get(IDC_RAIN) == L"1";
     n.nuke = get(IDC_NUKE) == L"1";
     if (!number(IDC_LIMIT, n.limit) && error.empty()) error = ui_text("ErrAttackers", "Enemy attackers at once: a number");
-    if (!number(IDC_WAVES, n.reinforcements) && error.empty()) error = ui_text("ErrWaves", "Reinforcement waves: a number");
-    n.train = to_pack(get(IDC_TRAIN));
-    if (error.empty() && !parse_trains(get(IDC_START), false, n.start, trains))
+    if (f.count(IDC_WAVES)) {   // a map whose arrivals the editor runs has the Arrivals panel instead
+        if (!number(IDC_WAVES, n.reinforcements) && error.empty()) error = ui_text("ErrWaves", "Reinforcement waves: a number");
+        n.train = to_pack(get(IDC_TRAIN));
+    }
+    if (error.empty() && !parse_trains(get(IDC_START), n.start, trains))
         error = ui_printf(ui_format("ErrStartTrains", "Enemy trains at the start, %s"), trains.c_str());
-    if (error.empty() && !parse_trains(get(IDC_QUEUE), true, n.queue, trains))
+    const std::vector<FactoryTrain> was = n.factories.queue;
+    if (error.empty() && !parse_queue(get(IDC_QUEUE), was, n.factories.queue, trains))
         error = ui_printf(ui_format("ErrQueue", "Enemy trains from its factory, %s"), trains.c_str());
     int patrols = 0;
-    for (const auto* list : {&n.start, &n.queue})
-        for (const EnemyTrain& t : *list) patrols += t.patrol;
+    for (const EnemyTrain& t : n.start) patrols += t.patrol;
+    for (const FactoryTrain& t : n.factories.queue) patrols += t.task == TASK_PATROL;
     if (error.empty() && patrols > PATROLS) error = ui_text("ErrPatrols", "At most ten patrolling trains (ATA_PATROL0 ... 9)");
     n.objectives = get(IDC_OBJECTIVES);
     n.win = get(IDC_WIN);
@@ -785,8 +1531,8 @@ INT_PTR CALLBACK mission_proc(HWND dialog, UINT m, WPARAM w, LPARAM) {
         SetDlgItemInt(dialog, IDC_LIMIT, s.limit, TRUE);
         SetDlgItemInt(dialog, IDC_WAVES, s.reinforcements, TRUE);
         SetDlgItemTextW(dialog, IDC_TRAIN, widen(s.train).c_str());
-        SetDlgItemTextW(dialog, IDC_START, train_lines(s.start, false).c_str());
-        SetDlgItemTextW(dialog, IDC_QUEUE, train_lines(s.queue, true).c_str());
+        SetDlgItemTextW(dialog, IDC_START, train_lines(s.start).c_str());
+        SetDlgItemTextW(dialog, IDC_QUEUE, queue_lines(s.factories.queue).c_str());
         SetDlgItemTextW(dialog, IDC_OBJECTIVES, s.objectives.c_str());
         SetDlgItemTextW(dialog, IDC_WIN, s.win.c_str());
         SetDlgItemTextW(dialog, IDC_LOSE, s.lose.c_str());
@@ -798,9 +1544,10 @@ INT_PTR CALLBACK mission_proc(HWND dialog, UINT m, WPARAM w, LPARAM) {
         EndDialog(dialog, 0);
         return TRUE;
     }
-    if (LOWORD(w) != IDOK) return FALSE;
+    if (LOWORD(w) != IDOK && LOWORD(w) != IDC_ARRIVALS) return FALSE;
     Fields fields;
-    for (int id = IDC_TITLE; id <= IDC_BRIEF; ++id) fields[id] = item_text(dialog, id);
+    for (int id = IDC_TITLE; id <= IDC_BRIEF; ++id)
+        if (GetDlgItem(dialog, id)) fields[id] = item_text(dialog, id);
     fields[IDC_TIME] = std::to_wstring(SendDlgItemMessageW(dialog, IDC_TIME, CB_GETCURSEL, 0, 0) + 1);
     fields[IDC_RAIN] = IsDlgButtonChecked(dialog, IDC_RAIN) == BST_CHECKED ? L"1" : L"0";
     fields[IDC_NUKE] = IsDlgButtonChecked(dialog, IDC_NUKE) == BST_CHECKED ? L"1" : L"0";
@@ -811,13 +1558,14 @@ INT_PTR CALLBACK mission_proc(HWND dialog, UINT m, WPARAM w, LPARAM) {
         return TRUE;
     }
     s = n;
+    g_open_arrivals = LOWORD(w) == IDC_ARRIVALS;   // the settings as OK keeps them, then the panel
     EndDialog(dialog, 1);
     return TRUE;
 }
 // The boxes as the dialog starts with them.
 Fields current_fields() {
     const Mission& s = g_mission;
-    return {{IDC_TITLE, s.title},
+    Fields f = {{IDC_TITLE, s.title},
             {IDC_HEADER, s.header},
             {IDC_MONEY, std::to_wstring(s.money)},
             {IDC_TIME, std::to_wstring(s.daytime)},
@@ -826,12 +1574,17 @@ Fields current_fields() {
             {IDC_LIMIT, std::to_wstring(s.limit)},
             {IDC_WAVES, std::to_wstring(s.reinforcements)},
             {IDC_TRAIN, widen(s.train)},
-            {IDC_START, train_lines(s.start, false)},
-            {IDC_QUEUE, train_lines(s.queue, true)},
+            {IDC_START, train_lines(s.start)},
+            {IDC_QUEUE, queue_lines(s.factories.queue)},
             {IDC_OBJECTIVES, s.objectives},
             {IDC_WIN, s.win},
             {IDC_LOSE, s.lose},
             {IDC_BRIEF, brief_text(s.brief)}};
+    if (g_arrivals.on) {   // as the dialog has them
+        f.erase(IDC_WAVES);
+        f.erase(IDC_TRAIN);
+    }
+    return f;
 }
 
 }  // namespace
@@ -843,8 +1596,9 @@ const std::vector<PushLine>& mission_script_push_lines() { return g_script_lines
 bool mission_managed() { return g_managed; }
 std::vector<EnemyTrainMark> mission_enemy_trains() {
     std::vector<EnemyTrainMark> out;
-    for (const auto* list : {&g_mission.start, &g_mission.queue})
-        for (const EnemyTrain& t : *list) out.push_back({type_name(t.type), t.time, t.patrol, t.x1, t.y1, t.x2, t.y2});
+    for (const EnemyTrain& t : g_mission.start) out.push_back({type_name(t.type), t.time, t.patrol, t.x1, t.y1, t.x2, t.y2});
+    for (const FactoryTrain& t : g_mission.factories.queue)   // a guard is marked at its factory, like an attack
+        out.push_back({queue_train_name(t), t.time, t.task == TASK_PATROL, t.tx, t.ty, t.tx2, t.ty2});
     return out;
 }
 
@@ -868,13 +1622,73 @@ void mission_load(const std::string& map) {
         if (g_managed && in_main && trim(lines[i]).rfind("//", 0) != 0 && parse_patrol(lines[i], t)) g_patrols.push_back(t);
     }
     g_mission = read_mission(p, g_managed, map);
-    patch::log("mission: %s - %s, %u push lines of the editor, %u of the script, %u start trains, %u in the queue",
+    read_orders(p, g_patrols);
+    g_arrivals = ArrivalsState();
+    g_arrivals.on = g_managed && b.arrivals();
+    g_arrivals.waves = g_mission.reinforcements;
+    if (g_arrivals.on) read_arrivals(p, g_arrivals);
+    g_arrivals_refusal = !g_managed ? 1 : !g_arrivals.on && (b.trains_tact < 0 || b.header < 0) ? 2 : 0;
+    patch::log("mission: %s - %s, %u push lines of the editor, %u of the script, %u start trains, %u in the queue, %s",
                script_of(map).c_str(), g_managed ? "an editor mission" : "no editor blocks",
                static_cast<unsigned>(g_lines.size()), static_cast<unsigned>(g_script_lines.size()),
-               static_cast<unsigned>(g_mission.start.size()), static_cast<unsigned>(g_mission.queue.size()));
+               static_cast<unsigned>(g_mission.start.size()), static_cast<unsigned>(g_mission.factories.queue.size()),
+               g_arrivals.on ? ui_printf("%u arrivals", static_cast<unsigned>(g_arrivals.list.size())).c_str()
+                             : "the authors' reinforcement");
 }
 
-bool mission_dialog(HWND owner) {
+ArrivalsState& mission_arrivals() { return g_arrivals; }
+FactoryState& mission_factories() { return g_mission.factories; }
+int mission_reinforcement_waves() { return g_mission.reinforcements; }
+std::vector<int> mission_reinforcement_train() {
+    std::vector<int> cars;
+    for (size_t a = 0; a <= g_mission.train.size();) {
+        const size_t b = g_mission.train.find(',', a);
+        const int v = to_int(g_mission.train.substr(a, b == std::string::npos ? std::string::npos : b - a));
+        if (v > 0) cars.push_back(v);
+        if (b == std::string::npos) break;
+        a = b + 1;
+    }
+    return cars;
+}
+std::string mission_arrivals_refusal() {
+    if (g_arrivals.on || !g_arrivals_refusal) return "";
+    return g_arrivals_refusal == 1 ? ui_text("ArrNoBlocks", "THIS MAP'S SCRIPT HAS NO EDITOR BLOCKS (A CAMPAIGN MISSION, THE "
+                                                            "SANDBOX): SAVE THE MAP UNDER A NEW NAME FIRST")
+                                   : ui_text("ArrNoTact", "THIS SCRIPT'S MAIN() HAS NO LINE TRAINSTACT(); TO CALL THE ARRIVALS "
+                                                          "FROM");
+}
+const std::vector<TrainTemplate>& mission_train_templates() { return templates(); }
+
+void mission_ai_use(int& patrols, int& posts, int& start_trains, int& queue_trains) {
+    patrols = posts = 0;
+    for (const EnemyTrain& t : g_mission.start) patrols += t.patrol;
+    for (const FactoryTrain& t : g_mission.factories.queue) {
+        patrols += t.task == TASK_PATROL;
+        posts += t.task == TASK_GUARD;
+    }
+    for (const Arrival& a : g_arrivals.list)
+        if (a.army == 1) {
+            patrols += a.task == TASK_PATROL;
+            posts += a.task == TASK_GUARD;
+        }
+    if (g_arrivals.on)   // the enemy trains' orders (OrdersTact)
+        for (const TrainPatrol& o : edit_train_patrols())
+            if (o.army == 1) {
+                patrols += o.task == TASK_PATROL;
+                posts += o.task == TASK_GUARD;
+            }
+    start_trains = static_cast<int>(g_mission.start.size());
+    queue_trains = static_cast<int>(g_mission.factories.queue.size());
+}
+
+bool Arrival::operator==(const Arrival& o) const {
+    return army == o.army && cars == o.cars && x == o.x && y == o.y && z == o.z && entry == o.entry && first == o.first &&
+           every == o.every && times == o.times && cond == o.cond && cond_n == o.cond_n && earlier == o.earlier &&
+           task == o.task && tx == o.tx && ty == o.ty && tz == o.tz && tx2 == o.tx2 && ty2 == o.ty2 && raid == o.raid &&
+           message == o.message;
+}
+
+bool mission_dialog(HWND owner, bool* open_arrivals) {
     using namespace dialog;
     DialogTemplate t(ui_wtext("MissionTitle", "Mission settings").c_str(), 420, 330);
     const DWORD label = SS_LEFT;
@@ -890,10 +1704,19 @@ bool mission_dialog(HWND owner) {
     t.item(BUTTON, ui_wtext("MissionLightning", "Lightning").c_str(), IDC_NUKE, BS_AUTOCHECKBOX | WS_TABSTOP, 222, 24, 50, 12);
     t.item(STATIC, ui_wtext("MissionAttackers", "Enemy attackers at once:").c_str(), -1, label, 290, 26, 90, 8);
     t.item(EDIT, L"", IDC_LIMIT, LINE | ES_NUMBER, 380, 24, 32, 12);
-    t.item(STATIC, ui_wtext("MissionWaves", "Player's reinforcement waves:").c_str(), -1, label, 8, 44, 102, 8);
-    t.item(EDIT, L"", IDC_WAVES, LINE | ES_NUMBER, 112, 42, 24, 12);
-    t.item(STATIC, ui_wtext("MissionTrain", "its train (VIDs, e.g. 5,20):").c_str(), -1, label, 146, 44, 92, 8);
-    t.item(EDIT, L"", IDC_TRAIN, LINE, 238, 42, 174, 12);
+    if (g_arrivals.on) {   // the trains that arrive: the Arrivals panel
+        t.item(STATIC,
+               ui_wide(ui_printf(ui_format("MissionArrivals", "Train arrivals: %u - set in the Arrivals panel (key 0 of the bar)"),
+                                 static_cast<unsigned>(g_arrivals.list.size())))
+                   .c_str(),
+               -1, label, 8, 44, 300, 8);
+        t.item(BUTTON, ui_wtext("MissionOpenArrivals", "Arrivals...").c_str(), IDC_ARRIVALS, BS_PUSHBUTTON | WS_TABSTOP, 332, 42, 80, 12);
+    } else {
+        t.item(STATIC, ui_wtext("MissionWaves", "Player's reinforcement waves:").c_str(), -1, label, 8, 44, 102, 8);
+        t.item(EDIT, L"", IDC_WAVES, LINE | ES_NUMBER, 112, 42, 24, 12);
+        t.item(STATIC, ui_wtext("MissionTrain", "its train (VIDs, e.g. 5,20):").c_str(), -1, label, 146, 44, 92, 8);
+        t.item(EDIT, L"", IDC_TRAIN, LINE, 238, 42, 174, 12);
+    }
     t.item(STATIC,
            ui_wtext("MissionStartTrains", "Enemy trains at the start, one a line: type x y (fights from there), or type "
                                           "x1 y1 x2 y2 (patrols between two rail points; screen coordinates - the Push "
@@ -924,8 +1747,10 @@ bool mission_dialog(HWND owner) {
            -1, label, 8, 294, 404, 16);
     t.item(BUTTON, ui_wtext("ButtonOk", "OK").c_str(), IDOK, BS_DEFPUSHBUTTON | WS_TABSTOP, 304, 312, 50, 14);
     t.item(BUTTON, ui_wtext("ButtonCancel", "Cancel").c_str(), IDCANCEL, BS_PUSHBUTTON | WS_TABSTOP, 362, 312, 50, 14);
+    g_open_arrivals = false;
     const INT_PTR result = DialogBoxIndirectParamW(GetModuleHandleW(nullptr), t.get(), owner, mission_proc, 0);
     if (result == 1) patch::log("mission: settings changed");
+    if (open_arrivals) *open_arrivals = result == 1 && g_open_arrivals;
     return result == 1;
 }
 
@@ -966,13 +1791,55 @@ void mission_save(const std::string& map) {
         if (title) g_mission.title = from_pack(upper(folder_name(map)));
         if (title || ascii_upper(g_mission.header, 32) == "TEMPLATE") g_mission.header = g_mission.title;
     }
-    // the blocks anew; main()'s block keeps the indentation of its marker
-    const std::string indent = lines[b.main_open].substr(0, lines[b.main_open].find_first_not_of(" \t"));
-    std::vector<std::string> out(lines.begin(), lines.begin() + b.open + 1);
-    for (const std::string& line : settings_block(g_mission, map)) out.push_back(line);
-    out.insert(out.end(), lines.begin() + b.close, lines.begin() + b.main_open + 1);
-    for (const std::string& line : push_block(indent)) out.push_back(line);
-    out.insert(out.end(), lines.begin() + b.main_close, lines.end());
+    // the blocks anew: each one's lines after its first marker up to its last (main()'s keep the
+    // indentation of their marker); a map converted to arrivals gets their two blocks, the runner
+    // after header.lgc's line and its call after TrainsTact();
+    auto indent_of = [&](int i) { return lines[i].substr(0, lines[i].find_first_not_of(" \t")); };
+    if (b.arrivals() && !g_arrivals.on) {   // a new map on the template's script (it runs arrivals)
+        g_arrivals.on = true;
+        g_arrivals.waves = g_mission.reinforcements;
+    }
+    // what is written: a script that lost its TrainsTact(); (edited outside the editor) cannot run
+    // the arrivals - they are not written, but the editor keeps them and says so
+    ArrivalsState arrivals = g_arrivals;
+    if (arrivals.on && !b.arrivals() && !(b.header >= 0 && b.trains_tact > b.header)) {
+        patch::log("mission: %s has no TrainsTact(); after header.lgc - its arrivals are not written", script.c_str());
+        edit_message_text("MsgArrivalsNotWritten", "saved without the arrivals, limits and later units: the script has no TrainsTact();");
+        arrivals.on = false;
+    }
+    struct Splice {
+        int after, resume;   // the lines up to `after` stay, then `lines`, then from `resume` on
+        std::vector<std::string> lines;
+    };
+    // the factories as they stand; a deleted one's units are not written
+    Mission written = g_mission;
+    written.factories.unlocks = edit_place_unlocks(g_mission.factories.unlocks);
+    std::vector<Splice> splices = {{b.open, b.close, settings_block(written, arrivals, map)},
+                                   {b.main_open, b.main_close, push_block(indent_of(b.main_open))}};
+    if (arrivals.on) {
+        const std::vector<std::string> runner(std::begin(ARRIVALS_RUNNER), std::end(ARRIVALS_RUNNER));
+        if (b.arrivals()) {
+            splices.push_back({b.arrivals_open, b.arrivals_close, runner});
+            splices.push_back({b.tact_open, b.tact_close, {indent_of(b.tact_open) + "ArrivalsTact();"}});
+        } else {
+            std::vector<std::string> block{ARRIVALS_OPEN};
+            block.insert(block.end(), runner.begin(), runner.end());
+            block.push_back(ARRIVALS_CLOSE);
+            splices.push_back({b.header, b.header + 1, block});
+            const std::string indent = indent_of(b.trains_tact);
+            splices.push_back({b.trains_tact, b.trains_tact + 1, {indent + TACT_OPEN, indent + "ArrivalsTact();", indent + TACT_CLOSE}});
+            patch::log("mission: %s converted to arrivals", script.c_str());
+        }
+    }
+    std::sort(splices.begin(), splices.end(), [](const Splice& a, const Splice& c) { return a.after < c.after; });
+    std::vector<std::string> out;
+    int next = 0;
+    for (const Splice& s : splices) {
+        out.insert(out.end(), lines.begin() + next, lines.begin() + s.after + 1);
+        out.insert(out.end(), s.lines.begin(), s.lines.end());
+        next = s.resume;
+    }
+    out.insert(out.end(), lines.begin() + next, lines.end());
     const char* eol = text.find("\r\n") != std::string::npos ? "\r\n" : "\n";
     std::string data;
     for (size_t i = 0; i < out.size(); ++i) data += out[i] + (i + 1 < out.size() ? eol : "");
@@ -999,7 +1866,7 @@ void mission_save(const std::string& map) {
     write_file(folder + "\\brief.lst", list);
     patch::log("mission: %s written - %u push lines, %u start trains, %u in the queue, %u briefing pages",
                script.c_str(), static_cast<unsigned>(g_lines.size()), static_cast<unsigned>(g_mission.start.size()),
-               static_cast<unsigned>(g_mission.queue.size()), static_cast<unsigned>(pages.size()));
+               static_cast<unsigned>(g_mission.factories.queue.size()), static_cast<unsigned>(pages.size()));
     // maps\<name>\<name>.map: the custom maps page (not the template itself)
     const std::string name = folder_name(map);
     const size_t slash = map.find_last_of('\\'), dot = map.find_last_of('.');
@@ -1009,10 +1876,71 @@ void mission_save(const std::string& map) {
         add_to_custom_list(name, ascii_upper(g_mission.title, 24));
 }
 
+// An arrival of the test file: words key=value - army=0-3, cars=5,20,20, at=x,y,z (the entry),
+// first=, every=, times= (s, s, waves; 0 without end), if=<ArrivalIf number>, n=, earlier=0/1,
+// task=none|attack|forts|guard|patrol|drive, to=x,y,z (its point), to2=x,y (the patrol's second),
+// raid=, msg=0/1.
+static bool arrival_of_line(const std::string& text, Arrival& a) {
+    static const char* const TASKS[] = {"none", "attack", "forts", "guard", "patrol", "drive"};
+    a = Arrival();
+    for (size_t p = 0; p < text.size();) {
+        const size_t e = text.find(' ', p);
+        const std::string word = text.substr(p, e == std::string::npos ? std::string::npos : e - p);
+        p = e == std::string::npos ? text.size() : e + 1;
+        if (word.empty()) continue;
+        const size_t eq = word.find('=');
+        if (eq == std::string::npos) return false;
+        const std::string key = word.substr(0, eq), value = word.substr(eq + 1);
+        std::vector<int> v;
+        for (size_t q = 0; q <= value.size();) {
+            const size_t c = value.find(',', q);
+            v.push_back(to_int(value.substr(q, c == std::string::npos ? std::string::npos : c - q)));
+            if (c == std::string::npos) break;
+            q = c + 1;
+        }
+        auto three = [&](int& x, int& y, int* z) {
+            if (v.size() < 2) return false;
+            x = v[0];
+            y = v[1];
+            if (z) *z = v.size() > 2 ? v[2] : 0;
+            return true;
+        };
+        if (key == "army") a.army = (std::max)(0, (std::min)(3, v[0]));
+        else if (key == "cars") a.cars = v;
+        else if (key == "at") {
+            if (!three(a.x, a.y, &a.z)) return false;
+            a.entry = true;
+        } else if (key == "first") a.first = v[0];
+        else if (key == "every") a.every = v[0];
+        else if (key == "times") a.times = v[0];
+        else if (key == "if") a.cond = (std::max)(0, (std::min)(IF_COUNT - 1, v[0]));
+        else if (key == "n") a.cond_n = v[0];
+        else if (key == "earlier") a.earlier = v[0] != 0;
+        else if (key == "raid") a.raid = v[0];
+        else if (key == "msg") a.message = v[0] != 0;
+        else if (key == "to") {
+            if (!three(a.tx, a.ty, &a.tz)) return false;
+        } else if (key == "to2") {
+            if (!three(a.tx2, a.ty2, nullptr)) return false;
+        } else if (key == "task") {
+            const auto t = std::find_if(std::begin(TASKS), std::end(TASKS), [&](const char* s) { return value == s; });
+            if (t == std::end(TASKS)) return false;
+            a.task = static_cast<int>(t - std::begin(TASKS));
+        } else {
+            return false;
+        }
+    }
+    return a.entry && !a.cars.empty();
+}
+
 // Test mode (editor.cpp's WM_COPYDATA 40042): the settings of a file instead of the dialog - UTF-8
 // lines "key: value" with the keys title, header, money, time (1-4), rain, nuke (0/1), limit,
 // waves, train, start and queue (a line per train), objectives, win, lose and brief ("\n" in a
-// value is a line end, "---" between briefing pages); the keys not given stay as they are.
+// value is a line end, "---" between briefing pages); the keys not given stay as they are. The
+// lines "arrival: ..." (arrival_of_line) replace the map's arrivals and make the map run them
+// ("arrivals: keep" keeps the authors' reinforcement waves, "arrivals:" alone sets them to 0); the
+// lines "limit: army nvid max" and "unlock: x y nvid seconds" (a factory's place on the map) replace
+// its unit limits and the units the factories get later.
 bool mission_settings_from_file(const std::string& path) {
     static const std::map<std::string, int> KEYS = {
         {"title", IDC_TITLE}, {"header", IDC_HEADER}, {"money", IDC_MONEY}, {"time", IDC_TIME},
@@ -1021,9 +1949,58 @@ bool mission_settings_from_file(const std::string& path) {
         {"win", IDC_WIN}, {"lose", IDC_LOSE}, {"brief", IDC_BRIEF}};
     Fields fields = current_fields();
     std::map<int, bool> cleared;
+    ArrivalsState arrivals = g_arrivals;
+    bool arrivals_given = false;
+    FactoryState factories;   // the file's limits and later units replace the map's
+    bool factories_given = false;
+    bool orders_given = false;   // the file's orders replace the map's
     for (const std::string& line : split_lines(read_file(path))) {
         const size_t colon = line.find(':');
         if (colon == std::string::npos) continue;
+        const std::string name = trim(line.substr(0, colon));
+        if (name == "order") {   // order: vid x y drive|patrol|attack|guard [to_x to_y to_z] (a car of the map)
+            const std::vector<std::string> w = words_of(line.substr(colon + 1));
+            static const char* const TASKS[] = {"", "attack", "", "guard", "patrol", "drive"};
+            int task = 0;
+            for (int k = 1; k < 6; ++k)
+                if (w.size() > 3 && w[3] == TASKS[k] && *TASKS[k]) task = k;
+            if (w.size() < 4 || !task) {
+                patch::log("mission test: a wrong order line: %s", line.c_str());
+                return false;
+            }
+            TrainPatrol t{to_int(w[0]), to_int(w[1]), to_int(w[2]), w.size() > 4 ? to_int(w[4]) : 0, w.size() > 5 ? to_int(w[5]) : 0};
+            t.task = task;
+            t.to_z = w.size() > 6 ? to_int(w[6]) : 0;
+            if (!orders_given) g_patrols.clear();
+            orders_given = true;
+            g_patrols.push_back(t);
+            continue;
+        }
+        if (name == "limit" || name == "unlock") {   // limit: army nvid max / unlock: x y nvid seconds
+            std::vector<int> v;
+            for (const std::string& w : words_of(line.substr(colon + 1))) v.push_back(to_int(w));
+            if (v.size() != (name == "limit" ? 3u : 4u)) {
+                patch::log("mission test: a wrong %s line: %s", name.c_str(), line.c_str());
+                return false;
+            }
+            factories_given = true;
+            if (name == "limit") factories.limits.push_back({v[0], v[1], v[2]});
+            else factories.unlocks.push_back({v[0], v[1], v[2], v[3], nullptr});
+            continue;
+        }
+        if (name == "arrivals" || name == "arrival") {
+            if (!arrivals_given) arrivals.list.clear();   // the file's arrivals replace the map's
+            arrivals_given = true;
+            arrivals.on = true;
+            if (name == "arrivals") arrivals.waves = trim(line.substr(colon + 1)) == "keep" ? arrivals.waves : 0;
+            Arrival a;
+            if (name == "arrival" && !arrival_of_line(trim(line.substr(colon + 1)), a)) {
+                patch::log("mission test: a wrong arrival line: %s", line.c_str());
+                return false;
+            }
+            if (name == "arrival") arrivals.list.push_back(a);
+            continue;
+        }
         auto key = KEYS.find(trim(line.substr(0, colon)));
         if (key == KEYS.end()) continue;
         std::string value = trim(line.substr(colon + 1));
@@ -1046,8 +2023,18 @@ bool mission_settings_from_file(const std::string& path) {
         patch::log("mission test: %s", error.c_str());
         return false;
     }
+    if (arrivals.on && !g_arrivals.on && g_arrivals_refusal) {
+        patch::log("mission test: the map cannot run arrivals (reason %d)", g_arrivals_refusal);
+        return false;
+    }
+    if (factories_given) {
+        n.factories.limits = factories.limits;
+        n.factories.unlocks = factories.unlocks;
+    }
     g_mission = n;
-    patch::log("mission test: settings of %s - %u start trains, %u in the queue", path.c_str(),
-               static_cast<unsigned>(n.start.size()), static_cast<unsigned>(n.queue.size()));
+    g_arrivals = arrivals;
+    patch::log("mission test: settings of %s - %u start trains, %u in the queue, %u arrivals", path.c_str(),
+               static_cast<unsigned>(n.start.size()), static_cast<unsigned>(n.factories.queue.size()),
+               static_cast<unsigned>(g_arrivals.list.size()));
     return true;
 }

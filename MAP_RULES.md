@@ -154,8 +154,11 @@ the editor of the game (DEVELOPERS.md "Editor mode", `editor_edit.cpp`) applies 
 - Tested (sandbox): the reinforcement arrives from past the edge; a train sent past the exit
   stops at the edge (x 39).
 - **[editor]** The editor's camera goes 300 px past the edges of the map, so the Track tool lays
-  the main line on out of sight, the reinforcement's point is placed there and the Push line tool
-  picks the entry's and the exit's points there.
+  the main line on out of sight and the Push line tool picks the entry's and the exit's points
+  there. The Arrivals panel's entries are rail points there too (a train is made on the point, at
+  its height); "+ ENTRY LINE" lays the level entry from the entry to the first rail point 50 px
+  inside the map, push_flag 1, with its semaphores (7). Its trains replace the reinforcement's
+  point in new maps.
 
 ## 5. One-way sections (push lines)
 
@@ -183,7 +186,7 @@ not forced to 0.
 
 | VID | Rule | Source |
 |---|---|---|
-| 102 factory | At the dead end of a straight spur (6+ rails in the missions) that meets the line through a Y - a curve pair each way - standing on the track; direction = the way out (0 north, 64 east, 128 south, 192 west); a factory push line (5). The player's factory needs a build list (`items`): the game's 14 factory units, in the order of their hotkeys, are `5 10 20 25 80 85 45 30 35 82 97 90 75 62` (F1-F12, `[`, `]`); the panel shows ten in a row, LocoFix adds a second row for the 11th-20th. **[tool]** rail point within 100 px, build list. **[editor]** a new factory takes the build list of one of the same army on the map, or these 14; a warning without track within 100 px | l02, l05 (spur, Y, 128/0); sandbox test: a built train leaves through the Y |
+| 102 factory | At the dead end of a straight spur (6+ rails in the missions) that meets the line through a Y - a curve pair each way - standing on the track; direction = the way out (0 north, 64 east, 128 south, 192 west); a factory push line (5). The player's factory needs a build list (`items`): the game's 14 factory units, in the order of their hotkeys, are `5 10 20 25 80 85 45 30 35 82 97 90 75 62` (F1-F12, `[`, `]`); the panel shows ten in a row, LocoFix adds a second row for the 11th-20th. **[tool]** rail point within 100 px, build list. **[editor]** a new factory takes the build list of one of the same army on the map, or these 14; a warning without track within 100 px; its panel ticks the list (the game's order), the units it gets later and the player's limits (8). The enemy's AI (army 1 only) ignores the list and builds `level_queue_*`; a neutral or pirate factory builds nothing, and only a neutral one is captured - on an editor map a train of the player's within 100 px of a neutral factory or repair point captures it (the runner's `CaptureTact`; the missions call `LDepoCapture`/`LMasterCapture` themselves) | l02, l05 (spur, Y, 128/0); sandbox test: a built train leaves through the Y |
 | 104 repair point | On a track trains drive through (a loop leg), the gate over the rails, turned along the track (0/128 on vertical track); every end of the loop meets the line through a Y each way; the leg is one way (5). It repairs only the car nearest to it (50 px), so the one-way push line through it matters: the train is pushed through and every car is repaired fully as it passes; a train standing in a repair point without one gets only its nearest car repaired. **[tool]** within 20 px of track | l05; sandbox tests: without a push line the loco 45 -> 150 hp, the wagon behind stayed at 22; with it the loco 45 -> 150 and the wagon 22 -> 75 (full: the player's army has 1.5x hp) |
 | 162 fort | A gate standing on the track (0-6 px in all 20 forts), turned along it (0/128 vertical, 64/192 horizontal, 32/96/160/224 diagonal). Guns (VID 115) on its wall: x +-47, z +92/+93 for 0/128; (-32, -24) and (+33, +23), z +93 for 32/160. It cannot be destroyed (U_OBJECT, maxHp 0); its guns can. **[tool]** within 8 px of track. **[editor]** a new fort comes with its guns at these places (64/192: (0, -33) and (0, +34); 96/224: (-33, +23) and (+33, -24), measured in l16 and l20), they move, turn and go with it; a warning without track within 40 px. Its sockets: below | l10-l20; sandbox test: trains drive through it |
 | 165 mining plant | Not on the track. One gun on its wall, on the side its direction picks (sockets below) | l09, l11, l14, l15, l18 (30) |
@@ -307,6 +310,16 @@ moves or deletes its line and posts.
   no `#ifdef` inside a block (a save writes the block without it). The enemy's trains have no
   object on the map (the AI makes them while the level runs); the editor marks where they start,
   their patrols and the factory that builds them.
+- **[editor]** Train arrivals (the Arrivals panel): arrays `arrival_*[]` and `ARRIVALS` in the
+  first block (a column per arrival; its own cars as `int this_trainNN[]`, a type no template uses,
+  the enemy's posts and patrols as `ATA_STANDn_X/Y` and `ATA_PATROLn_*`), the factories' later
+  units (`UNLOCKS`, `unlock_*[]`, `ACT_ADD_ITEM` at their time) and the unit limits (`UNIT_LIMITS`,
+  `limit_*[]`: `AddUnitLimit(max, nvid, army)` - its arguments are swapped against export.lgc, and
+  the `LIMITxx` defines `InitDefault` reads would set the wrong slot), run by `ArrivalsTact()`
+  of a block `// <editor arrivals>` after `header.lgc` and called from `// <editor tact>` after
+  `TrainsTact();`. The win and loss of the template wait for `ArrivalsLeft(army)`. Limits: the AI
+  has 16 trains (`ai_trains`), 10 patrols and 10 posts for the start trains, the queue and the
+  arrivals together; only army 1 has an AI.
 
 ## 9. Ordering of objects
 

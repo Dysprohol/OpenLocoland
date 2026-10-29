@@ -1417,8 +1417,8 @@ cursor with its key, the undo and redo counts, "not saved" and the last message.
 the way `Text_Draw` writes one: a frame of the font VID per character (its code), the VID's
 width apart. A click on the bar's plates does nothing on the map under them. Its entries: Select
 (1), Delete (2), Track (3, below), the factory 102 (4), the repair point 104 (5), the fort 162 (6, army
-1), All objects (7: the palette, below), a green (8) and a red (9) semaphore 152, the reinforcement point (0,
-VID 5, army 3), and in the strip Delete a section of track (a click on a rail deletes its section,
+1), All objects (7: the palette, below), a green (8) and a red (9) semaphore 152, Train arrivals (0: a
+panel, "Train arrivals" below), and in the strip Delete a section of track (a click on a rail deletes its section,
 as Shift+click with Delete), Decals (below; [ and ] pick which of the 61 decals of `objects.res` -
 read from the file: the editor mode loads them as class 0 -, its slot shows the chosen one's
 palette icon), the Push line tool, Mission
@@ -1601,6 +1601,172 @@ objectives and the money, its trains run, `error.log` has no `R_MAP` or `LOGIC` 
 `MAP_WIN_TEST` the win comes with the map's own text. File > Play the map played it and came
 back to the editor after the end screen. A variant with two trains of the factory's queue (one
 patrolling), night and rain plays without errors too.
+
+**Train arrivals** (`src/LocoFix/editor_arrivals.cpp` the panel, `editor_mission.cpp` the script,
+`editor_edit.cpp` "arrivals on the map"). The missions bring trains from past the edge of the map
+in a few ways: the player's reinforcement - `AddReinforcement()` of `reinforcement.lgc` makes
+`player_reinforcement_train[]` at the place of the army-3 VID 5 locomotive that `ReinforcementInit`
+takes away, at most `PLAYER_REINFORCEMENT` times, each mission calling it every 5 s when the player
+has no locomotive (and, l02-l20, a neutral factory still stands); seven missions really give one
+(l01-l04, l06, l08, l11; l04 sells it for 300) - and the queues of templates of l13 (the player's)
+and l19 (both sides: times, nine entries with their push lines, "fewer than 3 locomotives" bringing
+a train earlier, the enemy's trains given to the AI, the win and loss waiting for the queues).
+`AI_REINFORCEMENT` and the text `EnemyReinforcementArrived` exist and are never used. The editor
+follows l19's way. An **arrival** (`Arrival`, `editor_mission.h`) is the army, the cars, the entry (a
+rail point: screen x, y and its z), the first time, the time between waves and their number (0: no
+end), a condition (`ArrivalIf`: none, the player has no train / fewer than n / fewer units than n /
+no factory, a neutral factory stands, the enemy has fewer than n trains, fewer than n attack, the
+player pays n, the campaign's "no train and a neutral factory") that either gates the time ("only
+then", as l01-l13) or brings the wave earlier ("also earlier", as l19), the task after it (the
+enemy's: `ATA_FIGHT`, `ATA_FIGHT_FORT`, `ATA_STANDn` at a point, `ATA_PATROLn` between two points -
+the AI of `TrainsTact` runs them, only army 1 has one -; ours, the neutrals' and the pirates':
+`ACT_MOVE` to a point on the last car, as the marker's order 33 - "stays", no order, is read from a map but not offered: in play such a train stood behind the entry and held every later arrival at it), the enemy's raids
+(`ai_trains_random_task`) and the message (`ReinforcementArrived` / `EnemyReinforcementArrived` with
+sound 100, the game's own texts).
+
+In the script (`editor_mission.cpp`, "arrivals", has the details): `#define ARRIVALS n`, a train of
+its own cars as `int this_trainNN[]={...,0}` - the authors' way of redefining a template, with a type
+no template has (ones digit 4, 6, 7 or 8; the tens digit the kind the AI treats it as: 1x mortars, 2x
+rockets, 3x airships, 5x flame, 6x landing, 7x the super weapons, 0x the rest; a template's cars as
+they are keep its ATT_ type) -, the posts and patrols (`ATA_STANDn_X/Y`, `ATA_PATROLn_*`, numbered
+after the start trains' and the queue's) before `TrainsTactDeclares.lgc`, the columns
+`arrival_army[]` ... `arrival_last[]` (each with a 0 after the last arrival) after it. The runner is
+the block `// <editor arrivals>` after `header.lgc` - the same text in every map (`ARRIVALS_RUNNER` of
+`editor_mission.cpp` and of `map_tool.py`, kept the same), so an exported map runs in any game -,
+called from the block `// <editor tact>` after main()'s `TrainsTact();`. Once a second `ArrivalTry`
+looks at each arrival: its time and condition; then it waits while a car stands within 180 px of the
+entry (`FindNearestSprite(GETSPRITE_CLASS+B_ENGINE, ...)`, as l13) or the AI has its 16 trains
+(`find_num()`); it makes the cars with `Create(vid, x, y+z, z)` in the army (behave | 1 for the
+other armies, as `StartCreateTrain`), registers the enemy's train in `ai_trains[]` (as l19 and
+`TrainsTact`'s start), gives the others' last car its drive, shows the message and logs `ARRIVAL n
+army a wave w at t s task k slot s` in `error.log`. `ArrivalsLeft(army)` counts the waves still to
+come (those of a gating condition only while it holds); the template's win and loss wait for it. The
+template (`map_tool.py new --script`) has both blocks, no arrivals and no reinforcement waves.
+
+An editor map made before keeps its reinforcement and its blocks until the panel's CONVERT: the new
+blocks are added at the next save (refused with the reason when `main()` has no `TrainsTact();` after
+`header.lgc`), the reinforcement becomes two arrivals at its point (the first wave at the start, the
+others when the player has no train - the old template's "and a factory of its own" is not kept),
+driving where the marker's order 33 sent it, `PLAYER_REINFORCEMENT` becomes 0 and the point
+locomotives go (one step of the history). A campaign mission or the sandbox (no editor blocks) shows
+the reason only. A script edited outside the editor so that it lost `TrainsTact();` is saved without
+the arrivals, unit limits and later units; the editor keeps them and says so in the status line. The marker locomotive's panel (VID 5, army 3) shows what it is in play - "ours arrive
+here" with reinforcement waves, "taken away at the start" without - instead of its parking army 3,
+and opens the Arrivals panel.
+
+**Capturing** on the maps of the editor (`CaptureTact` of the same runner). The campaign captures in
+two ways: a fort or a mining plant by its event handler `F162_0` / `F165_0` (`ai_default_event.lgc`,
+every map has it: a train of another army within 75 px and no gun left within 150 px - none needed
+for a neutral one), and a neutral factory or repair point only by the calls `LDepoCapture` and
+`LMasterCapture` (`Captures.lgc`) that each mission makes in its own `main()` for its one such building
+at a point of its own - so a map made in the editor, with none of them, never captured those two, and
+`LDepoCapture` even takes once "the" factory of army 2 or 0, which on a map with the player's factory
+can be that one. `CaptureTact` turns every neutral factory and repair point to the player when a train
+of the player's comes within 100 px (`PlaySFX(25)`, the flash, `BuildingCapture` with its message, a
+`CAPTURE` line in `error.log`). A repair point taking over the enemy's wagons brought by the player's
+locomotive is the engine's own (`Building_UpdateWorkshop`), on any map. Checked in play: a neutral repair
+point and a neutral factory beside the main line captured as trains passed them, and an enemy wagon in a
+player's train taken over going through the player's repair point. Older editor maps get it with
+CONVERT in the Arrivals panel.
+
+**The trains' orders** (`editor_edit.cpp` "trains", `OrdersTact` of the runner). A train of the map has
+an order in its object panel, kept with its first car in the editor's state (undoable) - the same kinds
+as the arrivals' and the factory queue's: in a map that runs arrivals, ORDERS: NONE, DRIVE TO... and
+PATROL... for ours, the neutrals' and the pirates' trains, NONE, ATTACK, GUARD... and PATROL... for the
+enemy's (its AI: `ATA_FIGHT`, `ATA_STANDn`, `ATA_PATROLn` between where it stands and the point, with a
+train type of its cars); in an older map the patrol alone, as `PatrolEngine` lines in `main()`. The
+block's arrays `ORDERS`, `order_vid/x/y[]` (the first car, as it stands), `order_task[]` (-2 drive, -3
+patrol, an `ATA_` task), `order_type[]`, `order_to_x/y/z[]`; `OrdersTact` runs once at the start (after
+the AI's own start trains took their slots), finds each train with `FindNearestSprite` and logs `ORDER n
+task t train 1 slot k`. A train the AI gets must be armed: a bare locomotive is made a ram (`ATA_CLASH`)
+and waits. Checked in play: the enemy's trains with a gun car went to their post and stayed, patrolled
+between their two points and drove at the player's train to attack it; ours drove to its point and
+patrolled. Test mode: `order: vid x y drive|patrol|attack|guard [to_x to_y to_z]` lines of `M<file>`.
+
+**The panel** (the bar's entry 0, the marker's panel, Mission settings' Arrivals... button, which
+keeps the dialog's settings as OK does) is drawn in editor_panel.cpp's frame: the arrivals' row (1, 2
+... + ADD with its recipes - the player's train at the start, reinforcements as in the campaign,
+bought ones as in l04, enemy waves, a queue as in l19, a plain locomotive -, COPY, DELETE), WHO, TRAIN
+(the palette's icons; a click takes a car away, + CAR opens the Vehicles palette, which adds the car
+picked and goes back; TEMPLATE: the authors' trains of the normal difficulty, the defence trains
+aside - they have no locomotive), FROM (PICK: the next click on the map takes the rail point nearest
+to the cursor, shown in cyan; NEXT: another arrival's entry; + ENTRY LINE: the level entry from the
+entry along the track to the first rail point 50 px inside the map, push_flag 1, with its semaphores
+as the Push line tool's S; "line ok" when a push_flag 1 line of the editor or the script runs from
+it), FIRST / THEN EVERY (steps of 10 s) / TIMES, IF and AS, THEN and its POINT (PICK; a patrol's two
+ends one after the other), RAIDS and MESSAGE, and a line of warnings (no entry, no locomotive first,
+an endless enemy - the map is not won by destroying it -, a task without its point, no entry line, no
+track at the entry) or else the AI's use (the enemy's trains, patrols and posts of 16, 10 and 10).
+Each change is one step of the history (`edit_commit_arrivals`; Ctrl+Z / Ctrl+Y reach it while the
+panel is open). The entries are drawn on the map ("ENTRY n"), the chosen arrival's points too,
+joined to its entry. Test mode: `arrival:` lines of the `M<file>` settings (`arrival_of_line`:
+`army=`, `cars=`, `at=x,y,z`, `first=`, `every=`, `times=`, `if=`, `n=`, `earlier=`, `task=`,
+`to=`, `to2=`, `raid=`, `msg=`).
+
+Checked in play (three test maps on POLIGON's ground and track, scripts in the editor's format with a
+logger of the trains' places every 5 s - the `ARRIVAL` lines of the runner in `error.log`; the maps
+and their generator are kept outside the repository): every arrival came at its time - at the start
+(1 s), at a set time (70 and 90 s), every 45 s three times (70, 115, 160 s), when the player's last
+train was lost (4 s after the enemy destroyed it, never while a train was left), while a neutral
+factory stood, the campaign's "no train and a neutral factory" (and not again once that factory was
+gone), when the player had no factory, when the player had no units (the game counts the cars and the
+guns, `ARMY0_NVID_ARRAY`, not the factory), "also earlier" while the player had fewer than 3 trains
+(at 7 s for a time of 999 s), only when fewer than 1 enemy train attacked, not while the enemy had 2
+trains or more, and the bought one at its time with the money taken; a wave waited while a train
+stood at the entry. After it: the player's, the neutrals' and the pirates' trains drove to their
+points and stopped there (the pirates fired at the player's trains in passing), the enemy's patrolled
+between its two points again and again, went to its post and stayed, and attacked the player's trains;
+the messages showed. Not offered: "stays at the entry" - such a train stood behind the entry line and
+held every later arrival there, so a train of ours, the neutrals or the pirates always drives to a
+point (none picked: no order, and the panel warns); "attacks the forts" (`ATA_FIGHT_FORT` drove at the
+player's base, not at the player's fort beside it) and the raids (no sortie seen); `ARMY_OFFERED`,
+`TASK_OFFERED`, `IF_OFFERED`, `RAIDS_OFFERED` of `editor_arrivals.cpp`. The template's script compiles
+and runs with no arrivals; POLIGON and a copy of it saved on the template (its reinforcement not
+converted) bring the player's train as before (in the player's unit bar); a map's CONVERT turns
+POLIGON's reinforcement into two arrivals of its cars at its entry (with "line ok").
+
+**A factory's build options** (`src/LocoFix/editor_factory.cpp` the panel, `editor_mission.cpp`
+"factories", `editor_edit.cpp` "a factory's panel's side"). How the missions do it: what a factory
+builds is its build list, the `Unit.items` of its SPRD record, in the order of its keys (F1-F12, [
+and ] - `Player_SetPanel`); the campaign grows the player's units mission by mission through these
+lists alone (l02's neutral factory has 5 and 20, l14's player's ten, l15-l20 the super weapons) -
+no script adds or removes an item (`ACT_ADD_ITEM` 54 and `ACT_DELETE_ALL_ITEM` 57 are not called by
+any mission). The enemy's factories have empty lists in 11 of the 13 missions with one: the AI
+(`ai_events.lgc` `DepoFree`, only for a factory of army 1 - the factories of the neutrals and the
+pirates build nothing by themselves; a neutral one is there to be captured, a pirate one is not:
+`Captures.lgc` `LDepoCapture` and the runner's `CaptureTact` take army 2 only) builds with `ACT_BUILD_UNIT`
+commands what `level_queue_*` and the rebuilding of lost start trains ask for, in its first free
+factory, and ignores the list. Unit limits: `InitDefault` would call `AddUnitLimit(0, nvid, LIMITxx)`
+for `#define LIMITxx`, but every one of those defines is commented out in the missions, and the
+function takes its arguments swapped (the first is the limit, the last the slot: 255 the total,
+else the army - `BUGS.md`), so that path would set a limit 0 in the slot LIMITxx; the editor calls
+`AddUnitLimit(max, nvid, army)`, which `Player_CanBuild` checks against the army's units on the map
+and in the factories' queues (with LocoFix fix 14) - a script's `Create` is not limited by it.
+**The panel** (the factory's object panel: FACTORY: WHAT IT BUILDS...): for ours, the neutrals' and
+the pirates' factory the game's 14 factory units as the palette's icons - a click ticks or unticks
+one, the ticked ones keep the game's order and show their key -, and for the unit clicked last IN
+THE LIST: at the start or after a time (steps of 30 s) and AT MOST: the player's limit of it (army 0,
+0 none); a neutral factory says that the AI builds nothing there and the list is what the
+player builds after capturing it, a pirate one that the player captures only neutral factories. For the enemy's factory: that its AI builds the queue in its first
+free factory (only army 1 has an AI) and the queue itself - its trains (1, 2 ... + ADD, DELETE), each
+with its cars (+ CAR, the Vehicles palette, and the templates), NOT BEFORE (its earliest time) and
+THEN (attacks, guards a point - `ATA_STANDn` -, patrols between two points - `ATA_PATROLn`; PICK on
+the map as in the Arrivals panel), the queue Mission settings shows as well (its lines take a train's
+cars as `5+20+20` and a post as `guard x y` now). In the script: the start list stays the factory's
+SPRD items (the map's file), the units it gets later are `UNLOCKS` and `unlock_x/y/vid/time[]` (the
+factory by its place, kept with the factory when it is moved and dropped with it when it is deleted,
+written as it stands at the save) and the limits `UNIT_LIMITS` and `limit_army/vid/max[]`, both in the
+settings' block and run by `FactoryTact` of the arrivals' runner (the limits once at the start; a
+unit `ACT_ADD_ITEM` at its time, logged `UNLOCK vid n at t s` in `error.log`) - so these two need a map
+that runs arrivals (the panel says so and leads to the conversion), while the list and the queue work
+in any editor map. A queue train keeps the type it was read with while its cars are that type's (a
+difficulty's train stays one); a changed one gets a type of the map's own, as the arrivals'. Every
+change is one step of the history (the factory's list is in the editor's state of an object now).
+Test mode: `limit: army nvid max` and `unlock: x y nvid seconds` lines of the `M<file>` settings.
+Checked in play: with a limit of 1 on VID 20, F3 twice queued one and F4 (no limit) twice queued two;
+a unit put into the list at 30 s (`UNLOCK vid 30 at 30 s, factory 1`) was there the next time the
+factory was selected (a factory already selected keeps showing its old list); the keys stay the game's
+own per unit (a list without the airship cart leaves F8 out).
 
 **Ground, gravel bed, decals** (`editor_edit.cpp`, `ground.h`, `ground.cpp`). The strip's Ground height
 tool raises, lowers, flattens or smooths the GRID cells (8 x 8 px) in a circle around the cursor while
@@ -1790,7 +1956,15 @@ applies it as one step of the history, the right button elsewhere closes it. Its
 (ours, enemy, neutral, pirates), turn left / right, for a semaphore its colour and the line at it
 (lets in / keeps out, as L / Shift+L), a row for each socket of a fort, a mining plant or a citadel
 (empty, a tower with a cannon 110, a missile tower 115; the citadel's the pirates' tower 117), and
-delete. A, R, E, T, L and Del stay as the keys for them. A gun goes exactly into its socket (the
+delete. A neutral object (army 2) has two more: IN A FIGHT - no one fires at it on its own
+(`Object_FindTarget` 0x449ea0 takes a target of any other army but army 2, unless the shooter's weapon
+has flag 0x80 or the enemy may hit neutral trains after `SetEnemyCanAttackNeutralTrains`) - and, armed
+(a gun, a fort's guns, a train with a turret), IT FIRES: at all in range or no - its behave's bit 1,
+`BEH_AGGRESSIVE`, set or cleared on its armed members, a step of the history (the editor's object state
+has the behave now). Such a unit fires at the player, the enemy and the pirates alike; the missions'
+neutrals (civil trains and robots) have the bit clear. Checked in play: a neutral missile tower with
+the bit took a player's train from 320 to 15 hp in 60 s and was not fired at by it, one without the bit
+left a train beside it at 450. A, R, E, T, L and Del stay as the keys for them. A gun goes exactly into its socket (the
 missions' offsets, MAP_RULES.md 6), with the host's army (on a citadel of army 0 the enemy's, as in
 the missions) and direction, and follows it. The bar's entry 7, All objects, opens the palette: a
 panel like Help with the groups down the left (meadow, forest, desert, ice, volcanic, swamp, park,
@@ -2006,10 +2180,11 @@ pictures (22 px right of the device's middle, 18 up), the title in the menu titl
 the text in the menu font (VID 2), the page arrows (VIDs 475/476) and the start button (VID 477)
 with "back to the map". **Help** (the ? button or F1) shows the editor's help pages the way the
 game shows its own (`maps\menu4.lst` -> `menu41.txt` ...): `maps\edithelp.lst` lists
-`maps\edithelp1.txt` ... `edithelp12.txt` - the mouse, the keys, the bar, laying track, the mission,
+`maps\edithelp1.txt` ... `edithelp14.txt` - the mouse, the keys, the bar, laying track, the mission,
 the buttons, the object's panel, all objects and decals, trains and rails, water, painting and
-regions, heights, the ground tools' rows - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
-44 characters a line and 14 lines, ESC 7 / ESC 2 switch to the lit font VID 7 and back to VID 2):
+regions, heights, the ground tools' rows, the train arrivals, a factory's panel - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
+44 characters a line - the ESC pairs not counted, so a line with lit words is longer in the file - and 14
+lines, ESC 7 / ESC 2 switch to the lit font VID 7 and back to VID 2):
 English in `game/maps/` (the fallback of every pack) and the others in `lang/<code>/game/editor/`; the files are
 opened through the game's own `CreateFileA` import, so the chosen pack's copies are read. **Menu**
 has a row per command - the lamp of the custom maps page (VID 472, pulsing under the mouse) and the
