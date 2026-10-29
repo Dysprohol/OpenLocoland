@@ -7,9 +7,11 @@ tools/release.py (PyInstaller, one file).
               [--game-lang <code>] [--no-shortcuts] [--lang <code>]
         installs without the window: the log goes to install.log in the install folder and
         the exit code is 0 when it worked (scripted installs, tests)
-    Setup.exe --auto [--steam <folder>] [--target <folder>]
+    Setup.exe --auto [--steam <folder>] [--target <folder>] [--no-shortcuts]
         the window, which installs at once with what it shows and closes at the end, its log
         in install.log (tests of the window itself)
+    --captured <folder> (with any of them) keeps the language captures there instead (tests:
+        a folder with only some languages; Uninstall leaves it)
 
 It finds the player's Steam copy of Locoland (Steam's registry key, its libraries in
 steamapps\libraryfolders.vdf, or a folder chosen by hand), proposes an install folder of its
@@ -19,8 +21,10 @@ is in the installer, the game is assembled from the player's files on their mach
 logo of the window's header is our own OpenLocoland wordmark (the game's, read from the Steam
 copy, only without it). The language
 captures go to %LOCALAPPDATA%\OpenLocoland\captured; every language Steam has (the installed
-one and the depots downloaded next to it) is captured, and the game languages offered are those
-with a capture and a pack in lang\<code>\.
+one and the depots downloaded next to it) is captured. The game language list shows every pack
+of lang\<code>\: those with a capture (a fan translation, base= another language: any capture,
+see languages.build_base) can be chosen, the others are greyed with the Steam console line that
+gets their language; fan translations are marked unofficial.
 
 The window is in English unless another of its languages is picked; a new install sets the
 game's language to English (when that pack can be built) or the one picked. Running it again
@@ -54,7 +58,8 @@ APP = "OpenLocoland"
 MANIFEST = "OpenLocoland.json"
 SETTINGS_KEY = r"SOFTWARE\Gromada\Locoland"   # RegPath of Locoland.cfg: LocoFix's settings too
 DEFAULT_TARGET = os.path.join(os.environ.get("USERPROFILE", os.path.expanduser("~")), "Games", APP)
-CAPTURED = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), APP, "captured")
+DEFAULT_CAPTURED = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), APP, "captured")
+CAPTURED = DEFAULT_CAPTURED   # --captured <folder> for tests
 EDITOR_MAP = r"maps\template\template.map"   # what the menu's "EDYTOR MAP" opens
 DEFAULT_GAME_LANGUAGE = "en"
 languages.CAPTURED = CAPTURED   # languages.available() and build() look there
@@ -88,6 +93,10 @@ TEXTS = {
                   "language you want, wait until Steam has downloaded it and run Setup again:",
         "depots_local": "The game's other languages are not found (no Steam depots in skip-verify mode):",
         "no_language": "No language of the game can be built - is Locoland installed through Steam?",
+        "unofficial": "(unofficial)",
+        "needs_depot": "needs the Steam depot: {line}",
+        "needs_files": "needs the files of {base}: {line}",
+        "not_found": "not found in the game folder",
         "options": "Options (they can be changed later in the game's launcher window)",
         "cheats": "Cheats (developer keys: h, W, B, A, K, M, #, x)",
         "unlock": "All missions unlocked (your progress stays as it is)",
@@ -138,6 +147,11 @@ TEXTS = {
                   "Zeile jeder gewünschten Sprache ein, warte, bis Steam sie heruntergeladen hat, und starte "
                   "Setup erneut:",
         "no_language": "Keine Sprache des Spiels kann erstellt werden - ist Locoland über Steam installiert?",
+        "depots_local": "Die weiteren Sprachen des Spiels wurden nicht gefunden (ohne Versionsprüfung keine Steam-Depots):",
+        "unofficial": "(inoffiziell)",
+        "needs_depot": "braucht das Steam-Depot: {line}",
+        "needs_files": "braucht die Dateien von {base}: {line}",
+        "not_found": "nicht im Spielordner gefunden",
         "options": "Optionen (später im Startfenster des Spiels änderbar)",
         "cheats": "Cheats (Entwicklertasten: h, W, B, A, K, M, #, x)",
         "unlock": "Alle Missionen freigeschaltet (dein Fortschritt bleibt erhalten)",
@@ -187,6 +201,11 @@ TEXTS = {
                   "steam://open/console címet a böngészőbe vagy a Win+R ablakba), add meg a kívánt nyelvek "
                   "sorát, várd meg, amíg a Steam letölti, és futtasd újra a telepítőt:",
         "no_language": "A játék egyik nyelve sem építhető fel - a Locoland a Steamen keresztül van telepítve?",
+        "depots_local": "A játék további nyelvei nem találhatók (verzióellenőrzés nélkül nincsenek Steam depotok):",
+        "unofficial": "(nem hivatalos)",
+        "needs_depot": "a Steam depot kell hozzá: {line}",
+        "needs_files": "{base} fájljai kellenek hozzá: {line}",
+        "not_found": "nincs a játék mappájában",
         "options": "Beállítások (később a játék indítóablakában is módosíthatók)",
         "cheats": "Csalások (fejlesztői billentyűk: h, W, B, A, K, M, #, x)",
         "unlock": "Minden küldetés elérhető (az előrehaladásod nem változik)",
@@ -236,6 +255,11 @@ TEXTS = {
                   "w pasku adresu przeglądarki albo w Win+R), wpisz wiersz każdego potrzebnego języka, poczekaj, "
                   "aż Steam go pobierze, i uruchom instalator ponownie:",
         "no_language": "Nie da się zbudować żadnego języka gry - czy Locoland jest zainstalowany przez Steam?",
+        "depots_local": "Pozostałych języków gry nie znaleziono (bez weryfikacji wersji nie ma depotów Steama):",
+        "unofficial": "(nieoficjalne)",
+        "needs_depot": "wymaga depotu Steama: {line}",
+        "needs_files": "wymaga plików wersji {base}: {line}",
+        "not_found": "nie ma w folderze gry",
         "options": "Opcje (można je później zmienić w oknie startowym gry)",
         "cheats": "Kody (klawisze twórców: h, W, B, A, K, M, #, x)",
         "unlock": "Wszystkie misje odblokowane (Twoje postępy pozostają bez zmian)",
@@ -285,6 +309,11 @@ TEXTS = {
                   "steam://open/console na barra de endereços do navegador ou em Win+R), introduz a linha de "
                   "cada idioma que queres, espera que o Steam o descarregue e executa o Setup de novo:",
         "no_language": "Nenhum idioma do jogo pode ser criado - o Locoland está instalado através do Steam?",
+        "depots_local": "Os outros idiomas do jogo não foram encontrados (sem verificação de versão não há depots do Steam):",
+        "unofficial": "(não oficial)",
+        "needs_depot": "precisa do depot do Steam: {line}",
+        "needs_files": "precisa dos ficheiros de {base}: {line}",
+        "not_found": "não encontrado na pasta do jogo",
         "options": "Opções (podem ser alteradas mais tarde na janela inicial do jogo)",
         "cheats": "Batotas (teclas de programador: h, W, B, A, K, M, #, x)",
         "unlock": "Todas as missões desbloqueadas (o teu progresso fica como está)",
@@ -334,6 +363,11 @@ TEXTS = {
                   "steam://open/console в адресную строку браузера или в Win+R), введите строку каждого "
                   "нужного языка, дождитесь, пока Steam его скачает, и запустите установку снова:",
         "no_language": "Ни один язык игры не может быть собран - установлена ли Locoland через Steam?",
+        "depots_local": "Другие языки игры не найдены (без проверки версии депотов Steam нет):",
+        "unofficial": "(неофициальный)",
+        "needs_depot": "нужен депот Steam: {line}",
+        "needs_files": "нужны файлы версии {base}: {line}",
+        "not_found": "нет в папке игры",
         "options": "Параметры (их можно изменить позже в окне запуска игры)",
         "cheats": "Читы (клавиши разработчиков: h, W, B, A, K, M, #, x)",
         "unlock": "Все миссии открыты (ваш прогресс не меняется)",
@@ -383,6 +417,11 @@ TEXTS = {
                   "do adresního řádku prohlížeče nebo do Win+R), zadej řádek každého jazyka, který chceš, "
                   "počkej, až ho Steam stáhne, a spusť instalaci znovu:",
         "no_language": "Nelze sestavit žádný jazyk hry - je Locoland nainstalován přes Steam?",
+        "depots_local": "Další jazyky hry nebyly nalezeny (bez kontroly verze nejsou depoty Steamu):",
+        "unofficial": "(neoficiální)",
+        "needs_depot": "vyžaduje depot Steamu: {line}",
+        "needs_files": "vyžaduje soubory verze {base}: {line}",
+        "not_found": "není ve složce hry",
         "options": "Volby (lze je později změnit v úvodním okně hry)",
         "cheats": "Cheaty (klávesy vývojářů: h, W, B, A, K, M, #, x)",
         "unlock": "Všechny mise odemčené (tvůj postup zůstane, jak je)",
@@ -537,22 +576,34 @@ def pack_base(code):
 
 def game_languages(steam, skip_verify=False):
     """(buildable, missing): the codes of the packs of lang\\ that can be built from the captures
-    and Steam's languages, and of those whose language Steam still has to download.
-    If skip_verify=True (for CD/beta-demo), also look for languages in the game folder."""
+    and Steam's languages, and of those whose language Steam still has to download. A fan
+    translation is built on any captured language when its own base is not there
+    (languages.build_base). If skip_verify=True (for CD/beta-demo), also look for languages in
+    the game folder."""
     packs = languages.packs()
     have = languages.available(steam, local=skip_verify) if is_game(steam) else set()
-    return [c for c in packs if pack_base(c) in have], [c for c in packs if pack_base(c) not in have]
+    buildable = [c for c in packs if languages.build_base(c, have)]
+    return buildable, [c for c in packs if c not in buildable]
+
+
+def is_fan_pack(code):
+    return hasattr(languages, "fan_pack") and languages.fan_pack(code)
+
+
+def depot_line(code):
+    """The Steam console line of the language a pack needs (its base's for a translation), or None."""
+    depot = {c: d for d, c in languages.DEPOT_LANGUAGES.items()}.get(pack_base(code))
+    return f"download_depot {languages.STEAM_APP_ID} {depot}" if depot else None
 
 
 def depot_lines(codes):
     """The Steam console line of each pack's language (its base's for a translation), once each."""
-    depots = {code: depot for depot, code in languages.DEPOT_LANGUAGES.items()}
     lines, seen = [], set()
     for c in codes:
         base = pack_base(c)
-        if base in depots and base not in seen:
+        if depot_line(c) and base not in seen:
             seen.add(base)
-            lines.append(f"    download_depot {languages.STEAM_APP_ID} {depots[base]}    {pack_name(base)}")
+            lines.append(f"    {depot_line(c)}    {pack_name(base)}")
     return lines
 
 
@@ -782,7 +833,7 @@ class LogWriter:
 
 
 class Installer:
-    def __init__(self, root, steam=None, target=None, auto=False):
+    def __init__(self, root, steam=None, target=None, auto=False, shortcuts=True):
         self.root = root
         self.lang = first_ui_language()
         self.version = version()
@@ -801,13 +852,16 @@ class Installer:
         self.cheats = tk.BooleanVar(value=read_option("Cheats"))
         self.unlock = tk.BooleanVar(value=read_option("UnlockMissions"))
         self.skip_verify = tk.BooleanVar(value=False)
-        self.desktop = tk.BooleanVar(value=True)
-        self.start_menu = tk.BooleanVar(value=True)
+        self.desktop = tk.BooleanVar(value=shortcuts)
+        self.start_menu = tk.BooleanVar(value=shortcuts)
         self.ui_language = tk.StringVar(value=TEXTS[self.lang]["name"])
-        self.game_language = tk.StringVar()
+        self.game_language = tk.StringVar()        # the list's text: the chosen pack's name
+        self.game_language_code = tk.StringVar()   # its code
         self.layout()
+        self.game_language_code.trace_add("write", lambda *_: self.show_game_language())
         self.target.trace_add("write", lambda *_: self.target_changed())
         self.steam.trace_add("write", lambda *_: self.steam_changed())
+        self.skip_verify.trace_add("write", lambda *_: self.steam_changed())
         self.steam_changed()
         self.root.after(100, self.poll)
         if auto:
@@ -866,7 +920,10 @@ class Installer:
         w["game_language"].grid(row=3, column=0, sticky="w", pady=(4, 0))
         row = ttk.Frame(frame)
         row.grid(row=3, column=1, columnspan=2, sticky="ew", padx=6, pady=(4, 0))
-        w["game_language_choice"] = ttk.Combobox(row, textvariable=self.game_language, state="readonly", width=14)
+        # a menu, not a combobox: the languages that cannot be built are listed greyed, with why
+        w["game_language_choice"] = ttk.Menubutton(row, textvariable=self.game_language, width=24)
+        w["game_language_menu"] = tk.Menu(w["game_language_choice"], tearoff=False)
+        w["game_language_choice"]["menu"] = w["game_language_menu"]
         w["game_language_choice"].grid(row=0, column=0, sticky="w")
         w["more_languages"] = ttk.Label(row)
         w["more_languages"].grid(row=0, column=1, sticky="w", padx=(10, 0))
@@ -915,6 +972,7 @@ class Installer:
         w["browse_target"].configure(text=self.t("browse"))
         for key in ["uninstall", "run", "close"]:
             w["button_" + key].configure(text=self.t(key))
+        self.fill_language_menu()
         self.refresh()
         self.show_language_note()
 
@@ -975,7 +1033,6 @@ class Installer:
             else:
                 self.show_header_text()
         self.buildable, self.missing = game_languages(steam, skip_verify=self.skip_verify.get())
-        self.widgets["game_language_choice"].configure(values=[pack_name(c) for c in self.buildable])
         self.target_changed()
         self.apply_texts()
 
@@ -983,8 +1040,34 @@ class Installer:
         """An install there or not: the game language shown first is the saved one or English."""
         target = self.target.get().strip()
         self.first_language = first_game_language(self.buildable, bool(target) and read_manifest(target) is not None)
-        self.game_language.set(pack_name(self.first_language) if self.first_language else "")
+        self.game_language_code.set(self.first_language or "")
         self.refresh()
+
+    def language_label(self, code):
+        return pack_name(code) + (" " + self.t("unofficial") if is_fan_pack(code) else "")
+
+    def language_reason(self, code):
+        """Why a pack cannot be built, and what to do about it."""
+        if self.skip_verify.get() or not depot_line(code):
+            return self.t("not_found")
+        if is_fan_pack(code):   # a translation that needs its own base (needs_base=1) or no capture at all
+            return self.t("needs_files", base=pack_name(pack_base(code)), line=depot_line(code))
+        return self.t("needs_depot", line=depot_line(code))
+
+    def fill_language_menu(self):
+        """Every pack of lang\\: the ones that can be built to choose, the others greyed with the reason."""
+        menu = self.widgets["game_language_menu"]
+        menu.delete(0, "end")
+        for code in sorted(self.buildable + self.missing):
+            can = code in self.buildable
+            menu.add_radiobutton(label=self.language_label(code), variable=self.game_language_code, value=code,
+                                 state="normal" if can else "disabled",
+                                 accelerator="" if can else self.language_reason(code))
+        self.show_game_language()
+
+    def show_game_language(self):
+        code = self.game_language_code.get()
+        self.game_language.set(self.language_label(code) if code else "")
 
     def show_language_note(self):
         """The log starts with how to get the game's other languages from Steam."""
@@ -993,7 +1076,7 @@ class Installer:
             lines.append(self.t("no_language"))
         if self.missing:
             if self.skip_verify.get():
-                lines += [self.t("depots_local"), ""] + [f"  {pack_name(c)} (ensure files in game folder)" for c in self.missing]
+                lines += [self.t("depots_local"), ""] + [f"  {self.language_label(c)}" for c in self.missing]
             else:
                 lines += [self.t("depots"), ""] + depot_lines(self.missing)
         if not self.busy and self.progress["value"] == 0:
@@ -1003,8 +1086,8 @@ class Installer:
             self.log.configure(state="disabled")
 
     def chosen_game_language(self):
-        name = self.game_language.get()
-        return next((c for c in self.buildable if pack_name(c) == name), None)
+        code = self.game_language_code.get()
+        return code if code in self.buildable else None
 
     def refresh(self):
         """Install or Update, and whether Uninstall and Play can be used, by the install folder."""
@@ -1127,7 +1210,8 @@ class Installer:
             return
         remove_shortcuts(manifest)
         shutil.rmtree(target, ignore_errors=True)
-        shutil.rmtree(os.path.dirname(CAPTURED), ignore_errors=True)
+        if CAPTURED == DEFAULT_CAPTURED:   # a folder given with --captured stays
+            shutil.rmtree(os.path.dirname(CAPTURED), ignore_errors=True)
         self.say(self.t("uninstalled", path=target) + "\n")
         self.refresh()
 
@@ -1209,11 +1293,16 @@ def main():
     p.add_argument("--cheats", choices=["0", "1"], help="the option (default: as it is in the registry)")
     p.add_argument("--unlock", choices=["0", "1"], help="the option (default: as it is in the registry)")
     p.add_argument("--game-lang", help="the game's language (default for a new install: the system's if there is a pack, else English; kept on an update)")
-    p.add_argument("--no-shortcuts", action="store_true")
+    p.add_argument("--no-shortcuts", action="store_true", help="no shortcuts (the window: both boxes unticked)")
     p.add_argument("--lang", choices=codes, help="the language of the shortcuts' names (default: the system's, else en)")
     p.add_argument("--skip-verify", action="store_true",
                    help="skip Steam.exe version verification (for CD/beta-demo exes; may break patches)")
+    p.add_argument("--captured", help="the folder of the language captures (default: " + DEFAULT_CAPTURED +
+                   "; tests: a folder with only some languages)")
     a = p.parse_args()
+    if a.captured:
+        global CAPTURED
+        CAPTURED = languages.CAPTURED = os.path.abspath(a.captured)
     if a.silent:
         a.cheats = a.cheats or ("1" if read_option("Cheats") else "0")
         a.unlock = a.unlock or ("1" if read_option("UnlockMissions") else "0")
@@ -1222,7 +1311,7 @@ def main():
     icon = os.path.join(BUNDLE or os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon"), "openlocoland.ico")
     if os.path.exists(icon):
         root.iconbitmap(default=icon)
-    window = Installer(root, a.steam, a.target, a.auto)
+    window = Installer(root, a.steam, a.target, a.auto, not a.no_shortcuts)
     root.mainloop()
     if a.auto:
         sys.exit(0 if window.result else 1)

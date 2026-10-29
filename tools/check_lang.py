@@ -144,7 +144,48 @@ def texts(code):
     return out
 
 
+def ini_values(path):
+    """{(section, key): value bytes} of a strings.ini."""
+    out, section = {}, ""
+    for raw in open(path, "rb").read().splitlines():
+        line = raw.strip()
+        if line.startswith(b"["):
+            section = line.strip(b"[]").decode("ascii", "replace")
+        elif b"=" in line and not line.startswith(b";"):
+            key, value = line.split(b"=", 1)
+            out[(section, key.strip().decode("ascii", "replace"))] = value
+    return out
+
+
+def left_to_base(code, captured, bases):
+    """The keys of strings.ini a fan translation leaves to its base whose value differs between
+    the captured languages: on another base (languages.build_base) they would read otherwise."""
+    folder = os.path.join(REPO, "lang", code)
+    ours = {}
+    for rel, path in languages.pack_files(code):
+        if path.lower() == "strings.override.ini":
+            ours = ini_values(os.path.join(folder, rel))
+    values = [ini_values(path) for path in (find_file(os.path.join(captured, c), "strings.ini") for c in bases) if path]
+    keys = set().union(*values) if values else set()
+    return sorted(k for k in keys if k not in ours and len({v.get(k) for v in values}) > 1)
+
+
 def check(code, captured, font_code=None):
+    """A pack's texts against its fonts; a fan translation, which may be built on any captured
+    language (languages.build_base), against the fonts of each and for keys left to its base."""
+    if font_code or not languages.fan_pack(code) or languages.needs_base(code):
+        return check_fonts(code, captured, font_code)
+    bases = [c for c in languages.FALLBACK_BASES if os.path.isdir(os.path.join(captured, c))]
+    ok = all([check_fonts(code, captured, base if base != languages.pack_base(code) else None, False)
+              for base in bases or [languages.pack_base(code)]])
+    keys = left_to_base(code, captured, bases)
+    if keys:
+        print(f"  {len(keys)} key(s) of strings.ini left to the base differ between the captured languages "
+              f"(set them in strings.override.ini), e.g. [{keys[0][0]}] {keys[0][1]}")
+    return ok and not keys
+
+
+def check_fonts(code, captured, font_code=None, depot_note=True):
     cp = codepage(code)
     problems = []
     items = texts(code)
@@ -188,7 +229,7 @@ def check(code, captured, font_code=None):
     else:
         status = f"checked with the fonts of {font_code}" if font_code else "fonts checked"
     print(f"{code}: code page {cp}, {len(items)} texts, {status}")
-    if len(fonts) != len(FONT_FILES) or font_code:
+    if depot_note and (len(fonts) != len(FONT_FILES) or font_code):
         depot = {v: k for k, v in languages.DEPOT_LANGUAGES.items()}.get(languages.pack_base(code))
         if depot:
             print(f"  the fonts come with the depot: download_depot {languages.STEAM_APP_ID} {depot}, then build.py")

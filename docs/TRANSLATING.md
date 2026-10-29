@@ -7,7 +7,8 @@ The repository holds only our work: the texts we add or change. Everything else 
 language comes from the player's own Steam copy - `build.py` (and the installer) capture
 each language Steam has into `captured/<code>/` and assemble a pack from that capture with
 the files of `lang/<code>/` over it, into `<game>\lang\<code>\`. The game's window, the
-launcher and the editor then read the chosen pack first and fall back to the English root.
+launcher and the editor then read the chosen pack first and fall back to the root (English, or
+the Steam language when there is no English capture).
 
 The installer's own window texts are not part of a pack: they are in `TEXTS` of
 `tools/installer.py`.
@@ -55,7 +56,8 @@ Packs now: `cs` (Czech fan translation, `base=en`), `de`, `en`, `hu`, `pl`, `ru`
    [launcher]
    full_screen=...
    ```
-   Copy the `[launcher]` keys from an existing pack (e.g. `lang/en/language.ini`).
+   Copy the `[launcher]` keys from an existing pack (e.g. `lang/en/language.ini`); `unofficial=`
+   is the mark the launcher puts after a fan translation's name in this language.
 3. Translate the files under `game/`, and delete the ones you do not translate - a file of the
    pack replaces the captured one, so a placeholder left in would be shown in the game.
 4. Check and build (see below).
@@ -98,6 +100,28 @@ use them yet, so a pack's texts must stay within the letters its base's fonts ha
 pack is written without diacritics for that reason).
 
 
+## A fan translation on another base
+
+A pack with `base=` another language is a fan translation: the launcher and Setup mark it
+"(unofficial)". Many players have only one Steam language, so when its base is not captured
+`build.py` builds it on another captured language (`languages.build_base`: en, pt, de, pl, hu,
+ru, the first there is) - the Czech pack on the Polish files for a player with the Polish Steam
+copy. Then:
+
+- the fonts and the logo are that language's: keep the texts ASCII, which every font set draws
+  (`check_lang.py` checks a fan pack with each captured font set);
+- the files the pack does not have come from that language: for Czech these are `menu2.txt` and
+  `menu3.txt` (empty in every version), `shiftb.txt` (English in every version) and the Polish
+  version's empty `l08\brief2.txt` and `l15\brief2.txt` - nothing of the base's language shows;
+- `strings.ini` is that language's under the pack's `strings.override.ini`, and the versions
+  differ in more than the words: Polish leaves keys empty that English fills with references
+  such as `MenuGamer={strings:HeadPlayerName}:`. Set every such key in the override;
+  `check_lang.py` lists those the pack leaves to its base.
+
+A pack that really needs its base's files (letters only those fonts have) says `needs_base=1` in
+`[language]`; Setup then lists it greyed with that language's `download_depot` line.
+
+
 ## Checking a translation
 
 ```bash
@@ -127,4 +151,4 @@ The game does not wrap lines, so check the long ones on screen.
 | pl   | Polish     | 1250      | 352134           |
 | pt   | Portuguese | 1252      | 352135 (the English files; no pack) |
 | ru   | Russian    | 1251      | 352136           |
-| cs   | Czech      | 1250      | none (fan translation, `base=en`) |
+| cs   | Czech      | 1250      | none (fan translation, `base=en`; any captured language without it) |

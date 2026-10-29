@@ -121,8 +121,9 @@ Portugal is listed with exactly the size of 352131 English - 551,618,874 bytes o
 until that is checked.) Steam
 puts them in `steamapps\content\app_352130\depot_<id>\`. `build.py` captures the language
 files of the installed game and of every downloaded depot into `captured/<code>/` (outside
-git) and assembles the packs that have a capture; the others are skipped with the command
-to download them. The depot folders can be deleted after the build; keep `captured/`. A
+git) and assembles the packs that have a capture (a fan translation such as Czech: its base's,
+else any captured language - "Czech" below); the others are skipped with the command to
+download them. The depot folders can be deleted after the build; keep `captured/`. A
 checkout without `captured/` (a new worktree) uses the installer's captures in
 `%LOCALAPPDATA%\OpenLocoland\captured` when there are any (`languages.CAPTURED`); `--captured`
 of `build.py` and `check_lang.py` names another folder.
@@ -246,18 +247,34 @@ the editor's help pages in `game/maps/`) are English. Our own keys fall back to 
 given in the code: the editor's (`[Editor]`) to the English of `ui_text("PanelNew", "NEW MAP")`
 in LocoFix, and the keys our scripts add (the custom maps page's `MenuCustomEditor`,
 `MenuBackToEditor` ...) to the English in the script (`if(s=="") s="MAP EDITOR";`). And LocoFix
-takes the English pack for a saved language without a pack.
+takes the English pack for a saved language without a pack, or without an English pack the pack
+of the root's language - the one `build.py` writes into `lang\root.txt`: `en`, or with no English
+capture the language Steam installed.
 With no saved choice it follows the system language when there is a pack for it (Polish,
 German, Hungarian, Russian, Czech), otherwise English; a saved choice is kept, and the launcher's
 list switches it. Portuguese has no pack: its Steam depot is byte for byte the English one, so a
 Portuguese system gets English.
 
 **Czech** is a seventh language that Steam does not ship: the Czech fan translation (unofficial)
-of the English version - `strings.ini`, the menus' and the missions' texts; it has no
-`maps\menu2.txt`, `menu3.txt`, `shiftb.txt` or `l08\brief2.txt`, which stay English. A pack
-like it names its base in `language.ini` (`base=en` in `[language]`, `languages.pack_base`):
-`build.py` assembles it from that language's capture with `lang/cs/` over it, and the installer
-offers it when the base is captured. `lang/cs/game/` holds the fan translation's texts converted
+of the English version - `strings.ini`, the menus' and the missions' texts. A pack like it names
+its base in `language.ini` (`base=en` in `[language]`, `languages.pack_base`) and is marked
+unofficial in the launcher's and Setup's lists (`[launcher] unofficial=` of the chosen language,
+Setup's `TEXTS`): `build.py` assembles it from that language's capture with `lang/cs/` over it -
+or, when the base is not captured (a player with the Polish Steam copy only), from another
+captured language (`languages.build_base`: en, pt, de, pl, hu, ru, the first there is), with a
+line in the build's log; `needs_base=1` in `[language]` would keep a pack to its own base, and
+Setup would then list it greyed with that base's `download_depot` line. On another base the
+fonts and the logo are that language's (ASCII draws the same with all of them; `check_lang.py`
+checks a fan pack with every captured font set) and so are the files the pack does not have:
+`maps\menu2.txt` and `menu3.txt` (empty in every version), `shiftb.txt` (the developer keys'
+help, English in every version) and `l08\brief2.txt` / `l15\brief2.txt` (empty, only the Polish
+version has them) - none shows anything of the base's language. What differs is `strings.ini`:
+the Polish one leaves 80 keys empty that the English one fills with references
+(`MenuGamer={strings:HeadPlayerName}:`, the tooltips `MenuVid455Dir*`, `MenuVid468Dir*`, units
+`117={Units:115}` ...) or has other words (`MenuVid471Dir0=Zadania`), and German, Hungarian and
+Russian a few too, so `strings.override.ini` sets all of these to the English values (84 keys)
+and the pack reads the same on any base; `check_lang.py` reports such keys a fan pack leaves to
+its base. `lang/cs/game/` holds the fan translation's texts converted
 to what the game reads (ASCII, CRLF; it was UTF-8 with two files in CP1250, and its few Czech
 letters, dashes and a Cyrillic O are written without marks: the English fonts it is drawn with
 have Cyrillic in 0xC0-0xFF and no Czech letters, so `check_lang.py` would flag them), and
@@ -2565,7 +2582,10 @@ mode above) are not tested in full screen.
      gets a language list next to the full screen box, which switches the launcher labels
      (`[launcher]` in `language.ini`) and is saved in the registry (`Language` next to the
      game's settings); without a saved choice the system language is used if there is a pack,
-     and a saved language without a pack (a depot not downloaded) falls back to English,
+     and a saved language without a pack (a depot not downloaded) falls back to English, or
+     without it to the root's language (`lang\root.txt`); the list is owner-drawn so that the
+     open list can add the unofficial mark after a fan translation's name (`base=` another
+     language) while the narrow closed box shows the name only,
   9. objects and shadows across the whole screen (`view_culling.cpp`): before drawing, the
      engine skips objects outside a fixed box around the screen centre (x +-1024, y +-512;
      for shadows x +-512, y +-512), so at 1920x1080 shadows ended 512 pixels left and right
@@ -3043,11 +3063,16 @@ version, the Steam folder, the captures' folder and the shortcuts, so an update 
 removes the old ones). The language captures go to `%LOCALAPPDATA%\OpenLocoland\captured`
 (`build.py --captured`), not into a repository: the language Steam installed and every depot
 downloaded with `download_depot` (`languages.downloaded_depots`: `steamapps\content\app_352130`
-of the game's library and of Steam's own folder, where the console puts them). The game
-languages offered are the packs of `lang\` whose language is captured or can be captured
-(`languages.available`) - for a translation Steam does not ship, the language its `language.ini`
-names as `base=` in `[language]` (Czech on the English files) - so a pack added to `lang\<code>\`
-is picked up by the next release; for the others the log shows their `download_depot` lines. Steam's Portuguese depot is the English
+of the game's library and of Steam's own folder, where the console puts them). The "Game
+language" list (a menu, so entries can be greyed) shows every pack of `lang\`: those whose
+language is captured or can be captured (`languages.available`) can be chosen - a translation
+Steam does not ship (Czech) on its `base=` or, without it, on any captured language
+(`languages.build_base`) -, the others are greyed with the reason beside them ("needs the Steam
+depot: download_depot 352130 352132"; for a fan pack with `needs_base=1` "needs the files of
+English: ..."), fan translations carry "(unofficial)" in the window's language, and the log
+below keeps the `download_depot` lines. So a pack added to `lang\<code>\` is picked up by the
+next release. `--captured <folder>` keeps the captures in another folder (tests with only some
+languages; Uninstall leaves that folder). Steam's Portuguese depot is the English
 game byte for byte (checked on the captures), so it is captured but has no pack. The window
 itself has its texts in the languages of `TEXTS` (Steam's six and Czech; the list is made from it,
 English first, and the system's display language picks the first one), and its header is our own
@@ -3059,7 +3084,7 @@ which says "Steamland" - and before a game is found it is the project's name in 
 <folder>] [--cheats 0|1] [--unlock 0|1] [--game-lang <code>] [--no-shortcuts] [--lang <code>]`
 (`--lang` picks the language of the shortcuts' descriptions; both default as in the window) does the same without
 the window, with its log in `install.log` of the install folder and exit code 0 when it worked;
-`Setup.exe --auto [--target <folder>]` opens the window, which installs at once with what it
+`Setup.exe --auto [--target <folder>] [--no-shortcuts]` opens the window, which installs at once with what it
 shows and closes at the end (the same log and exit code - a test of the window
 itself, since Tk's buttons take no posted clicks). The Install / Update button has the focus,
 so Enter or Space installs.

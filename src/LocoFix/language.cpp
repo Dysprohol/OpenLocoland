@@ -11,7 +11,10 @@
 // the launcher labels at once and OK saves the choice in the registry next to the game's
 // own settings. Without a saved choice the system language is used when there is a pack
 // for it, else English; a saved choice whose pack is gone (not assembled) falls back to English
-// too. Other modules' launcher controls are labelled the same way (add_launcher_label).
+// too, or without it to the language of the game's own files (lang\root.txt, written by
+// build.py: Steam's language when there is no English capture). A fan translation (base=
+// another language) has the [launcher] label unofficial= after its name in the open list.
+// Other modules' launcher controls are labelled the same way (add_launcher_label).
 // language.ini also names the pack's code page ([language] codepage=, 1252 when missing): the
 // one of its strings.ini, texts and fonts - the editor converts its texts with it.
 #include "patch.h"
@@ -36,6 +39,7 @@ struct Pack {
     std::wstring name;
     std::map<std::string, std::wstring> launcher;   // labels from [launcher]
     unsigned codepage = 1252;                       // [language] codepage
+    bool fan = false;                               // [language] base= another language
 };
 
 std::vector<Pack> g_packs;
@@ -77,6 +81,10 @@ bool read_pack(const std::string& code, Pack& pack) {
         const std::wstring value = from_utf8(trim(line.substr(eq + 1)));
         if (section == "[language]" && key == "name") pack.name = value;
         if (section == "[language]" && key == "codepage") pack.codepage = std::strtoul(trim(line.substr(eq + 1)).c_str(), nullptr, 10);
+        if (section == "[language]" && key == "base") {
+            const std::string base = trim(line.substr(eq + 1));
+            pack.fan = !base.empty() && _stricmp(base.c_str(), code.c_str()) != 0;
+        }
         if (section == "[launcher]") pack.launcher[key] = value;
     }
     std::fclose(f);
@@ -100,6 +108,16 @@ int pack_index(const std::string& code) {
     for (size_t i = 0; i < g_packs.size(); ++i)
         if (_stricmp(g_packs[i].code.c_str(), code.c_str()) == 0) return static_cast<int>(i);
     return -1;
+}
+
+// The language of the game's own files (lang\root.txt), or an empty string.
+std::string root_language() {
+    FILE* f = std::fopen((g_folder + "lang\\root.txt").c_str(), "rb");
+    if (!f) return {};
+    char buffer[32] = {};
+    const bool read = std::fgets(buffer, sizeof buffer, f) != nullptr;
+    std::fclose(f);
+    return read ? trim(buffer) : std::string();
 }
 
 std::string saved_language() {
@@ -186,12 +204,80 @@ void set_label(HWND dialog, int id, const char* key) {
     if (it != labels.end()) SetWindowTextW(GetDlgItem(dialog, id), it->second.c_str());
 }
 
+// The mark after a fan translation's name, in the chosen pack's language.
+std::wstring unofficial_mark() {
+    const auto& labels = g_packs[g_current].launcher;
+    const auto it = labels.find("unofficial");
+    return it != labels.end() ? it->second : L"(unofficial)";
+}
+
+std::wstring list_text(int index, bool closed) {
+    const Pack& p = g_packs[index];
+    return p.fan && !closed ? p.name + L" " + unofficial_mark() : p.name;
+}
+
+// The open list is as wide as its longest line (the closed box shows the names only).
+void fit_list(HWND list) {
+    const HDC dc = GetDC(list);
+    const HGDIOBJ old = SelectObject(dc, reinterpret_cast<HGDIOBJ>(SendMessageW(list, WM_GETFONT, 0, 0)));
+    RECT box;
+    GetWindowRect(list, &box);
+    int width = box.right - box.left;
+    for (int i = 0; i < static_cast<int>(g_packs.size()); ++i) {
+        const std::wstring text = list_text(i, false);
+        SIZE size;
+        if (GetTextExtentPoint32W(dc, text.c_str(), static_cast<int>(text.size()), &size) && size.cx + 12 > width)
+            width = size.cx + 12;
+    }
+    SelectObject(dc, old);
+    ReleaseDC(list, dc);
+    SendMessageW(list, CB_SETDROPPEDWIDTH, width, 0);
+    InvalidateRect(list, nullptr, TRUE);
+}
+
 void apply_labels(HWND dialog) {
     if (g_current < 0) return;
     set_label(dialog, ID_FULL_SCREEN, "full_screen");
     set_label(dialog, IDCANCEL, "cancel");
     set_label(dialog, ID_LANGUAGE_LABEL, "language");
     for (const auto& label : g_other_labels) set_label(dialog, label.first, label.second.c_str());
+    if (HWND list = GetDlgItem(dialog, ID_LANGUAGE)) fit_list(list);
+}
+
+void measure_item(HWND dialog, MEASUREITEMSTRUCT* item) {
+    const HDC dc = GetDC(dialog);
+    const HGDIOBJ old = SelectObject(dc, reinterpret_cast<HGDIOBJ>(SendMessageW(dialog, WM_GETFONT, 0, 0)));
+    TEXTMETRICW metrics = {};
+    GetTextMetricsW(dc, &metrics);
+    SelectObject(dc, old);
+    ReleaseDC(dialog, dc);
+    item->itemHeight = metrics.tmHeight + 2;
+}
+
+void draw_item(const DRAWITEMSTRUCT* item) {
+    const bool selected = (item->itemState & ODS_SELECTED) != 0;
+    FillRect(item->hDC, &item->rcItem, GetSysColorBrush(selected ? COLOR_HIGHLIGHT : COLOR_WINDOW));
+    if (item->itemID < g_packs.size()) {
+        const int index = static_cast<int>(item->itemID);
+        RECT r = item->rcItem;
+        r.left += 3;
+        SetBkMode(item->hDC, TRANSPARENT);
+        SetTextColor(item->hDC, GetSysColor(selected ? COLOR_HIGHLIGHTTEXT : COLOR_WINDOWTEXT));
+        const std::wstring& name = g_packs[index].name;
+        DrawTextW(item->hDC, name.c_str(), static_cast<int>(name.size()), &r,
+                  DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS);
+        const std::wstring text = list_text(index, (item->itemState & ODS_COMBOBOXEDIT) != 0);
+        if (text.size() > name.size()) {   // the mark, greyed unless the line is highlighted
+            SIZE size;
+            GetTextExtentPoint32W(item->hDC, name.c_str(), static_cast<int>(name.size()), &size);
+            r.left += size.cx;
+            const std::wstring mark = text.substr(name.size());
+            if (!selected) SetTextColor(item->hDC, GetSysColor(COLOR_GRAYTEXT));
+            DrawTextW(item->hDC, mark.c_str(), static_cast<int>(mark.size()), &r,
+                      DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS);
+        }
+    }
+    if (item->itemState & ODS_FOCUS) DrawFocusRect(item->hDC, &item->rcItem);
 }
 
 // Places a control at a rectangle given in dialog units, like the dialog template does.
@@ -215,7 +301,9 @@ void add_language_list(HWND dialog) {
                                  r.right - r.left, r.bottom - r.top, dialog,
                                  reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_LANGUAGE_LABEL)), instance, nullptr);
     r = dialog_rect(dialog, 122, 164, 58, 80);
-    HWND list = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST,
+    // owner-drawn: the open list adds the mark after a fan translation's name (draw_item)
+    HWND list = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST |
+                                CBS_OWNERDRAWFIXED | CBS_HASSTRINGS,
                                 r.left, r.top, r.right - r.left, r.bottom - r.top, dialog,
                                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_LANGUAGE)), instance, nullptr);
     SendMessageW(label, WM_SETFONT, reinterpret_cast<WPARAM>(font), FALSE);
@@ -226,6 +314,14 @@ void add_language_list(HWND dialog) {
 }
 
 INT_PTR CALLBACK launcher_proc(HWND dialog, UINT m, WPARAM w, LPARAM l) {
+    if (m == WM_MEASUREITEM && w == ID_LANGUAGE) {
+        measure_item(dialog, reinterpret_cast<MEASUREITEMSTRUCT*>(l));
+        return TRUE;
+    }
+    if (m == WM_DRAWITEM && w == ID_LANGUAGE) {
+        draw_item(reinterpret_cast<const DRAWITEMSTRUCT*>(l));
+        return TRUE;
+    }
     if (m == WM_COMMAND && LOWORD(w) == ID_LANGUAGE) {
         if (HIWORD(w) == CBN_SELCHANGE) {
             const int selected = static_cast<int>(SendDlgItemMessageW(dialog, ID_LANGUAGE, CB_GETCURSEL, 0, 0));
@@ -294,6 +390,7 @@ void install_language() {
         g_current = pack_index(code);
     }
     if (g_current < 0) g_current = pack_index("en");
+    if (g_current < 0) g_current = pack_index(root_language());
     if (g_current < 0) g_current = 0;
     patch::log("language: %s (code page %u)%s", g_packs[g_current].code.c_str(), g_packs[g_current].codepage,
                !saved.empty() && _stricmp(saved.c_str(), g_packs[g_current].code.c_str()) != 0 ? " - the saved pack is not there"

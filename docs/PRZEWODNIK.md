@@ -33,6 +33,13 @@ zainstaluje OpenLocoland w `C:\Users\<ty>\Games\OpenLocoland` (można wybrać in
 
 na pulpicie i w menu Start (instalator może ich nie tworzyć).
 
+**Język gry.** Lista w instalatorze pokazuje wszystkie języki gry. Wybrać można języki twojej kopii
+ze Steama oraz fanowskie tłumaczenia oznaczone **(nieoficjalne)** (czeski), które instalator
+zbuduje na dowolnym języku, jaki masz. Pozostałe są wyszarzone, a obok jest wiersz, który pobiera
+je ze Steama (np. `download_depot 352130 352132` dla niemieckiego): wpisz go w konsoli Steama
+(`steam://open/console` w pasku adresu przeglądarki albo w Win+R), poczekaj, aż Steam go pobierze,
+i uruchom instalator ponownie - zostawi wybrany język i doda nowy.
+
 Folder gry jest samodzielny: są w nim twoje mapy, tabele wyników i logi. Profil gracza (imię,
 wygrane misje, wyniki, ustawienia dźwięku) jest zapisany w rejestrze twojego użytkownika Windows,
 tak jak w oryginale.
@@ -50,8 +57,9 @@ Gra startuje okienkiem startowym (z obrazkiem Locolandu):
   (od 1280 x 720 do 3840 x 2160) i rozdzielczość pulpitu.
 - **Pełny ekran** - pole pod obrazkiem. Gdy nie jest zaznaczone, gra działa w **oknie** (okno
   pamięta swoje miejsce).
-- **Język** - lista obok: języki, które masz (polski, angielski, ...). Napisy okienka zmieniają się
-  razem z nim.
+- **Język** - lista obok: języki, które masz (polski, angielski, ...; fanowskie tłumaczenie jest
+  oznaczone „(nieoficjalne)”). Napisy okienka zmieniają się razem z nim. Jeśli wybranego języka już
+  nie ma, gra startuje po angielsku, a bez angielskiego w języku twojej kopii ze Steama.
 - **Limit FPS** i **Licznik FPS** - wiersz pod rozdzielczością: ile klatek na sekundę rysuje gra
   (domyślnie 60; ∞ = bez limitu) i mały licznik u góry ekranu.
 

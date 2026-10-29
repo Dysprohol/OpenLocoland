@@ -28,7 +28,9 @@ Order:
   3. the language packs into lang\<code>\: the installed language and the language
      depots downloaded next to it are captured into captured/<code>/ if they are not there
      yet, then each pack of lang/ that has a capture is assembled with our changes (see
-     languages.py),
+     languages.py; a fan translation on any captured language when its base is not there,
+     languages.build_base), and lang\root.txt names the root's language (the launcher's
+     fallback, src/LocoFix/language.cpp),
   4. dgVoodoo2 (DDraw.dll, D3DImm.dll) from external/,
   5. LocoFix.dll - the C++ fixes from src/LocoFix (compiled when the sources changed, or the
      prebuilt one of --locofix),
@@ -157,6 +159,24 @@ def english_files():
             if languages.is_language_file(rel):
                 out[os.path.normcase(rel)] = os.path.join(directory, f)
     return out
+
+
+ROOT_LANGUAGE = os.path.join("lang", "root.txt")   # the code of the root's language (language.cpp)
+
+
+def root_language(steam):
+    """The language of the Steam copy's own files (the root's without an English capture): the one
+    Steam installed, or the capture whose strings.ini is the Steam folder's. None if unknown."""
+    code = languages.steam_language(steam)
+    if code:
+        return code
+    try:
+        data = patch_text.read(os.path.join(steam, "strings.ini"))
+    except OSError:
+        return None
+    return next((c for c in languages.FALLBACK_BASES if languages.captured(c) and os.path.isfile(
+        os.path.join(languages.CAPTURED, c, "strings.ini")) and
+        patch_text.read(os.path.join(languages.CAPTURED, c, "strings.ini")) == data), None)
 
 
 def game_files(game):
@@ -429,13 +449,21 @@ def build(steam, target, locofix=None, captured=None, progress=None, version=Non
     done(0.62)
     depots = {code: depot for depot, code in languages.DEPOT_LANGUAGES.items()}
     for code in languages.packs():
-        if not languages.captured(languages.pack_base(code)):
+        base = languages.build_base(code)
+        if not base:
             print(f"lang/{code}: skipped - not downloaded yet (Steam console: "
                   f"download_depot {languages.STEAM_APP_ID} {depots.get(languages.pack_base(code), '?')})")
             continue
+        if base != languages.pack_base(code):
+            print(f"lang/{code}: built on captured/{base} (no captured/{languages.pack_base(code)}): "
+                  f"its fonts and logo are those of {base}")
         written = languages.install(code, a.steam, a.target, lambda src, dst: copy(src, dst, copied),
                                     lambda path: steam_original(a.steam, path))
         copied[0] += written
+    # the language of the game's root, which the launcher falls back on when the saved pack is gone
+    root = "en" if english else root_language(a.steam)
+    if root:
+        copied[0] += patch_text.write_if_changed(os.path.join(a.target, ROOT_LANGUAGE), (root + "\r\n").encode())
 
     done(0.75)
     for f in DGVOODOO:

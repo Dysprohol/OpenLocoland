@@ -33,6 +33,13 @@ OpenLocoland into `C:\Users\<you>\Games\OpenLocoland` (you can choose another fo
 
 on the desktop and in the Start menu (Setup can leave them out).
 
+**Game language.** Setup's list shows all the game's languages. The ones you can choose are those
+of your Steam copy, plus the fan translations marked **(unofficial)** (Czech), which Setup builds on
+whatever language you have. The others are greyed, with the line that gets them from Steam
+(e.g. `download_depot 352130 352132` for German): type it into the Steam console
+(`steam://open/console` in the browser's address bar or Win+R), wait until Steam has downloaded it
+and run Setup again - it keeps your chosen language and adds the new one.
+
 The game folder is self-contained: the maps you make, your high scores and the logs live there.
 Your profile (the player's name, the missions won, the scores, the sound settings) is kept in your
 Windows user's registry, as the original kept it.
@@ -52,8 +59,9 @@ The game starts with its launcher (the window with the Locoland picture):
   monitor (1280 x 720 up to 3840 x 2160) and your desktop's own resolution.
 - **Full screen** - the box under the picture. Unticked, the game runs in a **window** (the window
   remembers its place).
-- **Language** - the list next to it: the languages you have (Polish, English, ...). The launcher's
-  labels change with it.
+- **Language** - the list next to it: the languages you have (Polish, English, ...; a fan
+  translation is marked "(unofficial)"). The launcher's labels change with it. If the language you
+  chose is no longer there, the game starts in English, or without English in your Steam copy's.
 - **Limit FPS** and **FPS counter** - the row under the resolution: how many frames a second the game
   draws (60 by default; ∞ = no limit) and a small counter at the top of the screen.
 

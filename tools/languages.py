@@ -153,13 +153,50 @@ def local_languages(game_folder):
     return codes
 
 
-def pack_base(code):
-    """The language whose captured files pack `code` is built on: its own, or for a translation
-    Steam does not ship the one `base=` names in [language] of its language.ini (Czech: en)."""
+def pack_value(code, key, default=None):
+    """A value of [language] in lang/<code>/language.ini."""
     import configparser
     ini = configparser.ConfigParser(interpolation=None)
-    ini.read(os.path.join(LANG, code, "language.ini"), encoding="utf-8")
-    return ini.get("language", "base", fallback=code).strip() or code
+    ini.read(os.path.join(LANG, code, "language.ini"), encoding="utf-8-sig")
+    return ini.get("language", key, fallback=default)
+
+
+def pack_base(code):
+    """The language whose captured files pack `code` is meant to be built on: its own, or for a
+    translation Steam does not ship the one `base=` names in [language] of its language.ini
+    (Czech: en)."""
+    return (pack_value(code, "base") or "").strip() or code
+
+
+def fan_pack(code):
+    """A translation Steam does not ship (base= another language): marked unofficial in the lists."""
+    return pack_base(code) != code
+
+
+def needs_base(code):
+    """A fan translation that can only be built on its own base= (needs_base=1 in its
+    language.ini: it uses letters or files only that language has)."""
+    return (pack_value(code, "needs_base") or "0").strip() == "1"
+
+
+# The captures a fan translation falls back on when its base= is not captured, in this order:
+# Steam's Portuguese is the English game, then the Latin fonts before the Cyrillic ones. Every
+# font set draws the ASCII letters, which is all a fan translation over another language may use.
+FALLBACK_BASES = ["en", "pt", "de", "pl", "hu", "ru"]
+
+
+def build_base(code, have=None):
+    """The captured language pack `code` is assembled on, or None when it cannot be built: its
+    base= when that is captured (in `have`, default: the captures of CAPTURED); for a fan
+    translation without it, another captured language (FALLBACK_BASES) unless needs_base."""
+    if have is None:
+        have = {d for d in os.listdir(CAPTURED) if captured(d)} if os.path.isdir(CAPTURED) else set()
+    base = pack_base(code)
+    if base in have:
+        return base
+    if not fan_pack(code) or needs_base(code):
+        return None
+    return next((c for c in FALLBACK_BASES + sorted(have) if c in have and c != code), None)
 
 
 def steam_language(game_folder):
@@ -259,12 +296,12 @@ def capture(code, game_folder, force=False):
 
 def install(code, game_folder, target, copy, read_original=None):
     """Assembles pack `code` into <target>\\lang\\<code>\\: the captured files (of its base, see
-    pack_base), then our files from lang/<code>/ at their place in the pack (pack_path; copied,
+    build_base), then our files from lang/<code>/ at their place in the pack (pack_path; copied,
     or applied when they are changes). The originals of changed files come from the capture, or
     from `game_folder` for files that are the same in every language (scripts). `copy(src, dst)` copies one file incrementally;
     `read_original(path)` reads an original (patch_text.read when not given). Returns the
     number of files written by the changes."""
-    pack, source = os.path.join(target, "lang", code), os.path.join(CAPTURED, pack_base(code))
+    pack, source = os.path.join(target, "lang", code), os.path.join(CAPTURED, build_base(code))
     ours = pack_files(code)
     changed_names = {os.path.normcase(patch_text.target_name(path) or path) for _, path in ours}
 
