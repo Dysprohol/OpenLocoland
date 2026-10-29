@@ -23,7 +23,7 @@ editor/
 - These are the help texts shown in the map editor (F1 help panels)
 - Each file corresponds to a help topic/page in the editor
 - Keep formatting consistent with the original
-- Encoding: UTF-8
+- Encoding: the pack's code page (`codepage=` in `language.ini`), CRLF line ends - not UTF-8
 
 ## Testing
 

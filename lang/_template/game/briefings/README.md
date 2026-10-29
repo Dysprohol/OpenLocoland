@@ -38,7 +38,7 @@ briefings/
 | `brief2.txt` | Second briefing page (if any) | ~200-500 chars |
 | `brief3.txt` | Third briefing page (rare) | ~100-300 chars |
 | `brief.lst` | List of briefings (Czech only) | ~50-100 chars |
-| `loose.txt` | "Loose" text - context unclear | ~50-150 chars |
+| `loose.txt` | Defeat message | ~50-150 chars |
 | `objectives.txt` | Mission objectives list | ~50-100 chars |
 | `script1-4.txt` | In-mission scripted texts | ~50-150 chars each |
 | `win.txt` | Victory message | ~50-150 chars |
@@ -48,7 +48,7 @@ briefings/
 1. **Translate meaning, not word-for-word** - keep the game's tone
 2. **Preserve formatting** - line breaks, punctuation
 3. **Character limits** - the game UI has fixed widths; test in-game
-4. **Encoding** - UTF-8 (save as UTF-8 without BOM)
+4. **Encoding** - the pack's code page (`codepage=` in `language.ini`), CRLF line ends - not UTF-8, no BOM
 5. **Only translate what exists** - if a file doesn't exist in Steam for a mission, don't create it
 
 ## Testing

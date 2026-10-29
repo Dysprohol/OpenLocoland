@@ -1,2 +1,2 @@
-﻿@ Translate template loose.txt
+@ Translate template loose.txt
 

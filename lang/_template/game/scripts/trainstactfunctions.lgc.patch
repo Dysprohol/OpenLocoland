@@ -1,2 +1,1 @@
-﻿@ Translate only text strings in this patch (text in quotes)\n@ Run: python tools/map_tool.py check
-
+@ Replace with the patch made by tools\patch_text.py diff (see README.md), or delete this file

@@ -28,7 +28,7 @@ menus/
 - These are the in-game menu texts (main menu, options, etc.)
 - Only translate files that exist in the Steam version for your language
 - Keep the same line structure and formatting
-- Encoding: UTF-8
+- Encoding: the pack's code page (`codepage=` in `language.ini`), CRLF line ends - not UTF-8
 
 ## Testing
 

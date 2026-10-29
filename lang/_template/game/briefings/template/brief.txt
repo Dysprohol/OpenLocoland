@@ -1,2 +1,2 @@
-﻿@ Translate template brief.txt
+@ Translate template brief.txt
 

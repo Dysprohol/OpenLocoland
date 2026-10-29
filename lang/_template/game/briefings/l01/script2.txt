@@ -1,2 +1,2 @@
-﻿@ Script text script2.txt
+@ Script text script2.txt
 

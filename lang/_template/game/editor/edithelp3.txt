@@ -1,2 +1,2 @@
-﻿@ Translate edithelp3.txt
+@ Translate edithelp3.txt
 

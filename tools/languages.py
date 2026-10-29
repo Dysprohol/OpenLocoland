@@ -17,11 +17,22 @@ of the installed game and of every downloaded depot into captured/<code>/ (outsi
 keeps them there.
 
 The repository holds only our work in lang/<code>/: language.ini (the launcher's name and
-labels for the language) and changes to the captured files - <file>.patch and
-strings.override.ini (see patch_text.py). The four developer mode scripts
-(maps\script\*.lgc) are the same in every language version; their patches apply to the
-game's own files. build.py assembles each pack into <game>\lang\<code>\ and LocoFix reads
-files from the chosen pack first (src/LocoFix/language.cpp).
+labels for the language) and in game/ the texts, by kind (pack_path gives each one's place in
+the pack):
+
+    game/strings.override.ini        strings.ini (changes, see patch_text.py)
+    game/briefings/<map>/*.txt       maps\<map>\ (the missions', sandbox's and template's texts)
+    game/menus/*.txt                 maps\ (the menu's pages)
+    game/editor/*.txt                maps\ (the editor's help pages)
+    game/scripts/*.lgc.patch         maps\script\ (the developer mode scripts)
+    game/scripts/shiftb.txt.patch    maps\ (the developer mode's help)
+
+A file is copied, or applied to the captured one when it is a change (<file>.patch,
+<file>.override.ini). The four developer mode scripts (maps\script\*.lgc) are the same in every
+language version; their patches apply to the game's own files. lang/_template/ is the starting
+point of a new translation, not a pack (README.md files there and anywhere in a pack are not
+shipped). build.py assembles each pack into <game>\lang\<code>\ and LocoFix reads files from the
+chosen pack first (src/LocoFix/language.cpp).
 """
 import argparse
 import fnmatch
@@ -37,7 +48,12 @@ import patch_text  # noqa: E402
 from safe_path import safe_relpath  # noqa: E402
 
 LANG = os.path.join(REPO, "lang")
+# The captures: captured/ of the repository, or - in a checkout without one (a new worktree) - the
+# installer's (%LOCALAPPDATA%\OpenLocoland\captured, tools/installer.py) when it has them.
 CAPTURED = os.path.join(REPO, "captured")
+INSTALLER_CAPTURED = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "OpenLocoland", "captured")
+if not os.path.isdir(CAPTURED) and os.path.isdir(INSTALLER_CAPTURED):
+    CAPTURED = INSTALLER_CAPTURED
 STEAM = r"C:\Program Files (x86)\Steam\steamapps\common\Locoland"
 STEAM_APP_ID = 352130
 DEPOT_LANGUAGES = {352131: "en", 352132: "de", 352133: "hu", 352134: "pl", 352135: "pt", 352136: "ru"}
@@ -65,10 +81,48 @@ def is_language_file(rel_path):
 
 
 def packs():
-    """Codes of the language packs in the repo, e.g. ["en", "pl"]."""
+    """Codes of the language packs in the repo, e.g. ["en", "pl"] (not lang/_template)."""
     if not os.path.isdir(LANG):
         return []
-    return sorted(d for d in os.listdir(LANG) if os.path.isfile(os.path.join(LANG, d, "language.ini")))
+    return sorted(d for d in os.listdir(LANG)
+                  if not d.startswith("_") and os.path.isfile(os.path.join(LANG, d, "language.ini")))
+
+
+def pack_files(code):
+    """(file in lang/<code>/, its path in the pack) of each file the pack ships (see pack_path)."""
+    folder = os.path.join(LANG, code)
+    out = []
+    for directory, _, files in os.walk(folder):
+        for f in files:
+            rel = safe_relpath(os.path.join(directory, f), folder)
+            path = pack_path(rel)
+            if path:
+                out.append((rel, path))
+    return sorted(out)
+
+
+def pack_path(rel):
+    """The path in the pack (as in the game folder) of a file of lang/<code>/ - with .patch or
+    .override.ini still on it for a change -, or None for a file that is not shipped."""
+    parts = rel.replace("/", "\\").split("\\")
+    name = parts[-1]
+    if name.lower() == "readme.md":
+        return None
+    if parts == ["language.ini"]:
+        return name
+    if parts[0] != "game":
+        return None
+    if parts[1:] == ["strings.override.ini"]:
+        return name
+    kind = parts[1] if len(parts) > 2 else None
+    if kind == "briefings" and len(parts) == 4:
+        return os.path.join("maps", parts[2], name)
+    if kind in ("menus", "editor") and len(parts) == 3:
+        return os.path.join("maps", name)
+    if kind == "scripts" and len(parts) == 3:
+        script = name.lower().endswith((".lgc", ".lgc.patch"))
+        return os.path.join("maps", "script", name) if script else os.path.join("maps", name)
+    return None
 
 
 def captured(code):
@@ -205,20 +259,14 @@ def capture(code, game_folder, force=False):
 
 def install(code, game_folder, target, copy, read_original=None):
     """Assembles pack `code` into <target>\\lang\\<code>\\: the captured files (of its base, see
-    pack_base), then our
-    files from lang/<code>/ (copied, or applied when they are changes). The originals of
-    changed files come from the capture, or from `game_folder` for files that are the same
-    in every language (scripts). `copy(src, dst)` copies one file incrementally;
+    pack_base), then our files from lang/<code>/ at their place in the pack (pack_path; copied,
+    or applied when they are changes). The originals of changed files come from the capture, or
+    from `game_folder` for files that are the same in every language (scripts). `copy(src, dst)` copies one file incrementally;
     `read_original(path)` reads an original (patch_text.read when not given). Returns the
     number of files written by the changes."""
     pack, source = os.path.join(target, "lang", code), os.path.join(CAPTURED, pack_base(code))
-    changed_names = set()
-    ours = []
-    for directory, _, files in os.walk(os.path.join(LANG, code)):
-        for f in files:
-            rel = safe_relpath(os.path.join(directory, f), os.path.join(LANG, code))
-            ours.append(rel)
-            changed_names.add(os.path.normcase(patch_text.target_name(rel) or rel))
+    ours = pack_files(code)
+    changed_names = {os.path.normcase(patch_text.target_name(path) or path) for _, path in ours}
 
     for directory, _, files in os.walk(source):
         for f in files:
@@ -227,11 +275,11 @@ def install(code, game_folder, target, copy, read_original=None):
                 copy(os.path.join(source, rel), os.path.join(pack, rel))
 
     written = 0
-    for rel in ours:
+    for rel, path in ours:
         src = os.path.join(LANG, code, rel)
-        name = patch_text.target_name(rel)
+        name = patch_text.target_name(path)
         if name is None:
-            copy(src, os.path.join(pack, rel))
+            copy(src, os.path.join(pack, path))
             continue
         original = os.path.join(source, name)
         if not os.path.isfile(original):

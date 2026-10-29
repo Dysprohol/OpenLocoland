@@ -1,2 +1,2 @@
-﻿@ Translate menu1.txt
+@ Translate menu1.txt
 

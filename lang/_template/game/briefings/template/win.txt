@@ -1,2 +1,2 @@
-﻿@ Translate template win.txt
+@ Translate template win.txt
 

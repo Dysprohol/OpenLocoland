@@ -1,226 +1,130 @@
 # Translating OpenLocoland
 
-**Welcome!** This guide explains how to add or update a language translation for OpenLocoland.
+This guide explains how the language packs are laid out and how to add or update one.
+`DEVELOPERS.md` ("Languages", "Repository layout") has the details.
 
-The game has two separate text domains:
-1. **Installer UI** - the Setup.exe window (language selector, options, errors)
-2. **Game texts** - everything inside the game (menus, missions, editor, strings.ini)
+The repository holds only our work: the texts we add or change. Everything else of a
+language comes from the player's own Steam copy - `build.py` (and the installer) capture
+each language Steam has into `captured/<code>/` and assemble a pack from that capture with
+the files of `lang/<code>/` over it, into `<game>\lang\<code>\`. The game's window, the
+launcher and the editor then read the chosen pack first and fall back to the English root.
 
-Both are organized per-language in `lang/<code>/` with a clear, simple structure.
-
-
-## Quick Start: Adding a New Language
-
-```bash
-# 1. Copy the template
-cp -r lang/_template lang/sk    # 'sk' = ISO 639-1 code for Slovak
-
-# 2. Edit metadata
-# lang/sk/language.ini
-#   name = Slovak
-#   code = sk
-#   codepage = 1250
-#   base = en          # or your language if it has a Steam depot
-
-# 3. Translate installer UI
-# lang/sk/installer/texts.ini    # all keys, keep placeholders like {version}
-
-# 4. Translate game texts
-# lang/sk/game/strings.override.ini     # strings.ini overrides
-# lang/sk/game/briefings/l01/brief.txt  # mission texts
-# lang/sk/game/menus/menu1.txt          # menu texts
-# lang/sk/game/editor/edithelp1.txt     # editor help
-# lang/sk/game/scripts/...              # script patches (only text in quotes)
-
-# 5. If new characters needed (e.g., ěščřž)
-#    Create fonts/mapping/sk.json (copy czech.json)
-#    Add mapping = sk.json to lang/sk/language.ini [font] section
-
-# 6. Test
-# python tools/installer.py --silent --lang sk --target test_install
-
-# 7. Commit & PR
-git add lang/sk/
-git commit -m "Add Slovak translation"
-git push && gh pr create
-```
-
-That's it! The CI will validate encoding, missing keys, and INI syntax.
+The installer's own window texts are not part of a pack: they are in `TEXTS` of
+`tools/installer.py`.
 
 
-## Repository Structure
+## Layout of a pack
 
 ```
-lang/
-├── _template/              # COPY THIS for new languages
-│   ├── language.ini        # metadata
-│   ├── installer/texts.ini # installer UI texts
-│   └── game/               # game texts
-│       ├── strings.override.ini
-│       ├── briefings/      # mission texts (l01-l20, sandbox, template)
-│       ├── menus/          # menu*.txt
-│       ├── editor/         # edithelp*.txt
-│       └── scripts/        # .lgc.patch files
-│
-├── en/                     # English (base, complete)
-├── de/                     # German (Steam)
-├── hu/                     # Hungarian (Steam)
-├── pl/                     # Polish (Steam)
-├── ru/                     # Russian (Steam)
-├── cs/                     # Czech (fan, base=en)
-└── sk/                     # your new language!
+lang/<code>/
+├── language.ini                 name, code page, base; the launcher's labels
+└── game/
+    ├── strings.override.ini     -> strings.ini        changes to the captured file
+    ├── briefings/<map>/*.txt    -> maps\<map>\        l01-l20, sandbox (POLIGON), template
+    ├── menus/menu*.txt          -> maps\              the menu's pages
+    ├── editor/edithelp*.txt     -> maps\              the editor's help pages (F1)
+    └── scripts/
+        ├── *.lgc.patch          -> maps\script\       the developer mode scripts
+        └── shiftb.txt.patch     -> maps\              the developer mode's help
 ```
 
-### language.ini
+The arrow is where `build.py` puts the file in the pack (`languages.pack_path`). A file
+ending in `.patch` or `.override.ini` is a change applied to the captured file (the scripts:
+to the Steam file); any other file replaces the captured one as a whole. So a pack holds
+only the files it changes - a file that is missing comes from the capture.
 
-```ini
-[language]
-name = Slovak              # Shown in launcher/installer
-code = sk                  # ISO 639-1
-codepage = 1250            # 1250=Central EU, 1251=Cyrillic, 1252=Western EU
-base = en                  # Steam files to use as base (empty = own depot)
+`lang/_template/` is the starting point of a new translation: a placeholder for every file,
+with a `README.md` per folder. It is not a pack (`languages.packs()` leaves out folders
+starting with `_`), and no `README.md` is shipped.
 
-[font]
-mapping = sk.json          # Optional: custom font mapping
-
-[installer]
-; installer texts in installer/texts.ini
-```
-
-### installer/texts.ini
-
-- **Format**: INI, UTF-8
-- **Keys**: Fixed (left side), do not change
-- **Values**: Translate (right side)
-- **Placeholders**: Keep `{version}`, `{path}`, `{files}`, `\n` exactly
-- **Sections**: `[metadata]`, `[window]`, `[labels]`, `[depots]`, `[options]`, `[shortcuts]`, `[buttons]`, `[errors]`, `[status]`, `[uninstall]`, `[shortcut_names]`
+Packs now: `cs` (Czech fan translation, `base=en`), `de`, `en`, `hu`, `pl`, `ru`.
 
 
-## Game Texts Details
+## Adding a language
 
-### strings.override.ini
-
-Overrides keys in Steam's `strings.ini`. Format:
-```ini
-251 = Water Dragon
-252 = Fire Dragon
-```
-Only include keys you change. Key = numeric ID as string.
-
-### briefings/
-
-Mission texts. Each mission has:
-```
-briefings/l01/
-├── brief.txt      # Main briefing
-├── brief2.txt     # Page 2 (if any)
-├── brief3.txt     # Page 3 (rare)
-├── brief.lst      # Briefing list (optional)
-├── loose.txt      # "Loose" text
-├── objectives.txt # Objectives list
-├── script1.txt    # In-mission script text
-├── script2.txt
-├── script3.txt
-├── script4.txt
-└── win.txt        # Victory message
-```
-Plus `sandbox/` and `template/`.
-
-### menus/
-
-In-game menu texts: `menu1.txt`, `menu6.txt`...`menu54.txt`. Same format as Steam.
-
-### editor/
-
-Editor help (F1): `edithelp1.txt`...`edithelp12.txt`.
-
-### scripts/
-
-Unified diff patches for `.lgc` scripts. **Only translate text in quotes.**
-```diff
--    "Cheats enabled"
-+    "Czyty włączone"
-```
-Test: `python tools/map_tool.py check`
-
-
-## Fonts & Extended Characters
-
-The game uses bitmap fonts (16×16 grid, 256 glyphs). Polish replaces Cyrillic.
-
-### To add characters like ěščřžýáíéóůú:
-
-1. **Create mapping**: `fonts/mapping/sk.json` (copy `czech.json`)
-2. **Map CP1250 slots** to Unicode characters
-3. **Add to language.ini**:
+1. Copy `lang/_template` to `lang/<code>/` (ISO 639-1 code, e.g. `sk`).
+2. Edit `language.ini`:
    ```ini
-   [font]
-   mapping = sk.json
+   [language]
+   name=Slovensky
+   ; the code page of the pack's texts: 1250 Central European, 1251 Cyrillic, 1252 Western
+   codepage=1250
+   ; the language whose Steam files the pack is built on, for a language Steam does not ship
+   base=en
+
+   [launcher]
+   full_screen=...
    ```
-4. **Generate BMPs**:
-   ```bash
-   pip install freetype-py
-   python tools/fonts/generate.py --lang sk --all
-   ```
-5. **Build installer** - picks up `fonts/generated/*.bmp`
-
-See `fonts/README.md` for full details.
+   Copy the `[launcher]` keys from an existing pack (e.g. `lang/en/language.ini`).
+3. Translate the files under `game/`, and delete the ones you do not translate - a file of the
+   pack replaces the captured one, so a placeholder left in would be shown in the game.
+4. Check and build (see below).
 
 
-## Testing Your Translation
+## The files
 
-### Installer only (fast)
+**Encoding.** The game's texts are bytes in the pack's code page (`codepage=`), not UTF-8,
+with CRLF line ends. `language.ini` itself is UTF-8.
+
+**strings.override.ini** - only the keys you change, under their sections:
+```ini
+[strings]
+Money=PENIZE
+[Editor]
+MenuLoad=&Nahrat...\tAlt+F3
+```
+`key=value` sets the key of the captured `strings.ini`; a section the original does not have
+(`[Editor]`, the map editor's texts) is added at its end. A bare `key` line only names a place
+to insert the next keys after. Syntax in `tools/patch_text.py`.
+
+**briefings/**, **menus/**, **editor/** - plain text files in the format of the game's own
+(at most 44 characters a line in briefings and menu pages; ESC 7 / ESC 2 switch to the lit
+font and back). A map's briefing pages are listed by its `brief.lst`.
+
+**scripts/** - unified diffs against the Steam files, made with
+`python tools\patch_text.py diff <original> <edited> <patch>`: edit the assembled file
+(e.g. `<game>\lang\pl\maps\shiftb.txt`), then make the patch against the original
+(`captured\<base>\maps\shiftb.txt`, or the Steam folder's `maps\script\*.lgc`). Translate the
+texts and comments; leave the code as it is.
+
+
+## Fonts
+
+The game draws texts with bitmap fonts (`fonts\*.bmp`, a 16 x 16 grid, one cell per byte). A
+pack uses the fonts of its base's capture, so a letter can be in the code page and still have
+no picture. `tools/fonts/generate.py --lang <code> --all` makes font pictures from
+`fonts/mapping/<code>.json` into `fonts/generated/` (see `fonts/README.md`); the build does not
+use them yet, so a pack's texts must stay within the letters its base's fonts have (the Czech
+pack is written without diacritics for that reason).
+
+
+## Checking a translation
+
 ```bash
-python tools/installer.py --silent --lang sk --target test_sk
+python tools\check_lang.py <code>
+```
+checks every text of the pack against its code page and the captured fonts (each character
+must have a picture, and outside Russian not the original Cyrillic one). Then build into a test
+folder and look at it in the game:
+
+```bash
+python tools\build.py --target <test folder>
+```
+```powershell
+.\tools\test_game.ps1 -Exe <test folder>\Locoland.exe -Language <code> -ClickOk 1 -SetFull 0
 ```
 
-### Full game build
-```bash
-python tools/build.py <steam_folder> test_build --lang sk
-```
+The game does not wrap lines, so check the long ones on screen.
 
-### Verify font generation
-```bash
-python tools/fonts/generate.py --lang sk --all
-ls fonts/generated/
-```
 
-### Check script patches apply
-```bash
-python tools/map_tool.py check
-```
+## Language codes
 
-## CI Validation
-
-On PR, GitHub Actions will check:
-- All `.ini` files are valid UTF-8
-- All required keys present in `installer/texts.ini`
-- `language.ini` has required fields
-- Script patches apply cleanly
-- No missing briefing files for missions 1-20
-
-## Tips
-
-- **Use a proper editor** (VS Code, Notepad++) with UTF-8 support
-- **Test in-game** - some texts have length limits (UI width)
-- **Keep tone consistent** - military/railway terminology
-- **Don't translate** variable names, code, or placeholders
-- **Ask questions** - open an issue or discussion if unsure
-
-## Language Codes Reference
-
-| Code | Language | Codepage | Steam Depot |
-|------|----------|----------|-------------|
-| en   | English  | 1252     | 352131      |
-| de   | German   | 1252     | 352132      |
-| hu   | Hungarian| 1250     | 352133      |
-| pl   | Polish   | 1250     | 352134      |
-| pt   | Portuguese| 1252    | 352135      |
-| ru   | Russian  | 1251     | 352136      |
-| cs   | Czech    | 1250     | (fan, base=en) |
-| sk   | Slovak   | 1250     | (fan, base=en) |
-| ...  | your language | ... | ... |
-
----
-
-**Questions?** Open a GitHub Issue or Discussion. Thanks for contributing!
+| Code | Language   | Code page | Steam depot      |
+|------|------------|-----------|------------------|
+| en   | English    | 1252      | 352131           |
+| de   | German     | 1252      | 352132           |
+| hu   | Hungarian  | 1250      | 352133           |
+| pl   | Polish     | 1250      | 352134           |
+| pt   | Portuguese | 1252      | 352135 (the English files; no pack) |
+| ru   | Russian    | 1251      | 352136           |
+| cs   | Czech      | 1250      | none (fan translation, `base=en`) |

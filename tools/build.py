@@ -107,7 +107,7 @@ STEAM_EXE_SHA256 = STEAM_VERSION["exe_sha256"]
 # a file missing here is checked by applying it.
 ORIGINAL_SHA256 = {
     os.path.join("maps", "logo.lgc"): "6b055bf8124832bd334dc2f28d2566cc35a16876b80791c3c1d27c109196dce9",
-    os.path.join("maps", "menu.lgc"): "0d1058f31ca29004660acc69e2e8fad7a433e5d2d93f5158884e5267dfb95fc39",
+    os.path.join("maps", "menu.lgc"): "0d1058f31ca2904660acc69e2e8fad7a433e5d2d93f5158884e5267dfb95fc39",
     os.path.join("maps", "script", "basefunctions.lgc"): "a0ee8eb3865434c423a71b0df701ab8ec142ff0515cdafe05415f243dbd41397",
     os.path.join("maps", "script", "constants.lgc"): "4313d929e4ea9c082c246cc9dc0e5b75eb687deb8f9c4df9cad6913d27a3d72c",
     os.path.join("maps", "script", "debug_functions.lgc"): "c425230d5851b7c776cfaa2e025e8f498d20c88f1dea1b49daa9b0b2725f8c0f",
@@ -294,12 +294,9 @@ def modified_steam_files(steam):
     changes = [(os.path.join(REPO, "game", rel), patch_text.target_name(rel))
                for rel in game_files(os.path.join(REPO, "game")) if rel.endswith(".patch")]
     for code in languages.packs():
-        folder = os.path.join(languages.LANG, code)
-        for directory, _, files in os.walk(folder):
-            for f in files:
-                rel = safe_relpath(os.path.join(directory, f), folder)
-                if rel.endswith(".patch") and not languages.is_language_file(patch_text.target_name(rel)):
-                    changes.append((os.path.join(folder, rel), patch_text.target_name(rel)))
+        for rel, path in languages.pack_files(code):
+            if path.endswith(".patch") and not languages.is_language_file(patch_text.target_name(path)):
+                changes.append((os.path.join(languages.LANG, code, rel), patch_text.target_name(path)))
     bad = set()
     for change, name in changes:
         path = os.path.join(steam, name)

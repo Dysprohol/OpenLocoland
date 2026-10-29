@@ -27,7 +27,7 @@ Buildings are named the way the game names them to the player: VID 102 is the **
 naprawczy"; the English game calls it "Repair Depot", which is why "depot" is not used for
 either). VID 165 (`завод`, the industrial building with two tower sockets like the fort's) is
 the **mine** - Polish "Kopalnia", English "Mining plant" (the game has no name for it; ours are
-in `lang/<code>/strings.override.ini`) - and VID 86 is the explosive **mine** the repair car lays
+in `lang/<code>/game/strings.override.ini`) - and VID 86 is the explosive **mine** the repair car lays
 (`МИНА`, English "Mine"): the Polish translation called it "Kopalnia", mistaking it for a mine
 pit, so the Polish pack now names it "Mina" and keeps "Kopalnia" for VID 165 alone. Our texts in
 the other languages take the names of that language's own `strings.ini` (German Fabrik and
@@ -122,7 +122,10 @@ until that is checked.) Steam
 puts them in `steamapps\content\app_352130\depot_<id>\`. `build.py` captures the language
 files of the installed game and of every downloaded depot into `captured/<code>/` (outside
 git) and assembles the packs that have a capture; the others are skipped with the command
-to download them. The depot folders can be deleted after the build; keep `captured/`.
+to download them. The depot folders can be deleted after the build; keep `captured/`. A
+checkout without `captured/` (a new worktree) uses the installer's captures in
+`%LOCALAPPDATA%\OpenLocoland\captured` when there are any (`languages.CAPTURED`); `--captured`
+of `build.py` and `check_lang.py` names another folder.
 `python tools\languages.py capture [<code>] [--force]` captures the installed language by
 hand (`--force` replaces an existing capture, e.g. after a Steam update).
 
@@ -136,17 +139,7 @@ For working on the engine, generate the local reverse-engineering output (not in
 |---|---|
 | `game/` | Our files for the game folder (`Locoland.cfg`, `dgVoodoo.conf`, `maps/custom.lst` - the custom maps of the menu) and changes to original files as `<file>.patch` (`maps/logo.lgc.patch`, `maps/menu.lgc.patch`) - same structure as the game folder; `maps/script/cheats.lgc`, `unlock.lgc` and their `_on` variants are the launcher's options (LocoFix fix 30). `objects.override/` would hold changed values of `objects.res` (see "Editing objects.res"), `maps.override/<map>/` changed objects of a map (`l11`: a rail of mission 11, `BUGS.md` F21) and `maps.new/<map>/` whole new maps (see "Editing maps and images"); `maps.new/template` (the empty template) and `maps.new/sandbox` (the one to play) at the moment, and `run_map.cmd` - a double-click at the game starts the sample map, `run_map <map>` any map; `edit_map.cmd` the same in editor mode (see "Editor mode"). |
 | `docs/` | The player's guide for the release, in Polish and English only (the German, Hungarian and Russian players get the English one): `PRZEWODNIK.md` (Polish) and `GUIDE.md` (English) - installing, what is new in the game, the custom maps page, the map editor with a tutorial and its keys - and a few screenshots of the game in `docs/img/`. Version 0.1; keep the guides in step with the in-game help pages (`maps/edithelp*.txt`) and "Editor mode" below. |
-| `lang/<code>/` | Our translation work for each language (`cs`, `de`, `en`, `hu`, `pl`, `ru`, and new ones):
-  - `language.ini` - metadata: `name`, `code`, `codepage`, `base` (for fan translations using another language's Steam files)
-  - `installer/texts.ini` - installer UI texts (window titles, labels, options, errors, shortcut names)
-  - `game/` - all in-game texts:
-    - `strings.override.ini` - overrides for `strings.ini` (numeric key = value)
-    - `briefings/l01-l20/`, `sandbox/`, `template/` - mission texts (brief, objectives, win, scripts)
-    - `menus/menu*.txt` - in-game menu texts
-    - `editor/edithelp*.txt` - map editor help pages (F1)
-    - `scripts/*.lgc.patch` - developer mode script patches (only translate quoted text)
-  - Legacy (pre-migration): `maps/edithelp*.txt`, `maps/sandbox/`, `maps/template/`, `maps/script/*.lgc.patch`, `maps/shiftb.txt.patch` — will be migrated to `game/`.
-  Each pack uses its code page (CP1250/1251/1252). Format details in `docs/TRANSLATING.md` and `tools/patch_text.py`. |
+| `lang/<code>/` | Our translation work for each language pack (`cs`, `de`, `en`, `hu`, `pl`, `ru`): `language.ini` (the launcher's name and labels, `codepage`, `base` for a translation Steam does not ship) and in `game/` the texts by kind, each assembled into its place in `<game>\lang\<code>\` (`languages.pack_path`): `game/strings.override.ini` -> `strings.ini` (changes to the captured file), `game/briefings/<map>/` -> `maps\<map>\` (the missions', POLIGON's and the template's texts), `game/menus/menu*.txt` -> `maps\` (the menu's pages), `game/editor/edithelp*.txt` -> `maps\` (the editor's help pages), `game/scripts/*.lgc.patch` -> `maps\script\` and `game/scripts/shiftb.txt.patch` -> `maps\` (the developer mode). A pack ships only what it changes; the rest comes from its capture. `lang/_template/` is the starting point of a new translation (a placeholder for every file and `README.md` notes per folder) and not a pack: `languages.packs()` leaves out folders starting with `_`, and no `README.md` is shipped. Each pack's texts are in its code page (CP1250/1251/1252); format details in `docs/TRANSLATING.md` and `tools/patch_text.py`. |
 | `external/dgVoodoo2/` | dgVoodoo2 2.87.5 (`DDraw.dll`, `D3DImm.dll`, unmodified; credit in `NOTICE.md`). |
 | `src/LocoFix/` | Game fixes in C++ - a library loaded by the exe before WinMain. |
 | `tools/` | Game assembly, language capture, text/exe/data patches, LocoFix build, decompilation, data unpacking, editing of objects.res, maps and images, tests; the installer (`installer.py`) and the release (`release.py`, see "Release"). |
@@ -240,13 +233,20 @@ so W, B, A, K, M are the capital letters (Shift).
 texts). The exe, `objects.res` and the scripts are the same. The English version is called
 "Steamland" in its texts and logo. Each language is captured once from the player's Steam files into `captured/<code>/`
 (`tools\languages.py`, run by `build.py`). The
-repository keeps only our translation work in `lang/<code>/`: the completed `strings.ini` as
-`strings.override.ini` and the developer mode texts as patches of `maps\shiftb.txt` and four
-scripts. `build.py` assembles each captured pack with those changes into `<game>\lang\<code>\`.
-English is the fallback everywhere: the root of the assembled game gets the language files of
-the English capture (`captured/en`) whatever language Steam has installed (without an English
-capture Steam's stay, with a note), our files there (the custom maps' texts, the editor's help
-pages) are English, and LocoFix takes the English pack for a saved language without a pack.
+repository keeps only our translation work in `lang/<code>/` (see "Repository layout"): the
+completed `strings.ini` as `game/strings.override.ini`, our texts in `game/briefings/`,
+`game/menus/` and `game/editor/`, and the developer mode texts as patches of `maps\shiftb.txt`
+and four scripts in `game/scripts/`. `build.py` assembles each captured pack with those changes
+into `<game>\lang\<code>\`, every file at its place there (`languages.pack_path`).
+English is the fallback, in three ways. The root of the assembled game gets the English
+capture's (`captured/en`) original language files, unchanged, whatever language Steam has
+installed (without an English capture Steam's stay, with a note) - so the root `strings.ini` has
+none of our keys and no `[Editor]` section; our own files at the root (the custom maps' texts,
+the editor's help pages in `game/maps/`) are English. Our own keys fall back to English text
+given in the code: the editor's (`[Editor]`) to the English of `ui_text("PanelNew", "NEW MAP")`
+in LocoFix, and the keys our scripts add (the custom maps page's `MenuCustomEditor`,
+`MenuBackToEditor` ...) to the English in the script (`if(s=="") s="MAP EDITOR";`). And LocoFix
+takes the English pack for a saved language without a pack.
 With no saved choice it follows the system language when there is a pack for it (Polish,
 German, Hungarian, Russian, Czech), otherwise English; a saved choice is kept, and the launcher's
 list switches it. Portuguese has no pack: its Steam depot is byte for byte the English one, so a
@@ -257,7 +257,7 @@ of the English version - `strings.ini`, the menus' and the missions' texts; it h
 `maps\menu2.txt`, `menu3.txt`, `shiftb.txt` or `l08\brief2.txt`, which stay English. A pack
 like it names its base in `language.ini` (`base=en` in `[language]`, `languages.pack_base`):
 `build.py` assembles it from that language's capture with `lang/cs/` over it, and the installer
-offers it when the base is captured. `lang/cs/maps/` holds the fan translation's texts converted
+offers it when the base is captured. `lang/cs/game/` holds the fan translation's texts converted
 to what the game reads (ASCII, CRLF; it was UTF-8 with two files in CP1250, and its few Czech
 letters, dashes and a Cyrillic O are written without marks: the English fonts it is drawn with
 have Cyrillic in 0xC0-0xFF and no Czech letters, so `check_lang.py` would flag them), and
@@ -285,8 +285,8 @@ pack drawn as Ц). A pack without a capture is checked against its code page onl
 
 The texts of our maps are per language the way the missions' are: `language.cpp` reads a file
 from `lang\<code>\` when the pack has one, so `maps\sandbox\brief.txt` at the root is English
-and `lang/pl/maps/sandbox/brief.txt` (`de`, `hu`, `ru`) replaces it in that pack - POLIGON's
-objectives, briefing pages, win and loss texts, and the template's (`lang/<code>/maps/template/`),
+and `lang/pl/game/briefings/sandbox/brief.txt` (`de`, `hu`, `ru`) replaces it in that pack - POLIGON's
+objectives, briefing pages, win and loss texts, and the template's (`lang/<code>/game/briefings/template/`),
 which File > New copies into a new map in the language it is made in. Not the high score page
 (`hiscores.txt`): the game writes it at the root after a win, with the pack's own header, so a
 pack copy would hide it; until the first win it shows the root's English header.
@@ -675,7 +675,7 @@ backward-compatible hooks in `basefunctions.lgc` and `menuend.lgc`), `win.txt` a
 `loose.txt`, and the briefing of the Esc menu: `BRIEF_LIST` names the pages (`brief.lst`:
 `brief.txt`, `brief2.txt` with hints, `hiscores.txt`; in the pack's code page, at most 44
 characters a line, CRLF; English at the root of a map of the repository and the other
-languages in `lang/<code>/maps/<map>/`, see "Languages") and `BRIEF_HEADER` the title (ASCII - the script is CP1251), hooks in `menutact.lgc`.
+languages in `lang/<code>/game/briefings/<map>/`, see "Languages") and `BRIEF_HEADER` the title (ASCII - the script is CP1251), hooks in `menutact.lgc`.
 Without them a map shows the briefing and the header of mission `LEVEL + 1`. `HISCORES_FILE`
 (hooks in `menuend.lgc`) keeps the map's high score table (`hiscores`, written on a win) and
 its page (`hiscores.txt`) in its own folder - without it a win went into mission 1's table
@@ -1939,8 +1939,8 @@ there - read through it the lookups found nothing), and keeps each text (the lan
 change in a run); a key not found is logged once. The status line's messages are made twice: in
 the pack's language for the screen and in English for `LocoFix.log` (`ui_english`), so tests read
 the same log lines in any language; the test commands (`WM_COPYDATA`) run in English as well. The
-670 keys are in `[Editor]` of `lang/en/strings.override.ini` (the English texts),
-`lang/pl/strings.override.ini` (Polish without diacritics, the Polish game's names: Fabryka, Punkt
+670 keys are in `[Editor]` of `lang/en/game/strings.override.ini` (the English texts),
+`lang/pl/game/strings.override.ini` (Polish without diacritics, the Polish game's names: Fabryka, Punkt
 naprawczy, Fortyfikacja, Wieza rakietowa) and the German, Hungarian and Russian ones (with the
 names of each pack's own `strings.ini`: Fabrik / Gyáregység / Депо, Werkstatt / Szervízdepó /
 Ремонтная мастерская; Bergwerk / Bánya / Рудник for VID 165, which the games do not name), grouped by where they are used; `patch_text.py merge` adds a
@@ -1971,7 +1971,7 @@ game shows its own (`maps\menu4.lst` -> `menu41.txt` ...): `maps\edithelp.lst` l
 the buttons, the object's panel, all objects and decals, trains and rails, water, painting and
 regions, heights, the ground tools' rows - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
 44 characters a line and 14 lines, ESC 7 / ESC 2 switch to the lit font VID 7 and back to VID 2):
-English in `game/maps/` (the fallback of every pack) and the others in `lang/<code>/maps/`; the files are
+English in `game/maps/` (the fallback of every pack) and the others in `lang/<code>/game/editor/`; the files are
 opened through the game's own `CreateFileA` import, so the chosen pack's copies are read. **Menu**
 has a row per command - the lamp of the custom maps page (VID 472, pulsing under the mouse) and the
 text, lit under the mouse - New map, Load, Save, Export, Import, Mission settings, Map size (two
@@ -2011,7 +2011,7 @@ mode above) are not tested in full screen.
   texts and `strings.ini` gaps filled in, the duplicate key 251 fixed (250/251 = Water
   Dragon).
 - New languages use `lang/_template` as a starting point: copy to `lang/<code>/`, edit `language.ini`,
-  translate `installer/texts.ini` and `game/`, add font mapping if needed. See `docs/TRANSLATING.md`.
+  translate the files of `game/`, add font mapping if needed. See `docs/TRANSLATING.md`.
 - Intros disabled (`game/maps/logo.lgc.patch`); the outro is a scene in `maps\outro` and
   stays.
 - Mission 11 (`maps\l11\l11.map`): a rail at 745,2075 laid as a ramp the wrong way up
@@ -2345,9 +2345,11 @@ mode above) are not tested in full screen.
   captured\pl\maps\shiftb.txt <edited file> lang\pl\game\scripts\shiftb.txt.patch` (scripts:
   against the Steam file). `strings.ini` changes go straight into `strings.override.ini`.
   A new language: copy `lang/_template` to `lang/<code>/`, edit `language.ini` (name, code page,
-  base), translate `installer/texts.ini` and all files under `game/`, add font mapping if needed
-  (`fonts/mapping/<code>.json`), run `python tools/fonts/generate.py --lang <code> --all`,
-  then test with `python tools/installer.py --silent --lang <code> --target test`. See `docs/TRANSLATING.md`.
+  base), translate the files under `game/` (and delete the ones it does not translate: a pack's
+  file replaces the captured one), add font mapping if needed (`fonts/mapping/<code>.json`),
+  run `python tools/fonts/generate.py --lang <code> --all`, then `python tools\check_lang.py <code>`,
+  build it (`python tools\build.py --target <test folder>`) and look at it in the game
+  (`tools\test_game.ps1 -Language <code>`). See `docs/TRANSLATING.md`.
 - `tools\test_game.ps1` - starts the game (`-Language <code>` sets the language), clicks OK in
   the launcher, waits for a log entry (`-WaitFor "menu\.map"`), performs steps
   (`-Steps "k371:489@5,13@20"`: mouse `m`/`k`/`p` at a point of the game area, a middle
@@ -2543,8 +2545,10 @@ from their own Steam copy, as `build.py` does it for a developer.
    <version>"; a `build.py` build says "dev"),
 2. LocoFix.dll is compiled with that version (`build_locofix.build(out_dir, version)`, the define
    `LOCOFIX_VERSION`, into `build\release\LocoFix`) - the player gets it prebuilt,
-3. the payload (`build\release\payload`) has our files in the repository's layout: `game\` and
-   `lang\` (only files git knows), `external\dgVoodoo2\` (the two DLLs and the notice),
+3. the payload (`build\release\payload`) has our files in the repository's layout: `game\`,
+   `lang\` and `tools\` (only files git knows; the packs stay in the `lang/<code>/game/` layout
+   and are assembled at install time, `lang\_template` is carried but not built),
+   `external\dgVoodoo2\` (the two DLLs and the notice),
    `LocoFix.dll` and `version.txt`; a file with an extension of the game's files (`.exe`, `.res`,
    `.vid`, `.map`, `.bmp`, `.wav`, `.ogg` ...) stops the release,
 4. PyInstaller (`--onefile --windowed`) freezes `tools/installer.py` - the window - with

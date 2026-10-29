@@ -9,7 +9,8 @@ with the frame of that number in a font picture: fonts\*.bmp, a 16 x 16 grid of 
 pack - the English ones hold Cyrillic in 0xC0-0xFF, the Polish ones Polish letters in place of
 some of it - so a letter may be in the code page and still have no picture in the pack's fonts.
 
-For every pack this checks what we ship in lang/<code>/ (strings.override.ini, maps\*.txt)
+For every pack this checks what we ship in lang/<code>/ (game/strings.override.ini, the texts of
+game/briefings, game/menus and game/editor)
 and, for English, the root texts every pack falls back to (game/maps/*.txt, the texts of
 game/maps.new/<map>/): that each text is valid in the code page and that each character has
 a picture in the fonts that draw such texts -
@@ -21,7 +22,7 @@ a picture in the fonts that draw such texts -
     maps\*.txt             font8x13 (2) and font8x13light (7), objectives.txt font8x13
                            and the messages' font-Objectives (14)
 
-A pack without a capture (captured/<code>/, see languages.py) is checked against its code
+A pack without a capture (captured/<code>/ or the installer's, see languages.CAPTURED) is checked against its code
 page only, and the command to download its Steam depot is printed; `--fonts <code>` checks
 against another pack's fonts instead (a preview: the English fonts hold the game's original
 Cyrillic). Exit code 1 when anything is missing.
@@ -124,48 +125,22 @@ def map_texts(path):
 
 
 def texts(code):
+    """The texts the pack ships (languages.pack_files): strings.override.ini and the maps' texts.
+    The script patches are left out: their lines hold the game's frame bytes (shiftb.txt) and
+    font switches."""
     out = []
     folder = os.path.join(REPO, "lang", code)
-    override = os.path.join(folder, "strings.override.ini")
-    if os.path.exists(override):
-        out += ini_texts(override)
-
-    # New structure: game/briefings, game/menus, game/editor, game/scripts
-    new_briefings = glob.glob(os.path.join(folder, "game", "briefings", "**", "*.txt"), recursive=True)
-    new_menus = glob.glob(os.path.join(folder, "game", "menus", "*.txt"))
-    new_editor = glob.glob(os.path.join(folder, "game", "editor", "*.txt"))
-    new_scripts = glob.glob(os.path.join(folder, "game", "scripts", "*.patch"))
-
-    # Legacy structure: maps/
-    legacy_files = glob.glob(os.path.join(folder, "maps", "**", "*.txt"), recursive=True)
-
-    files = sorted(new_briefings + new_menus + new_editor + new_scripts + legacy_files)
-
+    files = []
+    for rel, path in languages.pack_files(code):
+        if path.lower() == "strings.override.ini":
+            out += ini_texts(os.path.join(folder, rel))
+        elif path.lower().endswith(".txt"):
+            files.append(os.path.join(folder, rel))
     if code == "en":   # the root texts are English and every pack's fallback
         files += glob.glob(os.path.join(REPO, "game", "maps", "*.txt"))
         files += glob.glob(os.path.join(REPO, "game", "maps.new", "*", "*.txt"))
     for path in files:
-        if path.endswith(".patch"):
-            # Script patches: check only quoted text
-            out += patch_texts(path)
-        else:
-            out += map_texts(path)
-    return out
-
-
-def patch_texts(path):
-    """Extract translatable strings from a .lgc.patch file (only text in quotes)."""
-    out = []
-    try:
-        data = open(path, "rb").read()
-        # Find quoted strings in the patch
-        import re
-        for m in re.finditer(rb'"([^"]*)"', data):
-            text = m.group(1)
-            if text:
-                out.append((f"{safe_relpath(path, REPO)}:patch", text, MAP_TEXT_FONTS))
-    except Exception:
-        pass
+        out += map_texts(path)
     return out
 
 
@@ -229,8 +204,8 @@ def main():
     parser.add_argument("--captured", default=languages.CAPTURED, help="the captured language files")
     parser.add_argument("--fonts", help="check against the fonts of this pack instead of each pack's own")
     args = parser.parse_args()
-    codes = args.codes or sorted(c for c in os.listdir(os.path.join(REPO, "lang"))
-                                 if os.path.exists(os.path.join(REPO, "lang", c, "language.ini")))
+    print(f"captures: {args.captured}")
+    codes = args.codes or languages.packs()
     ok = all([check(code, args.captured, args.fonts) for code in codes])
     sys.exit(0 if ok else 1)
 
