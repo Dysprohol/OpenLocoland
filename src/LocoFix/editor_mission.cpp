@@ -6,8 +6,9 @@
 //    scripts in maps\script\ read - LEVEL, CUSTOM_MAP, MONEY, the time of day, rain, lightning
 //    (NUKE), the text files (OBJECTIVES_FILE ... HISCORES_FILE, BRIEF_HEADER), the player's
 //    reinforcement (PLAYER_REINFORCEMENT, player_reinforcement_train[]), the enemy (the patrol
-//    points ATA_PATROLn_*, start_trains*[], level_queue_*[], LIMIT_ATACKERS) and the other
-//    settings of the template (music, weather, gammas, AI timings) as they were,
+//    points ATA_PATROLn_*, start_trains*[], level_queue_*[], LIMIT_ATACKERS), FACTIONS 1 (the
+//    neutrals and the pirates fight by the editor's rules, factions.cpp) and the other settings
+//    of the template (music, weather, gammas, AI timings) as they were,
 //  - "// <editor main>" ... "// </editor main>" in main()'s iff(1): the SetPushLine calls and the
 //    trains' patrols (PatrolEngine on the train found by its first car - TrainPatrol).
 // and, in a map whose arrivals the editor runs (the Arrivals panel, below "arrivals"):
@@ -94,7 +95,7 @@ const char* const SETTINGS[][2] = {
 const char* const OWN[] = {"CUSTOM_MAP", "MONEY", "START_DAYNIGHT", "RAIN", "NUKE", "OBJECTIVES_FILE",
                            "WIN_FILE", "LOOSE_FILE", "BRIEF_LIST", "BRIEF_HEADER", "HISCORES_FILE",
                            "PLAYER_REINFORCEMENT", "LIMIT_ATACKERS", "ARRIVALS", "UNLOCKS", "UNIT_LIMITS", "ORDERS",
-                           "PLANS", "CLEVER_ATTACK", "PRICES"};
+                           "PLANS", "CLEVER_ATTACK", "PRICES", "FACTIONS"};
 constexpr int POSTS = 10;               // ATA_STAND0 ... ATA_STAND9
 
 // the train types of TrainsTactDeclares.lgc (ATT_<size>_<kind>)
@@ -2264,6 +2265,7 @@ std::vector<std::string> settings_block(const Mission& m, const ArrivalsState& a
         define("PRICES", std::to_string(prices.size()));
         define("CLEVER_ATTACK", std::to_string(ai.clever));
     }
+    define("FACTIONS", "1");   // the neutrals' and the pirates' rules, read as the level loads (factions.cpp)
     for (const auto& e : m.extra) define(e.first, e.second);
     out.push_back("#include \"maps\\script\\TrainsTactDeclares.lgc\"");
     types.push_back("-1");

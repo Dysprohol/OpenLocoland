@@ -158,7 +158,7 @@ Co widać:
 - **Wiersz stanu** u góry: narzędzie (albo to pod myszą), liczba kroków do cofnięcia i ponowienia,
   „nie zapisano” i ostatni komunikat - dlaczego czegoś nie da się zrobić, zawsze jest napisane tutaj.
 - **Przyciski ? i menu** na lewym końcu paska (tam, gdzie gra ma przycisk pauzy). **?** (albo F1)
-  otwiera pomoc: siedemnaście stron z tym, co jest w tym rozdziale, w skrócie. Zaczyna się od **spisu
+  otwiera pomoc: osiemnaście stron z tym, co jest w tym rozdziale, w skrócie. Zaczyna się od **spisu
   treści**: kategorie (PODSTAWY, TORY I POCIĄGI, OBIEKTY, MISJA I ZAPIS, TEREN, PRZYJAZDY I FABRYKI)
   po lewej, strony tej pod myszą po prawej - kliknięcie otwiera stronę. Strona ma swoją kategorię za
   tytuł i swój numer (5 / 17); strzałki, Page Up / Down i kółko zmieniają strony, a **SPIS TRESCI**,
@@ -385,8 +385,11 @@ Przyjazdy nie wybierzesz **PRZESTAW NA PRZYJAZDY**.
 **Zdobywanie**: neutralna fabryka albo punkt naprawczy staje się twój, gdy podjedzie do niego twój pociąg
 (fort albo kopalnia - gdy nie ma już ich dział).
 
-**Neutralni** (armia 2): nikt sam do nich nie strzela. W panelu neutralnego działa, fortu albo pociągu
-**STRZELA: DO WSZYSTKICH** sprawia, że strzela do gracza, wroga i piratów, **NIE** - że milczy.
+**Neutralni i piraci**: neutralni (armia 2) nigdy nie strzelają pierwsi. Gdy ktoś trafi neutralne działo,
+fort albo pociąg, ono i neutralni, którzy to widzą, odpowiadają tylko tej stronie - do końca misji, a
+ona może wtedy strzelać do nich. W panelu uzbrojonego neutralnego obiektu **STRZELA: W ODPOWIEDZI**
+(tak jest od początku) albo **NIGDY**. Piraci (armia 3) walczą ze wszystkimi stronami, a wszyscy z nimi
+(**W WALCE: PRZECIW WSZYSTKIM**). Tak gra mapa edytora; misje kampanii mają dawne zasady gry.
 
 ### 7. Wróg
 

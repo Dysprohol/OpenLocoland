@@ -2232,15 +2232,20 @@ applies it as one step of the history, the right button elsewhere closes it. Its
 TRAINS: the way they go, the other way turns it round), its colour and what its own line does (STOPS THEM / LETS THEM IN, or NONE;
 L / Shift+L), a row for each socket of a fort, a mining plant or a citadel
 (empty, a tower with a cannon 110, a missile tower 115; the citadel's the pirates' tower 117), and
-delete. A neutral object (army 2) has two more: IN A FIGHT - no one fires at it on its own
-(`Object_FindTarget` 0x449ea0 takes a target of any other army but army 2, unless the shooter's weapon
-has flag 0x80 or the enemy may hit neutral trains after `SetEnemyCanAttackNeutralTrains`) - and, armed
-(a gun, a fort's guns, a train with a turret), IT FIRES: at all in range or no - its behave's bit 1,
-`BEH_AGGRESSIVE`, set or cleared on its armed members, a step of the history (the editor's object state
-has the behave now). Such a unit fires at the player, the enemy and the pirates alike; the missions'
-neutrals (civil trains and robots) have the bit clear. Checked in play: a neutral missile tower with
-the bit took a player's train from 320 to 15 hp in 60 s and was not fired at by it, one without the bit
-left a train beside it at 450. A, R, E, T, L and Del stay as the keys for them. A gun goes exactly into its socket (the
+delete. A neutral object (army 2) and a pirate one (army 3) have a row IN A FIGHT, which says what
+it does by the rules of the map (MAP_RULES.md 6c, `faction_rows`). On a map of the editor (its
+settings have `FACTIONS 1`, LocoFix fix 33): a neutral one ONLY WHOEVER ATTACKS IT and, armed (a gun,
+a fort's guns, a train with a turret), IT FIRES: WHEN ATTACKED or NEVER - its behave's bit 1,
+`BEH_AGGRESSIVE`, set or cleared on its armed members, a step of the history (the editor's object
+state has the behave); a pirate one AGAINST ALL SIDES (a click sets the bit on an armed one that
+lacks it). A unit that becomes a neutral's or a pirate's - placed in that army or its army changed -
+gets the bit (`faction_behave`). On a campaign map the engine's rules: a neutral one NO ONE FIRES AT
+IT (`Object_FindTarget` 0x449ea0 takes a target of any other army but army 2, unless the shooter's
+weapon has flag 0x80 or the enemy may hit neutral trains after `SetEnemyCanAttackNeutralTrains`)
+and, armed, IT FIRES: AT ALL IN RANGE or NO - with the bit it fires at the player, the enemy and the
+pirates alike; the missions' neutrals (civil trains and robots) have the bit clear. Checked in play
+under the engine's rules: a neutral missile tower with the bit took a player's train from 320 to 15 hp in
+60 s and was not fired at by it, one without the bit left a train beside it at 450. A, R, E, T, L and Del stay as the keys for them. A gun goes exactly into its socket (the
 missions' offsets, MAP_RULES.md 6), with the host's army (on a citadel of army 0 the enemy's, as in
 the missions) and direction, and follows it. A gun in a socket is part of its host: a click on it
 selects the host (`pick`, `host_of`) and the right button opens the host's panel, where each socket
@@ -2566,11 +2571,11 @@ pictures (22 px right of the device's middle, 18 up), the title in the menu titl
 the text in the menu font (VID 2), the page arrows (VIDs 475/476) and the start button (VID 477)
 with "back to the map". **Help** (the ? button or F1) shows the editor's help pages the way the
 game shows its own (`maps\menu4.lst` -> `menu41.txt` ...): `maps\edithelp.lst` lists
-`maps\edithelp1.txt` ... `edithelp19.txt` - in the order a new user needs them: what the editor
+`maps\edithelp1.txt` ... `edithelp20.txt` - in the order a new user needs them: what the editor
 is (the bar, the status line, the two buttons), the bar's tools, selecting and placing (the mouse,
 undo), the keys, laying track, trains, the object's panel, all objects and decals, the mission,
 saving and playing, the ground (height, paint, water, regions, map size), the ground tools' rows,
-then the train arrivals and the orders (13, 14) turning (15) and the citadel, Charybdis, fly nests and mines (16; page 1 names 13-16), a factory's plan (17), the crusher, Scylla and the decorations' sets (18), the gravel bed (19) - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
+then the train arrivals and the orders (13, 14) turning (15) and the citadel, Charybdis, fly nests and mines (16; page 1 names 13-16), a factory's plan (17), the crusher, Scylla and the decorations' sets (18), the gravel bed (19), the neutrals and the pirates (20) - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
 44 characters a line - the ESC pairs not counted, so a line with lit words is longer in the file - and 14
 lines, ESC 7 / ESC 2 switch to the lit font VID 7 and back to VID 2):
 English in `game/maps/` (the fallback of every pack) and the others in `lang/<code>/game/editor/`; the files are
@@ -2959,6 +2964,14 @@ mode above) are not tested in full screen.
       that does not answer (the notice after 5.2 s), with the shipped `update.txt`, a replaced one
       (its notice, and its `link=` copied by the menu) and none (the built-in English); the box
       ticked checks as the launcher opens, OK saves it,
+  34. the neutrals and the pirates of an editor map (`factions.cpp`, MAP_RULES.md 6d): on a map
+      whose script has `#define FACTIONS 1` (the editor writes it, read from `<map>.lgc` in the
+      `Level_Load` wrapper of `frame_limit.cpp`) the army test of `Object_FindTarget` (0x449f7b ...
+      0x449ff3) jumps to `may_target`, and the two `ACT_DAMAGE` calls of an explosion
+      (`Object_Action` 15, 0x447e9c and 0x447eb0) first call `note_hit`: a neutral hit by an army,
+      and every armed neutral that sees it, answer that army - and only it - to the end of the level,
+      and that army may fire at them; the pirates may fire at the neutrals. On any other map
+      `may_target` is the engine's test and nothing is noted, so the missions play as before,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that

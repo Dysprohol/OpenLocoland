@@ -369,6 +369,39 @@ turned, raised and deleted as one object; a click on a piece selects the host; t
 a piece of several kinds (CORKSCREW: WHOLE / BROKEN, ON TOP:, FLAG:, SMOKE:, FOUNTAIN:) and puts back a
 missing one; a map's own records are found again by their offsets.
 
+## 6d. Neutrals and pirates in a fight
+
+**The engine** (the campaign's rules). A unit fires on its own only with `BEH_AGGRESSIVE` (behave
+bit 1); its target comes from `Object_FindTarget` (0x449ea0), which takes a unit of another army
+within the weapon's detect range - but never one of army 2 (the neutrals), unless the weapon has
+flag 0x80 or the shooter is the enemy (army 1), the target a train and the script called
+`SetEnemyCanAttackNeutralTrains(1)` (l02, l04, l17, l20). So no one fires at a neutral on its own,
+the pirates (army 3) fire at ours and the enemy but not at the neutrals, and a neutral with the bit
+fires at the player, the enemy and the pirates alike. The missions' neutrals (civil trains, robots,
+the factories and repair points to capture) are unarmed or have the bit clear: they never fire, and
+no mission script makes one fight back; a neutral fort or mining plant changes army when it is
+captured (`F162_0` of `ai_default_event.lgc`, to the army of the train that took it).
+
+**A map of the editor** (`#define FACTIONS 1` in its settings - the editor writes it, the template
+has it - read by LocoFix `factions.cpp` as the level loads; a map without it keeps the engine's
+rules):
+- **A neutral never fires first.** When a unit of another army damages a neutral object (a shot's
+  explosion, `Object_Action` 15, the projectile has its shooter's army), that object and every armed
+  neutral that sees it (within its weapon's detect range) answer that army - only that one, as a
+  captured neutral goes over to one army in the missions - to the end of the level; that army's units
+  may then fire at them on their own as well. An armed neutral's panel: IT FIRES: WHEN ATTACKED (the
+  bit set; new neutral units get it) or NEVER (clear: it does not answer either).
+- **The pirates fight every side**: their guns and trains fire at ours, the enemy and the neutrals,
+  and everyone fires at them. A unit that becomes a pirate's gets the bit.
+- Checked in play (sandbox track, test maps of the `factions` branch): a neutral fort's missile tower
+  beside the player's train fired nothing for 80 s, then the train was told to attack it - the
+  towers answered at once, the train destroyed that one and the fort's other tower shot the train
+  down; a neutral armed train
+  patrolled through an enemy fort for 175 s with no shot either way; a pirate fort shot down a
+  player's armed train (which destroyed one of its towers), an enemy's and a neutral locomotive; a
+  pirate armed train and an armed train of ours, the enemy's or a neutral one 300 px apart fired at
+  each other (the neutral one after it was hit).
+
 ## 7. Semaphores (VID 152)
 
 - A post with a lamp (halo VID 154, light spot VID 155), army 0, on the ground, 16-29 px

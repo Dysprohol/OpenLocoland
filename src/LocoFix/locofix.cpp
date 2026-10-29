@@ -20,6 +20,7 @@ void install_birth_animation();
 void install_adopt_command();
 void install_shadow_leak();
 void install_unit_limit();
+void install_factions();
 void install_fast_ftol();
 void install_layer10_lock();
 void install_mouse_coords();
@@ -114,6 +115,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         install_adopt_command();
         install_shadow_leak();
         install_unit_limit();
+        install_factions();
         install_fast_ftol();
         install_layer10_lock();
         install_mouse_coords();

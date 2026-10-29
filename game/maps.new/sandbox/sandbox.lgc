@@ -118,6 +118,7 @@ int this_train14[]={25,10,25,0};
 #define PLANS 2
 #define PRICES 0
 #define CLEVER_ATTACK 1
+#define FACTIONS 1
 #include "maps\script\TrainsTactDeclares.lgc"
 int start_trains[]={-1};
 int start_trains_task[]={0};

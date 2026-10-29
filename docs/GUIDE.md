@@ -158,7 +158,7 @@ What you see:
 - **The status line** at the top: the tool (or the one under the mouse), the undo and redo counts,
   "not saved" and the last message - why something could not be done is always written there.
 - **The ? and menu buttons** at the left end of the bar (where the game has its pause button).
-  **?** (or F1) opens the help: seventeen pages with everything of this chapter in short. It starts on
+  **?** (or F1) opens the help: eighteen pages with everything of this chapter in short. It starts on
   its **contents**: the categories (BASICS, TRACK AND TRAINS, OBJECTS, MISSION, SAVING, GROUND,
   ARRIVALS, FACTORIES) on the left, the pages of the one under the mouse on the right - a click opens
   one. A page has its category for the title and its number (5 / 17); the arrows, Page Up / Down and
@@ -392,9 +392,11 @@ on the track. ORDERS are there only in a map that runs arrivals; a map made with
 **Capturing**: a neutral factory or repair point becomes yours when one of your trains comes close to it
 (a fort or a mining plant once its guns are gone).
 
-**Neutrals** (army 2): no one fires at them on their own. In the panel of a neutral gun, fort or train,
-**IT FIRES: AT ALL IN RANGE** makes it fire at the player, the enemy and the pirates alike, **NO** keeps
-it quiet.
+**Neutrals and pirates**: the neutrals (army 2) never fire first. When a side hits a neutral gun, fort
+or train, it and the neutrals that see it answer that side only - to the end of the mission, and that
+side may fire at them then. The panel of an armed neutral object has **IT FIRES: WHEN ATTACKED** (as it
+starts) or **NEVER**. The pirates (army 3) fight every side, and every side fights them (**IN A FIGHT:
+AGAINST ALL SIDES**). A map of the editor plays so; the campaign's missions keep the game's old rules.
 
 ### 7. The enemy
 

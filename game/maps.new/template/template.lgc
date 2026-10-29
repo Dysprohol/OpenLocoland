@@ -54,6 +54,7 @@ int player_reinforcement_train[]={5,0};
 #define PLANS 0
 #define CLEVER_ATTACK 1
 #define PRICES 0
+#define FACTIONS 1
 #include "maps\script\TrainsTactDeclares.lgc"
 int start_trains[]={-1};
 int start_trains_task[]={0};
@@ -148,7 +149,9 @@ int price_of[]={0};
 // gets later, UNIT_LIMITS, limit_*[] the unit limits, PLANS, plan_*[] the enemy factory's plan (a
 // factory's panel: the next block puts each entry into level_queue_* when it is due), CLEVER_ATTACK
 // SetCleverEnemyAttack's value (RENEW_TIMEOUT, FIRSTCONTACTTIME, FIRSTATTACKTIME, start_trains_renew
-// and start_trains_random_task are the AI's other knobs of the panel).
+// and start_trains_random_task are the AI's other knobs of the panel), FACTIONS 1 the editor's
+// rules of a fight, which LocoFix applies to a map with it: a neutral (army 2) fires only back, at
+// an army that hit it or a neutral it sees, the pirates (army 3) at every side (MAP_RULES.md 6c).
 #include "maps\script\header.lgc"
 // <editor arrivals> the trains that arrive (the Arrivals panel) - written by the map editor when the map is saved
 // ArrivalsTact() brings the trains of the arrays arrival_*[] (the settings' block above), once a

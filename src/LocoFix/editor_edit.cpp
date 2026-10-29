@@ -2235,6 +2235,17 @@ void turn(int steps) {
     MESSAGE("MsgTurned", "turned VID %d to direction %d", nvid_of(o), direction);
 }
 
+bool armed(uint8_t* o);   // "the neutrals and the pirates in a fight", below
+
+// A unit that becomes a neutral's or a pirate's fires on its own (BEH_AGGRESSIVE): on a map of the
+// editor (FACTIONS) a neutral one only back at whoever attacks it, a pirate one at every side
+// (factions.cpp); the panel's NEVER clears it for a neutral.
+void faction_behave(uint8_t* o) {
+    const int army = army_of(o);
+    if ((army == 2 || army == 3) && is_unit_class(class_of(o)) && armed(o) && !(at<int>(o, O_BEHAVE) & 1))
+        act(o, ACT_SET_BEHAVE, at<int>(o, O_BEHAVE) | 1);
+}
+
 // The army of the selection: the object's and its guns' (a whole's: its faction, its other pieces army 0).
 void set_army(int army) {
     if (g_selection.empty() || class_of(g_selection[0]) == B_RAIL) return;
@@ -2243,11 +2254,13 @@ void set_army(int army) {
     const std::vector<Piece>& kinds = kinds_of(host);
     const std::vector<uint8_t*> pieces = pieces_on(host);
     for (uint8_t* o : g_selection) {
+        const int was = army_of(o);
         const auto piece = std::find(pieces.begin(), pieces.end(), o);
         if (o != host && piece != pieces.end())   // a piece of a whole: the faction's or army 0
             act(o, ACT_SET_ARMY, piece_army(kinds[piece - pieces.begin()], army));
         else   // the host and its guns (a whole's army is its faction)
             act(o, ACT_SET_ARMY, army);
+        if (army_of(o) != was) faction_behave(o);
     }
     commit({"OpArmy", "army"}, g_selection, before);
     MESSAGE("MsgArmy", "VID %d: army %d (%s)", nvid_of(host), army, army_name(army));
@@ -2464,6 +2477,7 @@ uint8_t* create(int nvid, float x, float y, float z, int direction, int army) {
     if (!o) return nullptr;
     if (army != army_of(o)) act(o, ACT_SET_ARMY, army);   // a gun of army 0 is the enemy's as created
     copy_unit_state(o);
+    faction_behave(o);
     return o;
 }
 
@@ -6429,13 +6443,18 @@ std::vector<Hit> g_context_hits;   // the choices where the last frame drew them
 constexpr int CONTEXT_FONT = 2, CONTEXT_LIT = 7, CONTEXT_STEP = 6;
 constexpr float CONTEXT_ROW = 41, CONTEXT_WIDTH = 409, CONTEXT_LABEL = 15;   // the label's characters
 
-// ---- the neutrals (army 2) in a fight ----
+// ---- the neutrals and the pirates in a fight ----
 //
-// What Object_FindTarget (0x449ea0) lets a unit aim at: anything of another army - except army 2,
-// which no one fires at on its own (a weapon with flag 0x80 aside; the enemy at neutral trains after
-// script SetEnemyCanAttackNeutralTrains, which no map of the editor calls) -, so a neutral unit
-// itself fires at the player, the enemy and the pirates alike when it fires on its own: BEH_AGGRESSIVE
-// (behave bit 1) - the missions' neutrals (civil trains and robots) have it clear and never fire.
+// What Object_FindTarget (0x449ea0) lets a unit firing on its own (BEH_AGGRESSIVE, behave bit 1)
+// aim at: anything of another army - except army 2, which no one fires at on its own (a weapon with
+// flag 0x80 aside; the enemy at neutral trains after script SetEnemyCanAttackNeutralTrains, which no
+// map of the editor calls) -, so on a campaign map a neutral unit with the bit fires at the player,
+// the enemy and the pirates alike, and the pirates leave the neutrals alone; the missions' neutrals
+// (civil trains and robots) have the bit clear and never fire. A map of the editor (FACTIONS in its
+// settings) has the editor's rules instead (factions.cpp, MAP_RULES.md 6c): a neutral fires only
+// back - at an army that hit it, or hit a neutral it sees -, and that army's units may fire at it
+// then; the pirates fire at every side and every side at them. A unit that becomes a neutral's or a
+// pirate's gets the bit (faction_behave); a neutral's panel can clear it (NEVER).
 
 // An object that has a weapon, or whose linked turret has one (a combat car).
 bool armed(uint8_t* o) {
@@ -6460,25 +6479,40 @@ std::vector<uint8_t*> armed_of(uint8_t* o) {
     return out;
 }
 
-void set_fires(uint8_t* o, bool on) {
+void set_fires(uint8_t* o, bool on, const UiText& what) {
     const std::vector<uint8_t*> members = armed_of(o);
+    if (members.empty()) return;
     const std::vector<State> before = states(members);
     for (uint8_t* m : members) act(m, ACT_SET_BEHAVE, on ? (at<int>(m, O_BEHAVE) | 1) : (at<int>(m, O_BEHAVE) & ~1));
     commit({"OpFires", "fires on its own"}, members, before);
-    MESSAGE("MsgFires", "%u armed units of VID %d fire on their own: %s", static_cast<unsigned>(members.size()), nvid_of(o),
-            on ? ui_text("WordYes", "YES") : ui_text("WordNo", "NO"));
+    MESSAGE("MsgFires", "%u armed units of VID %d fire: %s", static_cast<unsigned>(members.size()), nvid_of(o), what.get());
 }
 
-// A neutral object's rows: no one fires at it on its own; armed, whether it fires on its own.
-void neutral_rows(uint8_t* o, std::vector<ContextRow>& rows) {
-    if (army_of(o) != 2) return;
-    rows.push_back({{"CtxNeutralFight", "IN A FIGHT:"}, {{{"CtxNobodyFires", "NO ONE FIRES AT IT"}, true, [] {}}}});
+// A neutral's or a pirate's rows: what it does in a fight; armed, whether it fires on its own.
+void faction_rows(uint8_t* o, std::vector<ContextRow>& rows) {
+    const int army = army_of(o);
+    if (army != 2 && army != 3) return;
     const std::vector<uint8_t*> members = armed_of(o);
-    if (members.empty()) return;
     const bool on = std::any_of(members.begin(), members.end(), [](uint8_t* m) { return (at<int>(m, O_BEHAVE) & 1) != 0; });
+    if (!mission_managed()) {   // a campaign map: the engine's rules
+        if (army != 2) return;
+        rows.push_back({{"CtxNeutralFight", "IN A FIGHT:"}, {{{"CtxNobodyFires", "NO ONE FIRES AT IT"}, true, [] {}}}});
+        if (members.empty()) return;
+        const UiText yes{"CtxFiresYes", "AT ALL IN RANGE"}, no{"CtxFiresNo", "NO"};
+        rows.push_back({{"CtxFires", "IT FIRES:"},
+                        {{yes, on, [o, yes] { set_fires(o, true, yes); }}, {no, !on, [o, no] { set_fires(o, false, no); }}}});
+        return;
+    }
+    if (army == 3) {   // every side; one without the bit gets it
+        const UiText all{"CtxPiratesFight", "AGAINST ALL SIDES"};
+        rows.push_back({{"CtxNeutralFight", "IN A FIGHT:"}, {{all, members.empty() || on, [o, all] { set_fires(o, true, all); }}}});
+        return;
+    }
+    rows.push_back({{"CtxNeutralFight", "IN A FIGHT:"}, {{{"CtxNeutralAnswers", "ONLY WHOEVER ATTACKS IT"}, true, [] {}}}});
+    if (members.empty()) return;
+    const UiText back{"CtxFiresBack", "WHEN ATTACKED"}, never{"CtxFiresNever", "NEVER"};
     rows.push_back({{"CtxFires", "IT FIRES:"},
-                    {{{"CtxFiresYes", "AT ALL IN RANGE"}, on, [o] { set_fires(o, true); }},
-                     {{"CtxFiresNo", "NO"}, !on, [o] { set_fires(o, false); }}}});
+                    {{back, on, [o, back] { set_fires(o, true, back); }}, {never, !on, [o, never] { set_fires(o, false, never); }}}});
 }
 
 // The gun `nvid` (0: none) into socket `i` of the host: the old one goes, the new one comes.
@@ -6669,7 +6703,7 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
                           }}}});
         return rows;
     }
-    neutral_rows(o, rows);
+    faction_rows(o, rows);
     if (is_car(o)) {   // its train
         ContextRow train{{"CtxTrain", "TRAIN:"}, {{{"CtxReverse", "TURN ROUND (R)"}, false, [o] { reverse_train(o); }}}};
         if (car_prev(o)) train.choices.push_back({{"CtxUncouple", "UNCOUPLE (U)"}, false, [o] { uncouple(o); }});

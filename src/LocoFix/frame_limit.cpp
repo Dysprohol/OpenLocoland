@@ -38,6 +38,7 @@ void editor_level_loading(void* world);
 const char* editor_level_redirect(const char* map);
 void editor_level_loaded(void* world);
 void restart_level_loading(const char* map);   // restart.cpp
+void factions_level_loading(const char* map);  // factions.cpp
 
 namespace {
 
@@ -161,6 +162,7 @@ int __fastcall LevelLoad_measured(void* world, void* edx, const char* name) {
     const char* map = editor_level_redirect(test_map_replace(name));
     lstrcpynA(g_level, map ? map : "?", sizeof g_level);
     restart_level_loading(map);
+    factions_level_loading(map);
     editor_level_loading(world);
     const int result = g_level_load(world, edx, map);
     test_map_check(world);
