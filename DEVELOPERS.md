@@ -2577,8 +2577,10 @@ mode above) are not tested in full screen.
   canvas: the game scales that 4:3 picture to fit the window and centres it (pillarboxes
   in a 16:9 window), so the points are scaled and moved the same way. The logs it watches
   are the game's own and `LocoFix.log`, where test mode also lists every file the game
-  opens. The game only runs while its window is in front, so the test keeps bringing
-  it forward while waiting. Full screen is not part of the automatic tests - switching the mode
+  opens. In test mode the game keeps running behind other windows (`test.cpp` does not
+  pass `WM_ACTIVATEAPP` FALSE to the game, which would pause it and ignore the mouse), so a test
+  never brings the window forward and the user keeps the focus; only the game's own start (the
+  launcher dialog) takes it once. Full screen is not part of the automatic tests - switching the mode
   breaks the redrawing of other windows; `-SetFull 1` runs a single test in it. `-Map maps\l01\l01.map` starts straight into that
   map (LocoFix `--test-map`: no intro, no menu) and `-LogWait` sets how long `-WaitFor` may
   take (60 s). `-Editor` starts the game in editor mode (`--editor`); there the steps

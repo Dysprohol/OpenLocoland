@@ -162,12 +162,10 @@ function Wait-GameWin([int]$max = 10) {
     Start-Sleep -Milliseconds 250
   }
 }
-# The game only runs while its window is in front, so the window is brought forward
-# whenever the test waits for it.
-function Focus-Game {
-  $w = Find-GameWin
-  if ($w) { [void][W]::SetForegroundWindow($w) }
-}
+# In test mode LocoFix keeps the game active behind other windows (test.cpp: WM_ACTIVATEAPP
+# FALSE is not passed to the game), so the test never brings the window forward: the user
+# keeps the focus. Only the explicit Alt+Tab step (A) and typing into a file dialog (Q) touch it.
+function Focus-Game { }
 
 # Waits at most $max seconds until the logs match $pattern (".*" can span lines).
 function Wait-Log($pattern, $max) {
@@ -190,14 +188,14 @@ if ($ClickOk -gt 0) {
 
 function Save-Shot($h, $file) {
   $r = New-Object W+RECT; [void][W]::GetWindowRect($h, [ref]$r)
-  [void][W]::SetForegroundWindow($h); Start-Sleep -Milliseconds 800
   $bmp = New-Object Drawing.Bitmap ($r.R - $r.L), ($r.B - $r.T)
   $g = [Drawing.Graphics]::FromImage($bmp)
-  # PrintWindow draws just the game window, even when something covers it; when the
-  # result is black (some Direct3D modes), we copy the screen instead.
+  # PrintWindow draws just the game window, even when something covers it, without bringing
+  # it forward; only when the result is black (some Direct3D modes) is the window brought
+  # forward for a moment and the screen copied instead.
   $hdc = $g.GetHdc(); [void][W]::PrintWindow($h, $hdc, 2); $g.ReleaseHdc($hdc)
   $mid = $bmp.GetPixel([int]($bmp.Width / 2), [int]($bmp.Height / 2))
-  if ($mid.R + $mid.G + $mid.B -eq 0) { $g.CopyFromScreen($r.L, $r.T, 0, 0, $bmp.Size) }
+  if ($mid.R + $mid.G + $mid.B -eq 0) { [void][W]::SetForegroundWindow($h); Start-Sleep -Milliseconds 800; $g.CopyFromScreen($r.L, $r.T, 0, 0, $bmp.Size) }
   $bmp.Save($file); $g.Dispose(); $bmp.Dispose()
   "Screenshot: $file"
 }
@@ -252,7 +250,6 @@ if ($Steps) {
     if ($sec -match '^(\d+)\?(.+)$' -and [regex]::IsMatch((Read-Logs), $Matches[2], 'Singleline')) {
       "Step ${n}: already done"; continue
     }
-    [void][W]::SetForegroundWindow($game)
     if ($vk -match '^d(\d+):(\d+)-(\d+):(\d+)$') {
       # middle button drag (camera panning, src/LocoFix/mouse_pan.cpp): press at the first
       # point, move to the second in 10 steps over half a second, release

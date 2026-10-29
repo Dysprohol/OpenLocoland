@@ -10,7 +10,12 @@
 //    and turn the message into an ordinary mouse message,
 //  - messages from the real mouse in the queue are ignored,
 //  - the window procedure gets the virtual cursor position in every WM_NCHITTEST,
-//  - GetCursorPos/SetCursorPos work on the virtual cursor.
+//  - GetCursorPos/SetCursorPos work on the virtual cursor,
+//  - the game stays active: WM_ACTIVATEAPP with FALSE is not passed on (World_HandleMessage
+//    clears World flags 0x8 on it, after which GameWorld_Run sleeps and Mouse_HandleMessage
+//    ignores the mouse), and WM_ACTIVATEAPP TRUE is posted once when the window is shown, in
+//    case it came up behind another one - so a test runs with the game window behind the
+//    user's and never has to bring it forward (test_game.ps1 does not).
 // Outside test mode nothing changes.
 #include "patch.h"
 
@@ -25,8 +30,15 @@ constexpr UINT WM_TEST_MOUSE = WM_APP + 1;
 POINT g_cursor = {0, 0};   // screen coordinates
 WNDPROC g_game_wndproc = nullptr;
 
+bool g_activated = false;
+
 LRESULT CALLBACK test_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
     if (m == WM_NCHITTEST) l = MAKELPARAM(g_cursor.x, g_cursor.y);
+    if (m == WM_ACTIVATEAPP && !w) return 0;   // the game keeps running behind other windows
+    if (m == WM_SHOWWINDOW && w && !g_activated) {
+        g_activated = true;
+        PostMessageA(window, WM_ACTIVATEAPP, TRUE, 0);
+    }
     return CallWindowProcA(g_game_wndproc, window, m, w, l);
 }
 
@@ -85,5 +97,5 @@ void install_test_mode() {
     replace_iat(IAT_SetCursorPos, reinterpret_cast<void*>(&virtual_SetCursorPos));
     replace_iat(IAT_PeekMessageA, reinterpret_cast<void*>(&PeekMessageA_test));
     replace_iat(IAT_RegisterClassA, reinterpret_cast<void*>(&RegisterClassA_test));
-    patch::log("test mode: mouse input from the test only");
+    patch::log("test mode: mouse input from the test only, the game stays active behind other windows");
 }
