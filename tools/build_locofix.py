@@ -17,6 +17,8 @@ REPO = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.dirname(os.path
 SOURCES = os.path.join(REPO, "src", "LocoFix")
 OUT_DIR = os.path.join(REPO, "build", "LocoFix")
 DLL = os.path.join(OUT_DIR, "LocoFix.dll")
+# system DLLs only the launcher's update check uses (update_check.cpp): loaded at its first call
+DELAY_LOAD = " ".join(f"/DELAYLOAD:{d}" for d in ("winhttp.dll", "bcrypt.dll", "shell32.dll", "ole32.dll"))
 
 
 def vcvars32():
@@ -67,7 +69,8 @@ def build(out_dir=OUT_DIR, version=None):
         f.write(f'call "{bat}" >nul || exit /b 1\r\n')
         f.write(f'cd /d "{out_dir}"\r\n')
         f.write(f"cl /nologo /O2 /MT /LD /EHsc /utf-8 /W4 /std:c++17 {define}{cpp} "
-                f"/Fe:LocoFix.dll /link user32.lib advapi32.lib\r\n")
+                f"/Fe:LocoFix.dll /link user32.lib advapi32.lib winhttp.lib bcrypt.lib shell32.lib ole32.lib "
+                f"delayimp.lib {DELAY_LOAD}\r\n")
     result = subprocess.run(["cmd", "/c", script], capture_output=True, text=True, errors="replace")
     if result.returncode != 0 or not os.path.isfile(dll):
         sys.exit("LocoFix build failed:\n" + result.stdout + result.stderr)

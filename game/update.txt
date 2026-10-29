@@ -1,0 +1,11 @@
+; OpenLocoland: the notice the launcher shows when "Check for updates" cannot reach GitHub (no
+; network, or the project is not there any more) - one line per language pack code, en= for the
+; others; link= is the address the launcher's GitHub link opens then. UTF-8. A later Setup or the
+; player may replace this file (src/LocoFix/update_check.cpp).
+link=https://github.com/Dysprohol/OpenLocoland/releases
+en=Cannot check for updates. Project page: github.com/Dysprohol/OpenLocoland
+pl=Nie można sprawdzić aktualizacji. Strona projektu: github.com/Dysprohol/OpenLocoland
+de=Updates können nicht geprüft werden. Projektseite: github.com/Dysprohol/OpenLocoland
+hu=Nem sikerült ellenőrizni a frissítéseket. A projekt oldala: github.com/Dysprohol/OpenLocoland
+ru=Не удалось проверить обновления. Страница проекта: github.com/Dysprohol/OpenLocoland
+cs=Aktualizace nelze zkontrolovat. Stránka projektu: github.com/Dysprohol/OpenLocoland

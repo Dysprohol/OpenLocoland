@@ -64,6 +64,11 @@ under the frame limit - the launcher's choice counts from that start on, nothing
   always in normal play, where a later mission cannot be played) - so turning the option off
   shows the real progress again. The missions' scores are saved as before.
 
+**Updates.** "Sprawdź aktualizacje" / "Check for updates" in the launcher asks GitHub for the latest
+release; a newer one than the running version is offered with its Setup.exe, downloaded into the
+Downloads folder and started on a click (LocoFix fix 33); the box "przy starcie" / "at start" next to
+it (off by default) checks every time the launcher opens. Nothing is updated by itself.
+
 **Developers** build the game from the repository instead. Requirements: the game installed
 through Steam, Python 3, Visual Studio or Build Tools with the C++ tools (for LocoFix.dll); for
 decompiling, Java 21 and Ghidra.
@@ -138,7 +143,7 @@ For working on the engine, generate the local reverse-engineering output (not in
 
 | Folder | Contents |
 |---|---|
-| `game/` | Our files for the game folder (`Locoland.cfg`, `dgVoodoo.conf`, `maps/custom.lst` - the custom maps of the menu) and changes to original files as `<file>.patch` (`maps/logo.lgc.patch`, `maps/menu.lgc.patch`) - same structure as the game folder; `maps/script/cheats.lgc`, `unlock.lgc` and their `_on` variants are the launcher's options (LocoFix fix 30). `objects.override/` would hold changed values of `objects.res` (see "Editing objects.res"), `maps.override/<map>/` changed objects of a map (`l11`: a rail of mission 11, `BUGS.md` F21) and `maps.new/<map>/` whole new maps (see "Editing maps and images"); `maps.new/template` (the empty template) and `maps.new/sandbox` (the one to play) at the moment, and `run_map.cmd` - a double-click at the game starts the sample map, `run_map <map>` any map; `edit_map.cmd` the same in editor mode (see "Editor mode"). |
+| `game/` | Our files for the game folder (`Locoland.cfg`, `dgVoodoo.conf`, `maps/custom.lst` - the custom maps of the menu) and changes to original files as `<file>.patch` (`maps/logo.lgc.patch`, `maps/menu.lgc.patch`) - same structure as the game folder; `maps/script/cheats.lgc`, `unlock.lgc` and their `_on` variants are the launcher's options (LocoFix fix 30); `update.txt` is the launcher's notice when the update check cannot reach GitHub (fix 33). `objects.override/` would hold changed values of `objects.res` (see "Editing objects.res"), `maps.override/<map>/` changed objects of a map (`l11`: a rail of mission 11, `BUGS.md` F21) and `maps.new/<map>/` whole new maps (see "Editing maps and images"); `maps.new/template` (the empty template) and `maps.new/sandbox` (the one to play) at the moment, and `run_map.cmd` - a double-click at the game starts the sample map, `run_map <map>` any map; `edit_map.cmd` the same in editor mode (see "Editor mode"). |
 | `docs/` | The player's guide for the release, in Polish and English only (the German, Hungarian and Russian players get the English one): `PRZEWODNIK.md` (Polish) and `GUIDE.md` (English) - installing, what is new in the game, the custom maps page, the map editor with a tutorial and its keys - and a few screenshots of the game in `docs/img/`. Version 0.1; keep the guides in step with the in-game help pages (`maps/edithelp*.txt`) and "Editor mode" below. |
 | `lang/<code>/` | Our translation work for each language pack (`cs`, `de`, `en`, `hu`, `pl`, `ru`): `language.ini` (the launcher's name and labels, `codepage`, `base` for a translation Steam does not ship) and in `game/` the texts by kind, each assembled into its place in `<game>\lang\<code>\` (`languages.pack_path`): `game/strings.override.ini` -> `strings.ini` (changes to the captured file), `game/briefings/<map>/` -> `maps\<map>\` (the missions', POLIGON's and the template's texts), `game/menus/menu*.txt` -> `maps\` (the menu's pages), `game/editor/edithelp*.txt` -> `maps\` (the editor's help pages), `game/scripts/*.lgc.patch` -> `maps\script\` and `game/scripts/shiftb.txt.patch` -> `maps\` (the developer mode). A pack ships only what it changes; the rest comes from its capture. `lang/_template/` is the starting point of a new translation (a placeholder for every file and `README.md` notes per folder) and not a pack: `languages.packs()` leaves out folders starting with `_`, and no `README.md` is shipped. Each pack's texts are in its code page (CP1250/1251/1252); format details in `docs/TRANSLATING.md` and `tools/patch_text.py`. |
 | `external/dgVoodoo2/` | dgVoodoo2 2.87.5 (`DDraw.dll`, `D3DImm.dll`, unmodified; credit in `NOTICE.md`). |
@@ -182,7 +187,9 @@ redirects a normal user's writes there to the VirtualStore, so LocoFix moves tha
 `HKEY_CURRENT_USER\SOFTWARE\Gromada\Locoland\Players` (fix 24 below, `BUGS.md` F15).
 LocoFix keeps its own settings next to them, chosen in the launcher: `Language`,
 `FrameLimit` (frames per second, default 60, 0 = no limit), `FpsCounter` (0/1) and the
-options `Cheats` and `UnlockMissions` (0/1, DWORD; "Quick start", `options.cpp`).
+options `Cheats` and `UnlockMissions` (0/1, DWORD; "Quick start", `options.cpp`), and for the update
+check `UpdateCheckAtStart` (0/1, DWORD) and `UpdateLastCheck` (the date and the tag it found,
+`update_check.cpp`).
 
 **Game logic in scripts.** Missions, AI, menus and end screens are in `maps\**\*.lgc` - a
 C-like language of its own, compiled to bytecode on every start. Engine functions available
@@ -2816,6 +2823,44 @@ mode above) are not tested in full screen.
       were about a quarter of the main thread. With nothing in layer 10 (no object, and no member
       of the cursor chain drawn there) the block is skipped; with a message on the screen the
       original code runs. 5 locks per frame became 3,
+  33. "check for updates" in the launcher (`update_check.cpp`): a row under the options with the
+      button "Sprawdź aktualizacje" / "Check for updates", the box "przy starcie" / "at start"
+      (`UpdateCheckAtStart`, off by default: the check runs as the launcher opens), a link "GitHub"
+      (the releases page, or the new release's; its right button opens it or copies the address)
+      and a result line with a button beside it (labels `check_updates`, `check_at_start`,
+      `update_*`, `open_link`, `copy_link` of `[launcher]`, filled in with %1 / %2). The check
+      runs in a thread of its own: a GET of
+      `https://api.github.com/repos/Dysprohol/OpenLocoland/releases/latest` with WinHTTP (a
+      User-Agent "OpenLocoland/<version>", 5 s timeouts and a 5 s deadline of the dialog's own -
+      WinHTTP let a host that does not answer take 8 s; an answer after it still counts), and the
+      answer is read as text: `tag_name`, the release's `html_url` and of the asset whose name ends
+      with `Setup.exe` its `browser_download_url`, `size` and `digest`. The tag is compared with
+      `LOCOFIX_VERSION` by its numbers (a leading "v" dropped, a missing number 0): a newer tag
+      shows "Jest nowa wersja ... (masz ...)" / "New version ... (you have ...)" with Download, the same
+      or an older one "Masz aktualną wersję" / "You have the latest version"; a build after a tag
+      (v0.1.10-17-gcef9557) counts as the tag, and "dev" has no numbers, so it shows the latest
+      version without Download. Download writes the Setup into the Downloads folder
+      (`FOLDERID_Downloads`) as `<name>.part` with the progress in the line and Cancel on the button,
+      checks its size and SHA-256 against the release's (`bcrypt`), marks it as downloaded from the
+      internet (`Zone.Identifier`, as a browser does: Windows checks it when it starts) and renames
+      it; Run Setup asks first and starts it, then closes the game (the launcher's Cancel), so Setup
+      can update the install. No answer, an HTTP error (404: the repository gone) or an answer
+      without a release shows the notice of `update.txt` in the game folder (`game/update.txt`,
+      UTF-8: a line per language pack code, `en=` for the packs without one, and `link=`, the
+      address the link opens then) or, without the file, the English one built in; a later Setup or
+      the player can replace the file. The date and the tag of the last answer are kept as
+      `UpdateLastCheck` and shown until the next check. WinHTTP, bcrypt, shell32 and ole32 are
+      delay-loaded (`build_locofix.py`): a launcher where nobody checks loads none of them. The
+      controls use the TrueType Microsoft Sans Serif in the dialog font's size: the bitmap MS Sans
+      Serif has only the letters of code page 1252, and a button measured its Russian label with it
+      but drew it with a wider fallback, cut off. `LOCOFIX_UPDATE_URL` replaces the API's address
+      (tests). Checked in the game with DLLs built as v0.1.9 (New version v0.1.10, Download: 37158157
+      bytes and the release's SHA-256, the zone mark, Run Setup's question; Cancel halfway removed the
+      part), v0.1.10 and v0.1.10-17-gcef9557 (the latest version) and dev, in all six languages;
+      unreachable: a host that does not exist, a repository that does not exist (404) and an address
+      that does not answer (the notice after 5.2 s), with the shipped `update.txt`, a replaced one
+      (its notice, and its `link=` copied by the menu) and none (the built-in English); the box
+      ticked checks as the launcher opens, OK saves it,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
@@ -3084,6 +3129,10 @@ from their own Steam copy, as `build.py` does it for a developer.
 4. PyInstaller (`--onefile --windowed`) freezes `tools/installer.py` - the window - with
    `build.py` and every module it imports (Pillow for the generated pictures included) and the
    payload, which the frozen modules find in `sys._MEIPASS` (`build.REPO`, `languages.REPO`).
+
+The launcher's update check (LocoFix fix 33) reads the release GitHub calls the latest - the newest
+that is neither a draft nor a pre-release - so a release is found by it when its tag is
+`vX.Y.Z` (compared by the numbers) and its Setup is an asset whose name ends with `Setup.exe`.
 
 The icon of Setup.exe (the file and its window) is `tools/icon/openlocoland.ico`: a golden cog in the
 brass look of the game, our own drawing - `tools/make_icon.py` writes it as an SVG

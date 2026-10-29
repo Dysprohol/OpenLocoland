@@ -40,6 +40,7 @@ void install_editor();
 void restart_wait();
 void install_options();
 void install_restart();
+void install_update_check();
 
 namespace {
 
@@ -134,6 +135,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         install_frame_limit();
         install_options();   // after language and frame_limit: takes their CreateFileA and DialogBoxParamA
         install_restart();   // after options: takes its DialogBoxParamA entry
+        install_update_check();   // after restart: takes its DialogBoxParamA entry
     } else if (reason == DLL_PROCESS_DETACH) {
         frame_limit_exit();
     }

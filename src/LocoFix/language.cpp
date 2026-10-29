@@ -14,7 +14,8 @@
 // too, or without it to the language of the game's own files (lang\root.txt, written by
 // build.py: Steam's language when there is no English capture). A fan translation (base=
 // another language) has the [launcher] label unofficial= after its name in the open list.
-// Other modules' launcher controls are labelled the same way (add_launcher_label).
+// Other modules' launcher controls are labelled the same way (add_launcher_label, and
+// add_launcher_relabel / launcher_text for texts they change while the dialog is open).
 // language.ini also names the pack's code page ([language] codepage=, 1252 when missing): the
 // one of its strings.ini, texts and fonts - the editor converts its texts with it.
 #include "patch.h"
@@ -197,6 +198,7 @@ UINT WINAPI GetPrivateProfileIntA_language(LPCSTR app, LPCSTR key, INT def, LPCS
 
 DLGPROC g_launcher_proc = nullptr;
 std::vector<std::pair<int, std::string>> g_other_labels;   // add_launcher_label
+std::vector<void (*)(HWND)> g_relabels;                     // add_launcher_relabel
 
 void set_label(HWND dialog, int id, const char* key) {
     const auto& labels = g_packs[g_current].launcher;
@@ -241,6 +243,7 @@ void apply_labels(HWND dialog) {
     set_label(dialog, IDCANCEL, "cancel");
     set_label(dialog, ID_LANGUAGE_LABEL, "language");
     for (const auto& label : g_other_labels) set_label(dialog, label.first, label.second.c_str());
+    for (auto relabel : g_relabels) relabel(dialog);
     if (HWND list = GetDlgItem(dialog, ID_LANGUAGE)) fit_list(list);
 }
 
@@ -360,6 +363,25 @@ bool replace_iat(uintptr_t entry, const void* expected, void* function, const ch
 // before ours) get their labels from [launcher] too.
 void add_launcher_label(int id, const char* key) {
     g_other_labels.emplace_back(id, key);
+}
+
+// Launcher texts that change while the dialog is open (update_check.cpp's result line): the
+// callback sets them again whenever the labels are set - at the start and on a language change.
+void add_launcher_relabel(void (*relabel)(HWND dialog)) {
+    g_relabels.push_back(relabel);
+}
+
+// A label of [launcher] in the chosen pack, or `fallback` (the English) when it has none.
+std::wstring launcher_text(const char* key, const wchar_t* fallback) {
+    if (g_current < 0) return fallback;
+    const auto& labels = g_packs[g_current].launcher;
+    const auto it = labels.find(key);
+    return it != labels.end() && !it->second.empty() ? it->second : fallback;
+}
+
+// The chosen pack's code ("en" without packs).
+std::string language_code() {
+    return g_current >= 0 ? g_packs[g_current].code : "en";
 }
 
 // The chosen pack's code page (1252 without packs).

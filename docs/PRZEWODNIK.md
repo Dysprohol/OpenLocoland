@@ -46,6 +46,18 @@ tak jak w oryginale.
 
 **Aktualizacja.** Uruchom nowszy `Setup.exe` i wciśnij **Aktualizuj**: znajdzie zainstalowaną grę i skopiuje tylko to, co się zmieniło. Twoje mapy (w `maps\` folderu gry) i twój profil zostają.
 
+Czy jest nowsza wersja, sprawdzisz przyciskiem **Sprawdź aktualizacje** w okienku startowym (zob.
+[pierwsze uruchomienie](#2-pierwsze-uruchomienie)). Okienko pyta stronę projektu na GitHubie i
+odpowiada „Masz aktualną wersję” albo „Jest nowa wersja ...”; wtedy **Pobierz** zapisuje nowy
+`Setup.exe` w folderze Pobrane, a **Uruchom Setup** uruchamia go (po pytaniu) i zamyka grę, żeby
+instalator mógł ją zaktualizować - Windows może zapytać, czy uruchomić pobrany program, jak po
+pobraniu przeglądarką. Link **GitHub** otwiera zamiast tego stronę wydań w przeglądarce (prawy
+przycisk myszy kopiuje adres). Zaznacz **przy starcie**, żeby sprawdzać przy każdym otwarciu
+okienka; domyślnie jest wyłączone i nic nie jest pobierane ani instalowane bez twojego kliknięcia.
+Gdy GitHub jest nieosiągalny (brak internetu albo projekt się przeniósł), okienko mówi o tym i
+podaje adres projektu z pliku `update.txt` w folderze gry - późniejszy Setup może ten plik zmienić,
+ty też.
+
 **Odinstalowanie.** Uruchom `Setup.exe` i wciśnij **Odinstaluj**: usuwa skróty i folder gry ze wszystkim, co w nim jest (OpenLocoland nie figuruje w „Aplikacjach” Windows). Gra ze Steama zostaje bez zmian. Jeśli chcesz zachować swoje
 mapy, skopiuj je najpierw (każda to folder w `maps\`, zob. [udostępnianie mapy](#13-zapis-eksport-i-udostępnianie)).
 
@@ -62,6 +74,8 @@ Gra startuje okienkiem startowym (z obrazkiem Locolandu):
   nie ma, gra startuje po angielsku, a bez angielskiego w języku twojej kopii ze Steama.
 - **Limit FPS** i **Licznik FPS** - wiersz pod rozdzielczością: ile klatek na sekundę rysuje gra
   (domyślnie 60; ∞ = bez limitu) i mały licznik u góry ekranu.
+- **Sprawdź aktualizacje** - wiersz nad OK: czy jest nowsza wersja OpenLocoland, zob.
+  [aktualizacja](#1-instalacja-aktualizacja-odinstalowanie).
 
 Wybór jest zapamiętany. Filmy na początku są pomijane: gra otwiera się na ekranie gracza. Utwórz
 gracza (albo wybierz swojego) - pojawi się mapa strategiczna z 20 misjami kampanii.

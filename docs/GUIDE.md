@@ -46,6 +46,17 @@ Windows user's registry, as the original kept it.
 
 **Updating.** Run a newer `Setup.exe` and press **Update**: it finds the installed game and copies only what changed. Your own maps (in `maps\` of the game folder) and your profile are kept.
 
+To find out whether there is a newer version, press **Check for updates** in the launcher (see
+[the first start](#2-the-first-start)). It asks the project's page on GitHub and says "You have the
+latest version" or "New version ... is available"; then **Download** saves the new `Setup.exe` in
+your Downloads folder, and **Run Setup** starts it (after a question) and closes the game, so Setup
+can update it - Windows may ask whether to run a downloaded program, as it does after a browser's
+download. The **GitHub** link opens the releases page in your browser instead (right-click it to
+copy the address). Tick **at start** to check every time the launcher opens; it is off by default,
+and nothing is downloaded or installed without your click. When GitHub cannot be reached (no
+internet, or the project has moved) the launcher says so with the project's address, taken from
+`update.txt` in the game folder - a later Setup may change that file, and you may too.
+
 **Uninstalling.** Run `Setup.exe` and press **Uninstall**: it removes the shortcuts and the game folder with everything in it (OpenLocoland is not listed in Windows "Apps"). The Steam game stays as it is. Copy your own maps somewhere first
 if you want to keep them (each one is a folder in `maps\`, see [sharing a map](#13-save-export-and-share)).
 
@@ -64,6 +75,8 @@ The game starts with its launcher (the window with the Locoland picture):
   chose is no longer there, the game starts in English, or without English in your Steam copy's.
 - **Limit FPS** and **FPS counter** - the row under the resolution: how many frames a second the game
   draws (60 by default; ∞ = no limit) and a small counter at the top of the screen.
+- **Check for updates** - the row above OK: whether there is a newer OpenLocoland, see
+  [updating](#1-installing-updating-uninstalling).
 
 Your choice is remembered. The intro movies are skipped: the game opens on the player's screen.
 Make a player (or pick yours) and the strategic map with the campaign's 20 missions comes up.
