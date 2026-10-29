@@ -56,8 +56,8 @@ Running a newer `Setup.exe` updates the game and keeps your maps, scores and pro
 player's guide tells the rest, the editor with a step-by-step first mission included:
 [GUIDE.md](docs/GUIDE.md) (English), [PRZEWODNIK.md](docs/PRZEWODNIK.md) (Polish).
 
-This is a test version: bugs and ideas are welcome in
-[Issues](https://github.com/Dysprohol/OpenLocoland/issues).
+This is the first regular release; the map editor is still work in progress. Bugs and ideas are
+welcome in [Issues](https://github.com/Dysprohol/OpenLocoland/issues).
 
 ## How it was made
 
