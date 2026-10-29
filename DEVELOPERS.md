@@ -1319,7 +1319,9 @@ mouse button. Options > Run the level runs it from its saved file and holds it a
 Options (0xFFFF) never had a popup. In editor mode LocoFix handles them in a window procedure in
 front of the game's:
 
-- File > Load... (Alt+F3): a Windows open dialog in the folder of the current map; the map is
+- File > Load... (Alt+F3): a Windows open dialog in `maps\` with no name proposed (a map of the
+  scratch folders `maps\_new*\` and `maps\_run\` is refused with "This is the editor's scratch
+  folder - choose a map in another folder.", `ScratchFolder`); the map is
   then loaded the way script `Load()` does it (`World.nextLevelFile` and flags 0x40, loaded by
   `Game_Step`) and held,
 - File > Save... (Alt+F2): a save dialog, then `Level_Save` with the name as a String of the
@@ -1470,10 +1472,11 @@ typed straight into `maps\` becomes `maps\<name>\<name>.map` (a map already ther
 only after a question), the map's own folder with its ground image (`<name>.vid`), script and texts,
 and its line in `maps\custom.lst`; a title or briefing header NEW MAP becomes the folder's name in
 capitals, as TEMPLATE does. A map is not saved outside the game folder ("A map is saved in the maps
-folder of this game."): its script and texts are found by game paths. The save dialog gets the
-folder in its file name box: since Windows 7 the dialog opens in the folder it remembers for the
-program - every `Locoland.exe`, another game folder's too - and not in `lpstrInitialDir`, so a save
-went into another installation of the game. Run the level runs it from a copy in
+folder of this game."): its script and texts are found by game paths, and not into a scratch
+folder (refused as Load refuses it). The file dialogs are `IFileOpenDialog` / `IFileSaveDialog`
+with `SetFolder`: the old `GetOpenFileNameW` opened in the folder it remembers for the program -
+every `Locoland.exe`, another game folder's too - and not in `lpstrInitialDir`, so a save went into
+another installation of the game. Run the level runs it from a copy in
 `maps\_run\` (above), so the map stays unnamed, its edits not saved, and leaving it asks. The scratch
 folder goes when the editor leaves the map - another map loaded, made or imported, Back to the menu,
 Exit, the window closed ("the new map maps\_new left unsaved - removed" in `LocoFix.log`). Play the map

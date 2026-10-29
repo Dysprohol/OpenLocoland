@@ -312,6 +312,7 @@ if ($Steps) {
         if ($Shot) { Save-Shot $dlg ($Shot -replace '\.png$', "_${n}_dialog.png") }
         if ($file) {
           $edit = [W]::ChildById($dlg, 1001, "Edit")
+          if ($edit -eq [IntPtr]::Zero) { $edit = [W]::ChildById($dlg, 1148, "Edit") }   # the Vista dialog's name box
           if ($edit -eq [IntPtr]::Zero) { $edit = [W]::GetDlgItem($dlg, 1152) }   # the old dialog
           [void][W]::SendText($edit, 0x000C, [IntPtr]::Zero, $file)
           [void][W]::PostMessage($dlg, 0x0111, [IntPtr]1, [IntPtr]::Zero)   # IDOK

@@ -65,7 +65,7 @@
 #include "editor_ground.h"
 #include "editor_mission.h"
 #include "editor_text.h"
-#include <commdlg.h>
+#include <shobjidl.h>
 #include <cctype>
 #include <cstdio>
 
@@ -162,7 +162,6 @@ using SaveLevel_t = void(__fastcall*)(uint8_t* world, void* edx, char* name);
 using New_t = char*(__cdecl*)(size_t size);
 using Delete_t = void(__cdecl*)(const void* memory);
 using RegisterClassA_t = ATOM(WINAPI*)(const WNDCLASSA*);
-using FileDialog_t = BOOL(WINAPI*)(OPENFILENAMEW*);
 
 bool g_enabled = false;
 bool g_test = false;
@@ -468,11 +467,6 @@ bool save_map(const std::string& path) {
     return true;
 }
 
-FileDialog_t dialog_function(const char* name) {
-    static HMODULE comdlg = LoadLibraryA("comdlg32.dll");
-    return comdlg ? reinterpret_cast<FileDialog_t>(GetProcAddress(comdlg, name)) : nullptr;
-}
-
 std::wstring wide_acp(const std::string& s) {
     std::wstring w(static_cast<size_t>(MultiByteToWideChar(CP_ACP, 0, s.c_str(), -1, nullptr, 0)), L'\0');
     MultiByteToWideChar(CP_ACP, 0, s.c_str(), -1, &w[0], static_cast<int>(w.size()));
@@ -480,45 +474,50 @@ std::wstring wide_acp(const std::string& s) {
     return w;
 }
 
-// A Windows open or save dialog (the W one: its title and file types are the pack's texts, shown
-// right in any system code page); the file chosen as a path in the system's code page, empty when
-// cancelled. `kind` names the files of `pattern` ("*.map"), `ext` the default extension.
+// A Windows open or save dialog (IFileOpenDialog / IFileSaveDialog: its title and file types are the
+// pack's texts, shown right in any system code page), opened in `folder` with `file` proposed (none
+// when empty); the file chosen as a path in the system's code page, empty when cancelled. `kind`
+// names the files of `pattern` ("*.map"), `ext` the default extension. SetFolder, not the folder the
+// dialog remembers for the program (every Locoland.exe, another game folder's as well).
 std::string file_dialog(HWND owner, bool save, const std::string& folder, const std::string& file, const char* title,
                         const char* kind, const wchar_t* pattern, const wchar_t* ext) {
-    const FileDialog_t show = dialog_function(save ? "GetSaveFileNameW" : "GetOpenFileNameW");
-    if (!show) {
-        patch::log("editor: comdlg32.dll is not available");
-        return "";
+    const HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    std::string path;
+    IFileDialog* dialog = nullptr;
+    if (FAILED(CoCreateInstance(save ? CLSID_FileSaveDialog : CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
+                                IID_PPV_ARGS(&dialog)))) {
+        patch::log("editor: the file dialog is not available");
+    } else {
+        const std::wstring kind_w = ui_wide(kind), all = ui_wide(ui_text("FileAll", "All files (*.*)"));
+        const COMDLG_FILTERSPEC types[] = {{kind_w.c_str(), pattern}, {all.c_str(), L"*.*"}};
+        dialog->SetFileTypes(2, types);
+        dialog->SetTitle(ui_wide(title).c_str());
+        dialog->SetDefaultExtension(ext);
+        dialog->SetFileName(wide_acp(file).c_str());
+        FILEOPENDIALOGOPTIONS options = 0;
+        dialog->GetOptions(&options);
+        dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_NOCHANGEDIR | FOS_PATHMUSTEXIST |
+                           (save ? FOS_OVERWRITEPROMPT : FOS_FILEMUSTEXIST));
+        IShellItem* start = nullptr;
+        if (!folder.empty() && SUCCEEDED(SHCreateItemFromParsingName(wide_acp(folder).c_str(), nullptr, IID_PPV_ARGS(&start)))) {
+            dialog->SetFolder(start);
+            start->Release();
+        }
+        DialogScope scope;
+        IShellItem* result = nullptr;
+        if (SUCCEEDED(dialog->Show(owner)) && SUCCEEDED(dialog->GetResult(&result))) {
+            wchar_t* name = nullptr;
+            if (SUCCEEDED(result->GetDisplayName(SIGDN_FILESYSPATH, &name))) {
+                char chosen[MAX_PATH * 2] = "";
+                WideCharToMultiByte(CP_ACP, 0, name, -1, chosen, sizeof chosen, nullptr, nullptr);
+                path = chosen;
+                CoTaskMemFree(name);
+            }
+            result->Release();
+        }
+        dialog->Release();
     }
-    std::wstring filter = ui_wide(kind);
-    filter += L'\0';
-    filter += pattern;
-    filter += L'\0';
-    filter += ui_wide(ui_text("FileAll", "All files (*.*)"));
-    filter += L'\0';
-    filter += L"*.*";
-    filter += L'\0';
-    filter += L'\0';
-    const std::wstring initial = wide_acp(folder), caption = ui_wide(title);
-    // the folder in the name too: since Windows 7 the dialog opens in the folder it remembers for the
-    // program (every Locoland.exe, another game folder's as well) rather than lpstrInitialDir, but a
-    // name with its path is always taken
-    wchar_t name[MAX_PATH] = L"";
-    lstrcpynW(name, wide_acp(!folder.empty() && !file.empty() ? folder + "\\" + file : file).c_str(), MAX_PATH);
-    OPENFILENAMEW ofn = {};
-    ofn.lStructSize = sizeof ofn;
-    ofn.hwndOwner = owner;
-    ofn.lpstrFilter = filter.c_str();
-    ofn.lpstrFile = name;
-    ofn.nMaxFile = MAX_PATH;
-    ofn.lpstrInitialDir = initial.c_str();
-    ofn.lpstrTitle = caption.c_str();
-    ofn.lpstrDefExt = ext;
-    ofn.Flags = OFN_NOCHANGEDIR | OFN_HIDEREADONLY | OFN_PATHMUSTEXIST | (save ? OFN_OVERWRITEPROMPT : OFN_FILEMUSTEXIST);
-    DialogScope scope;
-    if (!show(&ofn)) return "";
-    char path[MAX_PATH * 2] = "";
-    WideCharToMultiByte(CP_ACP, 0, name, -1, path, sizeof path, nullptr, nullptr);
+    if (SUCCEEDED(com)) CoUninitialize();
     return path;
 }
 
@@ -536,8 +535,17 @@ std::string release_reason(const std::string& map) {
                      sandbox ? ui_text("ReleaseSandbox", "POLIGON") : ui_text("ReleaseTemplate", "The template"));
 }
 
-// A file chosen in a Windows dialog, as a game path; empty when cancelled. The editor's new map has
-// no name yet: the dialog opens in maps\ with the first free name mapN; a map of the release opens it
+// A scratch folder of the editor (a game path): the start's new map, maps\_new\ (_new2 ...), or the
+// copy of Run the level, maps\_run\ - they go when the editor leaves them, so no dialog proposes
+// them and a map chosen in one is refused.
+bool scratch_folder(const std::string& folder) {
+    const std::string lower = lower_path(folder);
+    return lower.compare(0, 9, "maps\\_new") == 0 || lower == lower_path(RUN_FOLDER) || auto_folder(folder);
+}
+
+// A file chosen in a Windows dialog, as a game path; empty when cancelled. Load opens in maps\ with
+// no name proposed; Save in the map's folder with its name. The editor's new map has no name yet:
+// the dialog opens in maps\ with the first free name mapN; a map of the release opens it
 // with the first free poligonN (POLIGON) or mapN and says why in its title and the status line, and
 // is not saved over. A map saved straight into maps\ (where the game keeps only its menu and intro
 // scenes) goes into a folder of its name, maps\<name>\<name>.map, so it is on the custom maps page; a
@@ -547,9 +555,10 @@ std::string choose_map(HWND owner, bool save) {
     const size_t slash = current.find_last_of('\\');
     std::string folder = slash == std::string::npos ? "" : current.substr(0, slash);
     std::string file = slash == std::string::npos ? "" : current.substr(slash + 1);
+    if (!save) folder.clear(), file.clear();
     const bool release = save && release_map(game_path(current));
     std::string title = save ? ui_text("FileSaveTitle", "Save map") : ui_text("FileLoadTitle", "Load map");
-    if (save && (release || auto_folder(folder_of(game_path(current))))) {
+    if (save && (release || scratch_folder(folder_of(game_path(current))))) {
         // a name of its own proposed: the first free maps\poligon<n>\ for POLIGON, maps\map<n>\ else
         const std::string base = release && lower_path(game_path(current)).compare(0, 13, "maps\\sandbox\\") == 0 ? "poligon" : "map";
         folder.clear();
@@ -566,6 +575,13 @@ std::string choose_map(HWND owner, bool save) {
     const std::string chosen = file_dialog(owner, save, folder, file, title.c_str(), ui_text("FileMaps", "Maps (*.map)"), L"*.map", L"map");
     if (chosen.empty()) return "";
     std::string map = game_path(chosen);
+    if (scratch_folder(folder_of(map))) {
+        DialogScope scope;
+        ui_message_box(owner, ui_text("ScratchFolder", "This is the editor's scratch folder - choose a map in another folder."),
+                       title.c_str(), MB_OK | MB_ICONINFORMATION);
+        patch::log("editor: a map of a scratch folder refused: %s", map.c_str());
+        return "";
+    }
     if (save && map.find(':') != std::string::npos) {   // a map's script and texts are found by game paths
         DialogScope scope;
         ui_message_box(owner, ui_text("SaveOutside", "A map is saved in the maps folder of this game."),
