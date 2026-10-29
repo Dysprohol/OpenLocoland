@@ -55,12 +55,13 @@ namespace {
 constexpr int STEP = PanelRows::STEP;
 constexpr int VID_PICTURE = 484, VID_ICONS = 944, VID_FRAME = 456;
 constexpr float LEFT = -182, LABEL = 88, ROW = PanelRows::ROW, ICON = 41;
-constexpr float TOP = -70, BOTTOM = 112;   // the first and the last row under the title, above the button bar
+constexpr float TOP = -70, BOTTOM = 98;    // the first and the last row under the title, clear of the button bar
+constexpr float TITLE_ROW = -93, PROBLEM_ROW = -128;   // the title's line, the strip above it (an arrival's screen)
 constexpr int WIDTH = 46;                  // characters a row
 constexpr int SHOWN_CARS = 6;
 constexpr int MAX_CARS = 30;   // the scripts' train array (temp_array of TrainsTactDeclares.lgc, arr_cpp copies 30)
-constexpr int LIST_PAGE = 6;   // arrivals a page of the list (two rows each)
-constexpr int TEMPLATE_PAGE = 12;
+constexpr int LIST_PAGE = 5;   // arrivals a page of the list (two rows each), above the note and the buttons
+constexpr int TEMPLATE_PAGE = 11;
 
 enum class Screen { List, Arrival, Templates };
 Screen g_screen = Screen::List;
@@ -514,14 +515,14 @@ float draw_then(const Arrival& a, float y) {
     return y;
 }
 
-float draw_message(const Arrival& a, float y) {
-    if (a.army > 1) return y;   // only ours and the enemy's have one
-    float x = label(y, "ArrMessage", "MESSAGE:");
-    x = put(x, y, ui_text("WordYes", "YES"), a.message,
-            [] { change({"OpArrivalMessage", "arrival message"}, [](Arrival& r) { r.message = true; }); });
-    put(x, y, ui_text("WordNo", "NO"), !a.message,
-        [] { change({"OpArrivalMessage", "arrival message"}, [](Arrival& r) { r.message = false; }); });
-    return y + ROW;
+// The message's switch, right-aligned on the row y (the title's line).
+void draw_message(const Arrival& a, float y) {
+    if (a.army > 1) return;   // only ours and the enemy's have one
+    const std::string head = ui_text("ArrMessage", "MESSAGE:"), yes = ui_text("WordYes", "YES"), no = ui_text("WordNo", "NO");
+    float x = g_px + LEFT + WIDTH * g_cw - (head.size() + yes.size() + no.size() + 2) * g_cw;
+    x = put(x, y, head);
+    x = put(x, y, yes, a.message, [] { change({"OpArrivalMessage", "arrival message"}, [](Arrival& r) { r.message = true; }); });
+    put(x, y, no, !a.message, [] { change({"OpArrivalMessage", "arrival message"}, [](Arrival& r) { r.message = false; }); });
 }
 
 void draw_arrival_screen() {
@@ -537,14 +538,13 @@ void draw_arrival_screen() {
     y = draw_when(a, y);
     y = draw_repeat(a, y);
     y = draw_then(a, y);
+    // the message on the title's line, at its right; a problem in the strip above the title - so the
+    // rows (13 at most, from TOP to BOTTOM) stay clear of the button bar
+    draw_message(a, g_py + TITLE_ROW);
     Problem p;
-    const bool problem = problem_of(a, g_selected, p);
-    // the last row is the problem's when there is one (the message is set the same, shown again after)
-    if (!problem || y < g_py + BOTTOM) y = draw_message(a, y);
-    if (problem) {
-        const float py = (std::min)(y, g_py + BOTTOM);
-        const float x = put(g_px + LEFT, py, p.text);
-        put(x, py, fit(p.button, x), false, p.act);
+    if (problem_of(a, g_selected, p)) {
+        const float x = put(g_px + LEFT, g_py + PROBLEM_ROW, p.text);
+        put(x, g_py + PROBLEM_ROW, fit(p.button, x), false, p.act);
     }
 }
 

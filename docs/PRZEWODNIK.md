@@ -277,7 +277,7 @@ każdy wiersz to jedna rzecz:
   Punkty **WSKAZ** na torze, poza główną linią;
 - **KOMUNIKAT** („przybyły posiłki”, dla naszych i wroga).
 
-Ostatni wiersz podaje prawdziwy problem z przyciskiem, który go naprawia - brak wjazdu (**WSKAZ
+Pasek nad tytułem podaje prawdziwy problem z przyciskiem, który go naprawia - brak wjazdu (**WSKAZ
 WJAZD**), brak świateł na wjeździe (**POSTAW SWIATLA**: para semaforów w pierwszym miejscu w mapie i ich
 linia, która wpycha pociąg - linia wjazdu i jej światła to jedno, jak w misjach) albo światła na drodze
 bez linii do nich (**LINIA DO SWIATEL**), brak lokomotywy w składzie, brak punktu. Fala czeka, gdy na wjeździe stoi pociąg. Strzałka na dole po lewej, Esc albo prawy przycisk

@@ -1734,7 +1734,14 @@ void couple(uint8_t* c) {
 }
 
 void reverse_train(uint8_t* c) {
-    const std::vector<uint8_t*> cars = all_cars();
+    // the cars and their guns (a gun cart's turret is its linked object, made with it: not in the map),
+    // so one step of the history turns them back too
+    std::vector<uint8_t*> cars = all_cars();
+    std::vector<uint8_t*> guns;
+    for (uint8_t* k : train_of(c))
+        if (uint8_t* g = at<uint8_t*>(k, O_LINK))
+            if (!removed(g)) guns.push_back(g);
+    cars.insert(cars.end(), guns.begin(), guns.end());
     const std::vector<State> before = states(cars);
     car_call(ENGINE_LEAVE_DOTS, c);
     // Train_Reverse only swaps the train's head: it toggles each car's "stands backwards" flag, so
@@ -1742,9 +1749,17 @@ void reverse_train(uint8_t* c) {
     car_call(TRAIN_REVERSE, c);
     for (uint8_t* k : train_of(c)) at<uint32_t>(k, E_FLAGS) ^= 1;
     for (uint8_t* k : train_of(c)) car_call(ENGINE_UPDATE_POSITION, k);
+    for (uint8_t* g : guns)   // each gun half a turn with its car: aimed the same way along it
+        reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(g, nullptr, (at<int>(g, O_DIRECTION) + 128) & 255);
     occupy_all();
     commit_cars({"OpReverse", "turn round"}, cars, before);
     g_selection = group_of(c);
+    std::string turned;
+    for (uint8_t* k : train_of(c)) {
+        uint8_t* g = at<uint8_t*>(k, O_LINK);
+        turned += ui_printf(" %d:%d", nvid_of(k), at<int>(k, O_DIRECTION)) + (g ? ui_printf("/gun %d", at<int>(g, O_DIRECTION)) : "");
+    }
+    patch::log("edit: turned round -%s", turned.c_str());
     MESSAGE("MsgReversed", "the train is turned round: VID %d first", nvid_of(train_of(c).front()));
 }
 
@@ -7845,6 +7860,17 @@ std::vector<uint8_t*> place_start_train(const EnemyTrain& t) {
         car_next(train[i]) = i + 1 < train.size() ? train[i + 1] : nullptr;
     }
     if (!train.empty()) move_train(train.front(), static_cast<float>(t.x1), static_cast<float>(t.y1));
+    // a car the laying left "standing backwards" (engineFlags bit 0) faces the same way with its own
+    // ends swapped and the bit clear - the state a map keeps over a save, so R turns it after a load too
+    for (uint8_t* k : train.empty() ? std::vector<uint8_t*>() : train_of(train.front()))
+        if (at<uint32_t>(k, E_FLAGS) & 1) {
+            uint8_t ends[16];
+            std::memcpy(ends, k + E_FRONT_DOT, sizeof ends);
+            std::memcpy(k + E_FRONT_DOT, k + E_REAR_DOT, sizeof ends);
+            std::memcpy(k + E_REAR_DOT, ends, sizeof ends);
+            at<uint32_t>(k, E_FLAGS) &= ~1u;
+            car_call(ENGINE_UPDATE_POSITION, k);
+        }
     occupy_all();
     if (train.empty()) return train;
     Order order{t.patrol ? TASK_PATROL : TASK_ATTACK, 0, 0, 0};

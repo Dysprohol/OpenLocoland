@@ -281,7 +281,7 @@ one thing a row:
   it). **PICK** the points on the track, off the main line;
 - **MESSAGE** ("reinforcements have arrived", for ours and the enemy's).
 
-A last line names a real problem with the button that mends it - no entry yet (**PICK THE ENTRY**),
+The strip above the title names a real problem with the button that mends it - no entry yet (**PICK THE ENTRY**),
 no lights at the entry (**PUT LIGHTS**: a pair of posts the first place inside the map and their line,
 which pushes the train in - the entry's line and its lights are one thing, as in the missions) or lights
 on the way in without a line to them (**LINE TO THE LIGHTS**), no locomotive in the train, no point. A

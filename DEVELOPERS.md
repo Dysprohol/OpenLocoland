@@ -1840,7 +1840,7 @@ panel, Mission settings' Arrivals... button, which keeps the dialog's settings a
 in editor_panel.cpp's frame, in three screens. The list: each arrival in two rows of plain words
 (number, army, entry, the first car's name and the number of cars; when and how often), a click
 opening it, + NEW (ours, a locomotive and two gun cars, at the entry of the one chosen), COPY n and
-DELETE n for the one opened last, pages of six. An arrival, one thing a row: WHO; CARS (the palette's
+DELETE n for the one opened last, pages of five (every row stays above the button bar). An arrival, one thing a row: WHO; CARS (the palette's
 icons over three rows, in the train's order - a click chooses a car, < and > move it, REMOVE takes it
 away; + CAR opens the Vehicles palette, which adds the car picked at the end and goes back; TEMPLATE... the list of the authors' trains of the normal difficulty by name,
 the defence trains aside - they have no locomotive); ENTRY (PICK: the next click takes the
@@ -1849,7 +1849,7 @@ the script runs from it); WHEN - one choice of AT THE START, AFTER n s, WHEN THE
 WHEN THE PLAYER PAYS n (the first time, or the condition `IF_NO_TRAIN` / `IF_MONEY` "only then" with
 the first time as NOT BEFORE); an older map's other condition is shown as it is; REPEAT - ONCE, n TIMES,
 WITHOUT END, EVERY m s (steps of 10 s); THEN and the POINT(S) (PICK; a patrol's two ends one after
-the other); MESSAGE (ours and the enemy's). The last row names a real problem with the button that
+the other); MESSAGE (ours and the enemy's) on the title's line at its right. The strip above the title names a real problem with the button that
 mends it: no entry (PICK THE ENTRY), no track at it, no entry line - the line and its lights are one
 thing (the posts own a line that ends at them, `edit_post_line` of the signals' side): with a pair of
 posts within 400 px on the way in (`edit_posts_on_way`) LINE TO THE LIGHTS lays the line from the
@@ -2307,7 +2307,11 @@ front, C couples an end car to the nearest free end of another train (the other 
 behind it car by car and takes its army), R / E turn the train round - `Train_Reverse` swaps its
 head and toggles every car's "stands backwards" flag (engineFlags bit 0), which keeps each car facing
 the way it was (nothing turned on the screen, a lone car neither); the editor toggles the flags back,
-so every car faces the other way and the train's order is reversed -, a drag
+so every car faces the other way and the train's order is reversed (a car must not be left with the
+flag set: the flag is not saved with the map, so after a load such a car looked turned and R did nothing
+- CONVERT's start trains swap such a car's ends and clear it); a gun cart's turret (its linked object,
+`link` +0x40, made with the car and not kept in the map; at rest it faces along its car) turns half a turn
+with it, in the same step of the history -, a drag
 moves the whole train along the track (the car to where it is dropped, the others before and
 behind it in their order), Del deletes the car and Shift+Del (the Delete tool with Shift) the
 train, A sets the army of the train. Its panel (the right button) has the army, TRAIN: turn round /
