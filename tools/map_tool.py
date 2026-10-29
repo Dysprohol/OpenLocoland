@@ -752,10 +752,25 @@ MISSION_TEXTS = {
 }
 
 
-def new_ground(folder, width, height, tile=256):
+# The heights of a ground's picture (height.png, the texture after each colour texture), which the
+# engine blits into the depth buffer and draws every object and its shadow against: the campaign's
+# grounds hold 1026 + 8 a GRID level (l02: 1025-1028 at 0, l01: 1586 at 70). The editor makes the
+# same (editor_ground.cpp picture_height, editor_newmap.cpp FLAT_PICTURE_HEIGHT; DEVELOPERS.md
+# "The ground of a map"). A picture of 0 under a GRID of 70 puts every object ~1500 above the
+# ground the engine sees: detached shadows.
+PICTURE_HEIGHT_BASE, PICTURE_HEIGHT_STEP = 1026, 8
+
+
+def picture_height(level):
+    """The height of a ground's picture where its GRID is `level`."""
+    return PICTURE_HEIGHT_BASE + PICTURE_HEIGHT_STEP * level
+
+
+def new_ground(folder, width, height, tile=256, level=70):
     """Writes `folder` as the image of a map ground: the picture of the map (ground.png),
-    its height (height.png) and the tiles that cut it up (tiles.tsv). The picture is
-    empty - the terrain is painted into it."""
+    its height (height.png: a flat ground at the GRID `level`, 70 as the new maps have it)
+    and the tiles that cut it up (tiles.tsv). The picture is empty - the terrain is painted
+    into it."""
     if width <= 0 or height <= 0:
         raise DataError("the size of the ground must be positive")
     columns = (width + tile - 1) // tile
@@ -777,7 +792,7 @@ def new_ground(folder, width, height, tile=256):
                       "x": str(x), "y": str(y), "next": str((index + 1) % count)})
     os.makedirs(folder, exist_ok=True)
     Image.new("RGB", (width, height), (0, 0, 0)).save(os.path.join(folder, "ground.png"))
-    Image.new("I;16", (width, height), 0).save(os.path.join(folder, "height.png"))
+    Image.new("I;16", (width, height), picture_height(level)).save(os.path.join(folder, "height.png"))
     save_tsv(os.path.join(folder, "tiles.tsv"), TILE_COLUMNS, tiles)
     meta = {"chunks": ["HEAD", "SURF", "DATA"], "imageFlags": "0x35", "frameSpeed": 71,
             "frameCount": 1, "width": width, "height": height, "kind": "texture",

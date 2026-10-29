@@ -3857,6 +3857,72 @@ void draw_push_lines(bool tool) {
     g_push_status = text;
 }
 
+// The enemy's trains of the script (start_trains, level_queue: the AI makes them while the level
+// runs, so the map has no object for them): the reinforcement point's icon in a red frame where
+// a start train starts, a patrol's way along the track in red to a ringed far end, and the frame
+// on the enemy's factory (VID 102, army 1) for the trains it builds that attack. The one under
+// the cursor goes to the status line.
+std::string g_enemy_status;
+void draw_screen(int nvid, int frame, float x, float y, int step);   // the bar's pictures, below
+
+void draw_enemy_trains() {
+    g_enemy_status.clear();
+    const std::vector<EnemyTrainMark> trains = mission_enemy_trains();
+    if (trains.empty()) return;
+    uint8_t* w = world();
+    const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
+    float mx, my;
+    mouse_on_map(mx, my);
+    auto square = [&](float x, float y, float size, uint32_t argb) {
+        reinterpret_cast<FillRect_t>(FILL_RECT)(graphics(), nullptr, x - cam_x - size, y - cam_y - size, x - cam_x + size,
+                                                y - cam_y + size, argb);
+    };
+    auto icon = [&](float x, float y) {
+        square(x, y, 22, 0xe0ff2020);   // around the icon (36 px)
+        square(x, y, 20, 0xc0000000);
+        draw_screen(VID_ICONS, 11, x - cam_x, y - cam_y, 2);
+    };
+    auto hovered = [&](float x, float y) { return std::fabs(mx - x) < 20 && std::fabs(my - y) < 20; };
+    auto describe = [](const EnemyTrainMark& t) {
+        std::string type = t.type;
+        std::replace(type.begin(), type.end(), '_', ' ');
+        const std::string what = t.patrol ? ui_printf(ui_format("EnemyPatrol", "patrol %d,%d - %d,%d"), t.x1, t.y1, t.x2, t.y2)
+                                          : std::string(ui_text("EnemyAttack", "attack"));
+        return t.time ? ui_printf(ui_format("StatusEnemyQueue", "enemy train from its factory after %d s: %s, %s (the script, "
+                                                                "File > Mission settings...)"),
+                                  t.time, type.c_str(), what.c_str())
+                      : ui_printf(ui_format("StatusEnemyTrain", "enemy train: %s, %s (the script, File > Mission settings...)"),
+                                  type.c_str(), what.c_str());
+    };
+    std::vector<POINT> factories;   // the enemy's, as the screen shows them
+    for_each_object([&](uint8_t* o) {
+        if (nvid_of(o) == VID_DEPOT && army_of(o) == 1 && !removed(o))
+            factories.push_back({static_cast<LONG>(at<float>(o, O_X)), static_cast<LONG>(at<float>(o, O_Y) - at<float>(o, O_Z))});
+    });
+    std::string built;   // the factory's trains that attack
+    for (const EnemyTrainMark& t : trains) {
+        if (t.time && !t.patrol) {   // from the factory, wherever it attacks
+            built += (built.empty() ? "" : "; ") + describe(t);
+            continue;
+        }
+        if (t.patrol) {
+            const Trace way = trace(PushLine{t.x1, t.y1, t.x2, t.y2, 0});
+            for (uint8_t* d : way.path)
+                square(static_cast<float>(at<int>(d, DOT_X)), static_cast<float>(screen_y(d)), 2, 0xd0ff2020);
+            square(static_cast<float>(t.x2), static_cast<float>(t.y2), 8, 0xe0ff2020);
+            square(static_cast<float>(t.x2), static_cast<float>(t.y2), 4, 0xe0000000);
+            if (hovered(static_cast<float>(t.x2), static_cast<float>(t.y2))) g_enemy_status = describe(t);
+        }
+        icon(static_cast<float>(t.x1), static_cast<float>(t.y1));   // a start train, or a queue's patrol from its start
+        if (hovered(static_cast<float>(t.x1), static_cast<float>(t.y1))) g_enemy_status = describe(t);
+    }
+    if (built.empty()) return;
+    for (const POINT f : factories) {
+        icon(static_cast<float>(f.x), static_cast<float>(f.y));
+        if (hovered(static_cast<float>(f.x), static_cast<float>(f.y))) g_enemy_status = built;
+    }
+}
+
 // The Ground height tool: the brush's cells as squares at their height, coloured by it (blue low,
 // green 60-80, red high; the track's cells, which it leaves alone, grey). The
 // Decals tool: the circle it scatters in, and the decal to place at the cursor.
@@ -4750,6 +4816,7 @@ void draw_overlay() {
     set_cursor(cursor);
     draw_regions();
     draw_push_lines(entry().tool == Tool::PushLine);
+    draw_enemy_trains();
 
     began = ground_clock();
     draw_bar();
@@ -4801,6 +4868,8 @@ void draw_overlay() {
                       swamp_rail(RAIL_KINDS[g_rail_kind]) ? "602" : g_bed ? std::to_string(g_bed).c_str() : ui_text("WordNone", "none"));
         status_line(v.l, v.t + 2 * LINE_HEIGHT, bed);
     }
+    if (!g_enemy_status.empty())   // below the tool's lines (the Track tool has two)
+        status_line(v.l, v.t + (entry().tool == Tool::Track ? 3 : 2) * LINE_HEIGHT, g_enemy_status.c_str());
     draw_context();
     panel_draw(g_mouse);   // the Help and Menu buttons, an open panel in front of everything
 }

@@ -736,6 +736,19 @@ have a terrain of its own: paint the picture, then point the map at it with `--v
 tiles of a ground point at the textures in pairs - the picture and its height - so the
 tile of the picture k is the texture 2k.
 
+The height of the picture is **1026 + 8 a GRID level** (`map_tool.picture_height`: l02 holds
+1025-1028 at GRID 0, l01 1586 at 70; the editor's `picture_height` in `editor_ground.cpp` and
+`FLAT_PICTURE_HEIGHT` of `editor_newmap.cpp` are the same). The engine blits it into the depth
+buffer and draws every object and its shadow against it, so it has to match the map's GRID:
+`ground` writes a flat ground at 70 (1586), the level of a new map. Until 2026-10-28 it wrote 0,
+and POLIGON (made with it, GRID 70) had a height of 0 under the whole map - its objects stood
+~1500 above the ground the engine saw, their shadows detached from them (the "floating" the
+user saw in the editor); its `height.png` is 1586 now. The missions set many objects a few px
+below their GRID (factories 9-11, repair points 6-8, semaphores 0-5); setting POLIGON's the same
+way was tried and dropped: with the height right, its objects at the GRID's height look as
+grounded as the missions' (their shadows attached, side by side with missions 2, 5 and 10), so
+the editor and `place` keep putting an object at the ground's height.
+
 The repository keeps such maps in `game/maps.new/<name>/`: `build.py` packs the folder as
 `maps\<name>\<name>.map`, its `vid/` folder (an unpacked image, optional) as
 `maps\<name>\<name>.vid`, and copies every other file (the script, briefing texts) next to
@@ -1510,7 +1523,7 @@ the enemy's trains at the start (a line each: its type - `light_gun`, `medium_mo
 patrols between, screen coordinates), the trains its factory builds later (the time, the type and
 optionally the patrol), the objectives, the win and the loss texts and the briefing's pages (a
 line `---` starts the next page; the dialog shows the texts the game shows - the pack's copy of a
-file when it has one). A save writes the texts into the map's folder in capitals, in the pack's code page,
+file when it has one). A save writes the texts into the map's folder (or the pack's copy of a file, see the sandbox below) in capitals, in the pack's code page,
 at most 44 characters a line (broken between words), CRLF: `objectives.txt`, `win.txt`,
 `loose.txt`, the pages `brief.txt`, `brief2.txt` ... and `brief.lst`. A map saved as
 `maps\<name>\<name>.map` gets its line in `maps\custom.lst` (the folder and its title in ASCII
@@ -1524,9 +1537,35 @@ neither units nor a factory, and `MAP_WIN_TEST`, which destroys the enemy at 20 
 end). A map saved from the template does not keep its name: a title or a briefing header "TEMPLATE"
 (the template's own - the Esc menu's first page showed it in a map played from the editor) becomes
 the map's folder name in capitals (`mission_save`; checked: the template saved as `maps\tpltest\` has
-"TPLTEST" in its script and on the custom maps page). A script without the blocks (the campaign, the sandbox) is not changed: its settings and
+"TPLTEST" in its script and on the custom maps page). A script without the blocks (the campaign) is not changed: its settings and
 its push lines are read and shown, read-only, and saved under a new name the map becomes an
 editor mission with them.
+
+The sandbox (POLIGON) is an editor mission too: its script has both blocks, written as File > Save
+writes them (the order of the settings, `int start_trains[]={ATT_LIGHT_GUN,ATT_LIGHT_MORTAIR,-1};`,
+the bare `SetPushLine` calls), so a save gives the same script back (checked by repeating the
+parse and the write of `editor_mission.cpp` on the file). What the editor does not manage stays
+outside the blocks: the mission's own car lists of the train types (`int this_train0[]` ... - they
+come before the block, as `TrainsTactDeclares.lgc` takes them only when they are declared before
+it), the comments of the push lines (above the `// <editor main>` marker), the tests
+(`SANDBOX_DRIVE_TEST` takes the start trains out of the lists in `iff(1)`, before `TrainsTact()`
+first reads them, instead of an `#ifdef` inside the block, which a save would lose) and its own
+win and loss. Its texts had lines of 45-47 characters, which a save would have broken; they are
+broken at the sentence. A save keeps the briefing's high scores page (`hiscores.txt`, last in
+`brief.lst`, as the sandbox and the campaign have it) when the list had it and the folder has the
+page, and writes a text the language pack has a copy of (the sandbox's,
+`lang\<code>\maps\sandbox\`) into that copy - the game reads it instead of the root's, so an edit
+written to the root never showed.
+
+**The enemy's trains of the script** (`draw_enemy_trains`, `editor_edit.cpp`). The start trains
+and the factory's queue (`start_trains*`, `level_queue_*`) are made by the AI while the level
+runs (`TrainsTact.lgc`, `ai_events.lgc`), so the map has no object for them. On the held level the
+editor marks them: the reinforcement point's icon in a red frame where a start train starts, a
+patrol's way along the track (traced as a push line is) in red to a ringed far end, and the icon on
+the enemy's factory (VID 102, army 1) for the trains it builds that attack; the mouse over a mark
+describes it below the status line ("enemy train: light gun, patrol 1810,1061 - 1810,736", the
+queue's with its time). They are edited in File > Mission settings...; the marks follow the
+dialog's lines at once.
 
 The Push line tool (the strip, the rails under a green arrow) picks two points of the rail
 network - the cursor's point is shown in cyan with its screen coordinates, which are also the

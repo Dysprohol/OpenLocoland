@@ -1,6 +1,6 @@
 // Sandbox mission: break through to the enemy base and destroy it.
 //
-// A 2048x1536 map laid out the way the campaign maps do it (l05): the depots
+// A 2048x1536 map laid out the way the campaign maps do it (l05): the factories
 // stand at the dead end of a straight spur that meets the line through a Y,
 // and the repair workshops stand on a track that trains drive through.
 //
@@ -8,13 +8,13 @@
 //     reinforcement arrives) along the bottom, up the east side and west along
 //     the top to past the west edge again (level exit, one way into the map)
 //   - the player's base (south-west): the reinforcement arrives past the west
-//     end of the main line (the point locomotive, VID 5 army 3), the depot
+//     end of the main line (the point locomotive, VID 5 army 3), the factory
 //     stands at the top of a spur north of the line, the repair workshop on
 //     the west leg of a loop next to it; every leg meets the line in a Y, so
 //     trains reach the loop and leave it both ways, and the workshop leg is
 //     one way (north through the workshop), as in l05
 //   - a passing loop on the east line
-//   - the enemy base (north): the depot at the bottom of a spur hanging from
+//   - the enemy base (north): the factory at the bottom of a spur hanging from
 //     the top line, the enemy repair workshop on a loop hanging from it (a Y at
 //     each leg, the workshop leg one way south), and a fort with two guns - a
 //     gate on the east line
@@ -26,75 +26,80 @@
 // ACT_MOVE of a script takes the world position (Engine_MoveToPoint, 3D).
 //
 // Goal: destroy every enemy unit that NoArmyUnits(1) counts (ARMY1_NVID_ARRAY in
-// constants.lgc): the depot, the fort's two rocket launchers and the trains. The
+// constants.lgc): the factory, the fort's two rocket launchers and the trains. The
 // fort itself is a static object without hit points (U_OBJECT, maxHp 0) - the gate
 // stays - and the workshops are not counted.
-// Lose condition: the player has no units left and no depot to rebuild from.
+// Lose condition: the player has no units left and no factory to rebuild from.
 
-#define LEVEL 0                     // mission number
-#define MONEY 300                   // money at the start
-#define music0 "music\\mus08.ogg"   // music played on the level
-#define music1 "music\\mus07.ogg"   // the other track
-#define MUXI 0                      // flies on the map
-#define MUXI_NVID 268               // the fly
-#define CIVIL 0                     // neutral trains
-#define SQUALL 1                    // gusts of wind
-#define TORNADO 0                   // tornado
-#define QUAKE_DELAY 0               // earthquake after this time, s (0 none)
-#define RAIN_ROUND_POWER 10         // circles on the water in the rain (0 none)
-#define ENV_SOUND_DAY 0             // sound of the day (PlaySFX number)
-#define ENV_SOUND_NIGHT 126         // sound of the night
-#define RAIN 0                      // no rain
-#define NUKE 0                      // no lightning (daynight.lgc: on by default, it
-                                    // flashes the whole screen purple every few seconds)
+// The two blocks between "// <editor>" and "// </editor>" and between "// <editor main>" and
+// "// </editor main>" belong to the map editor (DEVELOPERS.md "Editor mode", as in
+// maps\template\template.lgc): File > Mission settings... and the Push line tool change them and
+// the editor writes them anew when the map is saved. The rest is the mission's own code.
+//
+// What the settings say: 300 money at the start, day, no rain and no lightning (daynight.lgc:
+// on by default, it flashes the whole screen purple every few seconds), the gammas of mission
+// 2. This map is not a numbered campaign level, so the objective/win/loss texts, the briefing
+// of the Esc menu (its pages and header) and the high scores are read from and written to this
+// folder instead of maps\lNN\ - otherwise LEVEL 0 would show mission 1's briefing and put a win
+// into mission 1's high score table. CUSTOM_MAP marks a custom map, not a campaign mission
+// (menuend.lgc, menutact.lgc, initdefault.lgc): a win does not unlock missions or add to the
+// campaign scores, rank and hall of fame, "restart" in the Esc menu loads this map, and the
+// main menu comes back on the custom maps page.
+//
+// Reinforcements: two waves of a locomotive and a light gun wagon. The enemy: two trains at
+// the start, each patrolling a line (screen points: ATA_PATROL0 the east line, ATA_PATROL1 the
+// east part of the bottom line) and rebuilt by its factory when lost (start_trains_renew), and
+// two light gun trains its factory builds at 240 s and 420 s that attack (ATA_FIGHT), at most
+// two attackers at once, 45 s between rebuilt trains.
 
-// day and night: the gammas of mission 2
-#define START_DAYNIGHT 1            // time of day at the start: 1 day, 2 evening, 3 night, 4 morning
-#define GAMMA1       0x00000000     // day
-#define GAMMA2       0x0000253f     // evening
-#define GAMMA3       0x00715131     // night
-#define GAMMA4       0x001422f1     // morning
-#define RAIN_GAMMA1  0x00221400     // the same when it rains
-#define RAIN_GAMMA2  0x00453934
-#define RAIN_GAMMA3  0x00796259
-#define RAIN_GAMMA4  0x003c25f7
+// the cars of the enemy's train types (TrainsTactDeclares.lgc takes these instead of its own;
+// they must come before it)
+int this_train0[]={20, 5, 20, 0};   // light gun train: gun wagon, loco, gun wagon
+int this_train1[]={20, 10, 20, 85, 0};
+int this_train10[]={25, 10, 25, 0}; // light mortar train
+int this_train11[]={25, 10, 25, 85, 0};
 
-// This map is not a numbered campaign level, so objective/win/loss texts, the
-// briefing of the Esc menu (its pages and header) and the high scores are read from
-// and written to this folder instead of maps\lNN\ - otherwise LEVEL 0 would show
-// mission 1's briefing and put a win into mission 1's high score table.
+// <editor> the mission's settings - written by the map editor when the map is saved
+// title: POLIGON
+#define LEVEL 0
+#define CUSTOM_MAP "maps\\sandbox\\sandbox.map"
+#define MONEY 300
+#define START_DAYNIGHT 1
+#define RAIN 0
+#define NUKE 0
+#define music0 "music\\mus08.ogg"
+#define music1 "music\\mus07.ogg"
+#define MUXI 0
+#define MUXI_NVID 268
+#define CIVIL 0
+#define SQUALL 1
+#define TORNADO 0
+#define QUAKE_DELAY 0
+#define RAIN_ROUND_POWER 10
+#define ENV_SOUND_DAY 0
+#define ENV_SOUND_NIGHT 126
+#define GAMMA1 0x00000000
+#define GAMMA2 0x0000253f
+#define GAMMA3 0x00715131
+#define GAMMA4 0x001422f1
+#define RAIN_GAMMA1 0x00221400
+#define RAIN_GAMMA2 0x00453934
+#define RAIN_GAMMA3 0x00796259
+#define RAIN_GAMMA4 0x003c25f7
+#define AI_REINFORCEMENT 1
+#define RENEW_TIMEOUT 45
+#define FIRSTCONTACTTIME 15
+#define FIRSTATTACKTIME 30
+#define STG_DESTROY_TIME 20
 #define OBJECTIVES_FILE "maps\\sandbox\\objectives.txt"
 #define WIN_FILE "maps\\sandbox\\win.txt"
 #define LOOSE_FILE "maps\\sandbox\\loose.txt"
 #define BRIEF_LIST "maps\\sandbox\\brief.lst"
 #define BRIEF_HEADER "POLIGON"
 #define HISCORES_FILE "maps\\sandbox\\hiscores"
-// A custom map, not a campaign mission (menuend.lgc, menutact.lgc, initdefault.lgc): a win
-// does not unlock missions or add to the campaign scores, rank and hall of fame, "restart"
-// in the Esc menu loads this map, and the main menu comes back on the custom maps page.
-#define CUSTOM_MAP "maps\\sandbox\\sandbox.map"
-
-// Uncomment to check the routes: no enemy trains, the player's depot builds a
-// train, the reinforcement drives through both workshops to the enemy line and
-// error.log gets the position of every player train ("DRIVE ...").
-//#define SANDBOX_DRIVE_TEST 1
-// Uncomment one to check the end of the mission: the player's train is damaged
-// to 30 % and sent to its workshop ("END ... hp" in error.log shows the repair),
-// then at 50 s every enemy unit (WIN) or every player unit and the depot (LOSE)
-// is destroyed, and the end screen comes with win.txt / loose.txt.
-//#define SANDBOX_WIN_TEST 1
-//#define SANDBOX_LOSE_TEST 1
-
-//----------------------------- reinforcements ------------------------------
-#define PLAYER_REINFORCEMENT 2      // reinforcement waves the player gets
-int player_reinforcement_train[]={5,20,0}; // locomotive + light gun wagon
-
-//----------------------------- enemy AI ------------------------------------
-#define AI_REINFORCEMENT 1          // enemy reinforcement waves
-#define LIMIT_ATACKERS 2            // max enemy attackers at once
-#define RENEW_TIMEOUT 45            // seconds between enemy reinforcements
-
-// patrol points (screen): the east line and the east part of the bottom line
+#define PLAYER_REINFORCEMENT 2
+int player_reinforcement_train[]={5,20,0};
+#define LIMIT_ATACKERS 2
 #define ATA_PATROL0_X1 1810
 #define ATA_PATROL0_Y1 1061
 #define ATA_PATROL0_X2 1810
@@ -103,32 +108,29 @@ int player_reinforcement_train[]={5,20,0}; // locomotive + light gun wagon
 #define ATA_PATROL1_Y1 1299
 #define ATA_PATROL1_X2 1153
 #define ATA_PATROL1_Y2 1299
-
-int this_train0[]={20, 5, 20, 0};   // light gun train: gun wagon, loco, gun wagon
-int this_train1[]={20, 10, 20, 85, 0};
-int this_train10[]={25, 10, 25, 0}; // light mortar train
-int this_train11[]={25, 10, 25, 85, 0};
-
 #include "maps\script\TrainsTactDeclares.lgc"
+int start_trains[]={ATT_LIGHT_GUN,ATT_LIGHT_MORTAIR,-1};
+int start_trains_task[]={ATA_PATROL0,ATA_PATROL1,0};
+int start_trains_x[]={1810,1437,0};
+int start_trains_y[]={1061,1299,0};
+int start_trains_renew[]={1,1,0};
+int start_trains_random_task[]={0,0,0};
+int level_queue_times[]={240,420,0};
+int level_queue_trains[]={ATT_LIGHT_GUN,ATT_LIGHT_GUN,-1};
+int level_queue_task[]={ATA_FIGHT,ATA_FIGHT,0};
+// </editor>
 
-#ifdef SANDBOX_DRIVE_TEST
-int start_trains[]=            { -1};
-#else
-int start_trains[]=            { ATT_LIGHT_GUN, ATT_LIGHT_MORTAIR, -1};
-#endif
-int start_trains_task[]=       { ATA_PATROL0, ATA_PATROL1, 0};
-int start_trains_x[]=          { ATA_PATROL0_X1, ATA_PATROL1_X1, 0};
-int start_trains_y[]=          { ATA_PATROL0_Y1, ATA_PATROL1_Y1, 0};
-int start_trains_renew[]=      { 1, 1, 0};
-int start_trains_random_task[]={ 0, 0, 0};
-
-int level_queue_times[]   ={ 240, 420, 0 };
-int level_queue_trains[]  ={ ATT_LIGHT_GUN, ATT_LIGHT_GUN, -1 };
-int level_queue_task[]    ={ ATA_FIGHT, ATA_FIGHT, 0};
-
-#define FIRSTCONTACTTIME 15         // seconds before the enemy makes contact
-#define FIRSTATTACKTIME 30          // seconds before the enemy attacks
-#define STG_DESTROY_TIME 20         // seconds the enemy needs to destroy a target
+// Uncomment to check the routes: no enemy trains (the start trains are taken out of the
+// lists before TrainsTact() reads them), the player's factory builds a train, the
+// reinforcement drives through both workshops to the enemy line and error.log gets the
+// position of every player train ("DRIVE ...").
+//#define SANDBOX_DRIVE_TEST 1
+// Uncomment one to check the end of the mission: the player's train is damaged
+// to 30 % and sent to its workshop ("END ... hp" in error.log shows the repair),
+// then at 50 s every enemy unit (WIN) or every player unit and the factory (LOSE)
+// is destroyed, and the end screen comes with win.txt / loose.txt.
+//#define SANDBOX_WIN_TEST 1
+//#define SANDBOX_LOSE_TEST 1
 
 #include "maps\script\header.lgc"
 
@@ -156,10 +158,10 @@ DriveTest()
     for( u=FirstUnit(U_UNIT); u; u=NextUnit() )
       if( GetUnitVid(u)==102 && Action(u,act_getarmy,0,0)==0 )
       {
-        // one order: the depot builds the cars and pushes them out as one train
+        // one order: the factory builds the cars and pushes them out as one train
         BuildTrain(u,drive_build);
         drive_built=1;
-        Log("DRIVE depot queue: 5 20");
+        Log("DRIVE factory queue: 5 20");
       }
   for( u=FirstTrain(0); u; u=NextTrain() )
   {
@@ -184,7 +186,7 @@ DriveTest()
     }
     else
     {
-      // a train from the depot: out of the spur, then east along the main line
+      // a train from the factory: out of the spur, then east along the main line
       known=0;
       for( i=0; i<8 && drive_sent[i]; i++ )
         if( drive_sent[i]==u )
@@ -192,7 +194,7 @@ DriveTest()
       if( !known && i<8 )
       {
         drive_sent[i]=u;
-        Log("DRIVE depot train "+itoa(u)+" sent east");
+        Log("DRIVE factory train "+itoa(u)+" sent east");
         Action(u,ACT_MOVE,1100,1375);
       }
     }
@@ -257,20 +259,36 @@ main()
 {
   iff(1)
   {
+#ifdef SANDBOX_DRIVE_TEST
+    // no enemy trains: TrainsTact() creates the start trains on its first call, after this,
+    // and the factory would rebuild them (start_trains_renew)
+    start_trains[0]=-1;
+    start_trains[1]=-1;
+    start_trains_renew[0]=0;
+    start_trains_renew[1]=0;
+#endif
     InitDefault();
     // the reinforcement arrives at the point locomotive (VID 5, army 3) at
     // the west end of the main line and is pushed onto the line
     if(player_x || player_y)
       AddReinforcement();
     // the push lines run from the dead end along the track: trains are pushed
-    // out of the depot (and the reinforcement off the line's end), and no
-    // train may enter them the other way
-    SetPushLine(-195, 1299, 88, 1299, 1);   // level entry: from past the west edge onto the map
-    SetPushLine(-195, 149, 17, 149, 0);     // level exit: one way into the map, no train leaves it
-    SetPushLine(319, 936, 319, 1061, 1);    // our depo: south down the spur
-    SetPushLine(1313, 511, 1313, 386, 1);   // enemy depo: north up the spur
-    SetPushLine(674, 1211, 674, 861, 1);    // our master: north through the workshop
-    SetPushLine(745, 236, 745, 586, 1);     // enemy master: south through the workshop
+    // out of the factory (and the reinforcement off the line's end), and no
+    // train may enter them the other way - in this order:
+    //   level entry: from past the west edge onto the map
+    //   level exit: one way into the map, no train leaves it
+    //   our factory: south down the spur
+    //   enemy factory: north up the spur
+    //   our repair point: north through the workshop
+    //   enemy repair point: south through the workshop
+    // <editor main> the push lines - written by the map editor when the map is saved
+    SetPushLine(-195, 1299, 88, 1299, 1);
+    SetPushLine(-195, 149, 17, 149, 0);
+    SetPushLine(319, 936, 319, 1061, 1);
+    SetPushLine(1313, 511, 1313, 386, 1);
+    SetPushLine(674, 1211, 674, 861, 1);
+    SetPushLine(745, 236, 745, 586, 1);
+    // </editor main>
     // start at the player's base in the south-west corner (clamped to the map,
     // as mission 4 does it with SetPosition(0,1579))
     SetPosition(0, 1536);
@@ -297,7 +315,7 @@ main()
         if( !NoArmyUnits(1) )   // no enemy units left
           Win();
         if( !NoArmyUnits(0) )   // no player units left
-          if( IsNoDepo() )      // and no depot to rebuild from
+          if( IsNoDepo() )      // and no factory to rebuild from
             Loose();
       }
     }

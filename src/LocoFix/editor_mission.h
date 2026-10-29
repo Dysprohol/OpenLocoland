@@ -25,6 +25,16 @@ struct TrainPatrol {
 };
 // The patrols read from the block (editor_edit.cpp gives them to the trains of the held level).
 const std::vector<TrainPatrol>& mission_patrols();
+// An enemy train of the mission (start_trains*, level_queue_*): the script's AI makes it while
+// the level runs, so the map has no object for it - the editor marks where it comes from.
+struct EnemyTrainMark {
+    std::string type;     // as the dialog shows it: light_gun, or a number
+    int time;             // 0: at the start; from the factory's queue: the earliest second
+    bool patrol;          // patrols between (x1, y1) and (x2, y2); otherwise it attacks
+    int x1, y1, x2, y2;   // screen points; a start train starts at (x1, y1)
+};
+// The start trains, then the queue (read from the script, as File > Mission settings... has them).
+std::vector<EnemyTrainMark> mission_enemy_trains();
 // The script has the editor's blocks, so the settings and push lines are written on a save.
 bool mission_managed();
 // After a level is loaded in editor mode: reads the mission of the map's script.

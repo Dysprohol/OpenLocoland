@@ -14,12 +14,14 @@
 // and stays as it is. A new map gets the script of the map it was saved from when that one has
 // the blocks, otherwise the template's (maps\template\template.lgc, map_tool.py new --script) -
 // the settings and the SetPushLine calls read from the old script go into the new blocks. A
-// script without the blocks (the campaign, the sandbox) is not changed: its settings are shown
-// and its push lines drawn, read-only.
+// script without the blocks (the campaign) is not changed: its settings are shown and its push
+// lines drawn, read-only.
 //
 // The texts are the map's files, in the pack's code page in capitals (the fonts have no small letters), at most 44
 // characters a line (the briefing's width), CRLF: objectives.txt, win.txt, loose.txt and the
-// briefing pages brief.txt, brief2.txt ... listed in brief.lst. A map saved as
+// briefing pages brief.txt, brief2.txt ... listed in brief.lst (with the high scores page,
+// hiscores.txt, last when the list had it - the game writes that one); a text the language pack
+// has a copy of (the sandbox's, lang\<code>\maps\sandbox) is written to that copy. A map saved as
 // maps\<folder>\<folder>.map gets its line in maps\custom.lst (the folder and its title), so it
 // shows on the custom maps page of the menu.
 //
@@ -100,6 +102,7 @@ struct Mission {
     std::vector<EnemyTrain> start, queue;
     std::wstring objectives, win, lose;
     std::vector<std::wstring> brief;
+    bool scores_page = false;   // brief.lst ends with the high scores page (hiscores.txt)
     std::map<std::string, std::string> settings;   // SETTINGS as read
     std::vector<std::pair<std::string, std::string>> extra;   // other defines of the block
 };
@@ -475,7 +478,11 @@ Mission read_mission(const Parsed& p, bool block, const std::string& map) {
     m.lose = read_text(file("LOOSE_FILE", "loose.txt"));
     for (const std::string& page : split_lines(read_file(file("BRIEF_LIST", "brief.lst")))) {
         const std::string name = trim(page);
-        if (name.empty() || name.find("hiscores") != std::string::npos) continue;   // the high scores page
+        if (name.empty()) continue;
+        if (name.find("hiscores") != std::string::npos) {   // the high scores page: the game writes it
+            m.scores_page = true;
+            continue;
+        }
         m.brief.push_back(read_text(name));
     }
     std::string title = p.title;
@@ -834,6 +841,12 @@ std::string mission_listed_title(const std::string& folder) { return custom_titl
 const std::vector<TrainPatrol>& mission_patrols() { return g_patrols; }
 const std::vector<PushLine>& mission_script_push_lines() { return g_script_lines; }
 bool mission_managed() { return g_managed; }
+std::vector<EnemyTrainMark> mission_enemy_trains() {
+    std::vector<EnemyTrainMark> out;
+    for (const auto* list : {&g_mission.start, &g_mission.queue})
+        for (const EnemyTrain& t : *list) out.push_back({type_name(t.type), t.time, t.patrol, t.x1, t.y1, t.x2, t.y2});
+    return out;
+}
 
 void mission_load(const std::string& map) {
     g_mission = Mission();
@@ -966,19 +979,23 @@ void mission_save(const std::string& map) {
     if (!write_file(script, data)) return;
     g_managed = true;
     g_map = map;
-    // the texts
+    // the texts - into the pack's copy when the map has one (the sandbox's, lang\<code>\maps\...),
+    // which the game reads instead of the root's
     const std::string folder = folder_of(map);
-    write_file(folder + "\\objectives.txt", text_file(g_mission.objectives));
-    write_file(folder + "\\win.txt", text_file(g_mission.win));
-    write_file(folder + "\\loose.txt", text_file(g_mission.lose));
+    auto write_text = [](const std::string& path, const std::string& data) { write_file(language_file(path), data); };
+    write_text(folder + "\\objectives.txt", text_file(g_mission.objectives));
+    write_text(folder + "\\win.txt", text_file(g_mission.win));
+    write_text(folder + "\\loose.txt", text_file(g_mission.lose));
     std::vector<std::wstring> pages = g_mission.brief;
     if (pages.empty()) pages.push_back(g_mission.objectives);
     std::string list;
     for (size_t i = 0; i < pages.size(); ++i) {
         const std::string page = folder + (i ? "\\brief" + std::to_string(i + 1) + ".txt" : "\\brief.txt");
-        write_file(page, text_file(pages[i]));
+        write_text(page, text_file(pages[i]));
         list += (i ? "\r\n" : "") + page;
     }
+    // the high scores page stays last when the list had it and the folder has the page
+    if (g_mission.scores_page && exists(folder + "\\hiscores.txt")) list += "\r\n" + folder + "\\hiscores.txt";
     write_file(folder + "\\brief.lst", list);
     patch::log("mission: %s written - %u push lines, %u start trains, %u in the queue, %u briefing pages",
                script.c_str(), static_cast<unsigned>(g_lines.size()), static_cast<unsigned>(g_mission.start.size()),

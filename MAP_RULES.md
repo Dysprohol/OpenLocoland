@@ -300,8 +300,13 @@ moves or deletes its line and posts.
   marked blocks of the script, `// <editor>` ... `// </editor>` before `header.lgc` and
   `// <editor main>` ... `// </editor main>` in `main()`'s `iff(1)`, and writes them anew from File >
   Mission settings... and the Push line tool when the map is saved; the rest of the script is
-  kept. `map_tool.py new --script` writes a script with both blocks (the template); a script
-  without them is only read.
+  kept. `map_tool.py new --script` writes a script with both blocks (the template, and the
+  sandbox has them too); a script without them is only read. What a mission needs besides the
+  settings goes outside the blocks: its own car lists of the train types (`int this_trainNN[]`)
+  before `// <editor>`, as `TrainsTactDeclares.lgc` takes them only when declared before it, and
+  no `#ifdef` inside a block (a save writes the block without it). The enemy's trains have no
+  object on the map (the AI makes them while the level runs); the editor marks where they start,
+  their patrols and the factory that builds them.
 
 ## 9. Ordering of objects
 
