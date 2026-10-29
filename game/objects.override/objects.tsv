@@ -21,3 +21,7 @@ nvid	name	spriteType	spriteClass	flags	moveMask	sizeX	sizeY	sizeZ	maxHp	speed	sp
 # (VID 499) with "?" and three bars instead of their signs (patch_data.make_editor_buttons)
 942	Editor help button	0x400	FRAME	0x2800	0x7	20	20	0	0	0	0	999999	999999	2500	1	1	1	1	vid\942help.vid
 943	Editor menu button	0x400	FRAME	0x2800	0x7	40	40	0	0	0	0	999999	999999	2500	1	1	1	1	vid\943menu.vid
+# VID 945: the "edit the map" icon beside each map of the custom maps page (menu.lgc) - the hammer
+# and the wrench of the state bar's atlas as the page's green glyph, its mouse tip MenuVid945AllDir
+# (patch_data.make_custom_edit_icon)
+945	Custom maps edit	0x400	FRAME	0x2800	0xf	22	22	0	0	0	0	999999	999999	2500	1	1	1	1	vid\945edit.vid

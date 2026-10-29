@@ -120,6 +120,7 @@ Mapa strategiczna ma **drugą stronę**: przycisk `►►►` w jej prawym dolny
 - Pod nim są własne mapy: te dołączone do gry i te, które zrobisz albo dostaniesz od znajomych.
   Długa lista się przewija - strzałki obok niej, kółko myszy, klawisze w górę i w dół.
 - Kliknięcie mapy pokazuje jej odprawę; **URUCHOM GRE** gra ją jak misję kampanii.
+- Młotek i klucz na prawo od tytułu mapy (**Edytuj mape**) otwierają tę mapę w edytorze.
 
 ![POLIGON](img/poligon-pl.jpg)
 

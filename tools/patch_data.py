@@ -704,6 +704,73 @@ def make_editor_buttons(vid_folder, help_output, menu_output):
         shutil.rmtree(work, ignore_errors=True)
 
 
+# The "edit the map" icon of the custom maps page (vid\945edit.vid, VID 945): the hammer and the
+# wrench of the state bar's atlas (frame ATLAS_TOOLS of vid\455icon.vid) drawn as the page's green
+# glyphs, CUSTOM_EDIT_ICON px square, in the kind of image of the page's lamp (vid\472.vid): green
+# with an alpha. Four frames, as the animations of VID 945: STAND and STOP_MOVE dim, GO and
+# START_MOVE lit (the menu shows STOP_MOVE, act_menustandup, and START_MOVE under the mouse).
+ATLAS_TOOLS = 2
+CUSTOM_EDIT_ICON = 22
+
+
+def make_custom_edit_icon(vid_folder, output):
+    """Writes `output` (vid\\945edit.vid) from vid\\455icon.vid and vid\\472.vid in `vid_folder`.
+    Returns False (and writes nothing) when they are not the images this expects."""
+    import csv
+    import json
+    import shutil
+    import tempfile
+    from PIL import Image
+    import map_tool
+
+    work = tempfile.mkdtemp(prefix="customedit_")
+    try:
+        folders = {}
+        for name in ("455icon", "472"):
+            path = os.path.join(vid_folder, name + ".vid")
+            if not os.path.isfile(path):
+                return False
+            folders[name] = os.path.join(work, name)
+            map_tool.unpack(path, folders[name])
+        atlas = json.load(open(os.path.join(folders["455icon"], "vid.json"), encoding="utf-8"))
+        folder = folders["472"]
+        lamp = json.load(open(os.path.join(folder, "vid.json"), encoding="utf-8"))
+        if atlas["kind"] != "texture" or (atlas["width"], atlas["height"]) != (40, 40) or lamp["kind"] != "texture":
+            return False
+        with open(os.path.join(folders["455icon"], "tiles.tsv"), encoding="utf-8") as f:
+            tiles = list(csv.DictReader((l for l in f if not l.startswith("#")), delimiter="\t"))
+        t = tiles[ATLAS_TOOLS]
+        x, y = int(t["offsetX"]), int(t["offsetY"])
+        cell = Image.open(os.path.join(folders["455icon"], "texture_%03d.png" % int(t["texture"]))).convert("L")
+        # the light grey tools inside the gold frame, as the glyph's coverage
+        size = CUSTOM_EDIT_ICON
+        glyph = cell.crop((x + 3, y + 3, x + 37, y + 37)).point(lambda v: max(0, min(255, (v - 70) * 2)))
+        glyph = glyph.resize((size, size), Image.LANCZOS)
+        sheet = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+        frames = []
+        for frame, lit in enumerate((False, False, True, True)):
+            image = Image.new("RGBA", (size, size), (40, 255, 40, 0) if lit else (20, 200, 20, 0))
+            image.putalpha(glyph if lit else glyph.point(lambda v: v * 9 // 20))
+            frames.append((frame % 2 * 32, frame // 2 * 32))
+            sheet.paste(image, frames[-1])
+        sheet.save(os.path.join(folder, "texture_000.png"))
+        with open(os.path.join(folder, "tiles.tsv"), encoding="utf-8") as f:
+            rows = list(csv.DictReader((l for l in f if not l.startswith("#")), delimiter="\t"))
+        header = list(rows[0].keys())
+        with open(os.path.join(folder, "tiles.tsv"), "w", encoding="utf-8", newline="\n") as f:
+            f.write("\t".join(header) + "\n")
+            for k, (ox, oy) in enumerate(frames):
+                row = {"tile": k, "unknown_00": rows[0]["unknown_00"] if k == 0 else "0x00000000", "texture": 0,
+                       "offsetX": ox, "offsetY": oy, "width": size, "height": size, "x": 0, "y": 0, "next": 0}
+                f.write("\t".join(str(row[c]) for c in header) + "\n")
+        lamp.update(frameCount=len(frames), width=size, height=size, textures=1)
+        json.dump(lamp, open(os.path.join(folder, "vid.json"), "w", encoding="utf-8"), indent=2)
+        map_tool.pack(folder, output)
+        return True
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
 def _resign(disc, sign, area):
     """The disc with its sign replaced by `sign` (rows of '#' and '.'); the old sign lies within
     `area` x the width from the middle, inside the ring. A lit disc has a bright green sign, a

@@ -702,6 +702,9 @@ def build(steam, target, locofix=None, captured=None, progress=None, version=Non
             os.path.join(a.steam, "vid"), help_vid, menu_vid),
             os.path.join(vid, "942help.vid"), os.path.join(vid, "943menu.vid")):
         print("vid: unknown images, no Help and Menu buttons for the editor bar")
+    if not generate(copied, lambda path: patch_data.make_custom_edit_icon(os.path.join(a.steam, "vid"), path),
+                    os.path.join(vid, "945edit.vid")):
+        print("vid: unknown images, no edit icon for the custom maps page")
 
     done(0.9)
     for rel, folder in maps.items():

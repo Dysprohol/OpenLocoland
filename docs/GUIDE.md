@@ -121,6 +121,7 @@ The strategic map has a **second page**: the `►►►` button at its bottom ri
 - Under it are the custom maps: those that came with the game and those you make or get from
   friends. A long list scrolls - the arrows beside it, the mouse wheel, the up and down keys.
 - A click on a map shows its briefing; **START GAME** plays it like a campaign mission.
+- The hammer and wrench right of a map's title (**Edit the map**) opens that map in the editor.
 
 **POLIGON** is a ready mission made with the same tools as the editor: the enemy has built a
 bastion in the east - a fort with two guns guards its gates, behind it stand its factory and repair

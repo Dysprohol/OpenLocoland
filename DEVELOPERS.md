@@ -745,10 +745,17 @@ the map editor adds the maps it saves, and `build.py` keeps those lines when it 
 repository's list into the game). A map shows its
 briefing pages (`maps\<folder>\brief.lst`) under its title, with a previous button back to the
 list on the first page, and the start button loads `maps\<folder>\<folder>.map` the way a
-campaign mission starts. "EDYTOR MAP" calls `StartEditor()` in `menu.lgc`, the one place the
+campaign mission starts. "EDYTOR MAP" calls `StartEditor(map)` in `menu.lgc`, the one place the
 menu starts the editor from: fade, music off, then LocoFix's `StartEditorMode` (extern 200)
 starts the game again in editor mode on `maps\template\template.map`, which opens as a new empty
-map (see "Editor mode", "The map the editor starts on").
+map (see "Editor mode", "The map the editor starts on"). Each map row has an "edit the map" icon
+right of its title (VID 945, `Custom maps edit`: the hammer and the wrench of the state bar's atlas,
+VID 455 frame 2, as the page's green glyph, made by `patch_data.make_custom_edit_icon` into
+`vid\945edit.vid`; dim, lit under the mouse as the lamps are - STOP_MOVE / START_MOVE -, its mouse
+tip "Edytuj mape" / "Edit the map", `MenuVid945AllDir`), which starts the editor on that row's
+`maps\<folder>\<folder>.map` - POLIGON too, which the editor then saves only under a name of its
+own. Its column is not part of the row: a click there is the icon's (`MenuVid()` 945, the row by
+its y), the rest of the row still shows the briefing.
 
 `CUSTOM_MAP` (the map's own file, `#define CUSTOM_MAP "maps\\sandbox\\sandbox.map"` before
 `header.lgc`) marks a map that is not a campaign mission, hooks in `menuend.lgc` (the root and

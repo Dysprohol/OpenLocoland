@@ -23,6 +23,8 @@
 +#define CUSTOM_ARROW_X 165  // the scroll arrows, beside the first and the last map row
 +#define CUSTOM_UP     940   // the difficulty arrows of the player list (VID 447/448) as types of
 +#define CUSTOM_DOWN   941   // their own, with their own mouse tips (game/objects.override)
++#define CUSTOM_EDIT   945   // the "edit the map" icon right of a map's title (game/objects.override)
++#define CUSTOM_EDIT_X 140   // its place, from the centre of the picture
  
 @@ -88,2 +106,7 @@
  string load_list;
@@ -93,6 +95,7 @@
 +    Genocide(472);
 +    Genocide(CUSTOM_UP);
 +    Genocide(CUSTOM_DOWN);
++    Genocide(CUSTOM_EDIT);
 +    for(j=0;j<=CUSTOM_ROWS;j++)
 +    {
 +      if(custom_text[j]) Destroy(custom_text[j]);
@@ -157,7 +160,10 @@
 +  if(s=="") s="MAP EDITOR";
 +  CustomMenuRowCreate(CUSTOM_EDITOR,s);
 +  for(j=0;j<custom_shown;j++)
++  {
 +    CustomMenuRowCreate(j,custom_title[j]);
++    Action(MenuCreate(CUSTOM_EDIT,0,X+CUSTOM_EDIT_X,Y+CustomMenuRowY(j),20),act_menustandup,0,0);
++  }
 +  if(custom_top>0)
 +    MenuCreate(CUSTOM_UP,0,X+CUSTOM_ARROW_X,Y+CustomMenuRowY(0),20);
 +  if(custom_top+custom_shown<custom_count)
@@ -179,12 +185,12 @@
 +  }
 +}
 +// The entry under the point (x, y) of the screen - a map row, CUSTOM_EDITOR or -1 for none.
-+// The column of the scroll arrows is not a row.
++// The column of the edit icons and the scroll arrows is not a row (a click there is the icon's).
 +CustomMenuEntryAt(int x,int y)
 +{
 +  int j,row_y;
 +  GetRCX(MAIN_X);GetRCY(MAIN_Y);
-+  if(x<X+CUSTOM_X-12 || x>X+CUSTOM_ARROW_X-12) return -1;
++  if(x<X+CUSTOM_X-12 || x>X+CUSTOM_EDIT_X-12) return -1;
 +  for(j=0;j<=CUSTOM_EDITOR;j++)
 +    if(j<custom_shown || j==CUSTOM_EDITOR)
 +    {
@@ -193,29 +199,47 @@
 +    }
 +  return -1;
 +}
-+// The map editor entry of the custom maps page - the one place the menu starts it from.
-+// LocoFix's StartEditorMode (src/LocoFix/restart.cpp, extern number 200, free in export.lgc)
-+// starts the game again in its editor mode, where the template opens as a new empty map;
-+// File > Load of the editor opens the others.
++// The map row whose edit icon is at the y of the screen, or -1.
++CustomMenuEditAt(int y)
++{
++  int j,row_y;
++  GetRCX(MAIN_X);GetRCY(MAIN_Y);
++  for(j=0;j<custom_shown;j++)
++  {
++    row_y=Y+CustomMenuRowY(j);
++    if(y>=row_y-CUSTOM_DY/2 && y<row_y+CUSTOM_DY/2) return j;
++  }
++  return -1;
++}
++// The map editor of the custom maps page - the one place the menu starts it from: its row on
++// the template, the edit icon of a map row on that map. LocoFix's StartEditorMode
++// (src/LocoFix/restart.cpp, extern number 200, free in export.lgc) starts the game again in its
++// editor mode, where the template opens as a new empty map.
 +extern StartEditorMode(string map) 200;
 +// LocoFix's GetMouseWheel (src/LocoFix/menu_input.cpp, extern number 201): the turn of the mouse
 +// wheel in this frame, > 0 up - the list of the page scrolls with it.
 +extern GetMouseWheel() 201;
-+StartEditor()
++StartEditor(string map)
 +{
 +  ScrollLock(0);
 +  StopMusic();
 +  Effect(eff_fade,0);
-+  StartEditorMode("maps\\template\\template.map");
++  StartEditorMode(map);
 +}
 +// Entry j of the custom maps page: a map row shows its map's briefing, whose start button loads
-+// it like a campaign mission; CUSTOM_EDITOR is the editor. Returns 1 when the menu is left.
-+CustomMenuSelect(int j)
++// it like a campaign mission; CUSTOM_EDITOR is the editor; with `edit` (the edit icon of a map
++// row) the row's map opens in the editor. Returns 1 when the menu is left.
++CustomMenuSelect(int j,int edit)
 +{
 +  PlaySFX(24);
++  if(edit)
++  {
++    StartEditor("maps\\"+custom_folder[j]+"\\"+custom_folder[j]+".map");
++    return 1;
++  }
 +  if(j==CUSTOM_EDITOR)
 +  {
-+    StartEditor();
++    StartEditor("maps\\template\\template.map");
 +    return 1;
 +  }
 +  active_map="maps\\"+custom_folder[j]+"\\"+custom_folder[j]+".map";
@@ -291,6 +315,13 @@
 +          k=-1;
 +          if(mvid==CUSTOM_UP) CustomMenuScroll(-1);
 +          else if(mvid==CUSTOM_DOWN) CustomMenuScroll(1);
++          else if(mvid==CUSTOM_EDIT)
++          {
++            k=CustomMenuEditAt(GetScreenInputY());
++            if(k>-1)
++              if(CustomMenuSelect(k,1)) return;
++            k=-1;
++          }
 +          else if(mclick==1) k=CustomMenuEntryAt(GetScreenInputX(),GetScreenInputY());
 +          l=GetMouseWheel();
 +          if(l) CustomMenuScroll(-l);
@@ -299,5 +330,5 @@
 +          if(GetKey()==VK_PRIOR) CustomMenuScroll(-CUSTOM_ROWS);
 +          if(GetKey()==VK_NEXT) CustomMenuScroll(CUSTOM_ROWS);
 +          if(k>-1)
-+            if(CustomMenuSelect(k)) return;
++            if(CustomMenuSelect(k,0)) return;
          }
