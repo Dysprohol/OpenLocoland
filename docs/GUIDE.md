@@ -287,8 +287,10 @@ which pushes the train in - the entry's line and its lights are one thing, as in
 on the way in without a line to them (**LINE TO THE LIGHTS**), no locomotive in the train, no point. A
 wave waits while a train stands at its entry. The arrow at the bottom left, Esc or the right button go
 back to the list; a click on an entry or a point on the map opens its arrival. Every change is undone
-with Ctrl+Z. Maps made with an older version keep their reinforcement until **CONVERT TO ARRIVALS** in
-the panel.
+with Ctrl+Z. Maps made with an older version keep their reinforcement and the enemy's start trains of
+their script (shown as marks on the track; a click on one opens this panel) until **CONVERT TO
+ARRIVALS** in the panel: the start trains then stand on the map as trains with their orders (patrol or
+attack), editable like any train.
 
 ### 6. The factory, the repair point, one-way lines and semaphores
 

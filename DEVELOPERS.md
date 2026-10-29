@@ -1768,9 +1768,27 @@ free place in `ai_trains`).
 An editor map made before keeps its reinforcement and its blocks until the panel's CONVERT: the new
 blocks are added at the next save (refused with the reason when `main()` has no `TrainsTact();` after
 `header.lgc`), the reinforcement becomes two arrivals at its point (the first wave at the start, the
-others when the player has no train - the old template's "and a factory of its own" is not kept),
-driving where the marker's order 33 sent it, `PLAYER_REINFORCEMENT` becomes 0 and the point
-locomotives go (one step of the history). A campaign mission or the sandbox (no editor blocks) shows
+others when the player has no locomotive and has a factory of its own - `IF_OWN_FACTORY`, condition
+10 of `MissionIf`, as the old template and POLIGON bring their second wave), driving where the marker's
+order 33 sent it, `PLAYER_REINFORCEMENT` becomes 0 and the point locomotives go. The script's start
+trains (`start_trains*`, which the AI makes when the level starts and the editor showed as marks on the
+track) become trains of the map (`place_start_train`): the cars of their type as the map's script has
+them (its own `this_trainNN[]` wherever it stands in the script, else the authors'), the enemy's, laid
+from the start point along the track as a drag lays a train (the first car at the point), with the
+order in their panel - `ATA_PATROLn` a patrol to the far end of its patrol, else an attack - which
+`OrdersTact` hands to the AI as before; the arrays are written empty. Rebuilding a lost start train
+(`start_trains_renew`, read only for the start trains by `ai_events.lgc` DepoFree) and its raids
+(`start_trains_random_task`) are not kept: a train of the map has no such setting. The queue
+(`level_queue_*`) is already the enemy factory's plan in a map that runs arrivals. All of it is one
+step of the history (the start trains are in it: `Operation::start`). Until a map is converted, a left
+or right click on a start train's mark opens the Arrivals panel with CONVERT (`start_mark_click`), not
+the panel of the rail under it, and the status line says what the mark is. Checked in play on POLIGON
+converted: the light gun train came out as 20,5,20 at 1810,1061 and the light mortar train as 25,10,25
+at 1437,1299, both patrolled between the same points as before for 90 s (the AI's `STTEST` log of the
+old and the converted map side by side), the queue's first train was queued at 240 s and the AI took
+it; SANDBOX_DRIVE_TEST (points 0-4 reached, the enemy's 6 cars taken away first), SANDBOX_WIN_TEST
+(VICTORY) and SANDBOX_LOSE_TEST (DEFEAT, no second wave without a factory) pass.
+`game/maps.new/sandbox` is POLIGON so converted (its map and script). A campaign mission or the sandbox (no editor blocks) shows
 the reason only. A script edited outside the editor so that it lost `TrainsTact();` is saved without
 the arrivals, unit limits and later units; the editor keeps them and says so in the status line. The marker locomotive's panel (VID 5, army 3) shows what it is in play - "ours arrive
 here" with reinforcement waves, "taken away at the start" without - instead of its parking army 3,

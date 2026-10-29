@@ -282,8 +282,10 @@ WJAZD**), brak świateł na wjeździe (**POSTAW SWIATLA**: para semaforów w pie
 linia, która wpycha pociąg - linia wjazdu i jej światła to jedno, jak w misjach) albo światła na drodze
 bez linii do nich (**LINIA DO SWIATEL**), brak lokomotywy w składzie, brak punktu. Fala czeka, gdy na wjeździe stoi pociąg. Strzałka na dole po lewej, Esc albo prawy przycisk
 wracają do listy; kliknięcie wjazdu albo punktu na mapie otwiera jego przyjazd. Każdą zmianę cofa
-Ctrl+Z. Mapy ze starszej wersji zachowują swoje posiłki, dopóki w panelu nie wybierzesz **PRZESTAW NA
-PRZYJAZDY**.
+Ctrl+Z. Mapy ze starszej wersji zachowują swoje posiłki i pociągi startowe wroga ze skryptu (widać je
+jako znaczniki na torze; kliknięcie znacznika otwiera ten panel), dopóki w panelu nie wybierzesz
+**PRZESTAW NA PRZYJAZDY**: pociągi startowe stają wtedy na mapie jako zwykłe pociągi z rozkazami
+(patrol albo atak), które edytuje się jak każdy pociąg.
 
 ### 6. Fabryka, punkt naprawczy, linie jednokierunkowe i semafory
 

@@ -31,6 +31,23 @@ struct TrainPatrol {
     int from_x = 0, from_y = 0;  // the first car's rail point, screen (the enemy's patrol's other end)
     std::vector<int> cars;       // the train's cars, the first one first (the enemy's train type)
 };
+// An enemy train of the script's start (start_trains*: the AI makes it when the level starts) or of
+// Mission settings' queue as the dialog reads it.
+struct EnemyTrain {
+    int time = 0;          // the queue: seconds
+    std::string type;      // ATT_... or a number
+    bool patrol = false;
+    int x1 = 0, y1 = 0, x2 = 0, y2 = 0;   // screen coordinates; a fighting train starts at x1, y1
+    int renew = 1, raid = 0;              // start_trains_renew, start_trains_random_task as read (AiKnobs may set all)
+    bool operator==(const EnemyTrain& o) const {
+        return time == o.time && type == o.type && patrol == o.patrol && x1 == o.x1 && y1 == o.y1 && x2 == o.x2 && y2 == o.y2 &&
+               renew == o.renew && raid == o.raid;
+    }
+};
+// The script's start trains (CONVERT in the Arrivals panel makes trains of the map of them) and the
+// cars of a train type as the map's script has them.
+std::vector<EnemyTrain>& mission_start();
+std::vector<int> mission_type_cars(const std::string& type);
 // The patrols read from the block (editor_edit.cpp gives them to the trains of the held level).
 const std::vector<TrainPatrol>& mission_patrols();
 // An enemy train of the mission (start_trains*, level_queue_*): the script's AI makes it while
@@ -86,6 +103,7 @@ enum ArrivalIf : int {
     IF_FEW_ATTACKERS,    // fewer than n of the AI's trains attack
     IF_MONEY,            // the player has n money - and pays it
     IF_CAMPAIGN,         // no train and a neutral factory stands (the campaign's reinforcements)
+    IF_OWN_FACTORY,      // no locomotive and a factory of the player's (the old template's, POLIGON's second wave)
     IF_COUNT
 };
 // The conditions as one list - the WHEN of an arrival and of a factory's plan entry (later of the

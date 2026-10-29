@@ -292,8 +292,12 @@ void draw_list_screen() {
         g_rows.area(x - 2, y - ROW / 2, x + WIDTH * g_cw, y + ROW * 1.5f, [i] { open_arrival(i); });
         y += 2 * ROW;
     }
-    // the authors' reinforcement goes on beside the arrivals; the AI's limits
-    if (mission_arrivals().waves > 0) {
+    // the script's start trains and the authors' reinforcement go on beside the arrivals; the AI's limits
+    if (!mission_start().empty()) {
+        put(g_px + LEFT, g_py + BOTTOM - ROW,
+            ui_printf(ui_format("ArrStartConvert", "+ %d START TRAINS OF THE SCRIPT: CONVERT"), static_cast<int>(mission_start().size())),
+            false, [] { edit_convert_arrivals(); });
+    } else if (mission_arrivals().waves > 0) {
         int ex, ey, ez;
         if (edit_reinforcement_marker(ex, ey, ez))
             put(g_px + LEFT, g_py + BOTTOM - ROW, ui_text("ArrLegacyConvert", "+ THE AUTHORS' REINFORCEMENT: CONVERT"), false,
@@ -577,13 +581,22 @@ void draw_legacy() {
         return;
     }
     float y = g_py + TOP;
-    put(g_px + LEFT, y, ui_text("ArrLegacy1", "THIS MAP HAS THE AUTHORS' REINFORCEMENT:"));
-    y += ROW;
-    std::string train;
-    for (int c : mission_reinforcement_train()) train += (train.empty() ? "" : ",") + std::to_string(c);
-    put(g_px + LEFT, y, ui_printf(ui_format("ArrLegacy2", "%d WAVES OF %s AT ITS POINT LOCOMOTIVE"), mission_reinforcement_waves(),
-                                  train.c_str()));
-    y += 2 * ROW;
+    if (mission_reinforcement_waves() > 0) {
+        put(g_px + LEFT, y, ui_text("ArrLegacy1", "THIS MAP HAS THE AUTHORS' REINFORCEMENT:"));
+        y += ROW;
+        std::string train;
+        for (int c : mission_reinforcement_train()) train += (train.empty() ? "" : ",") + std::to_string(c);
+        put(g_px + LEFT, y, ui_printf(ui_format("ArrLegacy2", "%d WAVES OF %s AT ITS POINT LOCOMOTIVE"), mission_reinforcement_waves(),
+                                      train.c_str()));
+        y += 2 * ROW;
+    }
+    if (!mission_start().empty()) {   // the AI makes them at the start: CONVERT makes trains of the map with their orders
+        put(g_px + LEFT, y, ui_printf(ui_format("ArrLegacyStart1", "AND %d ENEMY START TRAINS OF THE SCRIPT:"),
+                                      static_cast<int>(mission_start().size())));
+        y += ROW;
+        put(g_px + LEFT, y, ui_text("ArrLegacyStart2", "CONVERT PUTS THEM ON THE MAP WITH THEIR ORDERS"));
+        y += 2 * ROW;
+    }
     put(g_px + LEFT, y, ui_text("ArrConvert", "CONVERT TO ARRIVALS"), false, [] { edit_convert_arrivals(); });
 }
 

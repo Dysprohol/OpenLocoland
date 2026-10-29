@@ -60,7 +60,7 @@ namespace {
 constexpr int STEP = PanelRows::STEP;
 constexpr int VID_PICTURE = 484, VID_ICONS = 944, VID_FRAME = 456;
 constexpr float LEFT = -182, LABEL = 88, ROW = PanelRows::ROW, ICON = 41;
-constexpr float TOP = -70, BOTTOM = 112;   // the first and the last row under the title, above the button bar
+constexpr float TOP = -70, BOTTOM = 98;    // the first and the last row under the title, clear of the button bar
 constexpr int WIDTH = 46;                  // characters a row
 constexpr int UNITS[] = {5, 10, 20, 25, 80, 85, 45, 30, 35, 82, 97, 90, 75, 62};   // the game's list, F1 ... ]
 const char* const KEYS[] = {"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "[", "]"};
@@ -211,11 +211,11 @@ void draw_list() {
         }
     }
     if (army() == 2) {
-        put(g_px + LEFT, g_py + 98, ui_text("FactoryIdle1", "THE AI BUILDS NOTHING HERE: THE PLAYER BUILDS"));
-        put(g_px + LEFT, g_py + 112, ui_text("FactoryIdle2", "THIS LIST ONCE THE FACTORY IS CAPTURED"));
+        put(g_px + LEFT, g_py + BOTTOM - ROW, ui_text("FactoryIdle1", "THE AI BUILDS NOTHING HERE: THE PLAYER BUILDS"));
+        put(g_px + LEFT, g_py + BOTTOM, ui_text("FactoryIdle2", "THIS LIST ONCE THE FACTORY IS CAPTURED"));
     } else if (army() == 3) {   // only a neutral one is captured (CaptureTact, as the missions' LDepoCapture)
-        put(g_px + LEFT, g_py + 98, ui_text("FactoryPirate1", "THE AI BUILDS NOTHING HERE, AND THE PLAYER"));
-        put(g_px + LEFT, g_py + 112, ui_text("FactoryPirate2", "CAPTURES ONLY NEUTRAL FACTORIES"));
+        put(g_px + LEFT, g_py + BOTTOM - ROW, ui_text("FactoryPirate1", "THE AI BUILDS NOTHING HERE, AND THE PLAYER"));
+        put(g_px + LEFT, g_py + BOTTOM, ui_text("FactoryPirate2", "CAPTURES ONLY NEUTRAL FACTORIES"));
     }
 }
 

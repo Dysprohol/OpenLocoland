@@ -101,14 +101,6 @@ constexpr int POSTS = 10;               // ATA_STAND0 ... ATA_STAND9
 const char* const SIZES[] = {"LIGHT", "MEDIUM", "HARD", "VERY_HARD", "DIFF", "DEFENCE"};
 const char* const KINDS[] = {"GUN", "MORTAIR", "ROCKET", "AIR", "FIRE", "DESANT"};
 
-struct EnemyTrain {
-    int time = 0;          // the queue: seconds
-    std::string type;      // ATT_... or a number
-    bool patrol = false;
-    int x1 = 0, y1 = 0, x2 = 0, y2 = 0;   // screen coordinates; a fighting train starts at x1, y1
-    int renew = 1, raid = 0;              // start_trains_renew, start_trains_random_task as read (AiKnobs may set all)
-};
-
 struct Mission {
     std::wstring title, header;
     int money = 0, daytime = 1, reinforcements = 1;
@@ -307,6 +299,8 @@ struct Parsed {
     std::map<std::string, std::vector<std::string>> arrays;
     std::string title;
 };
+Parsed g_parsed;   // the settings' block of the map's script as it was loaded, with the script's own
+                   // train types (int this_trainNN[]) wherever they stand in it
 
 void parse_line(const std::string& raw, Parsed& p) {
     const std::string line = trim(raw);
@@ -518,6 +512,8 @@ const char* const ARRIVALS_RUNNER[] = {
     "    return GetMoney(0)>=n;",
     "  if( c==9 )",
     "    return ArrivalTrains(0)==0 && GetVid(102,VID_COUNT2)>0;",
+    "  if( c==10 )",
+    "    return GetVid(5,VID_COUNT0)+GetVid(10,VID_COUNT0)==0 && GetVid(102,VID_COUNT0)>0;",
     "  return 1;",
     "}",
     "ArrivalIf(int i)",
@@ -2468,6 +2464,12 @@ Fields current_fields() {
 }
 
 }  // namespace
+
+// The script's start trains (editor_edit.cpp's CONVERT makes trains of the map of them; the history
+// keeps them), and the cars of a train type as this map's script has them (its own this_trainNN,
+// else the authors').
+std::vector<EnemyTrain>& mission_start() { return g_mission.start; }
+std::vector<int> mission_type_cars(const std::string& type) { return template_cars(type_number_of(type), g_parsed); }
 std::vector<PushLine>& mission_push_lines() { return g_lines; }
 void mission_list_map(const std::string& folder, const std::string& title) { add_to_custom_list(folder, title); }
 std::string mission_listed_title(const std::string& folder) { return custom_title(folder); }
@@ -2502,6 +2504,16 @@ void mission_load(const std::string& map) {
         if (g_managed && in_main && trim(lines[i]).rfind("//", 0) != 0 && parse_patrol(lines[i], t)) g_patrols.push_back(t);
     }
     g_mission = read_mission(p, g_managed, map);
+    g_parsed = p;
+    for (const std::string& line : lines) {   // a type the script defines outside the block (POLIGON's)
+        const std::string t = trim(line);
+        if (starts_with(t, "int this_train")) {
+            Parsed own;
+            parse_line(line, own);
+            for (const auto& a : own.arrays)
+                if (!g_parsed.arrays.count(a.first)) g_parsed.arrays[a.first] = a.second;
+        }
+    }
     read_orders(p, g_patrols);
     g_arrivals = ArrivalsState();
     g_arrivals.on = g_managed && b.arrivals();
@@ -2663,6 +2675,7 @@ const std::vector<Condition>& mission_conditions() {
         {IF_FEW_ATTACKERS, "ArrIfFewAttackers", "FEWER ENEMY ATTACKERS THAN", true, 1, 1, true},
         {IF_MONEY, "ArrIfMoney", "THE PLAYER PAYS", true, 300, 50, false},
         {IF_CAMPAIGN, "ArrIfCampaign", "NO TRAIN, A NEUTRAL FACTORY", false, 0, 0, true},
+        {IF_OWN_FACTORY, "ArrIfOwnFactory", "NO TRAIN, A FACTORY OF ITS OWN", false, 0, 0, false},
     };
     return list;
 }

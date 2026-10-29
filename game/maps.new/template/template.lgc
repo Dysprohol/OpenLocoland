@@ -196,6 +196,8 @@ MissionIf(int c,int n)
     return GetMoney(0)>=n;
   if( c==9 )
     return ArrivalTrains(0)==0 && GetVid(102,VID_COUNT2)>0;
+  if( c==10 )
+    return GetVid(5,VID_COUNT0)+GetVid(10,VID_COUNT0)==0 && GetVid(102,VID_COUNT0)>0;
   return 1;
 }
 ArrivalIf(int i)

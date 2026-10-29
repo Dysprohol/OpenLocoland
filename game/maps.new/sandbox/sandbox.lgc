@@ -97,27 +97,104 @@ int this_train11[]={25, 10, 25, 85, 0};
 #define BRIEF_LIST "maps\\sandbox\\brief.lst"
 #define BRIEF_HEADER "POLIGON"
 #define HISCORES_FILE "maps\\sandbox\\hiscores"
-#define PLAYER_REINFORCEMENT 2
+#define PLAYER_REINFORCEMENT 0
 int player_reinforcement_train[]={5,20,0};
 #define LIMIT_ATACKERS 2
+#define ARRIVALS 2
+int this_train4[]={5,20,0};
 #define ATA_PATROL0_X1 1810
 #define ATA_PATROL0_Y1 1061
 #define ATA_PATROL0_X2 1810
 #define ATA_PATROL0_Y2 736
+int this_train6[]={20,5,20,0};
 #define ATA_PATROL1_X1 1437
 #define ATA_PATROL1_Y1 1299
 #define ATA_PATROL1_X2 1153
 #define ATA_PATROL1_Y2 1299
+int this_train14[]={25,10,25,0};
+#define ORDERS 2
+#define UNLOCKS 0
+#define UNIT_LIMITS 0
+#define PLANS 2
+#define PRICES 0
+#define CLEVER_ATTACK 1
 #include "maps\script\TrainsTactDeclares.lgc"
-int start_trains[]={ATT_LIGHT_GUN,ATT_LIGHT_MORTAIR,-1};
-int start_trains_task[]={ATA_PATROL0,ATA_PATROL1,0};
-int start_trains_x[]={1810,1437,0};
-int start_trains_y[]={1061,1299,0};
-int start_trains_renew[]={1,1,0};
-int start_trains_random_task[]={0,0,0};
-int level_queue_times[]={240,420,0};
-int level_queue_trains[]={ATT_LIGHT_GUN,ATT_LIGHT_GUN,-1};
-int level_queue_task[]={ATA_FIGHT,ATA_FIGHT,0};
+int start_trains[]={-1};
+int start_trains_task[]={0};
+int start_trains_x[]={0};
+int start_trains_y[]={0};
+int start_trains_renew[]={0};
+int start_trains_random_task[]={0};
+int level_queue_times[]={0,0,0};
+int level_queue_trains[]={-1,-1,-1};
+int level_queue_task[]={0,0,0};
+int arrival_army[]={0,0,0};
+int arrival_type[]={4,4,0};
+int arrival_x[]={-89,-89,0};
+int arrival_y[]={1299,1299,0};
+int arrival_z[]={76,76,0};
+int arrival_first[]={0,0,0};
+int arrival_every[]={0,0,0};
+int arrival_times[]={1,1,0};
+int arrival_if[]={0,10,0};
+int arrival_if_n[]={0,0,0};
+int arrival_or[]={0,0,0};
+int arrival_task[]={-1,-1,0};
+int arrival_to_x[]={0,0,0};
+int arrival_to_y[]={0,0,0};
+int arrival_to_z[]={0,0,0};
+int arrival_to2_x[]={0,0,0};
+int arrival_to2_y[]={0,0,0};
+int arrival_raid[]={0,0,0};
+int arrival_msg[]={1,1,0};
+int arrival_done[]={0,0,0};
+int arrival_last[]={0,0,0};
+int arrival_unit[]={0,0,0};
+int arrival_part[]={0,0,0};
+int arrival_car[]={0,0,0};
+int order_vid[]={20,25,0};
+int order_x[]={1810,1437,0};
+int order_y[]={1129,1375,0};
+int order_task[]={ATA_PATROL0,ATA_PATROL1,0};
+int order_type[]={6,14,0};
+int order_to_x[]={1810,1153,0};
+int order_to_y[]={736,1299,0};
+int order_to_z[]={76,76,0};
+int unlock_x[]={0};
+int unlock_y[]={0};
+int unlock_vid[]={0};
+int unlock_time[]={0};
+int limit_army[]={0};
+int limit_vid[]={0};
+int limit_max[]={0};
+int plan_type[]={ATT_LIGHT_GUN,ATT_LIGHT_GUN,0};
+int plan_task[]={ATA_FIGHT,ATA_FIGHT,0};
+int plan_when[]={0,0,0};
+int plan_first[]={240,420,0};
+int plan_every[]={120,120,0};
+int plan_times[]={1,1,0};
+int plan_if[]={0,0,0};
+int plan_if_n[]={0,0,0};
+int plan_prev[]={-1,0,0};
+int plan_fx[]={0,0,0};
+int plan_fy[]={0,0,0};
+int plan_army[]={1,1,0};
+int plan_to_x[]={0,0,0};
+int plan_to_y[]={0,0,0};
+int plan_to_z[]={0,0,0};
+int plan_to2_x[]={0,0,0};
+int plan_to2_y[]={0,0,0};
+int plan_state[]={0,0,0};
+int plan_done[]={0,0,0};
+int plan_last[]={0,0,0};
+int plan_since[]={0,0,0};
+int plan_slot[]={0,0,0};
+int plan_fifo[]={0,0,0};
+int plan_next[]={0,0,0};
+int plan_base[]={0,0,0};
+int plan_unit[]={0,0,0};
+int price_vid[]={0};
+int price_of[]={0};
 // </editor>
 
 // Uncomment to check the routes: no enemy trains (the start trains are taken out of the
@@ -133,6 +210,931 @@ int level_queue_task[]={ATA_FIGHT,ATA_FIGHT,0};
 //#define SANDBOX_LOSE_TEST 1
 
 #include "maps\script\header.lgc"
+// <editor arrivals> the trains that arrive (the Arrivals panel) - written by the map editor when the map is saved
+// ArrivalsTact() brings the trains of the arrays arrival_*[] (the settings' block above), once a
+// second: a wave comes when its time is there (the first after arrival_first s, the next ones
+// arrival_every s after the one before, arrival_times of them or without end) and its condition
+// holds - or, with arrival_or, also earlier when the condition holds; a train the player pays for
+// comes only while the money is there and is paid as it starts to come. It waits while a train
+// stands at its entry (180 px) or the AI has its 16 trains. The cars are made on the entry's rail
+// point in the army, one at a time (ArrivalTry); the enemy's train goes to the AI (TrainsTact) with
+// its task, the others' last car gets the order to drive to arrival_to (arrival_part, arrival_car:
+// the cars made so far of a train under way, its last one). An arrival without its entry (0,0)
+// never comes.
+// ArrivalsLeft(army): the waves of an army still to come.
+ArrivalTrains(int army)
+{
+  return GetVid(5,VID_COUNT0+army)+GetVid(10,VID_COUNT0+army)+GetVid(97,VID_COUNT0+army);
+}
+// MissionIf(c,n): the condition c (the editor's list: 1 the player has no train, 2 fewer than n,
+// 3 fewer units than n, 4 no factory, 5 a neutral factory stands, 6 the enemy has fewer trains than
+// n, 7 fewer of the AI's trains attack than n, 8 the player has n money, 9 1 and 5), 0 always.
+MissionIf(int c,int n)
+{
+  int k,m;
+  if( c==1 )
+    return ArrivalTrains(0)==0;
+  if( c==2 )
+    return ArrivalTrains(0)<n;
+  if( c==3 )
+    return NoArmyUnits(0)<n;
+  if( c==4 )
+    return GetVid(102,VID_COUNT0)==0;
+  if( c==5 )
+    return GetVid(102,VID_COUNT2)>0;
+  if( c==6 )
+    return ArrivalTrains(1)<n;
+  if( c==7 )
+  {
+    m=0;
+    for( k=0; k<ARR_LENGTH; k++ )
+      if( ai_trains[k] && ai_trains_task[k]/10==1 )
+        m++;
+    return m<n;
+  }
+  if( c==8 )
+    return GetMoney(0)>=n;
+  if( c==9 )
+    return ArrivalTrains(0)==0 && GetVid(102,VID_COUNT2)>0;
+  if( c==10 )
+    return GetVid(5,VID_COUNT0)+GetVid(10,VID_COUNT0)==0 && GetVid(102,VID_COUNT0)>0;
+  return 1;
+}
+ArrivalIf(int i)
+{
+  return MissionIf(arrival_if[i],arrival_if_n[i]);
+}
+// MissionCars(u): mission_cars gets the VIDs of the train of u, its first car first.
+string mission_cars;
+int mission_count=0;
+MissionCars(int u)
+{
+  int c;
+  mission_cars="";
+  mission_count=0;
+  for( c=Action(u,ACT_FIRST_ENGINE); c; c=Action(c,ACT_NEXT_ENGINE) )
+  {
+    mission_cars=mission_cars+itoa(GetUnitVid(c))+",";
+    mission_count++;
+  }
+}
+// MissionTypeCars(type,built): mission_cars gets the VIDs of a train type (arr_gettype, as this
+// difficulty makes it); built: in the order a factory builds them (BuildTrain swaps the first two).
+MissionTypeCars(int type,int built)
+{
+  int j;
+  arr_gettype(temp_array,type);
+  if( built && temp_array[0] && temp_array[1] )
+  {
+    j=temp_array[0];
+    temp_array[0]=temp_array[1];
+    temp_array[1]=j;
+  }
+  mission_cars="";
+  for( j=0; j<30 && temp_array[j]; j++ )
+    mission_cars=mission_cars+itoa(temp_array[j])+",";
+}
+// ArrivalMade(u,i) and ArrivalsMade(): an arrival's train just made (its last car u) is logged with
+// its cars once they are all linked (10 s at most).
+int arrival_made[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+int arrival_made_i[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+int arrival_made_w[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+ArrivalMade(int u,int i)
+{
+  int j;
+  for( j=0; j<16; j++ )
+    if( !arrival_made[j] )
+    {
+      arrival_made[j]=u;
+      arrival_made_i[j]=i+1;
+      arrival_made_w[j]=0;
+      return 1;
+    }
+  return 0;
+}
+ArrivalsMade()
+{
+  int j,k,n;
+  for( j=0; j<16; j++ )
+    if( arrival_made[j] )
+    {
+      if( GetUnitVid(arrival_made[j]) )
+      {
+        MissionCars(arrival_made[j]);
+        arr_gettype(temp_array,arrival_type[arrival_made_i[j]-1]);
+        n=0;
+        for( k=0; k<30 && temp_array[k]; k++ )
+          n++;
+        arrival_made_w[j]=arrival_made_w[j]+1;
+        if( mission_count>=n || arrival_made_w[j]>=10 )
+        {
+          Log("ARRIVAL "+itoa(arrival_made_i[j])+" made "+mission_cars);
+          arrival_made[j]=0;
+        }
+      }
+      else
+        arrival_made[j]=0;
+    }
+}
+ArrivalsLeft(int army)
+{
+  int i,n;
+  n=0;
+  for( i=0; i<ARRIVALS; i++ )
+    if( arrival_army[i]==army && (arrival_x[i] || arrival_y[i]) )
+      if( !arrival_times[i] || arrival_done[i]<arrival_times[i] )
+        if( !arrival_if[i] || arrival_or[i] || ArrivalIf(i) )
+          n++;
+  return n;
+}
+// ArrivalCar(i,j): the car j of arrival i's train on its entry's rail point, in its army.
+ArrivalCar(int i,int j)
+{
+  int u;
+  arr_gettype(temp_array,arrival_type[i]);
+  u=Create(temp_array[j],arrival_x[i],arrival_y[i]+arrival_z[i],arrival_z[i]);
+  Action(u,ACT_SET_ARMY,arrival_army[i],0);
+  if( arrival_army[i] )
+    Action(u,ACT_SET_BEHAVE,Action(u,ACT_GET_BEHAVE)|1);
+  return u;
+}
+// ArrivalDone(i,t): the train of arrival i is made (its last car arrival_car): its order, its message.
+ArrivalDone(int i,int t)
+{
+  int j,k,u;
+  string s;
+  u=arrival_car[i];
+  arrival_part[i]=0;
+  arr_gettype(temp_array,arrival_type[i]);
+  s="";
+  for( j=0; j<30 && temp_array[j]; j++ )
+    s=s+itoa(temp_array[j])+",";
+  k=-1;
+  if( arrival_army[i]==1 )
+    k=find_num();
+  if( k>=0 )
+  {
+    ai_trains[k]=u;
+    ai_trains_type[k]=arrival_type[i];
+    ai_trains_task[k]=arrival_task[i];
+    ai_trains_task2[k]=ATA_NONE;
+    ai_trains_task_backup[k]=ATA_NONE;
+    ai_trains_behave[k]=0;
+    ai_trains_time[k]=GetTime();
+    ai_trains_random_task[k]=arrival_raid[i];
+  }
+  else if( arrival_task[i]==-2 || arrival_task[i]==-3 )
+    Action(u,ACT_MOVE,arrival_to_x[i],arrival_to_y[i]+arrival_to_z[i]);
+  if( arrival_task[i]==-3 )
+  {
+    if( arrival_unit[i] )
+      PatrolEngine(arrival_unit[i],arrival_to2_x[i],arrival_to2_y[i]);
+    arrival_unit[i]=u;
+  }
+  if( arrival_msg[i] )
+  {
+    PlaySFX(100);
+    if( arrival_army[i]==1 )
+      Message("EnemyReinforcementArrived",GetX(u),GetY(u));
+    else
+      Message("ReinforcementArrived",GetX(u),GetY(u));
+  }
+  arrival_done[i]=arrival_done[i]+1;
+  arrival_last[i]=t;
+  s=" cars "+s;
+  s="ARRIVAL "+itoa(i+1)+" army "+itoa(arrival_army[i])+" wave "+itoa(arrival_done[i])+" at "+itoa(t)+" s task "+itoa(arrival_task[i])+" slot "+itoa(k)+s;
+  Log(s);
+  ArrivalMade(u,i);
+  return 1;
+}
+// ArrivalTry(i,t): a wave of arrival i when it is due; its cars one at a time, the next once the
+// last one has left the rail point (the entry's push line moves it on; 5 s at most) - cars made on
+// one point all at once push each other apart out of their order.
+ArrivalTry(int i,int t)
+{
+  int u,go;
+  if( arrival_part[i] )   // a train being made: its next car
+  {
+    u=arrival_car[i];
+    if( GetUnitVid(u) )
+      if( SizeTo(u,arrival_x[i],arrival_y[i]+arrival_z[i])<36 && t-arrival_last[i]<5 )
+        return 0;
+    arr_gettype(temp_array,arrival_type[i]);
+    if( arrival_part[i]<30 && temp_array[arrival_part[i]] )
+    {
+      arrival_car[i]=ArrivalCar(i,arrival_part[i]);
+      arrival_part[i]=arrival_part[i]+1;
+      arrival_last[i]=t;
+      arr_gettype(temp_array,arrival_type[i]);
+      if( arrival_part[i]<30 && temp_array[arrival_part[i]] )
+        return 0;
+    }
+    return ArrivalDone(i,t);
+  }
+  if( !arrival_x[i] && !arrival_y[i] )
+    return 0;
+  if( arrival_times[i] && arrival_done[i]>=arrival_times[i] )
+    return 0;
+  if( arrival_done[i] )
+    go=t-arrival_last[i]>=arrival_every[i];
+  else
+    go=t>=arrival_first[i];
+  if( arrival_or[i] )
+  {
+    if( arrival_if[i] && ArrivalIf(i) )
+      go=1;
+  }
+  else if( !ArrivalIf(i) )
+    go=0;
+  if( !go )
+    return 0;
+  if( arrival_if[i]==8 && !ArrivalIf(i) )
+    return 0;
+  if( FindNearestSprite(GETSPRITE_CLASS+B_ENGINE,arrival_x[i],arrival_y[i]+arrival_z[i],180) )
+    return 0;
+  if( arrival_army[i]==1 )
+    if( find_num()<0 )
+      return 0;
+  arrival_car[i]=ArrivalCar(i,0);
+  if( !arrival_car[i] )
+    return 0;
+  if( arrival_if[i]==8 )   // paid as the train starts to come
+    SetMoney(0,GetMoney(0)-arrival_if_n[i]);
+  arrival_part[i]=1;
+  arrival_last[i]=t;
+  arr_gettype(temp_array,arrival_type[i]);
+  if( temp_array[1] )
+    return 0;
+  return ArrivalDone(i,t);
+}
+// PlanTact(t): the factories' plans (plan_*[], a factory's panel). A wave is due - the first one by
+// plan_when (0: plan_first s from the start, 1: plan_first s after the first train of the entry
+// plan_prev was built, 2: while MissionIf(plan_if, plan_if_n) holds, not before plan_first s), the
+// next ones plan_every s after the one before was built (and while the condition holds), plan_times
+// of them or without end. The enemy's (plan_fx, plan_fy 0) goes into the authors' queue
+// (level_queue_*, which DepoFree of ai_events.lgc builds from its first place on, in the AI's first
+// free factory, while fewer than LIMIT_ATACKERS of its trains attack) at the first empty place, with
+// a time already past, and is followed from there to the AI's slot of the train being built
+// (ATT_DEPO_CREATED) to the train made; plan_type's cars are the train's with the first two swapped,
+// as BuildTrain swaps them back. The others' factory builds its train as PlanBuild says. The cars
+// planned and the cars made are logged ("ARRIVAL F<n>").
+int plan_queued=0;
+PlanTaken(int t)
+{
+  int i,j,k;
+  i=plan_fifo[0];
+  for( j=0; j<PLANS-1; j++ )
+    plan_fifo[j]=plan_fifo[j+1];
+  plan_state[i]=2;
+  plan_slot[i]=-1;
+  for( k=0; k<ARR_LENGTH; k++ )
+    if( ai_trains[k] && ai_trains_type[k]>=ATT_DEPO_CREATED )
+      plan_slot[i]=k;
+  Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i]+1)+" taken at "+itoa(t)+" s slot "+itoa(plan_slot[i]));
+}
+PlanFollow(int i,int t)
+{
+  int k,u;
+  k=plan_slot[i];
+  if( k>=0 )
+    if( ai_trains_type[k]>=ATT_DEPO_CREATED )
+      return 0;
+  plan_state[i]=0;
+  plan_done[i]=plan_done[i]+1;
+  plan_last[i]=t;
+  if( plan_done[i]==1 )
+    plan_since[i]=t;
+  u=0;
+  if( k>=0 )
+    u=ai_trains[k];
+  if( u )
+    if( GetUnitVid(u)==102 )
+      u=0;
+  if( u )
+  {
+    MissionCars(u);
+    Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i])+" built at "+itoa(t)+" s made "+mission_cars);
+  }
+  else
+    Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i])+" lost at "+itoa(t)+" s: the AI dropped its build");
+  return 1;
+}
+// PlanPrice(v): what a car costs (price_*[], the factory's panel's prices).
+PlanPrice(int v)
+{
+  int j;
+  for( j=0; j<PRICES; j++ )
+    if( price_vid[j]==v )
+      return price_of[j];
+  return 0;
+}
+// A train of ours, the neutrals' or the pirates' factory (plan_fx, plan_fy, while it is plan_army's):
+// the runner orders the factory to build it car by car (AddCommand, as the AI's BuildTrain does, in
+// the train's order), a car once the factory is free and the army has its price - a car the money
+// does not cover would be left out -, then gives the train its order (plan_task -1 none, -2 drive
+// to plan_to, -3 drive there, then to and fro to plan_to2).
+PlanFactory(int i)
+{
+  int f;
+  f=FindNearestSprite(GETSPRITE_VID+102,plan_fx[i],plan_fy[i],30);
+  if( f )
+    if( Action(f,act_getarmy,0,0)!=plan_army[i] )
+      f=0;
+  return f;
+}
+PlanBuild(int i,int t)
+{
+  int f,v,u;
+  f=plan_slot[i];
+  if( GetUnitVid(f)!=102 )
+    f=0;
+  if( f )
+    if( Action(f,act_getarmy,0,0)!=plan_army[i] )
+      f=0;
+  if( !f )
+  {
+    plan_state[i]=0;
+    plan_done[i]=plan_done[i]+1;
+    plan_last[i]=t;
+    Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i])+" lost at "+itoa(t)+" s: its factory is gone or not of army "+itoa(plan_army[i]));
+    return 0;
+  }
+  arr_gettype(temp_array,plan_type[i]);
+  if( plan_state[i]==4 )   // all made: logged and sent off once the cars are linked (10 s at most)
+  {
+    if( t-plan_last[i]<3 )
+      return 0;
+    u=FindNearestSprite(GETSPRITE_VID+temp_array[plan_next[i]-1],GetX(f),GetY(f),160);
+    if( u )
+    {
+      MissionCars(u);
+      if( mission_count<plan_next[i] && t-plan_last[i]<10 )
+        return 0;
+    }
+    plan_state[i]=0;
+    plan_done[i]=plan_done[i]+1;
+    plan_last[i]=t;
+    if( plan_done[i]==1 )
+      plan_since[i]=t;
+    if( !u )
+    {
+      Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i])+" lost at "+itoa(t)+" s: no train at the factory");
+      return 0;
+    }
+    MissionCars(u);
+    Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i])+" built at "+itoa(t)+" s army "+itoa(plan_army[i])+" made "+mission_cars);
+    if( plan_task[i]==-2 || plan_task[i]==-3 )
+      Action(u,ACT_MOVE,plan_to_x[i],plan_to_y[i]+plan_to_z[i]);
+    if( plan_task[i]==-3 )
+      plan_unit[i]=u;
+    return 1;
+  }
+  if( Action(f,ACT_GET_COMMAND)==COM_BUILD )
+    return 0;
+  if( strlen(GetCommands(f))>plan_base[i] )
+    return 0;
+  v=temp_array[plan_next[i]];
+  if( !v )
+  {
+    plan_state[i]=4;
+    plan_last[i]=t;
+    return 0;
+  }
+  if( GetMoney(plan_army[i])<PlanPrice(v) )
+    return 0;
+  AddCommand(f,ACT_BUILD_UNIT,v);
+  plan_next[i]=plan_next[i]+1;
+  return 0;
+}
+// PlanOnPoint(i): a factory's train of a patrol (-3) that reached its point patrols from there.
+PlanOnPoint(int i)
+{
+  if( plan_task[i]!=-3 || !plan_unit[i] )
+    return 0;
+  if( !GetUnitVid(plan_unit[i]) )
+  {
+    plan_unit[i]=0;
+    return 0;
+  }
+  if( SizeTo(plan_unit[i],plan_to_x[i],plan_to_y[i]+plan_to_z[i])>=40 )
+    return 0;
+  PatrolEngine(plan_unit[i],plan_to2_x[i],plan_to2_y[i]);
+  plan_unit[i]=0;
+  return 1;
+}
+PlanTry(int i,int t)
+{
+  int go,n,f;
+  if( plan_times[i] && plan_done[i]>=plan_times[i] )
+    return 0;
+  if( plan_done[i] )
+    go=t-plan_last[i]>=plan_every[i];
+  else if( plan_when[i]==1 && plan_prev[i]>=0 )
+  {
+    go=0;
+    if( plan_done[plan_prev[i]] )
+      go=t-plan_since[plan_prev[i]]>=plan_first[i];
+  }
+  else
+    go=t>=plan_first[i];
+  if( plan_when[i]==2 && !MissionIf(plan_if[i],plan_if_n[i]) )
+    go=0;
+  if( !go )
+    return 0;
+  if( plan_fx[i] || plan_fy[i] )   // ours, the neutrals' or the pirates': when its factory is free
+  {
+    f=PlanFactory(i);
+    if( !f )
+      return 0;
+    if( Action(f,ACT_GET_COMMAND)==COM_BUILD )
+      return 0;
+    for( n=0; n<PLANS; n++ )   // one entry at a time in a factory
+      if( plan_state[n]>=3 && plan_slot[n]==f )
+        return 0;
+    if( FindNearestSprite(GETSPRITE_CLASS+B_ENGINE,GetX(f),GetY(f),250) )   // a train at its door or on its spur: the cars would join it
+      return 0;
+    plan_slot[i]=f;
+    plan_base[i]=strlen(GetCommands(f));
+    plan_next[i]=0;
+    plan_state[i]=3;
+    MissionTypeCars(plan_type[i],0);
+    Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i]+1)+" ordered at "+itoa(t)+" s army "+itoa(plan_army[i])+" task "+itoa(plan_task[i])+" cars "+mission_cars);
+    return 1;
+  }
+  n=plan_queued;
+  level_queue_times[n]=1;
+  level_queue_trains[n]=plan_type[i];
+  level_queue_task[n]=plan_task[i];
+  plan_fifo[n]=i;
+  plan_queued=n+1;
+  plan_state[i]=1;
+  MissionTypeCars(plan_type[i],1);
+  Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i]+1)+" queued at "+itoa(t)+" s place "+itoa(n)+" type "+itoa(plan_type[i])+" task "+itoa(plan_task[i])+" cars "+mission_cars);
+  return 1;
+}
+PlanTact(int t)
+{
+  int i,j,m,n;
+  n=0;
+  for( j=0; j<PLANS; j++ )
+    if( level_queue_times[j] )
+      n=j+1;
+  for( m=n; m<plan_queued; m++ )
+    PlanTaken(t);
+  if( plan_queued>n )
+    plan_queued=n;
+  for( i=0; i<PLANS; i++ )
+  {
+    PlanOnPoint(i);
+    if( plan_state[i]==2 )
+      PlanFollow(i,t);
+    else if( plan_state[i]>=3 )
+      PlanBuild(i,t);
+    else if( !plan_state[i] )
+      PlanTry(i,t);
+  }
+}
+// FactoryTact(t): the unit limits at the start (AddUnitLimit takes the limit first and the army
+// last), the units the factories get into their lists later (unlock_*[], the factory by its place).
+FactoryTact(int t)
+{
+  int i,u;
+  iff(1)
+  {
+    for( i=0; i<UNIT_LIMITS; i++ )
+      AddUnitLimit(limit_max[i],limit_vid[i],limit_army[i]);
+  }
+  for( i=0; i<UNLOCKS; i++ )
+    if( unlock_time[i]>=0 && t>=unlock_time[i] )
+    {
+      u=FindNearestSprite(GETSPRITE_VID+102,unlock_x[i],unlock_y[i],30);
+      if( u )
+        Action(u,ACT_ADD_ITEM,unlock_vid[i]);
+      Log("UNLOCK vid "+itoa(unlock_vid[i])+" at "+itoa(t)+" s, factory "+itoa(u!=0));
+      unlock_time[i]=-1;
+    }
+}
+// CaptureTact(): a neutral factory or repair point becomes the player's when a train of the player's
+// comes within 100 px of it (the missions call LDepoCapture / LMasterCapture of Captures.lgc for
+// their one such building; forts and mining plants are captured by F162_0 of ai_default_event.lgc).
+CaptureTact()
+{
+  int b,v;
+  for( b=FirstUnit(u_monster); b; b=NextUnit() )
+  {
+    v=GetUnitVid(b);
+    if( (v==102 || v==104) && Action(b,act_getarmy,0,0)==2 )
+      if( FindNearestSprite(GETSPRITE_UNIT+GETSPRITE_CLASS+B_ENGINE+GETSPRITE_ARMY0,GetX(b),GetY(b),100) )
+      {
+        PlaySFX(25);
+        Effect(eff_nuke,0x006000);
+        Action(b,act_setarmy,0,0);
+        BuildingCapture(b);
+        Log("CAPTURE vid "+itoa(v)+" at "+itoa(GetX(b))+","+itoa(GetY(b)));
+      }
+  }
+}
+// OrdersTact(): the orders of the map's trains (order_*[]), once at the start: each train found by its
+// first car's VID and place, then driven or patrolling (-2, -3), the enemy's given to the AI with its task.
+OrdersTact()
+{
+  int i,u,k;
+  for( i=0; i<ORDERS; i++ )
+  {
+    u=FindNearestSprite(GETSPRITE_VID+order_vid[i],order_x[i],order_y[i],20);
+    k=-1;
+    if( u && order_task[i]==-2 )
+      Action(u,ACT_MOVE,order_to_x[i],order_to_y[i]+order_to_z[i]);
+    if( u && order_task[i]==-3 )
+      PatrolEngine(u,order_to_x[i],order_to_y[i]);
+    if( u && order_task[i]>=0 )
+    {
+      k=find_num();
+      if( k>=0 )
+      {
+        ai_trains[k]=u;
+        ai_trains_type[k]=order_type[i];
+        ai_trains_task[k]=order_task[i];
+        ai_trains_task2[k]=ATA_NONE;
+        ai_trains_task_backup[k]=ATA_NONE;
+        ai_trains_behave[k]=0;
+        ai_trains_time[k]=GetTime();
+        ai_trains_random_task[k]=0;
+      }
+    }
+    Log("ORDER "+itoa(i+1)+" task "+itoa(order_task[i])+" train "+itoa(u!=0)+" slot "+itoa(k));
+  }
+}
+// ArrivalOnPoint(i): a train of a patrol (-3) that reached its point patrols to the other end from there.
+ArrivalOnPoint(int i)
+{
+  if( arrival_task[i]!=-3 || !arrival_unit[i] )
+    return 0;
+  if( !GetUnitVid(arrival_unit[i]) )
+  {
+    arrival_unit[i]=0;
+    return 0;
+  }
+  if( SizeTo(arrival_unit[i],arrival_to_x[i],arrival_to_y[i]+arrival_to_z[i])>=40 )
+    return 0;
+  PatrolEngine(arrival_unit[i],arrival_to2_x[i],arrival_to2_y[i]);
+  arrival_unit[i]=0;
+  return 1;
+}
+// PiecesTact(), every frame: the wholes the editor places work as in the missions. A citadel (VID
+// 149 with its tower 117) as l04 and l18 (pirates.lgc GratesTact): while its tower stands, the first
+// unit of another army than the tower's (the neutrals aside) within 100 px of it gets ACT_STOP and
+// 300 damage (SFX 45), its grates (146) rise 34 px in 1 s, stay 1 s and sink in 1 s; when the
+// tower is gone the grates stay down and its corkscrews (142) break (147). Charybdis (254 with its
+// eye 256) as l06: a unit of another army within 90 px is pulled in (ACT_MOVE to it) while its
+// teeth (255) chew (SFX 38), and one of the player's within 40 px is eaten - the enemy's, for a
+// Charybdis of the player's; its guns (258, 260) sleep until one of them or the eye is down to 80 %
+// or lost. A fly nest (265) as l06's two (its direction: 0 waves, 64 on
+// guard): green flies (263) in waves of 2-4 (2 for every AA gun of the map, less up to as many)
+// 25 s after the last of them is gone, or grey flies (262) on guard: 1-2 while a unit of another
+// army (not a factory or repair point) is within 400 px and none is left, 3 s after, and 6-9 when
+// the nest is destroyed; the flies are of the nest's army.
+int pc_n=-1,pc_x[8],pc_y[8],pc_z[8],pc_army[8],pc_g1[8],pc_g2[8],pc_mode[8],pc_time[8];
+int ch_n=-1,ch_x[4],ch_y[4],ch_army[4],ch_teeth[4],ch_guns[4],ch_peace[4],ch_ate[4],ch_time[4];
+int fn_n=-1,fn_x[8],fn_y[8],fn_army[8],fn_guard[8],fn_left[8],fn_vid[8],fn_time[8],fn_dead[8],fn_check=0;
+PieceFoe(int u,int army)
+{
+  int a;
+  a=Action(u,ACT_GET_ARMY);
+  return a!=army && a!=2;
+}
+PiecesGrates(int i,int z)
+{
+  if( pc_g1[i] )
+    Action(pc_g1[i],ACT_CHANGE_COOR,GetX(pc_g1[i]),GetY(pc_g1[i]),z);
+  if( pc_g2[i] )
+    Action(pc_g2[i],ACT_CHANGE_COOR,GetX(pc_g2[i]),GetY(pc_g2[i]),z);
+}
+CitadelTact()
+{
+  int i,k,u,c,t;
+  if( pc_n<0 )
+  {
+    pc_n=0;
+    for( u=FirstUnit(u_monster); u; u=NextUnit() )
+      if( GetUnitVid(u)==117 && pc_n<8 )
+      {
+        c=FindNearestSprite(GETSPRITE_VID+149,GetX(u),GetY(u),20);
+        if( c )
+        {
+          pc_x[pc_n]=GetX(c);
+          pc_y[pc_n]=GetY(c);
+          pc_z[pc_n]=GetZ(c);
+          pc_army[pc_n]=Action(u,ACT_GET_ARMY);
+          pc_g1[pc_n]=FindNearestSprite(GETSPRITE_VID+146,pc_x[pc_n]-34,pc_y[pc_n]+23,15);
+          pc_g2[pc_n]=FindNearestSprite(GETSPRITE_VID+146,pc_x[pc_n]+36,pc_y[pc_n]+25,15);
+          pc_mode[pc_n]=0;
+          pc_time[pc_n]=GetTime();
+          Log("CITADEL "+itoa(pc_n+1)+" at "+itoa(pc_x[pc_n])+","+itoa(pc_y[pc_n])+" army "+itoa(pc_army[pc_n])+" grates "+itoa((pc_g1[pc_n]!=0)+(pc_g2[pc_n]!=0)));
+          pc_n++;
+        }
+      }
+  }
+  t=GetTime();
+  for( i=0; i<pc_n; i++ )
+  {
+    if( pc_mode[i]>=0 && !FindNearestSprite(GETSPRITE_VID+117,pc_x[i],pc_y[i],20) )
+    {
+      PiecesGrates(i,pc_z[i]-33);
+      for( k=0; k<4; k++ )
+      {
+        c=FindNearestSprite(GETSPRITE_VID+142,pc_x[i],pc_y[i],90);
+        if( c )
+        {
+          CreateSprite(147,GetX(c),GetY(c),GetZ(c));
+          Destroy(c);
+        }
+      }
+      pc_mode[i]=-1;
+      Log("CITADEL "+itoa(i+1)+" tower down");
+    }
+    if( pc_mode[i]==0 && t-pc_time[i]>500 )
+    {
+      pc_time[i]=t;
+      for( u=FirstUnit(u_monster); u; u=NextUnit() )
+        if( SizeTo(u,pc_x[i],pc_y[i])<100 && PieceFoe(u,pc_army[i]) )
+        {
+          Action(u,ACT_STOP,1);
+          Action(u,ACT_DAMAGE,300);
+          PlaySFX(45);
+          pc_mode[i]=1;
+          Log("CITADEL "+itoa(i+1)+" gate hits vid "+itoa(GetUnitVid(u))+" army "+itoa(Action(u,ACT_GET_ARMY)));
+          break;
+        }
+    }
+    else if( pc_mode[i]==1 )
+    {
+      if( t-pc_time[i]>1000 )
+      {
+        pc_mode[i]=2;
+        pc_time[i]=t;
+      }
+      else
+        PiecesGrates(i,pc_z[i]-33+34*(t-pc_time[i])/1000);
+    }
+    else if( pc_mode[i]==2 )
+    {
+      if( t-pc_time[i]>1000 )
+      {
+        pc_mode[i]=3;
+        pc_time[i]=t;
+        PlaySFX(45);
+      }
+    }
+    else if( pc_mode[i]==3 )
+    {
+      if( t-pc_time[i]>1000 )
+      {
+        PiecesGrates(i,pc_z[i]-33);
+        pc_mode[i]=0;
+        pc_time[i]=t;
+      }
+      else
+        PiecesGrates(i,pc_z[i]+1-34*(t-pc_time[i])/1000);
+    }
+  }
+}
+CharybdisGuns(int i,int on)
+{
+  int u,v;
+  for( u=FirstUnit(u_monster); u; u=NextUnit() )
+  {
+    v=GetUnitVid(u);
+    if( (v==258 || v==260) && SizeTo(u,ch_x[i],ch_y[i])<90 )
+    {
+      if( on )
+        Action(u,ACT_SET_BEHAVE,Action(u,ACT_GET_BEHAVE)|1);
+      else
+        Action(u,ACT_SET_BEHAVE,Action(u,ACT_GET_BEHAVE)&(~1));
+    }
+  }
+}
+CharybdisTact()
+{
+  int i,u,v,b,n,found,t,prey;
+  if( ch_n<0 )
+  {
+    ch_n=0;
+    for( u=FirstUnit(u_monster); u; u=NextUnit() )
+      if( GetUnitVid(u)==256 && ch_n<4 )
+      {
+        b=FindNearestSprite(GETSPRITE_VID+254,GetX(u)+34,GetY(u)-22,20);
+        if( b )
+        {
+          ch_x[ch_n]=GetX(b);
+          ch_y[ch_n]=GetY(b);
+          ch_army[ch_n]=Action(u,ACT_GET_ARMY);
+          ch_teeth[ch_n]=FindNearestSprite(GETSPRITE_VID+255,ch_x[ch_n]-40,ch_y[ch_n]+27,15);
+          ch_peace[ch_n]=1;
+          ch_ate[ch_n]=0;
+          ch_time[ch_n]=GetTime();
+          ch_n++;
+        }
+      }
+    for( i=0; i<ch_n; i++ )
+    {
+      n=0;
+      for( u=FirstUnit(u_monster); u; u=NextUnit() )
+        if( (GetUnitVid(u)==258 || GetUnitVid(u)==260) && SizeTo(u,ch_x[i],ch_y[i])<90 )
+          n++;
+      ch_guns[i]=n;
+      CharybdisGuns(i,0);
+      Log("CHARYBDIS "+itoa(i+1)+" at "+itoa(ch_x[i])+","+itoa(ch_y[i])+" army "+itoa(ch_army[i])+" guns "+itoa(n)+" teeth "+itoa(ch_teeth[i]!=0));
+    }
+  }
+  t=GetTime();
+  for( i=0; i<ch_n; i++ )
+    if( ch_army[i]>=0 && t-ch_time[i]>500 )
+    {
+      ch_time[i]=t;
+      if( !FindNearestSprite(GETSPRITE_VID+256,ch_x[i]-34,ch_y[i]+22,20) )   // the eye is dead
+      {
+        CharybdisGuns(i,1);
+        ch_army[i]=-1;
+        Log("CHARYBDIS "+itoa(i+1)+" eye down");
+      }
+      else
+      {
+        if( ch_peace[i] )
+        {
+          n=0;
+          for( u=FirstUnit(u_monster); u; u=NextUnit() )
+          {
+            v=GetUnitVid(u);
+            if( (v==258 || v==260 || v==256) && SizeTo(u,ch_x[i],ch_y[i])<90 )
+            {
+              if( v!=256 )
+                n++;
+              if( Action(u,ACT_GET_PERCENT_HP)<=80 )
+                ch_peace[i]=0;
+            }
+          }
+          if( n<ch_guns[i] )
+            ch_peace[i]=0;
+          if( !ch_peace[i] )
+          {
+            CharybdisGuns(i,1);
+            Log("CHARYBDIS "+itoa(i+1)+" wakes");
+          }
+        }
+        found=0;
+        prey=0;
+        if( ch_army[i]==0 )
+          prey=1;
+        for( u=FirstUnit(u_monster); u; u=NextUnit() )
+          if( SizeTo(u,ch_x[i],ch_y[i])<90 && Action(u,ACT_GET_ARMY)!=ch_army[i] )
+          {
+            found=1;
+            Action(u,ACT_MOVE,ch_x[i],ch_y[i]);
+            if( SizeTo(u,ch_x[i],ch_y[i])<40 && Action(u,ACT_GET_ARMY)==prey )
+            {
+              Log("CHARYBDIS "+itoa(i+1)+" eats vid "+itoa(GetUnitVid(u)));
+              Destroy(u);
+              ch_ate[i]=1;
+            }
+          }
+        if( found && ch_teeth[i] )
+        {
+          Action(ch_teeth[i],ACT_CLEAR_STACK,0,0);
+          AddCommand(ch_teeth[i],act_open,0,0);
+          AddCommand(ch_teeth[i],act_stand_open,0,0);
+          AddCommand(ch_teeth[i],act_close,0,0);
+          AddCommand(ch_teeth[i],act_stand,0,0);
+          AddCommand(ch_teeth[i],ACT_CYCLE_STACK,4,0);
+          PlaySFX(38);
+        }
+        if( !found && ch_ate[i] && ch_teeth[i] )
+        {
+          Action(ch_teeth[i],ACT_CLEAR_STACK,0,0);
+          AddCommand(ch_teeth[i],act_close,0,0);
+          AddCommand(ch_teeth[i],act_stand,0,0);
+          AddCommand(ch_teeth[i],act_salut,0,0);
+          ch_ate[i]=0;
+        }
+      }
+    }
+}
+NestTact()
+{
+  int i,u,v,n,x,y,z,f,t;
+  if( fn_n<0 )
+  {
+    fn_n=0;
+    for( u=FirstUnit(u_monster); u; u=NextUnit() )
+      if( GetUnitVid(u)==265 && fn_n<8 )
+      {
+        fn_x[fn_n]=GetX(u);
+        fn_y[fn_n]=GetY(u);
+        fn_army[fn_n]=Action(u,ACT_GET_ARMY);
+        fn_guard[fn_n]=GetDirection(u)>=64;
+        fn_vid[fn_n]=263-fn_guard[fn_n];
+        fn_left[fn_n]=0;
+        fn_dead[fn_n]=0;
+        Log("NEST "+itoa(fn_n+1)+" at "+itoa(fn_x[fn_n])+","+itoa(fn_y[fn_n])+" army "+itoa(fn_army[fn_n])+" guard "+itoa(fn_guard[fn_n]));
+        fn_n++;
+      }
+  }
+  if( !OneTimeInSecond() )
+    return 0;
+  t=GetTime();
+  for( i=0; i<fn_n; i++ )
+  {
+    if( !fn_dead[i] && !FindNearestSprite(GETSPRITE_VID+265,fn_x[i],fn_y[i],10) )   // destroyed
+    {
+      fn_dead[i]=1;
+      fn_left[i]=0;
+      if( fn_guard[i] )
+      {
+        fn_left[i]=6+Random(3);
+        fn_time[i]=t-22000;
+      }
+      Log("NEST "+itoa(i+1)+" destroyed, last flies "+itoa(fn_left[i]));
+    }
+    if( !fn_dead[i] && fn_left[i]==0 && GetVid(fn_vid[i],VID_COUNT)==0 )
+    {
+      if( !fn_guard[i] )
+      {
+        n=0;
+        for( u=FirstUnit(u_monster); u; u=NextUnit() )
+          if( GetUnitVid(u)==30 )
+            n++;
+        fn_left[i]=n*2-Random(n);
+        if( fn_left[i]<2 )
+          fn_left[i]=2;
+        if( fn_left[i]>4 )
+          fn_left[i]=4;
+        fn_time[i]=t;
+      }
+      else
+      {
+        f=0;
+        for( u=FirstUnit(u_monster); u; u=NextUnit() )
+        {
+          v=GetUnitVid(u);
+          if( v!=102 && v!=104 && SizeTo(u,fn_x[i],fn_y[i])<400 && PieceFoe(u,fn_army[i]) )
+            f=1;
+        }
+        if( f )
+        {
+          fn_left[i]=1+Random(1);
+          fn_time[i]=t-22000;
+        }
+      }
+    }
+    if( fn_left[i]>0 && t-fn_time[i]>25000 )
+    {
+      x=fn_x[i]+5-Random(10);
+      y=fn_y[i]+5-Random(10);
+      z=120+5-Random(10);
+      if( !AskPlace(fn_vid[i],x,y,z) )
+      {
+        u=Create(fn_vid[i],x,y,z);
+        Action(u,act_changeaction,0,Random(255));
+        Action(u,act_setarmy,fn_army[i],0);
+        fn_left[i]--;
+        Log("NEST "+itoa(i+1)+" fly vid "+itoa(fn_vid[i])+", "+itoa(fn_left[i])+" to come");
+      }
+    }
+  }
+  return 1;
+}
+PiecesTact()
+{
+  CitadelTact();
+  CharybdisTact();
+  NestTact();
+}
+ArrivalsTact()
+{
+  int i,t;
+  PiecesTact();
+  if( !OneTimeInSecond() )
+    return 0;
+  t=(GetTime()-time_game_total)/1000;
+  iff(1)
+  {
+    OrdersTact();
+#ifdef CLEVER_ATTACK
+    SetCleverEnemyAttack(CLEVER_ATTACK);
+#endif
+  }
+  FactoryTact(t);
+  PlanTact(t);
+  CaptureTact();
+  ArrivalsMade();
+  for( i=0; i<ARRIVALS; i++ )
+  {
+    ArrivalOnPoint(i);
+    ArrivalTry(i,t);
+  }
+  return 1;
+}
+// </editor arrivals>
 
 #ifdef SANDBOX_DRIVE_TEST
 //----------------------------- route check ---------------------------------
@@ -147,6 +1149,20 @@ int drive_y[]={1100, 1100, 1100,  850,  500,  225, 0};
 int drive_sent[]={0,0,0,0,0,0,0,0};
 int drive_build[]={5,20,0};       // BuildTrain swaps the first two in place
 int drive_train=0, drive_step=0, drive_log=0, drive_built=0;
+int drive_enemy[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
+// the enemy's cars of the map, collected first, then destroyed (the unit list changes while destroying)
+DriveNoEnemy()
+{
+  int u,n,i;
+  n=0;
+  for( u=FirstUnit(U_UNIT); u && n<16; u=NextUnit() )
+    if( Action(u,act_getarmy,0,0)==1 && GetVid(GetUnitVid(u),VID_BEHAVE)==b_engine )
+      drive_enemy[n++]=u;
+  for( i=0; i<n; i++ )
+    Destroy(drive_enemy[i]);
+  Log("DRIVE "+itoa(n)+" enemy cars taken away");
+}
 
 DriveTest()
 {
@@ -260,12 +1276,8 @@ main()
   iff(1)
   {
 #ifdef SANDBOX_DRIVE_TEST
-    // no enemy trains: TrainsTact() creates the start trains on its first call, after this,
-    // and the factory would rebuild them (start_trains_renew)
-    start_trains[0]=-1;
-    start_trains[1]=-1;
-    start_trains_renew[0]=0;
-    start_trains_renew[1]=0;
+    // no enemy trains: the two of the map (their orders give them to the AI) go before it starts
+    DriveNoEnemy();
 #endif
     InitDefault();
     // the reinforcement arrives at the point locomotive (VID 5, army 3) at
@@ -301,6 +1313,9 @@ main()
     {
       GameTact();
       TrainsTact();
+      // <editor tact> the arrivals - written by the map editor when the map is saved
+      ArrivalsTact();
+      // </editor tact>
 #ifdef SANDBOX_DRIVE_TEST
       DriveTest();
 #endif

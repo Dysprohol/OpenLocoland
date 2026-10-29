@@ -711,6 +711,8 @@ struct Operation {
     ArrivalsState arrivals_before, arrivals_after;
     bool factories = false;              // the factories' queue, later units and limits changed
     FactoryState factories_before, factories_after;
+    bool start = false;                  // the script's start trains changed (CONVERT made trains of them)
+    std::vector<EnemyTrain> start_before, start_after;
 };
 
 std::vector<Operation> g_undo, g_redo;
@@ -844,6 +846,7 @@ void undo(bool redo) {
     if (op.lines) mission_push_lines() = redo ? op.lines_after : op.lines_before;
     if (op.arrivals) mission_arrivals() = redo ? op.arrivals_after : op.arrivals_before;
     if (op.factories) mission_factories() = redo ? op.factories_after : op.factories_before;
+    if (op.start) mission_start() = redo ? op.start_after : op.start_before;
     to.push_back(op);
     g_dirty = true;
     select(nullptr);
@@ -5147,6 +5150,17 @@ void draw_push_lines(bool tool) {
 std::string g_enemy_status;
 void draw_screen(int nvid, int frame, float x, float y, int step);   // the bar's pictures, below
 
+// A start train's mark of the script (its icon at the start, the far end of its patrol) under the
+// map point x, y: a click there opens CONVERT, not the rail under it.
+bool start_mark_at(float x, float y) {
+    for (const EnemyTrainMark& t : mission_enemy_trains()) {
+        if (t.time) continue;   // the factory's queue: no mark of its own on the track
+        if (std::fabs(x - t.x1) < 20 && std::fabs(y - t.y1) < 20) return true;
+        if (t.patrol && std::fabs(x - t.x2) < 20 && std::fabs(y - t.y2) < 20) return true;
+    }
+    return false;
+}
+
 void draw_enemy_trains() {
     g_enemy_status.clear();
     const std::vector<EnemyTrainMark> trains = mission_enemy_trains();
@@ -5173,7 +5187,8 @@ void draw_enemy_trains() {
         return t.time ? ui_printf(ui_format("StatusEnemyQueue", "enemy train from its factory after %d s: %s, %s (the script, "
                                                                 "File > Mission settings...)"),
                                   t.time, type.c_str(), what.c_str())
-                      : ui_printf(ui_format("StatusEnemyTrain", "enemy train: %s, %s (the script, File > Mission settings...)"),
+                      : ui_printf(ui_format("StatusStartTrain", "enemy start train of the script: %s, %s - a click: CONVERT in "
+                                                                "the Arrivals panel makes it a train of the map"),
                                   type.c_str(), what.c_str());
     };
     std::vector<POINT> factories;   // the enemy's, as the screen shows them
@@ -5945,6 +5960,20 @@ int arrival_marker_at(POINT m) {
         return i;
     }
     return -1;
+}
+
+// A click on a start train's mark of the script (as the last frame drew it under the mouse): the Arrivals
+// panel, which offers CONVERT - the mark is no object of the map, so the rail under it is not picked.
+bool start_mark_click() {
+    float x, y;
+    mouse_on_map(x, y);
+    if (!start_mark_at(x, y)) {
+        if (!mission_enemy_trains().empty()) patch::log("edit: click at %.0f,%.0f - no start train's mark there", x, y);
+        return false;
+    }
+    panel_open_arrivals();
+    MESSAGE("MsgStartMark", "an enemy start train of the script: CONVERT in the Arrivals panel makes it a train of the map");
+    return true;
 }
 
 // A click on an arrival's marker: that arrival in the Arrivals panel.
@@ -6796,6 +6825,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             return true;
         }
         if (entry().tool == Tool::Select && arrival_marker_click(g_mouse)) return true;
+        if (entry().tool == Tool::Select && start_mark_click()) return true;
         uint8_t* w0 = world();
         const float x = at<float>(w0, W_CAMERA_X) + g_mouse.x, y = at<float>(w0, W_CAMERA_Y) + g_mouse.y;
         if (entry().tool == Tool::Place) {
@@ -6921,7 +6951,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             return true;
         }
         if (entry().tool == Tool::Select && !on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
-            if (arrival_marker_click(g_mouse)) {
+            if (arrival_marker_click(g_mouse) || start_mark_click()) {
                 g_context = nullptr;
                 return true;
             }
@@ -7789,6 +7819,53 @@ bool edit_reinforcement_marker(int& x, int& y, int& z) {
 // becomes arrivals at its point - the first wave at the start, the others when the player has no
 // train - driving where its point locomotive's order (33, ACT_MOVE) sends it, and the point
 // locomotives go (they would stand on the entry). One step of the history.
+// A start train of the script as a train of the map (CONVERT): its type's cars as the map's script has
+// them, the enemy's, on the rail point of its start facing along the track, the first car first, and
+// the order the AI gave it - a patrol to the far end of its patrol (ATA_PATROLn), else an attack
+// (ATA_FIGHT). The AI's rebuilding of a lost start train (start_trains_renew) and its raids
+// (start_trains_random_task) belong to the script's start trains only: they are not kept.
+std::vector<uint8_t*> place_start_train(const EnemyTrain& t) {
+    std::vector<uint8_t*> train;
+    const std::vector<int> cars = mission_type_cars(t.type);
+    const TrackSpot spot = track_spot(static_cast<float>(t.x1), static_cast<float>(t.y1), CAR_REACH);
+    if (!spot.found || cars.empty()) {
+        patch::log("edit: start train %s at %d,%d: no track there - not made", t.type.c_str(), t.x1, t.y1);
+        return train;
+    }
+    for (uint8_t* c : all_cars()) car_call(ENGINE_LEAVE_DOTS, c);   // Engine_PutOnRails couples only where it is told
+    for (int nvid : cars)
+        if (uint8_t* o = create(nvid, spot.x, spot.y, spot.z, spot.direction, 1)) {
+            unlink_car(o);
+            if (army_of(o) != 1) act(o, ACT_SET_ARMY, 1);
+            train.push_back(o);
+        }
+    // coupled in the planned order, then laid along the track from its start as a drag lays a train
+    for (size_t i = 0; i < train.size(); ++i) {
+        car_prev(train[i]) = i ? train[i - 1] : nullptr;
+        car_next(train[i]) = i + 1 < train.size() ? train[i + 1] : nullptr;
+    }
+    if (!train.empty()) move_train(train.front(), static_cast<float>(t.x1), static_cast<float>(t.y1));
+    occupy_all();
+    if (train.empty()) return train;
+    Order order{t.patrol ? TASK_PATROL : TASK_ATTACK, 0, 0, 0};
+    if (t.patrol) {
+        const TrackSpot end_spot = track_spot(static_cast<float>(t.x2), static_cast<float>(t.y2), CAR_REACH);
+        if (end_spot.found && end_spot.dot) {
+            order.x = at<int>(end_spot.dot, DOT_X);
+            order.y = at<int>(end_spot.dot, DOT_Y) - at<int>(end_spot.dot, DOT_Z);
+            order.z = at<int>(end_spot.dot, DOT_Z);
+        } else {
+            order.task = TASK_ATTACK;
+        }
+    }
+    set_order(train_of(train.front()).front(), true, order);
+    std::string vids;
+    for (uint8_t* c : train_of(train.front())) vids += (vids.empty() ? "" : ",") + std::to_string(nvid_of(c));
+    patch::log("edit: start train %s at %d,%d: cars %s (planned %u), %s to %d,%d", t.type.c_str(), t.x1, t.y1, vids.c_str(),
+               static_cast<unsigned>(cars.size()), order.task == TASK_PATROL ? "patrol" : "attack", order.x, order.y);
+    return train;
+}
+
 void edit_convert_arrivals() {
     const std::string refusal = mission_arrivals_refusal();
     if (!refusal.empty()) {
@@ -7818,26 +7895,55 @@ void edit_convert_arrivals() {
                 a.task = TASK_DRIVE;
         s.list.push_back(a);
         if (s.waves > 1) {
-            a.cond = IF_NO_TRAIN;
+            a.cond = IF_OWN_FACTORY;   // as the old template and POLIGON: no locomotive and a factory of its own
             a.times = s.waves - 1;
             s.list.push_back(a);
         }
     }
     s.on = true;
     s.waves = 0;
-    const std::vector<State> was = states(markers);
+    std::vector<uint8_t*> objects = markers;
+    std::vector<State> was = states(markers);
     for (size_t i = 0; i < markers.size(); ++i) {
         State gone = was[i];
         gone.present = false;
         apply(markers[i], gone);
     }
-    commit({"OpArrivalsConvert", "convert to arrivals"}, markers, was);
+    // the script's start trains: trains of the map where they start, with their order
+    const std::vector<EnemyTrain> start_before = mission_start();
+    const std::vector<uint8_t*> cars_before = all_cars();
+    for (uint8_t* c : cars_before) {
+        objects.push_back(c);
+        was.push_back(state_of(c));
+    }
+    int made = 0, dropped = 0;
+    for (const EnemyTrain& t : start_before) {
+        const std::vector<uint8_t*> train = place_start_train(t);
+        if (train.empty()) {
+            ++dropped;
+            continue;
+        }
+        for (uint8_t* c : train) {
+            objects.push_back(c);
+            State none = state_of(c);
+            none.present = false;
+            was.push_back(none);
+        }
+        ++made;
+    }
+    mission_start().clear();
+    occupy_all();
+    commit({"OpArrivalsConvert", "convert to arrivals"}, objects, was);
     Operation& op = g_undo.back();
     op.arrivals = true;
     op.arrivals_before = before;
     op.arrivals_after = s;
-    MESSAGE("MsgArrivalsConverted", "arrivals: converted - %u arrivals, %u point locomotive cars taken away (saved with the map)",
-            static_cast<unsigned>(s.list.size()), static_cast<unsigned>(markers.size()));
+    op.start = !start_before.empty();
+    op.start_before = start_before;
+    op.start_after = mission_start();
+    MESSAGE("MsgArrivalsConverted", "arrivals: converted - %u arrivals, %u point locomotive cars taken away, %d start trains on the map%s",
+            static_cast<unsigned>(s.list.size()), static_cast<unsigned>(markers.size()), made,
+            dropped ? ui_printf(ui_format("MsgStartNoTrack", " (%d with no track at their start)"), dropped).c_str() : "");
 }
 
 // editor_panel.cpp's palette: an object picked - the bar's "All objects" entry (a car: the
