@@ -4,14 +4,16 @@ tools/release.py (PyInstaller, one file).
     python tools\installer.py      (the same window from the repository, for trying it)
     Setup.exe [--steam <folder>] [--target <folder>]      (the window with these folders)
     Setup.exe --silent [--steam <folder>] [--target <folder>] [--cheats 0|1] [--unlock 0|1]
-              [--game-lang <code>] [--no-shortcuts] [--lang <code>]
-        installs without the window: the log goes to install.log in the install folder and
+              [--game-lang <code>] [--no-shortcuts] [--lang <code>] [--no-clean]
+        installs without the window: the log goes to logs\install.log in the install folder and
         the exit code is 0 when it worked (scripted installs, tests)
     Setup.exe --auto [--steam <folder>] [--target <folder>] [--no-shortcuts]
         the window, which installs at once with what it shows and closes at the end, its log
-        in install.log (tests of the window itself)
+        in logs\install.log (tests of the window itself)
     --captured <folder> (with any of them) keeps the language captures there instead (tests:
         a folder with only some languages; Uninstall leaves it)
+    --no-clean (with any of them) removes nothing that earlier versions left in the install
+        folder (build.clean_up; DEVELOPERS.md "Updating")
 
 It finds the player's Steam copy of Locoland (Steam's registry key, its libraries in
 steamapps\libraryfolders.vdf, or a folder chosen by hand), proposes an install folder of its
@@ -31,8 +33,10 @@ game's language to English (when that pack can be built) or the one picked. Runn
 over an install updates it: build.py writes only our files and the game's originals, so the
 player's high scores, maps and lines of maps\custom.lst stay, and the progress in the registry
 is not touched - the two options are written with the values shown (the current ones of the
-registry), and the game's language only when it was changed in the window. OpenLocoland.json in
-the install folder records the version and the shortcuts; Uninstall removes the shortcuts, the
+registry), and the game's language only when it was changed in the window; what earlier versions
+left and this one does not write is removed (build.clean_up, listed in the log). OpenLocoland.json
+in the install folder records the version, the shortcuts and the files installed (for the next
+update's clean-up); Uninstall removes the shortcuts, the
 folder and the captures after a question, and leaves the registry (the progress and the
 profiles are the original game's too).
 """
@@ -61,6 +65,10 @@ DEFAULT_TARGET = os.path.join(os.environ.get("USERPROFILE", os.path.expanduser("
 DEFAULT_CAPTURED = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), APP, "captured")
 CAPTURED = DEFAULT_CAPTURED   # --captured <folder> for tests
 EDITOR_MAP = r"maps\template\template.map"   # what the menu's "EDYTOR MAP" opens
+# the editor shortcut: the game in editor mode on the template, which opens a new empty map
+# (LocoFix editor.cpp), without the intro and the menu (test_map.cpp)
+EDITOR_ARGUMENTS = "--editor --test-map " + EDITOR_MAP
+LOG = os.path.join(build.LOGS, "install.log")   # the log of --silent and --auto in the install folder
 DEFAULT_GAME_LANGUAGE = "en"
 languages.CAPTURED = CAPTURED   # languages.available() and build() look there
 
@@ -717,15 +725,14 @@ def special_folder(csidl):
     return buffer.value
 
 
-def make_shortcut(path, target, arguments, folder, icon, description, minimized=False):
-    """A .lnk through the shell's WScript.Shell (PowerShell is on every Windows 10 and 11);
-    `minimized` for a .cmd, so its console does not flash up."""
+def make_shortcut(path, target, arguments, folder, icon, description):
+    """A .lnk through the shell's WScript.Shell (PowerShell is on every Windows 10 and 11)."""
     def quoted(s):
         return "'" + s.replace("'", "''") + "'"
     script = ("$s = (New-Object -ComObject WScript.Shell).CreateShortcut({}); $s.TargetPath = {}; "
               "$s.Arguments = {}; $s.WorkingDirectory = {}; $s.IconLocation = {}; $s.Description = {}; "
-              "$s.WindowStyle = {}; $s.Save()").format(quoted(path), quoted(target), quoted(arguments), quoted(folder),
-                                                       quoted(icon + ",0"), quoted(description), 7 if minimized else 1)
+              "$s.WindowStyle = 1; $s.Save()").format(quoted(path), quoted(target), quoted(arguments), quoted(folder),
+                                                      quoted(icon + ",0"), quoted(description))
     os.makedirs(os.path.dirname(path), exist_ok=True)
     subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script], check=True,
                    capture_output=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
@@ -784,17 +791,20 @@ def install(steam, target, choices, ver, progress=None, skip_verify=False):
     locofix = os.path.join(BUNDLE, "LocoFix.dll") if BUNDLE else None
     os.makedirs(CAPTURED, exist_ok=True)
     print(f"OpenLocoland {ver}: {steam} -> {target}")
-    build.build(steam, target, locofix=locofix, captured=CAPTURED, progress=progress, skip_verify=skip_verify)
+    manifest = read_manifest(target)
+    files = build.build(steam, target, locofix=locofix, captured=CAPTURED, progress=progress, skip_verify=skip_verify,
+                        previous=(manifest or {}).get("files", []), clean=choices.get("clean", True))
     write_setting("Cheats", choices["cheats"])
     write_setting("UnlockMissions", choices["unlock"])
     print(f"Options: Cheats {int(choices['cheats'])}, UnlockMissions {int(choices['unlock'])}")
     if choices.get("game_language"):
         write_setting("Language", choices["game_language"])
         print(f"Game language: {choices['game_language']}")
-    remove_shortcuts(read_manifest(target))
+    remove_shortcuts(manifest)
     shortcuts = make_shortcuts(target, choices, ver)
     with open(os.path.join(target, MANIFEST), "w", encoding="utf-8") as f:
-        json.dump({"version": ver, "steam": steam, "captured": CAPTURED, "shortcuts": shortcuts}, f, indent=2)
+        json.dump({"version": ver, "steam": steam, "captured": CAPTURED, "shortcuts": shortcuts, "files": files}, f,
+                  indent=2)
 
 
 def make_shortcuts(target, choices, ver):
@@ -810,8 +820,7 @@ def make_shortcuts(target, choices, ver):
         game = os.path.join(folder, texts["game_name"] + ".lnk")
         make_shortcut(game, exe, "", target, exe, APP + " " + ver)
         editor = os.path.join(folder, texts["editor_name"] + ".lnk")
-        make_shortcut(editor, os.path.join(target, "edit_map.cmd"), EDITOR_MAP, target, exe, texts["editor_desc"],
-                      minimized=True)
+        make_shortcut(editor, exe, EDITOR_ARGUMENTS, target, exe, texts["editor_desc"])
         made += [game, editor]
         print("Shortcuts: " + folder)
     return made
@@ -833,13 +842,14 @@ class LogWriter:
 
 
 class Installer:
-    def __init__(self, root, steam=None, target=None, auto=False, shortcuts=True):
+    def __init__(self, root, steam=None, target=None, auto=False, shortcuts=True, clean=True):
         self.root = root
         self.lang = first_ui_language()
         self.version = version()
         self.events = queue.Queue()
         self.busy = False
         self.auto = auto   # --auto: install at once, no questions, close at the end
+        self.clean = clean   # False: --no-clean
         self.result = None
         self.widgets = {}
         self.logo = None
@@ -1129,11 +1139,12 @@ class Installer:
             messagebox.showerror(APP, text)
 
     def finish(self, ok, text):
-        """--auto: the window's log into install.log of the install folder, then close."""
+        """--auto: the window's log into logs\\install.log of the install folder, then close."""
         self.result = ok
         target = self.target.get().strip()
         if os.path.isdir(target):
-            with open(os.path.join(target, "install.log"), "w", encoding="utf-8") as f:
+            os.makedirs(os.path.join(target, build.LOGS), exist_ok=True)
+            with open(os.path.join(target, LOG), "w", encoding="utf-8") as f:
                 f.write(self.log.get("1.0", "end") + ("OK" if ok else "FAILED: " + text) + "\n")
         self.root.destroy()
 
@@ -1177,7 +1188,7 @@ class Installer:
         self.progress["value"] = 0
         self.say(self.t("working") + "\n")
         language = self.chosen_game_language()
-        choices = {"cheats": self.cheats.get(), "unlock": self.unlock.get(), "desktop": self.desktop.get(),
+        choices = {"cheats": self.cheats.get(), "unlock": self.unlock.get(), "desktop": self.desktop.get(), "clean": self.clean,
                    "start_menu": self.start_menu.get(), "lang": self.lang, "skip_verify": self.skip_verify.get(),
                    # a new install sets the game's language; an update only when it was changed here
                    "game_language": language if not update or language != self.first_language else None}
@@ -1249,17 +1260,17 @@ class Installer:
 
 
 def silent(a):
-    """--silent: the install without the window, its log in <target>\\install.log."""
+    """--silent: the install without the window, its log in <target>\\logs\\install.log."""
     target = os.path.abspath(a.target or DEFAULT_TARGET)
-    os.makedirs(target, exist_ok=True)
+    os.makedirs(os.path.join(target, build.LOGS), exist_ok=True)
     steam = a.steam or find_game() or ""
     update = read_manifest(target) is not None
     skip_verify = getattr(a, "skip_verify", False)
     buildable, missing = game_languages(steam, skip_verify=skip_verify)
     language = a.game_lang or (None if update else first_game_language(buildable, False))
-    choices = {"cheats": a.cheats == "1", "unlock": a.unlock == "1", "desktop": not a.no_shortcuts,
+    choices = {"cheats": a.cheats == "1", "unlock": a.unlock == "1", "desktop": not a.no_shortcuts, "clean": not a.no_clean,
                "start_menu": not a.no_shortcuts, "lang": a.lang or first_ui_language(), "game_language": language, "skip_verify": skip_verify}
-    with open(os.path.join(target, "install.log"), "w", encoding="utf-8") as log:
+    with open(os.path.join(target, LOG), "w", encoding="utf-8") as log:
         sys.stdout = sys.stderr = log
         try:
             if a.game_lang and a.game_lang not in buildable:
@@ -1295,6 +1306,8 @@ def main():
     p.add_argument("--game-lang", help="the game's language (default for a new install: the system's if there is a pack, else English; kept on an update)")
     p.add_argument("--no-shortcuts", action="store_true", help="no shortcuts (the window: both boxes unticked)")
     p.add_argument("--lang", choices=codes, help="the language of the shortcuts' names (default: the system's, else en)")
+    p.add_argument("--no-clean", action="store_true",
+                   help="remove nothing that earlier versions left in the install folder")
     p.add_argument("--skip-verify", action="store_true",
                    help="skip Steam.exe version verification (for CD/beta-demo exes; may break patches)")
     p.add_argument("--captured", help="the folder of the language captures (default: " + DEFAULT_CAPTURED +
@@ -1311,7 +1324,7 @@ def main():
     icon = os.path.join(BUNDLE or os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon"), "openlocoland.ico")
     if os.path.exists(icon):
         root.iconbitmap(default=icon)
-    window = Installer(root, a.steam, a.target, a.auto, not a.no_shortcuts)
+    window = Installer(root, a.steam, a.target, a.auto, not a.no_shortcuts, not a.no_clean)
     root.mainloop()
     if a.auto:
         sys.exit(0 if window.result else 1)

@@ -309,7 +309,7 @@ private:
 // ---- the map the editor starts on ----
 //
 // The editor started from the menu (EDYTOR MAP: StartEditorMode("maps\\template\\template.map")) or
-// by the desktop shortcut (edit_map.cmd maps\template\template.map) does not open the template but
+// by the desktop shortcut (--editor --test-map maps\template\template.map) does not open the template but
 // a new empty map that has no name yet: 2048 x 1536 of grass, as File > New makes it
 // (editor_newmap.cpp), titled NEW MAP (the pack's NewMapTitle). The engine loads a level only from
 // its files, so the map is made in a hidden scratch folder, maps\_new\ (_new2 ... while an older one

@@ -1,7 +1,7 @@
 ﻿# Mission smoke test: for each mission starts the game in a window with the mission's map
 # as the test map (LocoFix --test-map: the game loads the map at once, without the intro and
 # the menu), waits until the map and its script are loaded, takes a screenshot and collects
-# the mission script compile result and errors from error.log. Nothing is clicked, so a
+# the mission script compile result and errors from logs\error.log. Nothing is clicked, so a
 # mission that the player has not unlocked is tested just the same.
 # A mission passes when it loaded, its script compiled without errors, the game logged no
 # "EXCEPTION!" (the game catches a crash, logs that and quits) and closed normally; the
@@ -21,6 +21,7 @@ $repo = Split-Path $PSScriptRoot
 if (-not $Results) { $Results = Join-Path $repo "build\tests" }
 New-Item -ItemType Directory -Force $Results | Out-Null
 $game = $Game
+$logs = Join-Path $game "logs"   # the game's error logs and LocoFix.log
 
 $report = @()
 foreach ($m in $Missions) {
@@ -34,10 +35,10 @@ foreach ($m in $Missions) {
   $loadedPattern = "maps\\l$nr\\l$nr\.map.*LoadScript::ByteCode"
   $out = & (Join-Path $PSScriptRoot "test_game.ps1") -Wait 15 -Exe (Join-Path $game "Locoland.exe") -ClickOk 1 -SetFull 0 `
     -Map $map -WaitFor $loadedPattern -LogWait $Wait -Shot $shot -LastShotOnly 2>&1 | Out-String
-  # The game writes error<date> <time>.log and renames it to error.log on a normal exit; a
+  # The game writes logs\error<date> <time>.log and renames it to error.log on a normal exit; a
   # killed game leaves the dated one and error.log is from an earlier run. So the log of this
   # run is the newest one written since it started (none: the game did not get that far).
-  $logFile = Get-ChildItem (Join-Path $game "error*.log") -ErrorAction SilentlyContinue |
+  $logFile = Get-ChildItem (Join-Path $logs "error*.log") -ErrorAction SilentlyContinue |
     Where-Object { $_.LastWriteTime -ge $started.AddSeconds(-2) } | Sort-Object LastWriteTime | Select-Object -Last 1
   $log = if ($logFile) { Get-Content $logFile.FullName } else { @() }
   $script = ($log | Select-String "LoadScript::ByteCode" | Select-Object -Last 1).Line
@@ -45,7 +46,7 @@ foreach ($m in $Missions) {
   $loaded = [bool]($log | Select-String "maps\\l$nr\\l$nr.map")
   # LocoFix.log: "test map: loaded <map>" once the level load is over and World->levelFile
   # is the test map.
-  $fixLog = Get-Content (Join-Path $game "LocoFix.log") -ErrorAction SilentlyContinue
+  $fixLog = Get-Content (Join-Path $logs "LocoFix.log") -ErrorAction SilentlyContinue
   $confirmed = [bool]($fixLog | Select-String "test map: loaded maps\\l$nr\\l$nr\.map")
   $closed = $out -match 'Closed normally'
   $exceptions = @($log | Select-String "EXCEPTION!").Count

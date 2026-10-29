@@ -566,7 +566,7 @@ misji, Wysokosc terenu, Skrzynka z pieniedzmi, Pojazdy, Malowanie terenu, Woda i
   przez Steam (w dowolnym języku).
 - **Gdzie są moje mapy?** W `maps\` folderu gry (C:\Users\<ty>\Games\OpenLocoland), każda w swoim folderze; lista
   strony własnych map to `maps\custom.lst`.
-- **Coś poszło nie tak.** Gra zapisuje w swoim folderze `error.log` i `LocoFix.log`; wyślij je z
+- **Coś poszło nie tak.** Gra zapisuje w `logs\` swojego folderu `error.log` i `LocoFix.log`; wyślij je z
   opisem tego, co się stało.
 - **Pełny ekran.** Działa, ale sprawdzony jest tryb okna; jeśli ekran zostaje czarny, odznacz „pełny
   ekran” w okienku startowym.

@@ -20,6 +20,10 @@ void log(const char* format, ...);
 // Folder of the exe with a trailing backslash.
 std::string game_folder();
 
+// The logs folder of the game folder, logs\ with a trailing backslash: the game's error logs
+// and LocoFix.log.
+std::string log_folder();
+
 // One command line token, quoted or not, and the position moved past it.
 inline std::string read_token(const char*& at) {
     while (*at == ' ' || *at == '\t') ++at;

@@ -107,6 +107,7 @@ Add-Type -AssemblyName System.Drawing, System.Windows.Forms
 $scr = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
 "Screen: $($scr.Width)x$($scr.Height)"
 $dir = Split-Path $Exe
+$logs = Join-Path $dir "logs"   # the game's error logs and LocoFix.log (build.py, LocoFix make it)
 # LOCOFIX_TEST=1: the game listens only to the mouse from the test (src/LocoFix/test.cpp),
 # so clicks land where they should and the user's mouse is neither moved nor taken into account.
 $env:LOCOFIX_TEST = "1"
@@ -130,14 +131,14 @@ do { Start-Sleep -Milliseconds 250; Get-Wins; $p.Refresh() } while ($wins.Count 
 Start-Sleep -Milliseconds 500
 "Process alive: $(-not $p.HasExited)"
 
-# The logs of the running game as one text: the game's own (error<date>.log while it
+# The logs of the running game as one text: the game's own (logs\error<date>.log while it
 # runs, renamed to error.log on exit) followed by LocoFix.log, where test mode also lists
 # every file the game opens (e.g. "open maps\l01rief.txt"). The game keeps its log open
 # for writing, so it is read shared.
 function Read-Logs {
   $text = ""
-  $files = @(Get-ChildItem (Join-Path $dir "error*.log") | Sort-Object LastWriteTime | Select-Object -Last 1) +
-           @(Get-Item (Join-Path $dir "LocoFix.log") -ErrorAction SilentlyContinue)
+  $files = @(Get-ChildItem (Join-Path $logs "error*.log") -ErrorAction SilentlyContinue | Sort-Object LastWriteTime | Select-Object -Last 1) +
+           @(Get-Item (Join-Path $logs "LocoFix.log") -ErrorAction SilentlyContinue)
   foreach ($log in $files) {
     if (-not $log) { continue }
     $f = [IO.File]::Open($log.FullName, 'Open', 'Read', 'ReadWrite')

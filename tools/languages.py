@@ -294,13 +294,14 @@ def capture(code, game_folder, force=False):
     return copied
 
 
-def install(code, game_folder, target, copy, read_original=None):
+def install(code, game_folder, target, copy, read_original=None, write=None):
     """Assembles pack `code` into <target>\\lang\\<code>\\: the captured files (of its base, see
     build_base), then our files from lang/<code>/ at their place in the pack (pack_path; copied,
     or applied when they are changes). The originals of changed files come from the capture, or
     from `game_folder` for files that are the same in every language (scripts). `copy(src, dst)` copies one file incrementally;
-    `read_original(path)` reads an original (patch_text.read when not given). Returns the
-    number of files written by the changes."""
+    `read_original(path)` reads an original (patch_text.read when not given), `write(path, data)`
+    writes a changed one (patch_text.write_if_changed when not given). Returns the number of files
+    written by the changes."""
     pack, source = os.path.join(target, "lang", code), os.path.join(CAPTURED, build_base(code))
     ours = pack_files(code)
     changed_names = {os.path.normcase(patch_text.target_name(path) or path) for _, path in ours}
@@ -321,7 +322,7 @@ def install(code, game_folder, target, copy, read_original=None):
         original = os.path.join(source, name)
         if not os.path.isfile(original):
             original = os.path.join(game_folder, name)
-        written += patch_text.write_if_changed(
+        written += (write or patch_text.write_if_changed)(
             os.path.join(pack, name), patch_text.changed_file(src, original, (read_original or patch_text.read)(original)))
     return written
 

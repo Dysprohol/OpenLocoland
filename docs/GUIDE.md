@@ -572,7 +572,7 @@ Mission settings, Ground height, Money crate, Vehicles, Paint the ground, Water 
   Steam (any language).
 - **Where are my maps?** In `maps\` of the game folder (C:\Users\<you>\Games\OpenLocoland), one folder each; the
   list of the custom maps page is `maps\custom.lst`.
-- **Something went wrong.** The game writes `error.log` and `LocoFix.log` into its folder; send them
+- **Something went wrong.** The game writes `error.log` and `LocoFix.log` into `logs\` of its folder; send them
   with a description of what happened.
 - **Full screen.** It works, but windowed mode is the tested one; if the screen stays black, untick
   "full screen" in the launcher.

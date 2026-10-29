@@ -2,7 +2,7 @@
 //
 // The exe calls LoadLibraryA("LocoFix.dll") before WinMain (patch in tools/patch_exe.py),
 // so everything here happens before the game reads its configuration and creates the
-// window. Messages go to LocoFix.log next to the exe.
+// window. Messages go to logs\LocoFix.log in the game folder.
 #include "patch.h"
 #include <algorithm>
 #include <cstdarg>
@@ -45,14 +45,17 @@ void install_update_check();
 
 namespace {
 
-// The game writes its log to "error<date> <time>.log" and renames it to error.log only
-// on a normal exit (removing the previous one). After a crash or a killed process the
-// dated file stays behind, so they pile up. We keep the newest few - they may be needed
-// to look into a crash - and delete the rest. LocoFix.log starts afresh every run.
+// The game writes its log to "logs\error<date> <time>.log" and renames it to logs\error.log
+// only on a normal exit (removing the previous one); without a logs folder it drops the prefix
+// and writes next to the exe (Log_Construct), so the folder is made here when it is missing
+// (build.py makes it too). After a crash or a killed process the dated file stays behind, so
+// they pile up. We keep the newest few - they may be needed to look into a crash - and delete
+// the rest. LocoFix.log starts afresh every run.
 constexpr size_t KEPT_ORPHAN_LOGS = 3;
 
 void clean_up_logs() {
-    const std::string folder = patch::game_folder();
+    const std::string folder = patch::log_folder();
+    CreateDirectoryA(folder.c_str(), nullptr);
     std::vector<std::string> orphans;
     WIN32_FIND_DATAA found;
     HANDLE h = FindFirstFileA((folder + "error????-??-?? ??h??m??.log").c_str(), &found);
@@ -79,8 +82,12 @@ std::string game_folder() {
     return slash ? path : "";
 }
 
+std::string log_folder() {
+    return game_folder() + "logs\\";
+}
+
 void log(const char* format, ...) {
-    FILE* f = std::fopen((game_folder() + "LocoFix.log").c_str(), "a");
+    FILE* f = std::fopen((log_folder() + "LocoFix.log").c_str(), "a");
     if (!f) return;
     va_list a;
     va_start(a, format);

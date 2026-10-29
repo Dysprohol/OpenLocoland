@@ -6,5 +6,5 @@ rem (maps\template\template.map, as the desktop shortcut gives it, opens a new e
 setlocal
 set "MAP=%~1"
 if "%MAP%"=="" set "MAP=maps\sandbox\sandbox.map"
-rem /D: the game works in its own folder (its files and error.log), wherever this is run from
+rem /D: the game works in its own folder (its files and logs\), wherever this is run from
 start "" /D "%~dp0" "%~dp0Locoland.exe" --editor --test-map "%MAP%"

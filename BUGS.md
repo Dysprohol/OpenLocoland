@@ -106,9 +106,10 @@ Engine:
   (61/65*8 = 7.5 -> 7), as designed.
 - `Graphics_Init` always clears the flags 0x10 (GDI cursor), 0x20 (software device) and 0x40
   (triple buffering) - those paths are dead code.
-- The log goes to `logs\error<date> <time>.log`, but the installed game has no `logs`
+- The log goes to `logs\error<date> <time>.log`, but the Steam game has no `logs`
   directory, so the open fails and the game falls back to the same name next to the exe
-  (the deliberate second attempt in `Log_Construct`); on a normal exit the run's log is
+  (the deliberate second attempt in `Log_Construct`; our build makes the folder, DEVELOPERS.md
+  "Logs"); on a normal exit the run's log is
   renamed to `error.log` (`Log_Destruct`), so only crashed runs leave their dated file.
 - `Level_Save` (script `Save()`) is meant for the editor mode (DEVELOPERS.md "Editor mode"): outside
   it, the level it writes has lost its decals (spriteClass 8 objects are baked into the ground

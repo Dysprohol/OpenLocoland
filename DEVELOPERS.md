@@ -82,12 +82,21 @@ python -m venv .venv
 The game lands in `Locoland` next to the repository folder (`..\Locoland`; change with
 `--target`; `--locofix <dll>` takes a prebuilt LocoFix.dll instead of compiling it and
 `--captured <folder>` keeps the language captures elsewhere - both for the installer, see
-"Release"). Ghidra is looked for in `..\_tools\ghidra_*_PUBLIC` (or `--ghidra`). Run `Locoland.exe`. The
+"Release"; `--dev` adds the helpers `run_map.cmd` and `edit_map.cmd` of `game/`, which a build
+without it and Setup leave out). Ghidra is looked for in `..\_tools\ghidra_*_PUBLIC` (or `--ghidra`). Run `Locoland.exe`. The
 launcher picks the resolution, the mode (full screen unticked = window) and the language.
-The choice is remembered.
+The choice is remembered. A map starts without the intro and the menu with
+`Locoland.exe --test-map maps\l01\l01.map` in the game folder, in the editor with
+`Locoland.exe --editor --test-map <map>` (the editor shortcut gives the template, which opens a
+new empty map), or by a double-click on `run_map.cmd` / `edit_map.cmd` of a `--dev` build.
 
 `build.py` copies only changed files and does not overwrite the high score tables, so it
-can be run after every change in the repo.
+can be run after every change in the repo. A file is left as it is when it has the same size and
+date as its source, or the same content (Setup unpacks our files anew at every start, so their
+dates are new each time); the patched and generated files (the patched scripts, `Locoland.exe`,
+`objects.res`, the editor's images, the new maps) are made in memory or a temporary folder and
+written only when they differ. An update with nothing new writes nothing but `logs\install.log`
+and `OpenLocoland.json`.
 
 The Steam copy has to be the original. `build.py` (and so Setup) stops when `Steam.exe` is not
 the exe of 2003-10-07 that LocoFix is made for (its SHA-256 in `build.py`; the same exe for every
@@ -143,7 +152,7 @@ For working on the engine, generate the local reverse-engineering output (not in
 
 | Folder | Contents |
 |---|---|
-| `game/` | Our files for the game folder (`Locoland.cfg`, `dgVoodoo.conf`, `maps/custom.lst` - the custom maps of the menu) and changes to original files as `<file>.patch` (`maps/logo.lgc.patch`, `maps/menu.lgc.patch`) - same structure as the game folder; `maps/script/cheats.lgc`, `unlock.lgc` and their `_on` variants are the launcher's options (LocoFix fix 30); `update.txt` is the launcher's notice when the update check cannot reach GitHub (fix 33). `objects.override/` would hold changed values of `objects.res` (see "Editing objects.res"), `maps.override/<map>/` changed objects of a map (`l11`: a rail of mission 11, `BUGS.md` F21) and `maps.new/<map>/` whole new maps (see "Editing maps and images"); `maps.new/template` (the empty template) and `maps.new/sandbox` (the one to play) at the moment, and `run_map.cmd` - a double-click at the game starts the sample map, `run_map <map>` any map; `edit_map.cmd` the same in editor mode (see "Editor mode"). |
+| `game/` | Our files for the game folder (`Locoland.cfg`, `dgVoodoo.conf`, `maps/custom.lst` - the custom maps of the menu) and changes to original files as `<file>.patch` (`maps/logo.lgc.patch`, `maps/menu.lgc.patch`) - same structure as the game folder; `maps/script/cheats.lgc`, `unlock.lgc` and their `_on` variants are the launcher's options (LocoFix fix 30); `update.txt` is the launcher's notice when the update check cannot reach GitHub (fix 33). `objects.override/` would hold changed values of `objects.res` (see "Editing objects.res"), `maps.override/<map>/` changed objects of a map (`l11`: a rail of mission 11, `BUGS.md` F21) and `maps.new/<map>/` whole new maps (see "Editing maps and images"); `maps.new/template` (the empty template) and `maps.new/sandbox` (the one to play) at the moment, and `run_map.cmd` - a double-click at the game starts the sample map, `run_map <map>` any map; `edit_map.cmd` the same in editor mode (see "Editor mode"); these two are developer helpers, copied only by `build.py --dev`. |
 | `docs/` | The player's guide for the release, in Polish and English only (the German, Hungarian and Russian players get the English one): `PRZEWODNIK.md` (Polish) and `GUIDE.md` (English) - installing, what is new in the game, the custom maps page, the map editor with a tutorial and its keys - and a few screenshots of the game in `docs/img/`. Version 0.1; keep the guides in step with the in-game help pages (`maps/edithelp*.txt`) and "Editor mode" below. |
 | `lang/<code>/` | Our translation work for each language pack (`cs`, `de`, `en`, `hu`, `pl`, `ru`): `language.ini` (the launcher's name and labels, `codepage`, `base` for a translation Steam does not ship) and in `game/` the texts by kind, each assembled into its place in `<game>\lang\<code>\` (`languages.pack_path`): `game/strings.override.ini` -> `strings.ini` (changes to the captured file), `game/briefings/<map>/` -> `maps\<map>\` (the missions', POLIGON's and the template's texts), `game/menus/menu*.txt` -> `maps\` (the menu's pages), `game/editor/edithelp*.txt` -> `maps\` (the editor's help pages), `game/scripts/*.lgc.patch` -> `maps\script\` and `game/scripts/shiftb.txt.patch` -> `maps\` (the developer mode). A pack ships only what it changes; the rest comes from its capture. `lang/_template/` is the starting point of a new translation (a placeholder for every file and `README.md` notes per folder) and not a pack: `languages.packs()` leaves out folders starting with `_`, and no `README.md` is shipped. Each pack's texts are in its code page (CP1250/1251/1252); format details in `docs/TRANSLATING.md` and `tools/patch_text.py`. |
 | `external/dgVoodoo2/` | dgVoodoo2 2.87.5 (`DDraw.dll`, `D3DImm.dll`, unmodified; credit in `NOTICE.md`). |
@@ -315,10 +324,14 @@ which File > New copies into a new map in the language it is made in. Not the hi
 (`hiscores.txt`): the game writes it at the root after a win, with the pack's own header, so a
 pack copy would hide it; until the first win it shows the root's English header.
 
-**Logs.** The game writes `error<date> <time>.log` and renames it to `error.log` on a
-normal exit (replacing the previous one). After a crash or a killed process the dated file
-stays behind; LocoFix keeps the 3 newest of those and deletes the rest at startup.
-`LocoFix.log` starts afresh every run.
+**Logs** are in `logs\` of the game folder. The game writes `logs\error<date> <time>.log` and
+renames it to `logs\error.log` on a normal exit (replacing the previous one) - by itself, once the
+folder is there (`build.py` makes it, and LocoFix at startup when it is missing; without it the
+game writes next to the exe, see "The error log"). After a crash or a killed process the dated
+file stays behind; LocoFix keeps the 3 newest of those and deletes the rest at startup.
+`logs\LocoFix.log` starts afresh every run, and Setup's `--silent` / `--auto` write
+`logs\install.log`. An update moves the logs an older build left in the root into `logs\`
+(`build.py` `clean_up`, see "Updating"; one `logs\` has already is deleted instead).
 
 ## Data formats
 
@@ -706,9 +719,10 @@ its page (`hiscores.txt`) in its own folder - without it a win went into mission
 (`maps\l01\hiscores`). `build.py` copies a `hiscores.txt` of `maps.new` only while the game
 has not written one. It is won when no enemy unit remains (`!NoArmyUnits(1)`) and lost when the
 player has no units and no factory (`IsNoDepo()`). `test_game.ps1 -Map maps\<name>\<name>.map`
-starts it in a window (LocoFix's test map, `--test-map`), and `run_map.cmd` in the game
-folder starts it the same way by hand: a double-click starts the sample, `run_map
-maps\<name>\<name>.map` any map, after the launcher (window or full screen as chosen there).
+starts it in a window (LocoFix's test map, `--test-map`), and `Locoland.exe --test-map
+maps\<name>\<name>.map` in the game folder starts it the same way by hand, after the launcher
+(window or full screen as chosen there); in a `build.py --dev` build `run_map.cmd` does that too:
+a double-click starts the sample, `run_map maps\<name>\<name>.map` any map.
 
 **The custom maps page** (`game/maps/menu.lgc.patch`). The strategic map of the main menu has
 a second page, "WLASNE MAPY" / "CUSTOM MAPS": the page buttons of the briefings (VID 476 next,
@@ -964,10 +978,11 @@ its three wrappers differ in where the two operands come from (a register or the
 a struct `Log` (vtable 0x475758, 0x40c bytes) with the window for error boxes (+0x04), the `FILE*`
 (+0x08) and the path of this run (+0x0c). The game passes 1, so it opens
 `logs\error<YYYY-MM-DD HHhMMmSS>.log` for writing (`String_LocalTime`/`String_LocalDate`, the colons
-of the time replaced with h and m); when the `logs` directory is missing - the installed game has
-none - the open fails and the `logs\` prefix is dropped, so the file lands next to the exe.
-`Log_Destruct` (0x425ea0) closes it and renames it to `error.log`, which is why the last run is
-always `error.log` and a crashed one keeps its dated name. The first line is
+of the time replaced with h and m); when the `logs` directory is missing - the Steam game has
+none; ours has it, see "Logs" - the open fails and the `logs\` prefix is dropped, so the file
+lands next to the exe. `Log_Destruct` (0x425ea0) closes it and renames it to `logs\error.log`
+(`error.log` without the folder), which is why the last run is always `error.log` and a crashed
+one keeps its dated name. The first line is
 `----< date time >----< path of the exe >----`. `Log_Write` (0x426080) appends a formatted line;
 `Log_Error` (0x426140) writes `!!!ERROR <time>!!!` + the caller's message (its `format` and the
 variadic arguments, e.g. `RES '%s' '%.4s'`) + a category picked by `code` from 15 fixed texts
@@ -1262,9 +1277,9 @@ The authors edited their maps with a separate program (`MapEdit.exe`, not shippe
 mentions it at `SetGamma` 140, `CURSOR_DELETE` and `ACT_UNDO_REMOVE`/`INSERT` 132/133), and the
 game exe kept the engine's side of it: the editor mode, World flags 0x1, which `World_Construct`
 copies from bit 0 of `g_settings`+0x220 (0x47b410) - 0 in the exe, and nothing sets it. LocoFix
-sets it with `--editor` (`src/LocoFix/editor.cpp`): `edit_map.cmd [map]` in the game folder
-opens a map that way (the sandbox by default), `Locoland.exe --editor --test-map
-maps\l01\l01.map` any map, and `--editor` alone starts with the intro and the main menu, where
+sets it with `--editor` (`src/LocoFix/editor.cpp`): `Locoland.exe --editor --test-map
+maps\l01\l01.map` in the game folder opens a map that way (`edit_map.cmd [map]` of a
+`build.py --dev` build too, the sandbox by default), and `--editor` alone starts with the intro and the main menu, where
 a mission picked on the strategic map opens in the editor. In the game, "EDYTOR MAP" on the
 custom maps page of the menu starts it (see "Starting it and going back" below). The switch is taken out of the
 process command line before `WinMain` passes it on (`World_Construct` would open a command line
@@ -1428,7 +1443,7 @@ the cars' couplings and rail positions and the later units' factories point at t
 
 **The map the editor starts on** (`editor.cpp`, "the map the editor starts on"; `editor_newmap.cpp`
 `make_start_map`). Started on the template - `StartEditorMode("maps\\template\\template.map")` from
-the menu, or `--test-map maps\template\template.map` as the desktop shortcut's `edit_map.cmd` passes
+the menu, or `--editor --test-map maps\template\template.map` as the desktop shortcut passes
 it (`test_map.cpp` asks `editor_start_map` before the first `Level_Load`) - the editor opens a new
 empty map instead, at once and without a question: what File > New makes with "an empty map: Grass"
 and 2048 x 1536 (the template's script and texts), a map with no name yet, titled NEW MAP (the pack's
@@ -2989,7 +3004,7 @@ mode above) are not tested in full screen.
   1024x768) is nearest-pixel since - a filtered stretch of its own (Direct3D) would bring
   the smoothing back.
   Every fix checks the expected bytes; when something doesn't match, it skips the fix and
-  writes the reason to `LocoFix.log` next to the exe. The library works only with the exe
+  writes the reason to `logs\LocoFix.log` of the game folder. The library works only with the exe
   from 2003-10-07 (date in the PE header).
 
 ## Working with the code
@@ -3046,7 +3061,7 @@ mode above) are not tested in full screen.
   `error.log` complete). `-Menu` takes the `m`/`k`/`p` points in the menu's 1024x768
   canvas: the game scales that 4:3 picture to fit the window and centres it (pillarboxes
   in a 16:9 window), so the points are scaled and moved the same way. The logs it watches
-  are the game's own and `LocoFix.log`, where test mode also lists every file the game
+  (in `logs\` of the game folder) are the game's own and `LocoFix.log`, where test mode also lists every file the game
   opens. In test mode the game keeps running behind other windows (`test.cpp` does not
   pass `WM_ACTIVATEAPP` FALSE to the game, which would pause it and ignore the mouse), so a test
   never brings the window forward and the user keeps the focus; only the game's own start (the
@@ -3082,7 +3097,7 @@ mode above) are not tested in full screen.
   errors. A mission passes when it loaded, its script compiled without errors, the game
   logged no `EXCEPTION!` (the game catches a crash, logs that and quits - a crash that
   closes the window "normally" all the same) and closed; the script exits with 1 when one
-  fails. It reads the newest `error*.log` written since the mission started, since a killed
+  fails. It reads the newest `logs\error*.log` written since the mission started, since a killed
   game leaves its dated log and an older `error.log`. Results in `build\tests`. About 10 s per mission; `-Quick` runs only missions 1, 2
   and 8 (one of each map size) for everyday checks, the full 20 before bigger merges.
   `-Game <folder>` tests another assembled copy
@@ -3265,10 +3280,11 @@ running it again keeps them), the game's language (`Language`: a new install set
 the system's display language when there is a pack for it, else English; an update writes it only
 when it was changed in the window, so the language chosen in the game's launcher stays), the
 shortcuts (through PowerShell's `WScript.Shell`; the editor's
-runs `edit_map.cmd maps\template\template.map` minimised, so no console flashes up - the template
-is what the menu's "EDYTOR MAP" opens, and both open a new empty map in its place) and `OpenLocoland.json` in the install folder (the
-version, the Steam folder, the captures' folder and the shortcuts, so an update or uninstall
-removes the old ones). The language captures go to `%LOCALAPPDATA%\OpenLocoland\captured`
+runs `Locoland.exe --editor --test-map maps\template\template.map` - the template is what the
+menu's "EDYTOR MAP" opens, and both open a new empty map in its place) and `OpenLocoland.json` in the install folder (the
+version, the Steam folder, the captures' folder, the shortcuts, so an update or uninstall
+removes the old ones, and `files`, what the build installed, for the next update's clean-up - see
+"Updating"). The language captures go to `%LOCALAPPDATA%\OpenLocoland\captured`
 (`build.py --captured`), not into a repository: the language Steam installed and every depot
 downloaded with `download_depot` (`languages.downloaded_depots`: `steamapps\content\app_352130`
 of the game's library and of Steam's own folder, where the console puts them). The "Game
@@ -3289,9 +3305,9 @@ on black across the whole width of the window and redrawn when it is resized (PI
 nothing of the game is in Setup.exe); without that file it is the game's `vid\logo.bmp` cropped to
 its letters - the Steam copy's, or another captured language's when Steam has the English one,
 which says "Steamland" - and before a game is found it is the project's name in text. `Setup.exe --silent --target <folder> [--steam
-<folder>] [--cheats 0|1] [--unlock 0|1] [--game-lang <code>] [--no-shortcuts] [--lang <code>]`
+<folder>] [--cheats 0|1] [--unlock 0|1] [--game-lang <code>] [--no-shortcuts] [--lang <code>] [--no-clean]`
 (`--lang` picks the language of the shortcuts' descriptions; both default as in the window) does the same without
-the window, with its log in `install.log` of the install folder and exit code 0 when it worked;
+the window, with its log in `logs\install.log` of the install folder and exit code 0 when it worked;
 `Setup.exe --auto [--target <folder>] [--no-shortcuts]` opens the window, which installs at once with what it
 shows and closes at the end (the same log and exit code - a test of the window
 itself, since Tk's buttons take no posted clicks). The Install / Update button has the focus,
@@ -3305,6 +3321,34 @@ page"), the exported and imported maps, and everything in the registry: the sett
 options as they were and the campaign progress (`Players`). The two maps of the release itself,
 `maps\sandbox` and `maps\template`, are written anew - a map edited in place there is lost, a map
 saved under a name of its own is not.
+
+What earlier versions left and this one does not write is removed after the build (`build.py`
+`clean_up`), each file named in `logs\install.log` ("removed <path> (<reason>)"); `--no-clean` (of
+Setup and of `build.py`) skips it. The candidates:
+
+- the files the previous install's `OpenLocoland.json` lists under `files`: every file the build
+  wrote or found up to date (Setup records the list from this version on, so the next update removes
+  exactly what a version stopped writing - a help page, a pack file, a file of one of our maps),
+- for installs made before that record, the known leftovers: `OBSOLETE` (`Steam.exe`, `steam.cfg`,
+  `steam_appid.txt` - copied by 0.1 -, `D3D8.dll`, `D3D9.dll`, `dgVoodooCpl.exe`), `OBSOLETE_DIRS`
+  (`video\`, the intros), `DEV_FILES` (`run_map.cmd`, `edit_map.cmd`; not with `--dev`), the files
+  of `lang\` and `editor\` the build did not write (an older pack layout, e.g.
+  `lang\cs\maps\l08\brief2.txt` of v0.1.10), help pages `maps\edithelp*.txt` / `.lst` beyond the
+  current ones, and files of the Steam folder's root an older build copied (the same size, not ours),
+- the editor's scratch: `maps\_new*\` folders marked with `editor_new.txt` and `*.saving` files (a
+  save that did not finish, `level_save.cpp`) - in the player's map folders too,
+- the logs of the root, which move into `logs\` (one `logs\` has already is removed).
+
+Guards, checked for every candidate: the candidates are computed only when the build has finished,
+and nothing it wrote in this run is one (so no game file copied or patched from Steam, no DLL we
+ship); the path must resolve inside the install folder - not the folder itself, not through a link
+or junction, not inside the Steam folder (and nothing is removed when the two overlap), so a list
+naming `..\x` or an absolute path is refused; the player's data is excluded by name whatever a list
+says: the high scores (`hiscores`, `hiscores.txt`), `maps\custom.lst`, `OpenLocoland.json`,
+`Locoland.cfg` and `logs\`; and a `lang\<code>\` or `maps\<name>\` the build wrote nothing into this
+time - a player's map, a pack whose language could not be built - is left alone (apart from the
+scratch above), so a missing capture never takes a working pack with it. Folders the removals leave
+empty go too. The settings and the progress are in the registry, which the clean-up never touches.
 
 **Uninstalling**: the Uninstall button of Setup (after a question) removes the shortcuts, the
 install folder with everything in it and `%LOCALAPPDATA%\OpenLocoland`; deleting the install
