@@ -231,8 +231,8 @@ A few units and guns are always put on the ground by the game itself; the status
 ### 4. The main line
 
 **Track** (key 3). Click to start a line - at the end of a rail of the map or anywhere - and every
-next click lays **one rail** toward the cursor; Esc ends the line, and the right button deletes the
-rail under the cursor (Ctrl+Z puts it back; not one a train stands on). The preview shows
+next click lays **one rail** toward the cursor; the right button (or Esc) ends the line, and a click
+of the mouse wheel deletes the rail under the cursor (Ctrl+Z puts it back). The preview shows
 the next rail: **green** ends - it fits, **red** - the status line says which rule it breaks:
 
 - one step is 71 x 50 px or its half (the rails' lattice);
@@ -307,7 +307,7 @@ side of the track you point at (`R` / `E` or the wheel: the other side), and on 
 turn it round - it goes across the track to the trains of the other way; the status line and its
 panel (FOR TRAINS) say whose it is.
 `T` switches the colour. A semaphore you place gets its own one-way line at once, as the missions'
-semaphores have them, and the preview draws it - a line that ends at the semaphore: a **green** one
+semaphores have them, and the preview shows it: a **green** semaphore's way in is drawn green, a **red** one's stop as a short red mark in front of it, ending at it: a **green** one
 lets the trains it faces in (the line comes from them and pushes them past it), a **red** one stops
 them at it (the line comes from behind it, and they may not go against it). A green and a red one
 across the track from each other share one line - the map's entry, if you put them where the main
@@ -495,7 +495,7 @@ Mission settings, Ground height, Money crate, Vehicles, Paint the ground, Water 
 | W | water, swamp or lava |
 | S | the selected line's semaphores (Push line tool) |
 | Shift (with a brush) | take away |
-| Esc, right button | back to Select; Esc ends a line of track (in the Track tool the right button deletes the rail under the cursor) |
+| Esc, right button | back to Select; end a line of track (in the Track tool a wheel click deletes the rail under the cursor) |
 | Ctrl+R | run / hold the level |
 | F1 | help |
 | Ctrl+S | save the map |

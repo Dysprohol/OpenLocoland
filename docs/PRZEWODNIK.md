@@ -227,8 +227,8 @@ Kilka jednostek i dział gra zawsze sama stawia na ziemi; wiersz stanu to mówi.
 ### 4. Główna linia
 
 **Tory** (klawisz 3). Kliknij, żeby zacząć linię - na końcu szyny mapy albo gdziekolwiek - a każde
-następne kliknięcie kładzie **jedną szynę** w stronę kursora; Esc kończy linię, a prawy przycisk usuwa
-szynę pod kursorem (Ctrl+Z ją przywraca; nie tę, na której stoi pociąg). Podgląd
+następne kliknięcie kładzie **jedną szynę** w stronę kursora; prawy przycisk (albo Esc) kończy linię,
+a kliknięcie kółkiem myszy usuwa szynę pod kursorem (Ctrl+Z ją przywraca). Podgląd
 pokazuje następną szynę: **zielone** końce - pasuje, **czerwone** - wiersz stanu mówi, którą
 zasadę łamie:
 
@@ -302,7 +302,7 @@ jednokierunkowych i stoją obok toru, po prawej stronie pociągów, na które pa
 staje po tej stronie toru, którą wskażesz (`R` / `E` albo kółko: po drugiej), a na postawionym `R` / `E`
 obracają go - przechodzi na drugą stronę toru, do pociągów jadących w drugą stronę; wiersz stanu i jego
 panel (DLA POCIAGOW) mówią, dla których jest. `T` zmienia kolor. Postawiony semafor od razu dostaje własną linię
-jednokierunkową, tak jak mają je semafory misji, a podgląd ją rysuje - linię kończącą się przy semaforze:
+jednokierunkową, tak jak mają je semafory misji, a podgląd ją pokazuje: wjazd przez **zielony** semafor jest rysowany na zielono, zatrzymanie przy **czerwonym** - krótkim czerwonym znakiem przed nim, kończącym się przy nim:
 **zielony** wpuszcza pociągi, na które patrzy (linia biegnie od nich i przepycha je obok niego),
 **czerwony** zatrzymuje je przy sobie (linia biegnie zza niego, a pod prąd nie wolno). Zielony i
 czerwony naprzeciw siebie po dwóch stronach toru dzielą jedną linię - to wjazd na mapę, jeśli postawisz
@@ -491,7 +491,7 @@ misji, Wysokosc terenu, Skrzynka z pieniedzmi, Pojazdy, Malowanie terenu, Woda i
 | W | woda, bagno albo lawa |
 | S | semafory zaznaczonej linii (narzędzie Linia jednokierunkowa) |
 | Shift (z pędzlem) | usuwanie |
-| Esc, prawy przycisk | powrót do Zaznacz; Esc kończy linię toru (w narzędziu Tor prawy przycisk usuwa szynę pod kursorem) |
+| Esc, prawy przycisk | powrót do Zaznacz; koniec linii toru (w narzędziu Tor kliknięcie kółkiem usuwa szynę pod kursorem) |
 | Ctrl+R | uruchom / wstrzymaj poziom |
 | F1 | pomoc |
 | Ctrl+S | zapisz mapę |

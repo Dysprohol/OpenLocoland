@@ -1319,6 +1319,7 @@ void choose_entry(int i) {
 // ---- the mouse ----
 
 POINT g_mouse = {-1, -1};   // logical pixels
+POINT g_middle_down = {-1, -1};   // where the middle button went down (a click of it, not a drag)
 bool g_ctrl = false, g_shift = false;
 
 bool shift_down() { return g_shift || GetKeyState(VK_SHIFT) < 0; }
@@ -2415,8 +2416,9 @@ void place(POINT p) {
 // map's rails are on), every next click lays the rail to the point of the lattice nearest to
 // the cursor - one of the steps of the 12 shapes - when the rules of rail_rules.h (the same
 // as map_tool.py's) let it; the preview shows that rail and its ends green, or red with the
-// reason. Esc ends the line (and then the tool); the right button deletes the rail under the cursor
-// (delete_rail_at_cursor - a line being laid goes back with its last rail). A rail is created with World CreateObject:
+// reason. The right button or Esc ends the line (and then the tool); a click of the middle button
+// (which pans the map when dragged) deletes the rail under the cursor (delete_rail_at_cursor - a line
+// being laid goes back with its last rail). A rail is created with World CreateObject:
 // Rail_Construct runs ACT_CHANGE_DIRECTION, which puts its points and links them to the rails
 // at its ends. The ground under it is flattened as map_tool.py track does (the cells it
 // crosses to the track's level, the cells around half way), through World_SetGroundZ, and the
@@ -2714,23 +2716,30 @@ void lay_step() {
             s.segment.y, static_cast<int>(z), static_cast<unsigned>(changes.size()));
 }
 
-// The rail under a point of the map (screen coordinates plus the camera): of the rails whose box
-// holds it, the one whose middle is nearest.
+// The rail under a point of the map (screen coordinates plus the camera): the one whose way - the
+// line between its two ends, on the screen - passes nearest, within 20 px (at a junction several rails
+// share their box: a straight and the curves leaving its points).
 uint8_t* rail_at(float x, float y) {
     uint8_t* best = nullptr;
-    float best_d = 0;
-    for_each_object([&](uint8_t* o) {
-        if (class_of(o) != B_RAIL || !pickable(o) || !box_of(o).contains(x, y)) return;
-        const float d = std::hypot(at<float>(o, O_X) - x, at<float>(o, O_Y) - at<float>(o, O_Z) - y);
-        if (!best || d < best_d) {
-            best = o;
+    float best_d = 20;
+    for (const RailObject& r : map_rails()) {
+        if (!pickable(r.object)) continue;
+        const rail::Point a = rail::end_of(r.rail, 0), b = rail::end_of(r.rail, 1);
+        const float z = at<float>(r.object, O_Z);
+        const float ax = static_cast<float>(a.x), ay = static_cast<float>(a.y) - z, ux = static_cast<float>(b.x - a.x),
+                    uy = static_cast<float>(b.y - a.y);
+        const float len2 = ux * ux + uy * uy;
+        const float t = len2 > 0 ? (std::max)(0.0f, (std::min)(1.0f, ((x - ax) * ux + (y - ay) * uy) / len2)) : 0;
+        const float d = std::hypot(x - (ax + ux * t), y - (ay + uy * t));
+        if (d < best_d) {
             best_d = d;
+            best = r.object;
         }
-    });
+    }
     return best;
 }
 
-// The right button of the Track tool: the rail under the cursor goes (with its bed, one step of the
+// A click of the middle button in the Track tool: the rail under the cursor goes (with its bed, one step of the
 // history; not one a train car stands on or next to - delete_objects refuses it). When it was the
 // last rail of the line being laid, the line goes on from the point before, at that point's height.
 void delete_rail_at_cursor() {
@@ -2738,7 +2747,7 @@ void delete_rail_at_cursor() {
     mouse_on_map(x, y);
     uint8_t* r = rail_at(x, y);
     if (!r) {
-        MESSAGE("MsgTrackNoRail", "track: no rail under the cursor (the right button deletes one, Esc ends the line)");
+        MESSAGE("MsgTrackNoRail", "track: no rail under the cursor (a middle click deletes one, the right button ends the line)");
         return;
     }
     bool last = false;   // the line's last rail
@@ -4002,7 +4011,7 @@ void push_semaphores() {
 // posts with it; all of it is one step of the history.
 
 constexpr float FACTORY_INSIDE = 22;     // the factory's middle from the dead end (sandbox, l05)
-constexpr float FACTORY_LINE = 140, REPAIR_LINE_HALF = 120, POST_SIDE = 24, POST_REACH = 70;
+constexpr float FACTORY_LINE = 140, REPAIR_LINE_HALF = 120, POST_SIDE = 24, POST_REACH = 70, POST_LINE = 70;
 
 struct Snap {
     bool ok = false;
@@ -4518,7 +4527,7 @@ bool crate_left(uint8_t* crate) { return !point_near(at<float>(crate, O_X), at<f
 // the missions' entry: from past the edge to the pair, trains pushed in, none out. A line is a post's
 // own by that shape alone (owns), of any length, so the script needs no mark for it and a pair shares
 // one; the line of a factory or a repair point is never a post's. A post placed by hand gets its line
-// at once (140 px), unless it owns one already or stands within 40 px of an end of a line no post
+// at once (70 px), unless it owns one already or stands within 40 px of an end of a line no post
 // owns (S's, a building's, the script's); turning it round, recolouring it (T) or moving it makes it
 // again - a line another post owns too stays, the post gets a line of its own beside it -, deleting
 // it deletes it unless another post owns it, each in the post's step of the history. L / Shift+L
@@ -4548,14 +4557,14 @@ uint8_t* post_dot_at(float x, float y, int direction) {
 uint8_t* post_dot(uint8_t* o) { return post_dot_at(at<float>(o, O_X), at<float>(o, O_Y), at<int>(o, O_DIRECTION)); }
 bool post_on_track(uint8_t* o) { return o && nvid_of(o) == VID_SEMAPHORE && post_dot(o); }
 
-// The line of a post standing at (x, y) facing `direction`, green or red: 140 px along the track
+// The line of a post standing at (x, y) facing `direction`, green or red: 70 px along the track
 // to its rail point - from the trains it faces (green), from behind it (red); false without track.
 bool post_line_at(float x, float y, int direction, bool is_red, PushLine& line) {
     uint8_t* d = post_dot_at(x, y, direction);
     if (!d) return false;
     float fx, fy;
     facing_of(direction, fx, fy);
-    uint8_t* from = is_red ? walk(d, -fx, -fy, FACTORY_LINE) : walk(d, fx, fy, FACTORY_LINE);
+    uint8_t* from = is_red ? walk(d, -fx, -fy, POST_LINE) : walk(d, fx, fy, POST_LINE);
     if (from == d) return false;
     const POINT p = dot_screen(d), q = dot_screen(from);
     line = PushLine{q.x, q.y, p.x, p.y, 1};
@@ -4679,6 +4688,25 @@ void lines_into_step(const std::vector<PushLine>& before) {
         op.lines_before = before;
     }
     op.lines_after = mission_push_lines();
+}
+
+// What a red post shows on the map for its line: the line itself lies behind it (the engine's way, as
+// the missions have it), but its trains stop at the post coming from in front of it - so it is drawn
+// there, from 35 px toward them to the post, red, with a stop bar at the post.
+bool red_indicator_at(float x, float y, int direction, PushLine& out) {
+    uint8_t* d = post_dot_at(x, y, direction);
+    if (!d) return false;
+    float fx, fy;
+    facing_of(direction, fx, fy);
+    uint8_t* from = walk(d, fx, fy, POST_LINE / 2);
+    if (from == d) return false;
+    const POINT p = dot_screen(d), q = dot_screen(from);
+    out = PushLine{q.x, q.y, p.x, p.y, 1};
+    return true;
+}
+
+bool red_indicator(uint8_t* o, PushLine& out) {
+    return red_indicator_at(at<float>(o, O_X), at<float>(o, O_Y), at<int>(o, O_DIRECTION), out);
 }
 
 // What a post's line does, for the messages: lets its trains in, keeps them out, or none.
@@ -4876,7 +4904,7 @@ void draw_track() {
         mark(static_cast<float>(p.x), static_cast<float>(p.y), z, 0xc0ffff00);
         std::snprintf(text, sizeof text, ui_format("StatusTrackStart", "Track: click a start point (%.1f,%.1f%s)"), p.x, p.y,
                       r ? ui_text("StatusRailEnd", ", the end of a rail") : "");
-        g_track_status = std::string(text) + ui_text("StatusTrackKeys", " - the right button deletes the rail under the cursor, Esc ends the line");
+        g_track_status = std::string(text) + ui_text("StatusTrackKeys", " - the right button ends the line, a middle click deletes the rail under the cursor");
         return;
     }
     const TrackStep s = next_step(rails);
@@ -4894,7 +4922,7 @@ void draw_track() {
     std::snprintf(text, sizeof text, ui_format("StatusTrack", "Track: %u rails - %.1f,%.1f -> %.1f,%.1f %s"),
                   static_cast<unsigned>(g_line.size() - 1), g_line.back().x, g_line.back().y, s.to.x, s.to.y,
                   s.valid ? ui_text("WordOk", "ok") : s.reason.get());
-    g_track_status = std::string(text) + ui_text("StatusTrackKeys", " - the right button deletes the rail under the cursor, Esc ends the line");
+    g_track_status = std::string(text) + ui_text("StatusTrackKeys", " - the right button ends the line, a middle click deletes the rail under the cursor");
 }
 
 // A filled triangle on the screen, a row of pixels at a time (Graphics_FillRect has rectangles only).
@@ -4955,14 +4983,35 @@ std::string line_owner(int index) {
     const std::vector<PushLine>& lines = mission_push_lines();
     if (index < 0 || index >= static_cast<int>(lines.size())) return "";
     std::string out;
-    for_each_object([&](uint8_t* o) {
-        if (out.empty() && owns(o, lines[index]))
-            out = ui_printf(ui_format("LineOfPost", " - the semaphore's at %.0f,%.0f"), at<float>(o, O_X),
-                            at<float>(o, O_Y));
-    });
+    uint8_t* green = nullptr;
+    uint8_t* red_one = nullptr;
+    if (!building_lines().count(index))
+        for_each_object([&](uint8_t* o) {
+            if (owns(o, lines[index])) (red(o) ? red_one : green) = o;
+        });
+    if (green && red_one)   // a pair: the way in
+        out = ui_printf(ui_format("LineOfPair", " - the semaphores' at %.0f,%.0f: the trains going %s come in, none goes back out"),
+                        at<float>(green, O_X), at<float>(green, O_Y), way_name(at<int>(green, O_DIRECTION)));
+    else if (red_one)
+        out = ui_printf(ui_format("LineOfRedPost", " - the red semaphore's at %.0f,%.0f: the trains going %s stop there"),
+                        at<float>(red_one, O_X), at<float>(red_one, O_Y), way_name(at<int>(red_one, O_DIRECTION)));
+    else if (green)
+        out = ui_printf(ui_format("LineOfGreenPost", " - the green semaphore's at %.0f,%.0f: it lets the trains going %s in"),
+                        at<float>(green, O_X), at<float>(green, O_Y), way_name(at<int>(green, O_DIRECTION)));
     if (out.empty() && building_lines().count(index)) out = ui_text("LineOfBuilding", " - a factory's or repair point's");
     if (out.empty() && outside_map(lines[index].bx, lines[index].by)) out = ui_text("LineEntry", " - the level's entry or exit");
     return out;
+}
+
+// A line for the status line: a semaphore's by what it does for its trains (and its two points), the
+// others by what they do and whose they are.
+std::string line_status(const PushLine& shown, bool script, int index) {
+    const bool editor = index >= 0 && index < static_cast<int>(mission_push_lines().size());
+    const PushLine& l = editor ? mission_push_lines()[index] : shown;   // a red post's indicator names its line
+    const std::string owner = line_owner(index);
+    if (index >= 0 && !owner.empty() && !building_lines().count(index) && !outside_map(l.bx, l.by))
+        return owner.substr(3) + ui_printf(" (%d,%d -> %d,%d)", l.bx, l.by, l.ex, l.ey);   // " - " left out
+    return line_effect(l, script) + owner;
 }
 
 // The push lines over the track, each in its colour (green for push_flag 1, yellow for 0, light
@@ -4972,10 +5021,11 @@ std::string line_owner(int index) {
 // described in a status line (g_line_status), the selected one with the tool. With the tool, the
 // rail point under the cursor in cyan with its screen coordinates.
 std::string g_push_status, g_line_status;
+constexpr uint32_t POST_GREEN = 0xd000ff00, POST_RED = 0xe0ff3030;   // the lines of the green and the red posts
 float g_line_hover = 0;   // the cursor's distance to the line described in g_line_status
 
 // One line; the cursor near it (within g_line_hover) describes it in g_line_status when `hover`.
-void draw_line(const PushLine& l, uint32_t colour, bool script, bool hover, int index = -1) {
+void draw_line(const PushLine& l, uint32_t colour, bool script, bool hover, int index = -1, bool stop = false) {
     uint8_t* w = world();
     const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
     float mx, my;
@@ -5008,7 +5058,7 @@ void draw_line(const PushLine& l, uint32_t colour, bool script, bool hover, int 
         const float d = std::hypot(mx - (ax + ux * along), my - (ay + uy * along));
         if (hover && d < g_line_hover) {
             g_line_hover = d;
-            g_line_status = line_effect(l, script) + line_owner(index);
+            g_line_status = line_status(l, script, index);
         }
         if (i + 2 < t.path.size() && len > 14)   // the last link has the big arrowhead
             arrowhead((ax + bx) / 2 - cam_x + ux * 4, (ay + by) / 2 - cam_y + uy * 4, ux, uy, 8, 5, colour);
@@ -5023,6 +5073,7 @@ void draw_line(const PushLine& l, uint32_t colour, bool script, bool hover, int 
     point(t.path.size() - 1, x1, y1);
     len = (std::max)(1.0f, std::hypot(x1 - x0, y1 - y0));
     arrowhead(x1 - cam_x, y1 - cam_y, (x1 - x0) / len, (y1 - y0) / len, 18, 10, colour);
+    if (stop) tail_bar(x1 - cam_x, y1 - cam_y, (x1 - x0) / len, (y1 - y0) / len, 16, POST_RED);   // a red post stops its trains here
 }
 
 uint32_t line_colour(const PushLine& l) { return l.flag ? 0xd000ff00 : 0xd0ffff00; }
@@ -5035,11 +5086,30 @@ void draw_push_lines(bool tool) {
     g_line_status.clear();
     for (const PushLine& l : mission_script_push_lines()) draw_line(l, 0xd0b0b0ff, true, true);
     const std::vector<PushLine>& lines = mission_push_lines();
-    for (int i = 0; i < static_cast<int>(lines.size()); ++i)
-        draw_line(lines[i], i == g_push_selected ? 0xf0ffffff : line_colour(lines[i]), false, true, i);
+    // a post's line in its colour: green where a green post lets its trains in, red where only a red one
+    // owns it (the way its trains may not go); a red post's stop bar across the line's end
+    std::vector<char> green(lines.size(), 0);
+    std::vector<uint8_t*> red_post(lines.size(), nullptr);
+    const std::set<int> buildings = building_lines();   // never a post's
+    for_each_object([&](uint8_t* o) {
+        if (removed(o) || nvid_of(o) != VID_SEMAPHORE) return;
+        for (size_t i = 0; i < lines.size(); ++i)
+            if (!buildings.count(static_cast<int>(i)) && owns(o, lines[i])) {
+                if (red(o)) red_post[i] = o;
+                else green[i] = 1;
+            }
+    });
+    for (int i = 0; i < static_cast<int>(lines.size()); ++i) {
+        const uint32_t selected = i == g_push_selected ? 0xf0ffffff : 0;
+        PushLine stop;
+        if (red_post[i] && red_indicator(red_post[i], stop))   // a red post: where its trains stop, in front of it
+            draw_line(stop, selected ? selected : POST_RED, false, true, i, true);
+        if (!red_post[i] || green[i])   // the line itself: a green post's way in, a line of no post
+            draw_line(lines[i], selected ? selected : green[i] ? POST_GREEN : line_colour(lines[i]), false, true, i);
+    }
     if (g_line_status.empty() && g_push_selected >= 0 && g_push_selected < static_cast<int>(lines.size()))
         g_line_status = ui_printf(ui_format("StatusLineSelected", "selected: %s"),
-                                  (line_effect(lines[g_push_selected], false) + line_owner(g_push_selected)).c_str());
+                                  line_status(lines[g_push_selected], false, g_push_selected).c_str());
     if (!tool) return;
     auto dot_mark = [&](uint8_t* d, float size, uint32_t argb) {
         const float sx = at<int>(d, DOT_X) - at<float>(w, W_CAMERA_X), sy = screen_y(d) - at<float>(w, W_CAMERA_Y);
@@ -6491,7 +6561,9 @@ void draw_overlay() {
                     PushLine line;
                     if (shown && place_nvid() == VID_SEMAPHORE) {
                         const bool own = mission_managed() && !at_line_end(x, y, direction) && post_line_at(x, y, direction, entry().red, line);
-                        if (own) draw_line(line, line_colour(line), false, false);
+                        PushLine stop;
+                        if (own && entry().red && red_indicator_at(x, y, direction, stop)) draw_line(stop, POST_RED, false, false, -1, true);
+                        else if (own) draw_line(line, POST_GREEN, false, false);
                         g_place_status = ui_printf(ui_format("StatusPostFor", "%s: for the trains going %s (R / E: the other side) - %s"),
                                                    place_label(), way_name(direction),
                                                    !own ? ui_text("PostNoLine", "no line of its own")
@@ -6773,8 +6845,8 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             g_patrol_train = nullptr;
             return true;
         }
-        if (entry().tool == Tool::Track && !on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
-            delete_rail_at_cursor();   // the right button stays with the tool: Esc ends the line, then the tool
+        if (entry().tool == Tool::Track && !g_line.empty()) {
+            end_line();   // the right button ends the line first, then the tool
             return true;
         }
         if (entry().tool == Tool::PushLine && g_push_started) {
@@ -6823,6 +6895,14 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
     case WM_RBUTTONUP:
         end_strokes();
         return true;
+    case WM_MBUTTONDOWN:   // the middle button pans the map (mouse_pan.cpp); a click of it in the Track tool
+        g_middle_down = g_mouse;   // deletes the rail under the cursor
+        return false;
+    case WM_MBUTTONUP:
+        if (entry().tool == Tool::Track && std::abs(g_mouse.x - g_middle_down.x) + std::abs(g_mouse.y - g_middle_down.y) < 4 &&
+            !on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)))
+            delete_rail_at_cursor();
+        return false;
     case WM_MOUSEWHEEL:
         if (brush_tool())   // the brushes: the wheel sizes the brush, as + and - do
             brush_size(GET_WHEEL_DELTA_WPARAM(w) > 0 ? 1 : -1);
