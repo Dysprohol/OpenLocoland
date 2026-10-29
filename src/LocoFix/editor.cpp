@@ -82,6 +82,7 @@ void edit_keep_history();
 void edit_restore_history();
 void edit_saved();
 void edit_message_saved(const std::string& map);
+void panel_saved(const std::string& file);   // editor_panel.cpp: the SAVED notice
 void install_editor_edit();
 void edit_level_held();
 void edit_touch();
@@ -452,6 +453,7 @@ bool save_map(const std::string& path) {
     // its mission: the script (a new map gets one), the texts, the custom maps page
     mission_save(game_path(path));
     if (!scratch) edit_message_saved(game_path(path));
+    panel_saved(scratch ? "" : game_path(path));   // SAVED in the middle of the view
     return true;
 }
 

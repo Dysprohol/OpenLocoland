@@ -68,6 +68,16 @@ Packs now: `cs` (Czech fan translation, `base=en`), `de`, `en`, `hu`, `pl`, `ru`
 **Encoding.** The game's texts are bytes in the pack's code page (`codepage=`), not UTF-8,
 with CRLF line ends. `language.ini` itself is UTF-8.
 
+**The editor's help** - `editor/edithelp<n>.txt`, one file per page in the order of
+`game/maps/edithelp.lst` (shared by every pack): the first line is the page's title, which the
+help's contents list as well; at most 14 lines of 44 characters (ESC 7 / ESC 2, the lit font and
+back, not counted). The contents group the pages by the categories of `edithelp.lst` (its second
+column, an `[Editor]` key `HelpCat...`); translate those keys in `strings.override.ini` with
+`HelpContents` and `HelpPageNumber` - a category's name is the title of its pages in the big
+title font, so at most 19 characters. A new page is a new line of `edithelp.lst` (the file, the
+category's key and its English name, tab-separated; the file alone puts it in the category of the
+page before) and its file in each pack.
+
 **strings.override.ini** - only the keys you change, under their sections:
 ```ini
 [strings]

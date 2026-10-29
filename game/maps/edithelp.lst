@@ -1,17 +1,17 @@
-maps\edithelp1.txt
-maps\edithelp2.txt
-maps\edithelp3.txt
-maps\edithelp4.txt
-maps\edithelp5.txt
-maps\edithelp6.txt
-maps\edithelp7.txt
-maps\edithelp8.txt
-maps\edithelp9.txt
-maps\edithelp10.txt
-maps\edithelp11.txt
-maps\edithelp12.txt
-maps\edithelp13.txt
-maps\edithelp14.txt
-maps\edithelp15.txt
-maps\edithelp16.txt
-maps\edithelp17.txt
+maps\edithelp1.txt	HelpCatBasics	BASICS
+maps\edithelp2.txt	HelpCatBasics	BASICS
+maps\edithelp3.txt	HelpCatBasics	BASICS
+maps\edithelp4.txt	HelpCatBasics	BASICS
+maps\edithelp5.txt	HelpCatTrack	TRACK AND TRAINS
+maps\edithelp6.txt	HelpCatTrack	TRACK AND TRAINS
+maps\edithelp7.txt	HelpCatObjects	OBJECTS
+maps\edithelp8.txt	HelpCatObjects	OBJECTS
+maps\edithelp9.txt	HelpCatMission	MISSION, SAVING
+maps\edithelp10.txt	HelpCatMission	MISSION, SAVING
+maps\edithelp11.txt	HelpCatGround	GROUND
+maps\edithelp12.txt	HelpCatGround	GROUND
+maps\edithelp13.txt	HelpCatTrains	ARRIVALS, FACTORIES
+maps\edithelp14.txt	HelpCatTrains	ARRIVALS, FACTORIES
+maps\edithelp15.txt	HelpCatBasics	BASICS
+maps\edithelp16.txt	HelpCatObjects	OBJECTS
+maps\edithelp17.txt	HelpCatTrains	ARRIVALS, FACTORIES

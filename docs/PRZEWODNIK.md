@@ -142,7 +142,11 @@ Co widać:
 - **Wiersz stanu** u góry: narzędzie (albo to pod myszą), liczba kroków do cofnięcia i ponowienia,
   „nie zapisano” i ostatni komunikat - dlaczego czegoś nie da się zrobić, zawsze jest napisane tutaj.
 - **Przyciski ? i menu** na lewym końcu paska (tam, gdzie gra ma przycisk pauzy). **?** (albo F1)
-  otwiera pomoc: jedenaście stron z tym, co jest w tym rozdziale, w skrócie. **Przycisk menu**
+  otwiera pomoc: siedemnaście stron z tym, co jest w tym rozdziale, w skrócie. Zaczyna się od **spisu
+  treści**: kategorie (PODSTAWY, TORY I POCIĄGI, OBIEKTY, MISJA I ZAPIS, TEREN, PRZYJAZDY I FABRYKI)
+  po lewej, strony tej pod myszą po prawej - kliknięcie otwiera stronę. Strona ma swoją kategorię za
+  tytuł i swój numer (5 / 17); strzałki, Page Up / Down i kółko zmieniają strony, a **SPIS TRESCI**,
+  `Esc` albo prawy przycisk wracają do spisu. **Przycisk menu**
   otwiera menu edytora ze wszystkimi poleceniami - nowa mapa, wczytaj, zapisz, ustawienia misji,
   rozmiar mapy, zagraj na mapie, cofnij, ponów, uruchom poziom, powrót do menu, wyjdź z gry.
 
@@ -461,7 +465,8 @@ zmiany najpierw pyta.
 `Ctrl+S` zapisuje mapę do jej pliku; mapa, która go jeszcze nie ma (mapa kampanii, nowa mapa), pyta
 o nazwę. Menu → **ZAPISZ MAPE** (Alt+F2) pyta zawsze - żeby zapisać pod inną nazwą. Mapa zapisana jako
 `maps\<nazwa>\<nazwa>.map` zapisuje się ze skryptem i tekstami i pojawia na stronie **WLASNE MAPY**
-pod swoim tytułem. Otworzysz ją znowu przez **WCZYTAJ MAPE** (Alt+F3).
+pod swoim tytułem. Otworzysz ją znowu przez **WCZYTAJ MAPE** (Alt+F3). Każdy zapis pokazuje na chwilę
+duże **ZAPISANO** z plikiem mapy na środku widoku, z kliknięciem menu.
 
 ### 13. Zapis, eksport i udostępnianie
 

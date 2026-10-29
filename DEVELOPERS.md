@@ -2469,7 +2469,24 @@ then the train arrivals and the orders (13, 14) turning (15) and the citadel, Ch
 44 characters a line - the ESC pairs not counted, so a line with lit words is longer in the file - and 14
 lines, ESC 7 / ESC 2 switch to the lit font VID 7 and back to VID 2):
 English in `game/maps/` (the fallback of every pack) and the others in `lang/<code>/game/editor/`; the files are
-opened through the game's own `CreateFileA` import, so the chosen pack's copies are read. **Menu**
+opened through the game's own `CreateFileA` import, so the chosen pack's copies are read. Help opens on
+its **contents**, built from the pages' first lines and the categories of `edithelp.lst`: a line of the
+list is the page's file, the `[Editor]` key of its category and the category's English name,
+tab-separated (`maps\edithelp5.txt<TAB>HelpCatTrack<TAB>TRACK AND TRAINS`); the categories come in
+the order of their first pages, a page keeps its number (its line), and a line with the file alone is
+in the category of the page before - so a new page is one line of the list, with a category of its
+own (a new `HelpCat...` key in the six packs) or an existing one. Six now: BASICS (1-4, 15), TRACK AND
+TRAINS (5, 6), OBJECTS (7, 8, 16), MISSION, SAVING (9, 10), GROUND (11, 12), ARRIVALS, FACTORIES (13,
+14, 17). The 23 rows of categories and titles (up to 37 characters) do not fit a page's 14 lines, so
+the contents are laid out as the palette: the categories down the left (two lines at most, the chosen
+one lit and underlined; the mouse over one, Up / Down or a click chooses it), the chosen one's pages on
+the right as the Menu panel's rows - the lamp (VID 472, pulsing under the mouse) and the page's title
+in two lines at most, lit under the mouse; a click or Enter opens a page. A page has its category for
+the title (VID 3, so a category's name is at most 19 characters) and in the strip above it CONTENTS
+with its lamp and the page's number (`HelpPageNumber`, "5 / 17"); CONTENTS, Esc or the right button go
+back to the contents, at that page's category; the arrows, Left / Right, Page Up / Down and the wheel
+turn the pages with the contents before page 1 (LocoFix.log: "panel: help page 5", "panel: help
+contents"). `check_lang.py` checks the `HelpCat...` keys against the title font as well. **Menu**
 has a row per command - the lamp of the custom maps page (VID 472, pulsing under the mouse) and the
 text, lit under the mouse - New map, Load, Save, Export, Import, Mission settings, Map size (two
 columns of seven), Play the map, Undo, Redo, Run the level, Back to the menu and Exit the game; a click closes the panel and posts the
@@ -2482,7 +2499,16 @@ closes an object's or a line's panel, drops a train's point being picked, ends a
 laid or a push line whose begin is picked, or leaves a tool for Select - before, Esc always opened
 Menu and none of these could be done with it.
 **Ctrl+R** runs the level or holds it again (Options > Run the level): the bar and its buttons are
-not there while the level runs. Checked in the game in Polish and English: the bar with both
+not there while the level runs. **Every save** (`save_map` in `editor.cpp`: Ctrl+S, Save map, a Yes to
+"Save the changes?", the write of Run the level and Play the map) shows SAVED (`SavedNotice`, in the
+menu titles' font VID 3) in the middle of the view, the map's file under it in the menu font when it
+was saved under a name (not the scratch folder of a new map), on a dark box whose last 0.4 s fade -
+the box over the held level only, as a running level's lighting turns the untextured quad light -,
+for 1.5 s from the first frame drawn after the save (`panel_draw_saved` from `DrawScene_editor`, so
+Run the level shows it once the level is loaded and running), in front of everything and taking no
+input; the status line's "saved as ..." stays. The menus' click sounds with it: `PlaySFX(g_sound, 24,
+0, 0)` (0x4447e0, thiscall; `menu.lgc` plays SFX 24 for its clicks). Play the map starts the game
+again right after its save, so only the click is heard there. Checked in the game in Polish and English: the bar with both
 buttons, the six help pages and back, the Menu panel; from it Save (the dialog titled "Zapisz mape"
 / "Save map"; saved into a new folder: the map, its script and texts written and its line on the
 custom maps page), Undo, Run the level and Ctrl+R back (the log: "the level runs", "is held").

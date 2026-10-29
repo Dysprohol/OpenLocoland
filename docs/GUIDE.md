@@ -143,7 +143,11 @@ What you see:
 - **The status line** at the top: the tool (or the one under the mouse), the undo and redo counts,
   "not saved" and the last message - why something could not be done is always written there.
 - **The ? and menu buttons** at the left end of the bar (where the game has its pause button).
-  **?** (or F1) opens the help: eleven pages with everything of this chapter in short.
+  **?** (or F1) opens the help: seventeen pages with everything of this chapter in short. It starts on
+  its **contents**: the categories (BASICS, TRACK AND TRAINS, OBJECTS, MISSION, SAVING, GROUND,
+  ARRIVALS, FACTORIES) on the left, the pages of the one under the mouse on the right - a click opens
+  one. A page has its category for the title and its number (5 / 17); the arrows, Page Up / Down and
+  the wheel turn the pages, and **CONTENTS**, `Esc` or the right button go back to the contents.
 
   ![The help](img/editor-help-en.jpg)
 
@@ -468,7 +472,8 @@ EDITOR**. Unsaved changes are asked about first.
 `Ctrl+S` saves the map into its file; a map that has none yet (a campaign map, a new map) asks for
 the name. Menu → **SAVE MAP** (Alt+F2) always asks - to save under another name. A map saved as
 `maps\<name>\<name>.map` is written with its script and texts and appears on the **custom maps** page
-under its title. Open it again with **LOAD MAP** (Alt+F3).
+under its title. Open it again with **LOAD MAP** (Alt+F3). Every save shows a large **SAVED** with the
+map's file in the middle of the view for a moment, with the menus' click.
 
 ### 13. Save, export and share
 

@@ -44,7 +44,7 @@ STRINGS_FONTS = (2, 6, 7)
 MAP_TEXT_FONTS = (2, 7)
 OBJECTIVES_FONTS = (2, 14)
 TITLE_FONT = 3
-EDITOR_TITLES = {"HelpHeader", "PanelMenuHeader", "PaletteHeader", "VehiclesHeader"}   # editor_panel.cpp
+EDITOR_TITLES = {"HelpHeader", "PanelMenuHeader", "PaletteHeader", "VehiclesHeader", "SavedNotice"}   # editor_panel.cpp (and HelpCat...)
 ESC = 0x1b
 
 
@@ -97,7 +97,7 @@ def ini_texts(path):
             value = value[1:-1]
         key = key.decode("ascii", "replace")
         header = (section == "strings" and key.startswith(("MenuHeader", "MapHeader"))) or \
-            (section == "Editor" and (key in EDITOR_TITLES or key.startswith("Group")))
+            (section == "Editor" and (key in EDITOR_TITLES or key.startswith(("Group", "HelpCat"))))
         fonts = STRINGS_FONTS + ((TITLE_FONT,) if header else ())
         # \n and \t of the editor's texts are escapes, not letters
         out.append((f"{safe_relpath(path, REPO)}:{n} [{section}] {key}",

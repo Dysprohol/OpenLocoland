@@ -83,6 +83,7 @@ std::string map_ground_image(const std::string& map);   // editor_newmap.cpp: th
 void editor_mission_settings();     // editor.cpp: File > Mission settings...
 // editor_panel.cpp: the Help and Menu buttons of the bar and their panels
 void panel_draw(POINT mouse);
+void panel_draw_saved();
 const char* panel_tip(POINT mouse);
 bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse);
 bool panel_open();
@@ -6805,6 +6806,7 @@ void __fastcall DrawScene_editor(void* g, void* edx, int draw) {
         draw_map_frame();
         draw_overlay();
     }
+    if (draw) panel_draw_saved();   // the SAVED notice, also over the level Run the level runs
 }
 
 }  // namespace
