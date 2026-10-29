@@ -665,7 +665,10 @@ int panel_palette_army(int which) { return g_palette_army[which & 1]; }
 void panel_set_palette_army(int which, int army) { g_palette_army[which & 1] = army; }
 
 // A level goes (editor.cpp's edit_reset): no panel over the next one.
-void panel_reset() { g_panel = Panel::None; }
+void panel_reset() {
+    g_panel = Panel::None;
+    g_for_train = Panel::None;
+}
 
 // The palette (the bar's "All objects", editor_edit.cpp), or with `vehicles` the cars' (the bar's
 // "Vehicles": the groups GroupTrain...).

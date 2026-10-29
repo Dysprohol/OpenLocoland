@@ -48,6 +48,8 @@
 
 std::vector<TrainPatrol> edit_train_patrols();   // editor_edit.cpp: the trains' patrols of the held level
 void edit_message_text(const char* key, const char* english);   // editor_edit.cpp: a message of the status line
+bool editor_unsaved_map(const std::string& map);   // editor.cpp: the editor's new map, not saved yet
+std::string editor_new_map_title();                // editor.cpp: its title until it is saved
 std::vector<UnitUnlock> edit_place_unlocks(std::vector<UnitUnlock>& unlocks);   // editor_edit.cpp: the factories' places now, the units to write
 std::string language_file(const std::string& path);   // language.cpp: the pack's copy of a file
 
@@ -106,7 +108,11 @@ struct EnemyTrain {
 struct Mission {
     std::wstring title, header;
     int money = 0, daytime = 1, reinforcements = 1, limit = 2;
-    bool rain = false, nuke = false;
+    // the weather (daynight.lgc, environmenttact.lgc): RAIN 0 none, 1 now and then (it comes and goes,
+    // about 30 s each), 2 all the time - daynight.lgc's comment has 1 and 2 the other way round, its
+    // code does this -, of the kind RAIN_TYPE: 0 rain, 1 snow, 2 clouds, 3 storm clouds, 4 meteorites
+    int rain = 0, weather = 0;
+    bool nuke = false;   // lightning: in a clear sky (RAIN 0), else only while rain (not snow ...) falls
     std::string train = "5";   // the reinforcement's VIDs
     std::vector<EnemyTrain> start;
     FactoryState factories;   // the enemy's queue (level_queue_*), the units that come later, the unit limits
@@ -1287,7 +1293,8 @@ Mission read_mission(const Parsed& p, bool block, const std::string& map) {
     for (const auto& s : SETTINGS) m.settings[s[0]] = get(s[0], s[1]);
     m.money = to_int(get("MONEY", "0"));
     m.daytime = (std::max)(1, (std::min)(4, to_int(get("START_DAYNIGHT", "1"), 1)));
-    m.rain = to_int(get("RAIN", "0")) != 0;
+    m.rain = (std::max)(0, (std::min)(2, to_int(get("RAIN", "0"))));
+    m.weather = (std::max)(0, (std::min)(4, to_int(get("RAIN_TYPE", "0"))));
     m.nuke = to_int(get("NUKE", "1"), 1) != 0;   // daynight.lgc: lightning unless NUKE is 0
     m.reinforcements = to_int(get("PLAYER_REINFORCEMENT", "1"), 1);
     m.limit = to_int(get("LIMIT_ATACKERS", "2"), 2);
@@ -1350,7 +1357,8 @@ std::vector<std::string> settings_block(const Mission& m, const ArrivalsState& a
     define("CUSTOM_MAP", quoted_path(map));
     define("MONEY", std::to_string(m.money));
     define("START_DAYNIGHT", std::to_string(m.daytime));
-    define("RAIN", m.rain ? "1" : "0");
+    define("RAIN", std::to_string(m.rain));
+    if (m.weather) define("RAIN_TYPE", std::to_string(m.weather));   // rain is daynight.lgc's default
     define("NUKE", m.nuke ? "1" : "0");
     for (const auto& s : SETTINGS)
         if (std::strcmp(s[0], "LEVEL") != 0) define(s[0], m.settings.count(s[0]) ? m.settings.at(s[0]) : s[1]);
@@ -1600,7 +1608,7 @@ void add_to_custom_list(const std::string& folder, const std::string& title) {
 
 enum : int {
     IDC_TITLE = 100, IDC_HEADER, IDC_MONEY, IDC_TIME, IDC_RAIN, IDC_NUKE, IDC_LIMIT, IDC_WAVES, IDC_TRAIN, IDC_START,
-    IDC_QUEUE, IDC_OBJECTIVES, IDC_WIN, IDC_LOSE, IDC_BRIEF, IDC_ARRIVALS
+    IDC_QUEUE, IDC_OBJECTIVES, IDC_WIN, IDC_LOSE, IDC_BRIEF, IDC_ARRIVALS, IDC_WEATHER
 };
 bool g_open_arrivals = false;   // the dialog ended with its Arrivals... button
 
@@ -1821,7 +1829,9 @@ std::string apply_fields(const Fields& f, Mission& n) {
     if (!number(IDC_MONEY, n.money)) error = ui_text("ErrMoney", "Money: a number");
     int time = 1;
     if (number(IDC_TIME, time)) n.daytime = (std::max)(1, (std::min)(4, time));
-    n.rain = get(IDC_RAIN) == L"1";
+    int rain = 0, weather = 0;
+    if (number(IDC_RAIN, rain)) n.rain = (std::max)(0, (std::min)(2, rain));
+    if (f.count(IDC_WEATHER) && number(IDC_WEATHER, weather)) n.weather = (std::max)(0, (std::min)(4, weather));
     n.nuke = get(IDC_NUKE) == L"1";
     if (!number(IDC_LIMIT, n.limit) && error.empty()) error = ui_text("ErrAttackers", "Enemy attackers at once: a number");
     if (f.count(IDC_WAVES)) {   // a map whose arrivals the editor runs has the Arrivals panel instead
@@ -1855,7 +1865,15 @@ INT_PTR CALLBACK mission_proc(HWND dialog, UINT m, WPARAM w, LPARAM) {
                                       ui_wtext("TimeNight", "night"), ui_wtext("TimeMorning", "morning")})
             SendDlgItemMessageW(dialog, IDC_TIME, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(t.c_str()));
         SendDlgItemMessageW(dialog, IDC_TIME, CB_SETCURSEL, s.daytime - 1, 0);
-        CheckDlgButton(dialog, IDC_RAIN, s.rain ? BST_CHECKED : BST_UNCHECKED);
+        for (const std::wstring& t : {ui_wtext("WeatherRain", "rain"), ui_wtext("WeatherSnow", "snow"),
+                                      ui_wtext("WeatherClouds", "clouds"), ui_wtext("WeatherStorm", "storm clouds"),
+                                      ui_wtext("WeatherMeteorites", "meteorites")})
+            SendDlgItemMessageW(dialog, IDC_WEATHER, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(t.c_str()));
+        SendDlgItemMessageW(dialog, IDC_WEATHER, CB_SETCURSEL, s.weather, 0);
+        for (const std::wstring& t : {ui_wtext("RainNever", "never"), ui_wtext("RainSometimes", "now and then"),
+                                      ui_wtext("RainAlways", "all the time")})
+            SendDlgItemMessageW(dialog, IDC_RAIN, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(t.c_str()));
+        SendDlgItemMessageW(dialog, IDC_RAIN, CB_SETCURSEL, s.rain, 0);
         CheckDlgButton(dialog, IDC_NUKE, s.nuke ? BST_CHECKED : BST_UNCHECKED);
         SetDlgItemInt(dialog, IDC_LIMIT, s.limit, TRUE);
         SetDlgItemInt(dialog, IDC_WAVES, s.reinforcements, TRUE);
@@ -1878,7 +1896,8 @@ INT_PTR CALLBACK mission_proc(HWND dialog, UINT m, WPARAM w, LPARAM) {
     for (int id = IDC_TITLE; id <= IDC_BRIEF; ++id)
         if (GetDlgItem(dialog, id)) fields[id] = item_text(dialog, id);
     fields[IDC_TIME] = std::to_wstring(SendDlgItemMessageW(dialog, IDC_TIME, CB_GETCURSEL, 0, 0) + 1);
-    fields[IDC_RAIN] = IsDlgButtonChecked(dialog, IDC_RAIN) == BST_CHECKED ? L"1" : L"0";
+    fields[IDC_RAIN] = std::to_wstring(SendDlgItemMessageW(dialog, IDC_RAIN, CB_GETCURSEL, 0, 0));
+    fields[IDC_WEATHER] = std::to_wstring(SendDlgItemMessageW(dialog, IDC_WEATHER, CB_GETCURSEL, 0, 0));
     fields[IDC_NUKE] = IsDlgButtonChecked(dialog, IDC_NUKE) == BST_CHECKED ? L"1" : L"0";
     Mission n = s;
     const std::string error = apply_fields(fields, n);
@@ -1898,7 +1917,8 @@ Fields current_fields() {
             {IDC_HEADER, s.header},
             {IDC_MONEY, std::to_wstring(s.money)},
             {IDC_TIME, std::to_wstring(s.daytime)},
-            {IDC_RAIN, s.rain ? L"1" : L"0"},
+            {IDC_RAIN, std::to_wstring(s.rain)},
+            {IDC_WEATHER, std::to_wstring(s.weather)},
             {IDC_NUKE, s.nuke ? L"1" : L"0"},
             {IDC_LIMIT, std::to_wstring(s.limit)},
             {IDC_WAVES, std::to_wstring(s.reinforcements)},
@@ -2019,20 +2039,34 @@ bool Arrival::operator==(const Arrival& o) const {
 
 bool mission_dialog(HWND owner, bool* open_arrivals) {
     using namespace dialog;
-    DialogTemplate t(ui_wtext("MissionTitle", "Mission settings").c_str(), 420, 330);
+    // the trains' rows on the left as they were; the map's name on top of them, the money, the time
+    // and the weather in a column on the right, each with its label in full words
+    DialogTemplate t(ui_wtext("MissionTitle", "Mission settings").c_str(), 620, 330);
     const DWORD label = SS_LEFT;
-    t.item(STATIC, ui_wtext("MissionMapTitle", "Title on the custom maps page:").c_str(), -1, label, 8, 8, 104, 8);
-    t.item(EDIT, L"", IDC_TITLE, LINE, 112, 6, 116, 12);
-    t.item(STATIC, ui_wtext("MissionHeader", "Briefing header:").c_str(), -1, label, 236, 8, 60, 8);
-    t.item(EDIT, L"", IDC_HEADER, LINE, 296, 6, 116, 12);
-    t.item(STATIC, ui_wtext("MissionMoney", "Money:").c_str(), -1, label, 8, 26, 28, 8);
-    t.item(EDIT, L"", IDC_MONEY, LINE | ES_NUMBER, 36, 24, 40, 12);
-    t.item(STATIC, ui_wtext("MissionStartAt", "Start at:").c_str(), -1, label, 86, 26, 32, 8);
-    t.item(COMBOBOX, L"", IDC_TIME, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, 118, 24, 56, 80);
-    t.item(BUTTON, ui_wtext("MissionRain", "Rain").c_str(), IDC_RAIN, BS_AUTOCHECKBOX | WS_TABSTOP, 184, 24, 34, 12);
-    t.item(BUTTON, ui_wtext("MissionLightning", "Lightning").c_str(), IDC_NUKE, BS_AUTOCHECKBOX | WS_TABSTOP, 222, 24, 50, 12);
-    t.item(STATIC, ui_wtext("MissionAttackers", "Enemy attackers at once:").c_str(), -1, label, 290, 26, 90, 8);
-    t.item(EDIT, L"", IDC_LIMIT, LINE | ES_NUMBER, 380, 24, 32, 12);
+    t.item(STATIC, ui_wtext("MissionMapTitle", "Title on the custom maps page:").c_str(), -1, label, 8, 8, 150, 8);
+    t.item(EDIT, L"", IDC_TITLE, LINE, 160, 6, 252, 12);
+    t.item(STATIC, ui_wtext("MissionHeader", "Briefing header:").c_str(), -1, label, 8, 26, 150, 8);
+    t.item(EDIT, L"", IDC_HEADER, LINE, 160, 24, 252, 12);
+    const short cx = 424, cw = 188;   // the column on the right
+    t.item(STATIC, ui_wtext("MissionMoney", "Money at the start:").c_str(), -1, label, cx, 8, 100, 8);
+    t.item(EDIT, L"", IDC_MONEY, LINE | ES_NUMBER, cx + 104, 6, cw - 104, 12);
+    t.item(STATIC, ui_wtext("MissionStartAt", "Time of day at the start:").c_str(), -1, label, cx, 26, 100, 8);
+    t.item(COMBOBOX, L"", IDC_TIME, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, cx + 104, 24, cw - 104, 80);
+    t.item(STATIC, ui_wtext("MissionDayNote", "Then it goes on: day, evening, night, morning, 5 minutes each.").c_str(), -1,
+           label, cx, 40, cw, 16);
+    t.item(STATIC, ui_wtext("MissionWeather", "Weather:").c_str(), -1, label, cx, 64, 100, 8);
+    t.item(COMBOBOX, L"", IDC_WEATHER, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, cx + 104, 62, cw - 104, 90);
+    t.item(STATIC, ui_wtext("MissionRain", "How often:").c_str(), -1, label, cx, 82, 100, 8);
+    t.item(COMBOBOX, L"", IDC_RAIN, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, cx + 104, 80, cw - 104, 60);
+    t.item(STATIC, ui_wtext("MissionWeatherNote", "Now and then: it comes and goes, about half a minute each. Clouds "
+                                                  "and storm clouds pass over the map.").c_str(),
+           -1, label, cx, 96, cw, 24);
+    t.item(BUTTON, ui_wtext("MissionLightning", "Lightning").c_str(), IDC_NUKE, BS_AUTOCHECKBOX | WS_TABSTOP, cx, 124, cw, 12);
+    t.item(STATIC, ui_wtext("MissionLightningNote", "Flashes in a clear sky; with rain, only while it rains; none with "
+                                                    "snow, clouds or meteorites.").c_str(),
+           -1, label, cx, 138, cw, 24);
+    t.item(STATIC, ui_wtext("MissionAttackers", "Enemy attackers at once:").c_str(), -1, label, cx, 170, 150, 8);
+    t.item(EDIT, L"", IDC_LIMIT, LINE | ES_NUMBER, cx + 156, 168, cw - 156, 12);
     if (g_arrivals.on) {   // the trains that arrive: the Arrivals panel
         t.item(STATIC,
                ui_wide(ui_printf(ui_format("MissionArrivals", "Train arrivals: %u - set in the Arrivals panel (key 0 of the bar)"),
@@ -2074,8 +2108,8 @@ bool mission_dialog(HWND owner, bool* open_arrivals) {
                      : ui_wtext("MissionUnmanaged", "This script has no editor blocks: the settings are written when the "
                                                     "map is saved under a new name.").c_str(),
            -1, label, 8, 294, 404, 16);
-    t.item(BUTTON, ui_wtext("ButtonOk", "OK").c_str(), IDOK, BS_DEFPUSHBUTTON | WS_TABSTOP, 304, 312, 50, 14);
-    t.item(BUTTON, ui_wtext("ButtonCancel", "Cancel").c_str(), IDCANCEL, BS_PUSHBUTTON | WS_TABSTOP, 362, 312, 50, 14);
+    t.item(BUTTON, ui_wtext("ButtonOk", "OK").c_str(), IDOK, BS_DEFPUSHBUTTON | WS_TABSTOP, 504, 312, 50, 14);
+    t.item(BUTTON, ui_wtext("ButtonCancel", "Cancel").c_str(), IDCANCEL, BS_PUSHBUTTON | WS_TABSTOP, 562, 312, 50, 14);
     g_open_arrivals = false;
     const INT_PTR result = DialogBoxIndirectParamW(GetModuleHandleW(nullptr), t.get(), owner, mission_proc, 0);
     if (result == 1) patch::log("mission: settings changed");
@@ -2113,12 +2147,18 @@ void mission_save(const std::string& map) {
         g_map = map;
         return;
     }
-    // a map saved from the template keeps nothing of its name: "TEMPLATE" as the title (the custom
-    // maps page) or the briefing's header (the Esc menu's first page) becomes the map's own name
-    if (lstrcmpiA(folder_name(map).c_str(), "template") != 0) {
-        const bool title = ascii_upper(g_mission.title, 24) == "TEMPLATE";
+    // a map saved from the template or from the editor's new map keeps nothing of its name:
+    // "TEMPLATE" or the new map's "NEW MAP" as the title (the custom maps page) or the briefing's
+    // header (the Esc menu's first page) becomes the map's own name
+    if (lstrcmpiA(folder_name(map).c_str(), "template") != 0 && !editor_unsaved_map(map)) {
+        const std::string unnamed = editor_unsaved_map(g_map) ? editor_new_map_title() : "";
+        auto placeholder = [&](const std::wstring& text, size_t length) {
+            const std::string a = ascii_upper(text, length);
+            return a == "TEMPLATE" || (!unnamed.empty() && a == unnamed);
+        };
+        const bool title = placeholder(g_mission.title, 24);
         if (title) g_mission.title = from_pack(upper(folder_name(map)));
-        if (title || ascii_upper(g_mission.header, 32) == "TEMPLATE") g_mission.header = g_mission.title;
+        if (title || placeholder(g_mission.header, 32)) g_mission.header = g_mission.title;
     }
     // the blocks anew: each one's lines after its first marker up to its last (main()'s keep the
     // indentation of their marker); a map converted to arrivals gets their two blocks, the runner
@@ -2196,12 +2236,13 @@ void mission_save(const std::string& map) {
     patch::log("mission: %s written - %u push lines, %u start trains, %u in the queue, %u briefing pages",
                script.c_str(), static_cast<unsigned>(g_lines.size()), static_cast<unsigned>(g_mission.start.size()),
                static_cast<unsigned>(g_mission.factories.queue.size()), static_cast<unsigned>(pages.size()));
-    // maps\<name>\<name>.map: the custom maps page (not the template itself)
+    // maps\<name>\<name>.map: the custom maps page (not the template itself, nor the editor's new map
+    // written into its scratch folder, as Run the level does)
     const std::string name = folder_name(map);
     const size_t slash = map.find_last_of('\\'), dot = map.find_last_of('.');
     const std::string base = slash == std::string::npos ? map : map.substr(slash + 1, dot - slash - 1);
     if (lstrcmpiA(folder.c_str(), ("maps\\" + name).c_str()) == 0 && lstrcmpiA(base.c_str(), name.c_str()) == 0 &&
-        lstrcmpiA(name.c_str(), "template") != 0)
+        lstrcmpiA(name.c_str(), "template") != 0 && !editor_unsaved_map(map))
         add_to_custom_list(name, ascii_upper(g_mission.title, 24));
 }
 
@@ -2263,7 +2304,7 @@ static bool arrival_of_line(const std::string& text, Arrival& a) {
 }
 
 // Test mode (editor.cpp's WM_COPYDATA 40042): the settings of a file instead of the dialog - UTF-8
-// lines "key: value" with the keys title, header, money, time (1-4), rain, nuke (0/1), limit,
+// lines "key: value" with the keys title, header, money, time (1-4), rain (0-2), weather (0-4), nuke (0/1), limit,
 // waves, train, start and queue (a line per train), objectives, win, lose and brief ("\n" in a
 // value is a line end, "---" between briefing pages); the keys not given stay as they are. The
 // lines "arrival: ..." (arrival_of_line) replace the map's arrivals and make the map run them
@@ -2273,7 +2314,7 @@ static bool arrival_of_line(const std::string& text, Arrival& a) {
 bool mission_settings_from_file(const std::string& path) {
     static const std::map<std::string, int> KEYS = {
         {"title", IDC_TITLE}, {"header", IDC_HEADER}, {"money", IDC_MONEY}, {"time", IDC_TIME},
-        {"rain", IDC_RAIN}, {"nuke", IDC_NUKE}, {"limit", IDC_LIMIT}, {"waves", IDC_WAVES},
+        {"rain", IDC_RAIN}, {"weather", IDC_WEATHER}, {"nuke", IDC_NUKE}, {"limit", IDC_LIMIT}, {"waves", IDC_WAVES},
         {"train", IDC_TRAIN}, {"start", IDC_START}, {"queue", IDC_QUEUE}, {"objectives", IDC_OBJECTIVES},
         {"win", IDC_WIN}, {"lose", IDC_LOSE}, {"brief", IDC_BRIEF}};
     Fields fields = current_fields();

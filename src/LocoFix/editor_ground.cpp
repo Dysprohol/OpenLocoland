@@ -398,8 +398,11 @@ void ground_flush() {
 void ground_reset() {
     g_ready = g_painted = g_stroke = false;
     g_vid = nullptr;
-    g_pending_x0 = 0;
-    g_pending_x1 = -1;
+    g_w = g_h = 0;
+    g_x0 = g_y0 = 0;
+    g_x1 = g_y1 = -1;
+    g_pending_x0 = g_pending_y0 = 0;
+    g_pending_x1 = g_pending_y1 = -1;
     g_image.clear();
     g_pixels.clear();
     g_heights.clear();

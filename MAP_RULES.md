@@ -48,7 +48,8 @@ the editor of the game (DEVELOPERS.md "Editor mode", `editor_edit.cpp`) applies 
   ground object; an empty map or a meadow is any size from 512 to 4096 in steps of 256 (the ground's
   tile; - and + or a preset: 1024 x 768, 2048 x 1536, 3072 x 2304, 1536 x 1024, 4096 x 3072) with the
   GRID flat at 70 and the picture's height 1586. File > Map size grows (a meadow beyond the old
-  picture) or crops a map at its right and bottom edge, with the same size row.
+  picture) or crops a map at its right and bottom edge, with the same size row; either way the map
+  gets a ground image of its own of the new size (cropped, the picture ends at the new edge).
 - **The ground's picture holds heights** (a D16 texture after every colour texture, blitted into the
   depth buffer): the campaign grounds hold **1026 + 8 a GRID level** (l06 and l13 at 0: 1025-1027,
   at 70: 1586, l15 at 144: 2181). Objects, water and fog are drawn against these depths, not the GRID.
@@ -344,8 +345,11 @@ other armies; a marker's panel makes it a mine. The palette has the mine, not th
 ## 8. Mission script
 
 - Before `#include "maps\script\header.lgc"`: `LEVEL`, `MONEY`, music, the environment
-  (`NUKE 0` - lightning is on by default and flashes the screen purple; `RAIN`, day/night
-  gammas `START_DAYNIGHT`, `GAMMA1..4`, `RAIN_GAMMA1..4`), the reinforcement
+  (`NUKE 0` - lightning is on by default and flashes the screen purple, in a clear sky or while
+  rain falls; `RAIN` 0 none, 1 now and then, 2 all the time - `daynight.lgc`'s comment has 1 and 2
+  swapped -, of the kind `RAIN_TYPE` 0 rain, 1 snow, 2 clouds, 3 storm clouds, 4 meteorites; the
+  day's start `START_DAYNIGHT` 1-4 day, evening, night, morning, 5 minutes each; gammas `GAMMA1..4`,
+  `RAIN_GAMMA1..4`), the reinforcement
   (`PLAYER_REINFORCEMENT`, `player_reinforcement_train[]`), the AI (`start_trains*` -
   declare them even when empty, `BUGS.md` F10; `level_queue_*`, `LIMIT_ATACKERS`,
   `RENEW_TIMEOUT`, `FIRSTCONTACTTIME`, `FIRSTATTACKTIME`) and the texts of a map that is not a

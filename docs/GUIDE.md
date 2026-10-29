@@ -117,10 +117,11 @@ game never offered: what you place is what the game plays. You can open any map 
 one, POLIGON or a campaign mission (save a campaign map under a name of its own before changing it).
 
 **Starting it:** **MAP EDITOR** on the custom maps page - the game starts again in the editor, on a
-new empty map: 2048 x 1536 of grass in a folder of its own (`maps\map1\`, then `map2` ...), titled
-MAP 1. The desktop shortcut **Locoland - map editor** opens one straight away. Save it to keep it
-(Menu → **SAVE MAP**): a start map left unsaved is removed when you leave it (another map, back to the
-menu, exit), so trying the editor out leaves nothing behind.
+new empty map of 2048 x 1536 grass that has no name yet (NEW MAP). The desktop shortcut **Locoland -
+map editor** opens one straight away. `Ctrl+S` (or Menu → **SAVE MAP**) saves it: the first time it
+asks for the name - type e.g. `bridge_1` and the map goes into a folder of its own,
+`maps\bridge_1\bridge_1.map`, and onto the custom maps page. A new map never saved is gone when you
+leave it (another map, back to the menu, exit), so trying the editor out leaves nothing behind.
 
 ![The editor](img/editor-factory-en.jpg)
 
@@ -155,7 +156,7 @@ What you see:
 | raise / lower it | PgUp / PgDn by 4 (with Shift by 16), or Shift+wheel; Home puts it back on the ground - the status line shows its height above the ground |
 | change its army | A: ours, enemy, neutral, pirates - the flags change colour |
 | delete | Del (Shift+Del: a whole train; Shift+click with the Delete tool: a whole section of track) |
-| undo / redo | Ctrl+Z / Ctrl+Y - every change, as many steps as you like |
+| undo / redo | Ctrl+Z / Ctrl+Y - every change; the last 500 steps are kept |
 | its panel | the right mouse button on it |
 
 The **object's panel** (right button) has its army, turning, its height (lower, raise, on the ground) and delete, a semaphore's colour and
@@ -174,7 +175,7 @@ The mission is won when the enemy has no units left.
 ### 1. A new map
 
 The editor starts on an empty 2048 x 1536 grass map - you can build the mission right on it and
-save it under a name of your own (Menu → **SAVE MAP**, e.g. `maps\bridge_1\bridge_1.map`). For another
+save it under a name of your own (`Ctrl+S` asks for it the first time, e.g. `bridge_1`). For another
 ground or size, Menu button → **NEW MAP**:
 
 ![The New map dialog](img/new-map-en.jpg)
@@ -188,7 +189,9 @@ ground or size, Menu button → **NEW MAP**:
   (big). Take 2048 x 1536 for a start.
 
 OK - the editor opens the new map. It already has a mission script and texts made from the
-template; you will fill them in at step 10. (**MAP SIZE** in the menu changes the size later.)
+template; you will fill them in at step 10. (**MAP SIZE** in the menu changes the size later: a
+smaller map loses the ground and the objects past its new edge - the track may go on 300 px further,
+out of sight.)
 
 ### 2. Paint the ground
 
@@ -397,8 +400,12 @@ changed things while it ran.)
 Menu → **MISSION SETTINGS** (or the gear in the strip):
 
 - **Title** on the custom maps page and the **briefing's header**;
-- **Money** at the start, the **time of day** (day, evening, night, morning), **rain**,
-  **lightning**;
+- **Money at the start**; the **time of day at the start** (day, evening, night, morning - then it
+  goes on, 5 minutes each);
+- **Weather** - rain, snow, clouds, storm clouds or meteorites - and **how often**: never, now and
+  then (it comes and goes, about half a minute each) or all the time;
+- **Lightning** - flashes in a clear sky; with rain only while it rains, none with snow, clouds or
+  meteorites;
 - **Enemy attackers at once** - how many enemy trains attack together;
 - **Train arrivals** - their count and the button to their panel (step 5); a map made with an older
   version has the **player's reinforcement waves** and **their train** (VIDs, e.g. `5,20`) here
@@ -425,9 +432,10 @@ EDITOR**. Unsaved changes are asked about first.
 
 ### 12. Save
 
-Menu → **SAVE MAP** (Alt+F2). A map saved as `maps\<name>\<name>.map` - a new map is
-already there - is written with its script and texts and appears on the **custom maps** page under
-its title. Open it again with **LOAD MAP** (Alt+F3).
+`Ctrl+S` saves the map into its file; a map that has none yet (a campaign map, a new map) asks for
+the name. Menu → **SAVE MAP** (Alt+F2) always asks - to save under another name. A map saved as
+`maps\<name>\<name>.map` is written with its script and texts and appears on the **custom maps** page
+under its title. Open it again with **LOAD MAP** (Alt+F3).
 
 ### 13. Save, export and share
 
@@ -490,7 +498,8 @@ Mission settings, Ground height, Money crate, Vehicles, Paint the ground, Water 
 | Esc, right button | back to Select; Esc ends a line of track (in the Track tool the right button deletes the rail under the cursor) |
 | Ctrl+R | run / hold the level |
 | F1 | help |
-| Alt+F2 / Alt+F3 | save / load |
+| Ctrl+S | save the map |
+| Alt+F2 / Alt+F3 | save under a name / load |
 
 ## 8. Questions and problems
 

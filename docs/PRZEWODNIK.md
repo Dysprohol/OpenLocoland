@@ -116,10 +116,11 @@ udostępniła: co postawisz, to gra zagra. Otworzysz w nim każdą mapę - nową
 kampanii (mapę kampanii zapisz pod własną nazwą, zanim zaczniesz ją zmieniać).
 
 **Uruchamianie:** **EDYTOR MAP** na stronie własnych map - gra uruchamia się od nowa w edytorze, na
-nowej pustej mapie: 2048 x 1536, trawa, we własnym folderze (`maps\map1\`, potem `map2` ...), z tytułem
-MAP 1. Skrót na pulpicie **Locoland - edytor map** od razu otwiera taką mapę. Zapisz ją, żeby została
-(Menu → **ZAPISZ MAPE**): niezapisana mapa startowa znika, gdy ją opuścisz (inna mapa, powrót do menu,
-wyjście), więc wypróbowanie edytora niczego nie zostawia.
+nowej pustej mapie: 2048 x 1536, trawa, jeszcze bez nazwy (NOWA MAPA). Skrót na pulpicie **Locoland -
+edytor map** od razu otwiera taką mapę. `Ctrl+S` (albo Menu → **ZAPISZ MAPE**) ją zapisuje: za
+pierwszym razem pyta o nazwę - wpisz np. `most_1`, a mapa trafi do własnego folderu
+`maps\most_1\most_1.map` i na stronę własnych map. Nigdy niezapisana nowa mapa znika, gdy ją opuścisz
+(inna mapa, powrót do menu, wyjście), więc wypróbowanie edytora niczego nie zostawia.
 
 ![Edytor](img/editor-factory-pl.jpg)
 
@@ -153,7 +154,7 @@ Co widać:
 | wyżej / niżej | PgUp / PgDn o 4 (z Shift o 16) albo Shift+kółko; Home stawia z powrotem na ziemi - wiersz stanu pokazuje wysokość nad ziemią |
 | zmiana armii | A: nasi, wróg, neutralni, piraci - flagi zmieniają kolor |
 | usunięcie | Del (Shift+Del: cały pociąg; Shift+klik narzędziem Usun: cały odcinek toru) |
-| cofnij / ponów | Ctrl+Z / Ctrl+Y - każdą zmianę, ile kroków chcesz |
+| cofnij / ponów | Ctrl+Z / Ctrl+Y - każdą zmianę; pamięta ostatnie 500 kroków |
 | panel obiektu | prawy przycisk myszy na nim |
 
 **Panel obiektu** (prawy przycisk) ma jego armię, obrót, wysokość (niżej, wyżej, na ziemi) i usuwanie, kolor semafora i linię przy
@@ -172,7 +173,7 @@ gdy wrogowi nie zostanie żadna jednostka.
 ### 1. Nowa mapa
 
 Edytor startuje na pustej mapie 2048 x 1536 z trawą - możesz zrobić misję od razu na niej i zapisać
-ją pod własną nazwą (Menu → **ZAPISZ MAPE**, np. `maps\most_1\most_1.map`). Dla innego terenu albo
+ją pod własną nazwą (`Ctrl+S` za pierwszym razem o nią pyta, np. `most_1`). Dla innego terenu albo
 rozmiaru: przycisk menu → **NOWA MAPA**:
 
 ![Okno Nowa mapa](img/new-map-pl.jpg)
@@ -185,7 +186,8 @@ rozmiaru: przycisk menu → **NOWA MAPA**:
   początek weź 2048 x 1536.
 
 OK - edytor otwiera nową mapę. Ma już skrypt misji i teksty zrobione z szablonu; uzupełnisz je w
-kroku 10. (**ROZMIAR MAPY** w menu zmienia rozmiar później.)
+kroku 10. (**ROZMIAR MAPY** w menu zmienia rozmiar później: mniejsza mapa traci teren i obiekty za
+nową krawędzią - tor może biec jeszcze 300 px dalej, poza zasięgiem wzroku.)
 
 ### 2. Pomaluj teren
 
@@ -395,7 +397,12 @@ postawiłeś: jeśli coś zmieniało się w czasie działania, wczytaj go od now
 Menu → **USTAWIENIA MISJI** (albo zębatka na listwie):
 
 - **Tytuł** na stronie własnych map i **nagłówek odprawy**;
-- **pieniądze** na początku, **pora startu** (dzień, wieczór, noc, ranek), **deszcz**, **błyskawice**;
+- **pieniądze na początku**; **pora dnia na początku** (dzień, wieczór, noc, ranek - potem płynie dalej,
+  po 5 minut);
+- **pogoda** - deszcz, śnieg, chmury, chmury burzowe albo meteoryty - i **jak często**: nigdy, od czasu
+  do czasu (przychodzi i odchodzi, mniej więcej co pół minuty) albo cały czas;
+- **błyskawice** - błyska przy czystym niebie; z deszczem tylko, gdy pada; przy śniegu, chmurach i
+  meteorytach nie ma ich;
 - **atakujących naraz** - ile pociągów wroga atakuje jednocześnie;
 - **przyjazdy pociągów** - ich liczba i przycisk do ich panelu (krok 5); mapa ze starszej wersji ma tu
   **fale posiłków gracza** i **ich pociąg** (numery, np. `5,20`), dopóki nie zostanie przestawiona;
@@ -421,8 +428,9 @@ zmiany najpierw pyta.
 
 ### 12. Zapisz
 
-Menu → **ZAPISZ MAPE** (Alt+F2). Mapa zapisana jako `maps\<nazwa>\<nazwa>.map` -
-nowa mapa już tam jest - zapisuje się ze skryptem i tekstami i pojawia na stronie **WLASNE MAPY**
+`Ctrl+S` zapisuje mapę do jej pliku; mapa, która go jeszcze nie ma (mapa kampanii, nowa mapa), pyta
+o nazwę. Menu → **ZAPISZ MAPE** (Alt+F2) pyta zawsze - żeby zapisać pod inną nazwą. Mapa zapisana jako
+`maps\<nazwa>\<nazwa>.map` zapisuje się ze skryptem i tekstami i pojawia na stronie **WLASNE MAPY**
 pod swoim tytułem. Otworzysz ją znowu przez **WCZYTAJ MAPE** (Alt+F3).
 
 ### 13. Zapis, eksport i udostępnianie
@@ -486,7 +494,8 @@ misji, Wysokosc terenu, Skrzynka z pieniedzmi, Pojazdy, Malowanie terenu, Woda i
 | Esc, prawy przycisk | powrót do Zaznacz; Esc kończy linię toru (w narzędziu Tor prawy przycisk usuwa szynę pod kursorem) |
 | Ctrl+R | uruchom / wstrzymaj poziom |
 | F1 | pomoc |
-| Alt+F2 / Alt+F3 | zapisz / wczytaj |
+| Ctrl+S | zapisz mapę |
+| Alt+F2 / Alt+F3 | zapisz pod nazwą / wczytaj |
 
 ## 8. Pytania i problemy
 

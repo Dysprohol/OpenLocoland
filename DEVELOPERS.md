@@ -1268,9 +1268,13 @@ front of the game's:
 - File > Load... (Alt+F3): a Windows open dialog in the folder of the current map; the map is
   then loaded the way script `Load()` does it (`World.nextLevelFile` and flags 0x40, loaded by
   `Game_Step`) and held,
-- File > Save... (Alt+F2, ctrl+s): a save dialog, then `Level_Save` with the name as a String of the
+- File > Save... (Alt+F2): a save dialog, then `Level_Save` with the name as a String of the
   game's heap (a new folder of the name is made), then the map's mission: its script, texts and
-  its line on the custom maps page ("Mission settings and push lines" below),
+  its line on the custom maps page ("Mission settings and push lines" below); the status line says
+  "saved as ...",
+- Ctrl+S: the same save into the map's own file without the dialog - the file it was loaded from or
+  last saved as -, and with the dialog when it has none: a campaign map or the template (not saved
+  over) or the editor's new map; a Yes to "Save the changes?" saves the same way,
 - File > New...: a new map in its own folder, on a campaign map's terrain or a meadow (below),
 - File > Map size...: the map's size (below),
 - File > Mission settings...: the mission's settings and texts in a dialog (below),
@@ -1366,24 +1370,51 @@ the level is off" in `LocoFix.log`).
 the menu, or `--test-map maps\template\template.map` as the desktop shortcut's `edit_map.cmd` passes
 it (`test_map.cpp` asks `editor_start_map` before the first `Level_Load`) - the editor opens a new
 empty map instead, at once and without a question: what File > New makes with "an empty map: Grass"
-and 2048 x 1536 (the template's script and texts under the new name), in `maps\map1\` - `map2` ...,
-the first folder not there yet -, titled MAP 1 ...; the view starts at its top-left corner. Its folder
-holds `editor_new.txt` until the map is saved there (then it is a map like any other and gets its
-line in `maps\custom.lst`, as every saved map does). A start map that still has the mark when the
-editor leaves it - another map loaded, made or imported, Back to the menu, Exit, the window closed -
-goes with its folder ("the new map maps\map1 left unsaved - removed" in `LocoFix.log`); saved under
-another name, the saved map takes the ground image along (`<name>.vid`), and the start's folder still
-goes. Play the map keeps it - the played game and the editor coming back open it -, and a marked
-folder left behind (the game was ended in play) is removed at the next start. The template stays as
-it was: it can be loaded, and every new map takes its script and texts from it. Checked in the game
-(in a window): from the menu (MAP EDITOR on the custom maps page -> the empty grass map held in the
-editor, MAP 2 as `map1` was taken) and with `--test-map` on the template; left untouched and closed -
-its folder gone, `custom.lst` unchanged; a hill raised with the Ground height tool and saved as
-`maps\map1\map1.map` - the mark gone, "map1 / MAP 1" on the custom maps page, loaded again with the
-hill and played; an untouched start map played (its folder kept with the mark) and swept at the next
-start; the start map saved as `maps\other1\other1.map` - `other1.vid` written, the start's folder
-removed when `other1` was loaded; in full screen at 2560 x 1440 the start map made, a hill raised on
-it, saved in its own folder (the mark gone) and loaded again.
+and 2048 x 1536 (the template's script and texts), a map with no name yet, titled NEW MAP (the pack's
+`NewMapTitle`); the view starts at its top-left corner. The engine loads a level only from its files
+(`Level_Load` reads the map, the script is compiled from its file, the ground from its image), so
+the map is held in a hidden scratch folder, `maps\_new\` (`_new2` ... while an older one is still in
+use), marked with `editor_new.txt`; it is never put on the custom maps page. The first save - File >
+Save, Ctrl+S, a Yes to "Save the changes?" (of Load, New, Play, Back, Exit), Export, Map size - asks
+for the name in the save dialog, which opens in `maps\` with the first free `mapN` offered; a name
+typed straight into `maps\` becomes `maps\<name>\<name>.map` (a map already there is overwritten
+only after a question), the map's own folder with its ground image (`<name>.vid`), script and texts,
+and its line in `maps\custom.lst`; a title or briefing header NEW MAP becomes the folder's name in
+capitals, as TEMPLATE does. A map is not saved outside the game folder ("A map is saved in the maps
+folder of this game."): its script and texts are found by game paths. The save dialog gets the
+folder in its file name box: since Windows 7 the dialog opens in the folder it remembers for the
+program - every `Locoland.exe`, another game folder's too - and not in `lpstrInitialDir`, so a save
+went into another installation of the game. Written into its scratch folder (the arrivals session's
+Run the level saves the map it runs), the map stays unnamed and off the custom maps page, and its
+changes still count as not saved (the map file is newer than the mark), so leaving it asks. The scratch
+folder goes when the editor leaves the map - another map loaded, made or imported, Back to the menu,
+Exit, the window closed ("the new map maps\_new left unsaved - removed" in `LocoFix.log`). Play the map
+and Export ask for the name first, as a save does, so the played game never runs from the scratch
+folder (the next start's sweep could remove it under that game) and a package never holds it; a marked
+folder left behind (the game was ended) is removed at the next start of the editor, but the folder of
+the map it opens. The template stays as it was: it can be loaded, and every new map takes its script and texts
+from it. Checked in the game
+(in a window, `--test-map` on the template): `maps\_new\_new.map` made, hidden, nothing added to
+`custom.lst`; a hill raised, a fort placed, Ctrl+S -> the Save map dialog in the game's own `maps\`
+with `map1.map` offered, "edtest2" typed -> `maps\edtest2\edtest2.map` with its `.vid`, script and
+texts, "edtest2 / EDTEST2" on the custom maps page, the script titled EDTEST2; a second Ctrl+S saved
+without a dialog; the game closed -> `maps\_new` removed.
+
+**A level change resets the editor** (`editor_level_loading` -> `edit_reset`, `editor_level_loaded`).
+Every level that loads - File > Load, New, Import, Map size, StartEditorMode, a mission picked in the
+game's menus, Run the level's return - first clears what the editor kept of the old one: the history,
+the selection, a drag, a line of track or a push line under way, a stroke of the ground's tools and
+its repeat timer, the picture's buffers and painted textures (`ground_reset`), the panels and their
+picks (`panel_reset`, `arrivals_reset`, `factory_reset`), the trains' orders, the status line's texts
+and its message, the hit boxes of the last frame and the heights' view (H); the tool goes back to
+Select. The mission's settings, push lines and arrivals are read again from the new map's script
+(`mission_load`), and the map Ctrl+S saves into becomes the level loaded (before, a level loaded
+another way than File > Load kept the old map's path, so Ctrl+S would have saved into it). The
+brushes' settings and the palette (read from `objects.res`) stay. Checked in the game: a map with
+track, a hill (saved), the heights' view on and an unsaved stroke, then the sandbox loaded - the
+Select tool, no heights' view, "nothing to undo" - and the map again: its saved track and hill, no
+unsaved stroke, nothing to undo; the sandbox painted (unsaved), another map loaded and the sandbox
+again: its picture as it was.
 
 **Editing objects** (`src/LocoFix/editor_edit.cpp`). On the held level LocoFix does the editing
 with the engine's own pieces (scripts and object updates are off, so nothing else would):
@@ -1398,7 +1429,7 @@ with the engine's own pieces (scripts and object updates are off, so nothing els
 | army | A (0 -> 1 -> 2 -> 3: ours, enemy, neutral, pirates) | `ACT_SET_ARMY` 97; the armies' colours as in play (below) |
 | semaphore red / green | T | red is the command `10,0,0,0` (MAP_RULES.md 7), shown with that animation - also the red posts of a loaded map, whose first command never runs on a held level (the command stays as it is); a post's own line changes with it ("On the track") |
 | delete | Del, or the Delete tool of the bar (the filled circle marks what a click takes, the cursor is the game's delete cursor); Shift+Del or Shift+click on a rail: its section, as far as one rail continues it at each end (up to a junction or an end) | `ACT_UNDO_REMOVE` 132 - made for the authors' MapEdit: the object leaves the layer lists (not drawn, not updated, not saved; a train car leaves its rail points and couplings); a rail also leaves the rail network (below) |
-| undo / redo | Ctrl+Z / Ctrl+Y | every change keeps the state of the objects it touched before and after (position, direction, army, present, red); undo puts the "before" back - a deleted object returns with `ACT_UNDO_INSERT` 133 - and redo the "after" |
+| undo / redo | Ctrl+Z / Ctrl+Y | every change keeps the state of the objects it touched before and after (position, direction, army, present, red); undo puts the "before" back - a deleted object returns with `ACT_UNDO_INSERT` 133 - and redo the "after"; the last 500 steps are kept, at most 256 MB of them (below) |
 | place | the bar at the bottom: 1-0 or a click picks an entry, a click on the map places it, Esc or the right button go back to selecting | World `CreateObject` at the point under the cursor on the ground, after `AskPlace` (161) - a place another object with a common `moveMask` takes is refused; a preview of the object (its own sprite in the chosen direction, `Graphics_DrawVid`) follows the cursor |
 
 The bar looks like the game's state bar and is drawn with its pictures over the scene, after
@@ -1447,6 +1478,23 @@ with the factory moved and turned, the repair point gone and the six new ones - 
 record unchanged, the semaphores' commands as set, the new factory with the 14 units; then File >
 Play the map: the edited map plays with its interface, and `error.log` has no `LOGIC`, `R_MAP`
 or `RAIL` line.
+
+**The history's limits** (`editor_edit.cpp`, "object state and the undo history"). Undoing and
+redoing far crashed the editor: a train car's state kept the pointers to the rail points its two ends
+stand on (`RailPos`), but undo and redo take rails away and lay them again - `RailDot_Release`
+deletes a point no rail uses any more and `RailMap_AddDot` makes a new one -, so a car put back by
+`ACT_UNDO_INSERT` (which runs `Engine_OccupyDots`) wrote into a freed point and `Engine_UpdatePosition`
+read from one. A car's ends are now kept by the places of their points and of the link's other end
+and found again when the car is put back (`RailMap_FindDot`, `RailDot_FindLink`, as `RailPos_Load`
+does); a point that is gone leaves the end empty instead. The history is bounded too: a stroke of the
+ground's tools keeps the rectangle of the picture it changed before and after (10 bytes a pixel, tens
+of MB for a stroke across a big map) and the game has 2 GB, so at most 500 steps and 256 MB of them
+are kept, the oldest going first (`trim_history`; "the history keeps the last ..." in `LocoFix.log`).
+Checked on the sandbox: the reinforcement's locomotive deleted, the main line's section under it
+deleted, 4 rails laid, three strokes of Ground height, a factory and a fort placed, then undone past
+the start and redone past the end three times - the build before crashed at the undo that put the
+locomotive back (`EXCEPTION!`, EIP 0x40a241 in `Engine_LeaveDots`), this one does not, and the
+locomotive stands on its points again; 510 turns of a fort left 500 steps.
 
 **Laying track** (the Track tool, key 3; `src/LocoFix/rail_rules.h`). The first click starts a
 line - at the end of a rail of the map near the cursor, or at the point of the rail lattice of
@@ -1529,8 +1577,14 @@ saved - the rest of the file, the mission's own code, stays as it is:
   calls.
 
 File > Mission settings... (or the gear of the bar's strip) shows them in a Windows dialog -
-the title on the custom maps page, the briefing's header, money, the time of day, rain,
-lightning, the reinforcement waves and their train (VIDs), the enemy trains attacking at once,
+the title on the custom maps page, the briefing's header, money at the start (`SetMoney(0, MONEY)`
+of `initdefault.lgc`), the time of day at the start (`START_DAYNIGHT` 1-4: day, evening, night,
+morning; `daynight.lgc` then goes on, 5 minutes each), the weather (`RAIN_TYPE`: rain, snow, clouds,
+storm clouds, meteorites - `environmenttact.lgc` makes the last three) and how often (`RAIN`: 0
+never, 1 now and then - it comes and goes, about half a minute each -, 2 all the time;
+`daynight.lgc`'s own comment has 1 and 2 the other way round, its code does this), lightning
+(`NUKE`: a flash and its sound at random in a clear sky, with rain only while it rains, never with
+the other weathers), the reinforcement waves and their train (VIDs), the enemy trains attacking at once,
 the enemy's trains at the start (a line each: its type - `light_gun`, `medium_mortair`, ... the
 `ATT_` names of `TrainsTactDeclares.lgc` - and the point it starts at, or two rail points it
 patrols between, screen coordinates), the trains its factory builds later (the time, the type and
@@ -1538,7 +1592,13 @@ optionally the patrol), the objectives, the win and the loss texts and the brief
 line `---` starts the next page; the dialog shows the texts the game shows - the pack's copy of a
 file when it has one). A save writes the texts into the map's folder (or the pack's copy of a file, see the sandbox below) in capitals, in the pack's code page,
 at most 44 characters a line (broken between words), CRLF: `objectives.txt`, `win.txt`,
-`loose.txt`, the pages `brief.txt`, `brief2.txt` ... and `brief.lst`. A map saved as
+`loose.txt`, the pages `brief.txt`, `brief2.txt` ... and `brief.lst`. The dialog had rain as a
+check box that wrote `RAIN 1` - a campaign map's `RAIN 2` became 1 when it was saved under a new
+name - and dropped `RAIN_TYPE`, so a map with snow got rain; its labels were cut short in some
+packs. Now each setting has a row with its label in full words, the map's settings on the right of the trains'
+rows (which stay as they were). Checked in play: money 12345, night, snow all the time and a new
+objectives text set, saved and played - $12345 in the state bar, the night's gamma, the snow
+falling all the time, the objectives line at the start. A map saved as
 `maps\<name>\<name>.map` gets its line in `maps\custom.lst` (the folder and its title in ASCII
 capitals; not the template), so it shows on the WLASNE MAPY page; `build.py`
 keeps the lines the editor added when it writes the repository's list into the game. A new map
@@ -1922,11 +1982,20 @@ past the new edge stay, the main line goes on out of sight - after a question wi
 then the map is saved, its file is resized - HEAD's size, the GRID (a new cell gets the height of
 the old cell nearest to it) - and loaded again (not undone). Growing gives the map a ground image of
 its own: the old picture with its heights (read from its texture tiles: the map's own or the
-campaign's) and a meadow beyond it, the ground object moving to the middle; cropping keeps the image
-(the picture goes on past the edge, out of the camera's reach). A campaign map or the template is not
-resized in place: it is saved under a name of its own first. Checked: a 1280 x 1024 meadow made, a
-rail laid, saved, grown to 1792 x 1280 (the old picture kept, the rail where it was) and cropped to
-1024 x 768; `map_tool.py check` round-trips every map and image of the game folder (586 files).
+campaign's) and a meadow beyond it, the ground object moving to the middle. Cropping cuts the same
+way: the map gets an image of its own of exactly the new size - the old picture with its heights
+where it lay on the map (drawn centred on the ground object) up to the new edge - and the ground
+object goes to the middle, so nothing of the old ground is drawn past the edge; before, the image was
+kept and the old terrain still showed in the 300 px the camera goes past the map. The Water tool's
+tiles outside go too, and the cars outside are deleted before the rails (a rail is not deleted while
+a car stands on it). A campaign map or the template is not resized in place: it is saved under a
+name of its own first, and the editor's new map gets its name first. Checked: a 1280 x 1024 meadow
+made, a rail laid, saved, grown to 1792 x 1280 (the old picture kept, the rail where it was) and
+cropped to 1024 x 768; a 2048 x 1536 meadow with a line of 8 rails from x 816 to 1420, a fort at
+x 1400 and a hill, cropped to 1024 x 768: the ground ends at the new edge (the grid beyond it), the
+line goes on to x 1384 out of sight (7 rails; the one past 300 px, the fort and its guns deleted),
+the hill kept, `crop3.vid` of 1024 x 768, the ground object at 512, 384; `map_tool.py check`
+round-trips every map and image of the game folder.
 
 **The map's frame.** The camera of a held level goes 300 px past the map, where nothing is drawn;
 the outside gets a dim 32 px grid and the map's edge a frame, so an empty map stands out - the track
@@ -2245,9 +2314,11 @@ pictures (22 px right of the device's middle, 18 up), the title in the menu titl
 the text in the menu font (VID 2), the page arrows (VIDs 475/476) and the start button (VID 477)
 with "back to the map". **Help** (the ? button or F1) shows the editor's help pages the way the
 game shows its own (`maps\menu4.lst` -> `menu41.txt` ...): `maps\edithelp.lst` lists
-`maps\edithelp1.txt` ... `edithelp16.txt` - the mouse, the keys, the bar, laying track, the mission,
-the buttons, the object's panel, all objects and decals, trains and rails, water, painting and
-regions, heights, the ground tools' rows, the train arrivals, a factory's panel, turning, the citadel, Charybdis, fly nests and mines - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
+`maps\edithelp1.txt` ... `edithelp16.txt` - in the order a new user needs them: what the editor
+is (the bar, the status line, the two buttons), the bar's tools, selecting and placing (the mouse,
+undo), the keys, laying track, trains, the object's panel, all objects and decals, the mission,
+saving and playing, the ground (height, paint, water, regions, map size), the ground tools' rows,
+then the train arrivals and the orders (13, 14) turning (15) and the citadel, Charybdis, fly nests and mines (16; page 1 names 13-16) - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
 44 characters a line - the ESC pairs not counted, so a line with lit words is longer in the file - and 14
 lines, ESC 7 / ESC 2 switch to the lit font VID 7 and back to VID 2):
 English in `game/maps/` (the fallback of every pack) and the others in `lang/<code>/game/editor/`; the files are

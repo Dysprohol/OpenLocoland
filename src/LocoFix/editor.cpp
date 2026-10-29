@@ -77,6 +77,7 @@ void edit_command(int id);
 void edit_reset();
 bool edit_dirty();
 void edit_saved();
+void edit_message_saved(const std::string& map);
 void install_editor_edit();
 void edit_level_held();
 void edit_touch();
@@ -85,7 +86,7 @@ void edit_commit_mission(const ArrivalsState& arrivals_before, const FactoryStat
 void panel_open_arrivals();   // editor_panel.cpp
 void new_map_dialog(HWND owner);                // editor_newmap.cpp
 bool new_map_for_test(const std::string& text);  // editor_newmap.cpp
-std::string make_start_map();                    // editor_newmap.cpp: maps\mapN\, empty grass
+std::string make_start_map();                    // editor_newmap.cpp: maps\_new\, empty grass
 std::string map_ground_image(const std::string& map);                          // editor_newmap.cpp
 bool set_map_ground_image(const std::string& map, const std::string& image);  // editor_newmap.cpp
 bool map_size_dialog(HWND owner, int& w, int& h);   // editor_newmap.cpp
@@ -93,6 +94,7 @@ bool resize_map(const std::string& map, int w, int h, std::string& error);   // 
 void edit_map_size(int& w, int& h);              // editor_edit.cpp
 int edit_outside(int w, int h, bool remove);     // editor_edit.cpp
 void edit_log_rail_points(float x, float y);
+std::string editor_new_map_title();   // below: the new map's title until it is saved
 
 namespace {
 
@@ -279,14 +281,17 @@ private:
 //
 // The editor started from the menu (EDYTOR MAP: StartEditorMode("maps\\template\\template.map")) or
 // by the desktop shortcut (edit_map.cmd maps\template\template.map) does not open the template but
-// a new empty map: 2048 x 1536 of grass in maps\map1\ (map2 ... the first folder free), titled MAP 1,
-// as File > New makes it (editor_newmap.cpp). Its folder holds a mark (AUTO_MARK) until the map is
-// saved there; a map that still has it when the editor leaves it - for another map, back to the menu,
-// the end of the game - goes with its folder, so an untouched start leaves nothing in maps\ (nor in
-// maps\custom.lst, which gets a map's line when it is saved). Play the map keeps it: the played game
-// and the editor coming back open it. A marked folder left behind (the game ended in play) is removed
-// at the next start. The template itself stays: it is loaded like any map, and new maps take their
-// script and texts from it.
+// a new empty map that has no name yet: 2048 x 1536 of grass, as File > New makes it
+// (editor_newmap.cpp), titled NEW MAP (the pack's NewMapTitle). The engine loads a level only from
+// its files, so the map is made in a hidden scratch folder, maps\_new\ (_new2 ... while an older one
+// is still in use), marked with AUTO_MARK; it is never on the custom maps page, and the first save -
+// File > Save, Ctrl+S, the "save the changes?" of Load, Play, Exit ... - asks for the name in maps\
+// (choose_map), as File > Save does. A marked folder goes when the editor leaves its map - for
+// another map, back to the menu, the end of the game -, so an untouched start leaves nothing in
+// maps\. Play the map and Export ask for its name first, as a save does, so the played game and a
+// package never take the scratch folder. A marked folder left behind (the game ended) is removed at
+// the next start of the editor. The template
+// itself stays: it is loaded like any map, and new maps take their script and texts from it.
 constexpr const char* AUTO_MARK = "editor_new.txt";
 bool g_playing = false;   // Play the map: the current map is kept for the game that plays it
 
@@ -306,6 +311,15 @@ bool auto_folder(const std::string& folder) {
     return !folder.empty() && GetFileAttributesA((folder + "\\" + AUTO_MARK).c_str()) != INVALID_FILE_ATTRIBUTES;
 }
 
+// The new map written into its scratch folder after the mark was made (Run the level saves the map
+// it runs): its edits are there, so leaving it asks to save them even when the level is clean.
+bool auto_folder_written(const std::string& map) {
+    WIN32_FILE_ATTRIBUTE_DATA a, b;
+    return auto_folder(folder_of(map)) && GetFileAttributesExA(map.c_str(), GetFileExInfoStandard, &a) &&
+           GetFileAttributesExA((folder_of(map) + "\\" + AUTO_MARK).c_str(), GetFileExInfoStandard, &b) &&
+           CompareFileTime(&a.ftLastWriteTime, &b.ftLastWriteTime) > 0;
+}
+
 // A marked folder of maps\ with its files (the editor made them all; it has no subfolders).
 void remove_auto_folder(const std::string& folder) {
     if (!auto_folder(folder)) return;
@@ -321,8 +335,8 @@ void remove_auto_folder(const std::string& folder) {
     patch::log("editor: the new map %s left unsaved - %s", folder.c_str(), removed ? "removed" : "could not be removed");
 }
 
-// The marked folders of maps\ left behind.
-void sweep_auto_folders() {
+// The marked folders of maps\ left behind (but `keep`, the folder of the map being opened).
+void sweep_auto_folders(const std::string& keep) {
     WIN32_FIND_DATAA f;
     HANDLE find = FindFirstFileA("maps\\*", &f);
     if (find == INVALID_HANDLE_VALUE) return;
@@ -331,18 +345,22 @@ void sweep_auto_folders() {
         if ((f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && f.cFileName[0] != '.') folders.push_back(std::string("maps\\") + f.cFileName);
     } while (FindNextFileA(find, &f));
     FindClose(find);
-    for (const std::string& folder : folders) remove_auto_folder(folder);
+    for (const std::string& folder : folders)
+        if (lower_path(folder) != lower_path(keep)) remove_auto_folder(folder);
 }
 
 // The map to open when the editor is started on `requested`: for the template, a new empty map.
 std::string start_map(const std::string& requested) {
-    if (!g_enabled || lower_path(game_path(requested)) != "maps\\template\\template.map") return requested;
-    sweep_auto_folders();
+    if (!g_enabled) return requested;
+    const bool fresh = lower_path(game_path(requested)) == "maps\\template\\template.map";
+    sweep_auto_folders(fresh ? "" : folder_of(game_path(requested)));
+    if (!fresh) return requested;
     const std::string map = make_start_map();
     if (map.empty()) return requested;
+    SetFileAttributesA(folder_of(map).c_str(), FILE_ATTRIBUTE_HIDDEN);
     HANDLE mark = CreateFileA((folder_of(map) + "\\" + AUTO_MARK).c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, 0, nullptr);
     if (mark != INVALID_HANDLE_VALUE) {
-        const char text[] = "Made by the editor at its start; removed with this folder unless the map is saved here.\r\n";
+        const char text[] = "The editor's new map, not saved yet; removed with this folder when the editor leaves it.\r\n";
         DWORD written = 0;
         WriteFile(mark, text, sizeof text - 1, &written, nullptr);
         CloseHandle(mark);
@@ -390,20 +408,23 @@ bool save_map(const std::string& path) {
     save(w, nullptr, name);   // Level_Save frees the name
     if (!level_save_succeeded()) return false;
     g_current = path;
-    edit_saved();
+    // the new map written into its scratch folder (Run the level) still has no name: its edits are
+    // not saved for the user, and it stays off the custom maps page
+    const bool scratch = auto_folder(folder_of(game_path(path)));
+    if (!scratch) edit_saved();
     // a painted ground: its own image next to the map, the map pointing at it
     ground_save(game_path(path));
-    // the start's new map saved in its own folder is a map like any other now; saved elsewhere, it
-    // takes its ground image along (the folder of the start goes when the editor leaves it)
-    const std::string target = folder_of(game_path(path)), image = map_ground_image(game_path(path));
-    if (auto_folder(target)) DeleteFileA((target + "\\" + AUTO_MARK).c_str());
-    if (!image.empty() && auto_folder(folder_of(image))) {
+    // the new map saved under its name takes its ground image along (the scratch folder goes when
+    // the editor leaves it)
+    const std::string image = map_ground_image(game_path(path));
+    if (!scratch && !image.empty() && auto_folder(folder_of(image))) {
         const std::string base = game_path(path), own = base.substr(0, base.find_last_of('.')) + ".vid";
         if (CopyFileA(image.c_str(), own.c_str(), FALSE) && set_map_ground_image(base, own))
             patch::log("editor: %s takes its ground along as %s", base.c_str(), own.c_str());
     }
     // its mission: the script (a new map gets one), the texts, the custom maps page
     mission_save(game_path(path));
+    if (!scratch) edit_message_saved(game_path(path));
     return true;
 }
 
@@ -439,8 +460,11 @@ std::string file_dialog(HWND owner, bool save, const std::string& folder, const 
     filter += L'\0';
     filter += L'\0';
     const std::wstring initial = wide_acp(folder), caption = ui_wide(title);
+    // the folder in the name too: since Windows 7 the dialog opens in the folder it remembers for the
+    // program (every Locoland.exe, another game folder's as well) rather than lpstrInitialDir, but a
+    // name with its path is always taken
     wchar_t name[MAX_PATH] = L"";
-    lstrcpynW(name, wide_acp(file).c_str(), MAX_PATH);
+    lstrcpynW(name, wide_acp(!folder.empty() && !file.empty() ? folder + "\\" + file : file).c_str(), MAX_PATH);
     OPENFILENAMEW ofn = {};
     ofn.lStructSize = sizeof ofn;
     ofn.hwndOwner = owner;
@@ -458,18 +482,48 @@ std::string file_dialog(HWND owner, bool save, const std::string& folder, const 
     return path;
 }
 
-// A file chosen in a Windows dialog, as a game path; empty when cancelled.
+// A file chosen in a Windows dialog, as a game path; empty when cancelled. The editor's new map has
+// no name yet: the dialog opens in maps\ with the first free name mapN. A map saved straight into
+// maps\ (where the game keeps only its menu and intro scenes) goes into a folder of its name,
+// maps\<name>\<name>.map, so it is on the custom maps page; a map there already is overwritten only
+// when the user says so.
 std::string choose_map(HWND owner, bool save) {
     const std::string current = full_path(g_current.empty() ? level_file() : g_current);
     const size_t slash = current.find_last_of('\\');
     std::string folder = slash == std::string::npos ? "" : current.substr(0, slash);
+    std::string file = slash == std::string::npos ? "" : current.substr(slash + 1);
+    if (save && auto_folder(folder_of(game_path(current)))) {
+        folder.clear();
+        int n = 1;
+        while (n < 1000 && GetFileAttributesA(("maps\\map" + std::to_string(n)).c_str()) != INVALID_FILE_ATTRIBUTES) ++n;
+        file = "map" + std::to_string(n) + ".map";
+    }
     if (folder.empty() || GetFileAttributesA(folder.c_str()) == INVALID_FILE_ATTRIBUTES)
         folder = patch::game_folder() + "maps";
-    const std::string file = slash == std::string::npos ? "" : current.substr(slash + 1);
     const std::string chosen = file_dialog(owner, save, folder, file,
                                            save ? ui_text("FileSaveTitle", "Save map") : ui_text("FileLoadTitle", "Load map"),
                                            ui_text("FileMaps", "Maps (*.map)"), L"*.map", L"map");
-    return chosen.empty() ? "" : game_path(chosen);
+    if (chosen.empty()) return "";
+    std::string map = game_path(chosen);
+    if (save && map.find(':') != std::string::npos) {   // a map's script and texts are found by game paths
+        DialogScope scope;
+        ui_message_box(owner, ui_text("SaveOutside", "A map is saved in the maps folder of this game."),
+                       ui_text("FileSaveTitle", "Save map"), MB_OK | MB_ICONINFORMATION);
+        patch::log("editor: not saved outside the game folder: %s", map.c_str());
+        return "";
+    }
+    if (save && lower_path(folder_of(map)) == "maps") {
+        const std::string name = map.substr(5, map.find_last_of('.') - 5);
+        map = "maps\\" + name + "\\" + name + ".map";
+        if (GetFileAttributesA(map.c_str()) != INVALID_FILE_ATTRIBUTES && (!g_test || g_test_ask)) {
+            DialogScope scope;
+            const std::string text = ui_printf(ui_format("AskOverwrite", "There is a map %s already. Overwrite it?"), map.c_str());
+            if (ui_message_box(owner, text.c_str(), ui_text("FileSaveTitle", "Save map"), MB_YESNO | MB_ICONQUESTION) != IDYES)
+                return "";
+        }
+        patch::log("editor: saved into a folder of its own: %s", map.c_str());
+    }
+    return map;
 }
 
 void about(HWND owner) {
@@ -495,14 +549,35 @@ void about(HWND owner) {
 
 std::string current_map() { return g_current.empty() ? std::string(level_file()) : g_current; }
 
+bool game_folder_map(const std::string& map);
+
+// The file Ctrl+S saves the map into without asking: the one it was loaded from or last saved as -
+// not a map of the game's own folders (the campaign, the template) nor the start's new map, which
+// has no name yet; empty when the name is to be asked.
+std::string own_file() {
+    const std::string map = game_path(current_map());
+    if (map.empty() || game_folder_map(map) || auto_folder(folder_of(map))) return "";
+    return map;
+}
+
+// Ctrl+S (and a Yes to "Save the changes?"): into the map's own file, or the name asked as File > Save
+// asks it. False when cancelled or the save failed.
+bool save_current(HWND window) {
+    std::string map = own_file();
+    if (map.empty()) map = choose_map(window, true);
+    return !map.empty() && save_map(map);
+}
+
 // Before the level goes away: with edits not saved, asks whether to save them. False when the
 // user cancels (or the save fails). Tests are never asked.
 bool ask_save(HWND window) {
-    if (!edit_dirty() || (g_test && !g_test_ask)) return true;
+    if ((!edit_dirty() && !auto_folder_written(game_path(current_map()))) || (g_test && !g_test_ask)) return true;
     int answer;
     {
         DialogScope scope;
-        const std::string text = ui_printf(ui_format("AskSave", "Save the changes to %s?"), current_map().c_str());
+        // the new map has no name yet: its title instead of the scratch folder's file
+        const std::string name = auto_folder(folder_of(game_path(current_map()))) ? editor_new_map_title() : current_map();
+        const std::string text = ui_printf(ui_format("AskSave", "Save the changes to %s?"), name.c_str());
         answer = ui_message_box(window, text.c_str(), ui_text("AskSaveTitle", "Editor"), MB_YESNOCANCEL | MB_ICONQUESTION);
     }
     if (answer == IDNO) {
@@ -510,15 +585,18 @@ bool ask_save(HWND window) {
         return true;
     }
     if (answer != IDYES) return false;
-    const std::string map = choose_map(window, true);
-    return !map.empty() && save_map(map);
+    return save_current(window);
 }
 
 // File > Map size: the objects outside the new size go (asked first), the map is saved and its file
 // resized (editor_newmap.cpp), then loaded again. A campaign map or the template is not resized in
-// place: it is saved under a name of its own first.
+// place: it is saved under a name of its own first. The editor's new map gets its name first.
 bool resize_current(HWND window, int w, int h) {
-    const std::string map = game_path(current_map());
+    std::string map = game_path(current_map());
+    if (auto_folder(folder_of(map))) {   // the new map: its name first
+        map = choose_map(window, true);
+        if (map.empty()) return false;
+    }
     const std::string lower = [&] {
         std::string s = map;
         for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
@@ -604,6 +682,7 @@ std::string choose_package(HWND owner, bool save, const std::string& name) {
 bool export_current(HWND window, const std::string& zip_given) {
     if (!g_held) return false;
     if (!ask_save(window)) return false;
+    if (auto_folder(folder_of(game_path(current_map()))) && !save_current(window)) return false;   // the new map: named
     const std::string map = game_path(current_map());
     if (game_folder_map(map)) {
         patch::log("exchange: %s is a map of the game - not exported", map.c_str());
@@ -742,7 +821,12 @@ void handle_command(HWND window, int id) {
     } else if (id == ID_RUN) {
         set_running(window, !g_running);
     } else if (id == ID_PLAY) {
-        if (!ask_save(window)) return;
+        // the new map gets its name first: the played game must not run from the scratch folder
+        if (auto_folder(folder_of(game_path(current_map())))) {
+            if (!save_current(window)) return;
+        } else if (!ask_save(window)) {
+            return;
+        }
         g_playing = true;   // the map stays for the game that plays it
         g_playing = restart_game(false, current_map(), true);   // back here when it ends
     } else if (id == ID_BACK) {
@@ -762,6 +846,12 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
     if (m == WM_KEYDOWN && w == 'R' && !(l & 0x40000000) && (g_ctrl || GetKeyState(VK_CONTROL) < 0) && !g_in_dialog &&
         !g_in_menu) {
         handle_command(window, ID_RUN);
+        return 0;
+    }
+    // Ctrl+S saves the map (save_current); File > Save (Alt+F2) always asks for the name
+    if (m == WM_KEYDOWN && w == 'S' && !(l & 0x40000000) && (g_ctrl || GetKeyState(VK_CONTROL) < 0) && !g_in_dialog &&
+        !g_in_menu) {
+        if (g_held) save_current(window);
         return 0;
     }
     if (g_held && !g_in_dialog && !g_in_menu && edit_message(window, m, w, l)) return 0;
@@ -901,6 +991,9 @@ void editor_level_loaded(void* w) {
     auto* world = static_cast<uint8_t*>(w);
     const char* map = *reinterpret_cast<const char**>(world + WORLD_LEVEL_FILE);
     if (g_enabled && !g_running && current_format(map)) {
+        // the map Ctrl+S saves into is the one loaded, whichever way it came (File > Load, a mission
+        // picked in the game's menus, StartEditorMode); the new map of the start keeps its scratch path
+        g_current = game_path(map);
         mission_load(game_path(map));
         hold_level(world, true);
         // the start's new map fills the view from its top-left corner (a new map's first view
@@ -918,6 +1011,11 @@ void editor_mission_settings() {
     uint8_t* w = world();
     if (HWND window = w ? *reinterpret_cast<HWND*>(w + WORLD_HWND) : nullptr) handle_command(window, ID_MISSION);
 }
+
+// editor_mission.cpp: the editor's new map, not saved yet (its folder is the scratch one), and the
+// title it has until then (ASCII capitals: the custom maps page's and the script's).
+bool editor_unsaved_map(const std::string& map) { return auto_folder(folder_of(game_path(map))); }
+std::string editor_new_map_title() { return ui_text("NewMapTitle", "NEW MAP"); }
 
 // mouse_pan.cpp pans a held level although it is paused.
 bool editor_level_held() { return g_held; }

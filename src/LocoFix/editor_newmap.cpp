@@ -34,6 +34,7 @@ std::string language_file(const std::string& path);   // language.cpp: the pack'
 #include <vector>
 
 void editor_load_map(const std::string& map);   // editor.cpp
+std::string editor_new_map_title();               // editor.cpp: the new map's title until it is saved
 
 namespace {
 
@@ -503,10 +504,48 @@ bool valid_name(const std::string& name) {
 
 // ---- resizing ----
 
-// The map file `map` (saved just before) at the size w x h: the right and the bottom edge move.
-// Growing gives it a ground image of its own - the old picture (its own or the campaign's) and a
-// meadow where it did not reach - with the ground object in the middle; cropping keeps the image
-// and the ground object (the picture goes on past the edge, out of the camera's reach).
+// Where the ground object stands (SPR); false when the map has none.
+bool ground_place(std::vector<Chunk>& chunks, float& x, float& y) {
+    Chunk* spr = chunk(chunks, "SPR ");
+    if (!spr) return false;
+    const std::string& r = spr->records[0];
+    for (size_t at = 0; at + 28 <= r.size() && static_cast<int32_t>(u32(r, at)) != -1; at += 28)
+        if (static_cast<int>(u32(r, at + 4)) == GROUND_NVID) {
+            std::memcpy(&x, &r[at + 8], 4);
+            std::memcpy(&y, &r[at + 12], 4);
+            return true;
+        }
+    return false;
+}
+
+// The part w x h of the map from its top-left corner of a ground picture drawn centred on (gx, gy),
+// as a picture of its own; where the old one does not reach, a meadow at the flat ground's height.
+Picture picture_on_map(const Picture& old, float gx, float gy, int w, int h, uint32_t seed) {
+    const int ox = static_cast<int>(std::lround(gx - old.width / 2.0f)), oy = static_cast<int>(std::lround(gy - old.height / 2.0f));
+    Picture p;
+    p.width = w;
+    p.height = h;
+    p.pixels.resize(static_cast<size_t>(w) * h);
+    p.heights.resize(static_cast<size_t>(w) * h);
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x) {
+            const int sx = x - ox, sy = y - oy;
+            const size_t to = static_cast<size_t>(y) * w + x;
+            if (sx >= 0 && sy >= 0 && sx < old.width && sy < old.height) {
+                p.pixels[to] = old.pixels[static_cast<size_t>(sy) * old.width + sx];
+                p.heights[to] = old.heights[static_cast<size_t>(sy) * old.width + sx];
+            } else {
+                p.pixels[to] = meadow(x, y, seed);
+                p.heights[to] = FLAT_PICTURE_HEIGHT;
+            }
+        }
+    return p;
+}
+
+// The map file `map` (saved just before) at the size w x h: the right and the bottom edge move. The
+// map gets a ground image of its own, <map>.vid, of exactly its new size: the old picture (its own or
+// the campaign's) where it lay on the map - grown, a meadow where it did not reach; cropped, cut at
+// the new edge, so nothing of the old ground is left past it - with the ground object in the middle.
 bool resize_map_file(const std::string& map, int w, int h, std::string& error) {
     std::vector<Chunk> chunks;
     if (!read_res(read_file(map), "MAP ", chunks)) {
@@ -522,32 +561,35 @@ bool resize_map_file(const std::string& map, int w, int h, std::string& error) {
     float f[2];
     std::memcpy(f, &head->records[0][0], 8);
     const int ow = static_cast<int>(f[0]), oh = static_cast<int>(f[1]);
-    const bool grows = w > ow || h > oh;
-    if (grows) {
+    if (w != ow || h != oh) {
         std::string* record = nullptr;
         for (std::string& r : obj->records)
             if (static_cast<int>(u32(r, 0)) == GROUND_NVID) record = &r;
         size_t start;
         const std::string old_image = record ? ground_image(*record, start) : "";
         Picture old;
+        float gx = ow / 2.0f, gy = oh / 2.0f;
+        ground_place(chunks, gx, gy);
         if (!record || old_image.empty() || !read_ground(old_image, old)) {
             error = ui_printf(ui_format("SizeNoImage", "the ground's image %s cannot be read"), old_image.c_str());
             return false;
         }
         const size_t dot = map.find_last_of('.');
         const std::string image = map.substr(0, dot) + ".vid";
-        if (!write_file(image, ground_vid(w, h, GetTickCount(), &old))) {
+        const uint32_t seed = GetTickCount();
+        const Picture cut = picture_on_map(old, gx, gy, w, h, seed);
+        if (!write_file(image, ground_vid(w, h, seed, &cut))) {
             error = ui_printf(ui_format("NewNotWritten", "%s could not be written"), image.c_str());
             return false;
         }
         *record = record->substr(0, start) + image + '\0';
     }
-    set_size(chunks, w, h, grows);
+    set_size(chunks, w, h, true);
     if (!write_file(map, write_res("MAP ", chunks))) {
         error = ui_printf(ui_format("NewNotWritten", "%s could not be written"), map.c_str());
         return false;
     }
-    patch::log("map size: %s %dx%d -> %dx%d%s", map.c_str(), ow, oh, w, h, grows ? ", a ground image of its own" : "");
+    patch::log("map size: %s %dx%d -> %dx%d, a ground image of its own of that size", map.c_str(), ow, oh, w, h);
     return true;
 }
 
@@ -860,19 +902,20 @@ void new_map_dialog(HWND owner) {
 }
 
 // The map the editor starts on (editor.cpp): what File > New makes with "an empty map: Grass" and
-// 2048 x 1536, in maps\map1\ - or map2, map3 ... the first folder not there yet -, titled MAP 1 ...
-// Returns its path (empty when it could not be made: the reason is in LocoFix.log).
+// 2048 x 1536, in the scratch folder maps\_new\ (_new2, _new3 ... while an older one is still there),
+// titled with editor_new_map_title(). Returns its path (empty when it could not be made: the reason
+// is in LocoFix.log).
 std::string make_start_map() {
     std::vector<uint16_t> sample;
     const std::vector<GroundTexture>& textures = ground_textures();
     for (size_t k = 0; k < textures.size() && sample.empty(); ++k)
         if (textures[k].key == "TexGrass") ground_texture_sample(static_cast<int>(k), sample);
-    for (int n = 1; n < 1000; ++n) {
-        const std::string name = "map" + std::to_string(n);
+    for (int n = 1; n < 100; ++n) {
+        const std::string name = n == 1 ? "_new" : "_new" + std::to_string(n);
         if (GetFileAttributesA(("maps\\" + name).c_str()) != INVALID_FILE_ATTRIBUTES) continue;
         std::string error;
         const std::string map = make_map(name, true, CAMPAIGN[0], 2048, 1536, error, sample.empty() ? nullptr : &sample,
-                                         "MAP " + std::to_string(n));
+                                         editor_new_map_title());
         if (map.empty()) patch::log("new map: %s", error.c_str());
         return map;
     }

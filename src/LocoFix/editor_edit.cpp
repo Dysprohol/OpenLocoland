@@ -322,6 +322,17 @@ void set_army_gammas() {
 
 // ---- object state and the undo history ----
 
+// A car's end on the rails (RailPos: its point, the distance, the link it goes along) by the places of
+// the point and of the link's other end. Undo and redo take rails away and lay them again:
+// RailDot_Release deletes a point no rail uses any more and RailMap_AddDot makes a new one, so a
+// pointer kept in the history could be a deleted point - Engine_OccupyDots then wrote into freed
+// memory and Engine_UpdatePosition read from it, and undoing far enough crashed the editor. The
+// point is found again where it was (RailMap_FindDot), the link by its other end (RailDot_FindLink).
+struct RailPlace {
+    bool dot = false, link = false;
+    int x = 0, y = 0, z = 0, ox = 0, oy = 0, oz = 0;
+};
+
 struct State {
     float x, y, z;
     int direction, army;
@@ -333,6 +344,7 @@ struct State {
     uint8_t* next = nullptr;
     uint32_t car_flags = 0;
     int front[4] = {}, rear[4] = {};
+    RailPlace front_at, rear_at;   // the points of front and rear by their place (rail_place)
     uint8_t* front_to = nullptr;   // the rail point the link of each end leads to (the link's index in its
     uint8_t* rear_to = nullptr;    // point changes when a rail next to it is deleted or put back)
     bool patrol = false;   // an order (a patrol, a drive, the enemy's AI task)
@@ -448,12 +460,51 @@ void set_order(uint8_t* o, bool on, const Order& order) {
     else g_patrols.erase(o);
 }
 
+using FindDot_t = uint8_t*(__fastcall*)(void* map, void* edx, int x, int y, int z);
+using FindLink_t = int(__fastcall*)(void* dot, void* edx, void* other);
+constexpr uintptr_t RAIL_MAP_FIND_DOT = 0x434fd0, DOT_FIND_LINK = 0x433f20;
+
+uint8_t* link_dot(uint8_t* dot, int link) {
+    if (!dot || link < 0 || link >= (std::min)(6, at<int>(dot, DOT_LINK_COUNT))) return nullptr;
+    return at<uint8_t*>(dot + DOT_LINKS + link * DOT_LINK_SIZE, LINK_DOT);
+}
+
 // The rail point the link of a RailPos leads to, and its link to that point found again.
 uint8_t* pos_target(uint8_t* pos) {
     uint8_t* dot = at<uint8_t*>(pos, POS_DOT);
     const int link = at<int>(pos, POS_LINK);
     if (!dot || link < 0 || link >= (std::min)(6, at<int>(dot, DOT_LINK_COUNT))) return nullptr;
     return at<uint8_t*>(dot + DOT_LINKS + link * DOT_LINK_SIZE, LINK_DOT);
+}
+
+// Only of a car on the map: a car taken away keeps the pointers it had, which may be gone.
+RailPlace rail_place(const int pos[4]) {
+    RailPlace p;
+    uint8_t* dot = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(static_cast<uint32_t>(pos[POS_DOT / 4])));
+    if (!dot) return p;
+    p.dot = true;
+    p.x = at<int>(dot, DOT_X), p.y = at<int>(dot, DOT_Y), p.z = at<int>(dot, DOT_Z);
+    if (uint8_t* other = link_dot(dot, pos[POS_LINK / 4])) {
+        p.link = true;
+        p.ox = at<int>(other, DOT_X), p.oy = at<int>(other, DOT_Y), p.oz = at<int>(other, DOT_Z);
+    }
+    return p;
+}
+
+// `pos` with its point and link as they are now at `p`'s places (the distance kept); no point when
+// there is none there.
+void place_pos(int pos[4], const RailPlace& p) {
+    uint8_t* dot = nullptr;
+    int link = 0;
+    if (p.dot) {
+        void* map = reinterpret_cast<void*>(G_RAIL_MAP);
+        dot = reinterpret_cast<FindDot_t>(RAIL_MAP_FIND_DOT)(map, nullptr, p.x, p.y, p.z);
+        uint8_t* other = dot && p.link ? reinterpret_cast<FindDot_t>(RAIL_MAP_FIND_DOT)(map, nullptr, p.ox, p.oy, p.oz)
+                                       : nullptr;
+        if (other) link = (std::max)(0, reinterpret_cast<FindLink_t>(DOT_FIND_LINK)(dot, nullptr, other));
+    }
+    pos[POS_DOT / 4] = static_cast<int>(reinterpret_cast<uintptr_t>(dot));
+    pos[POS_LINK / 4] = link;
 }
 
 void pos_relink(uint8_t* pos, uint8_t* target) {
@@ -473,6 +524,10 @@ State state_of(uint8_t* o) {
         s.car_flags = at<uint32_t>(o, E_FLAGS);
         std::memcpy(s.front, o + E_FRONT_DOT, sizeof s.front);
         std::memcpy(s.rear, o + E_REAR_DOT, sizeof s.rear);
+        if (s.present) {
+            s.front_at = rail_place(s.front);
+            s.rear_at = rail_place(s.rear);
+        }
         s.front_to = pos_target(o + E_FRONT_DOT);
         s.rear_to = pos_target(o + E_REAR_DOT);
         Order order;
@@ -563,26 +618,40 @@ void car_call(uintptr_t function, uint8_t* car) { reinterpret_cast<EngineCall_t>
 // A train car as it was: its couplings, its ends on the rails and its place between them
 // (Engine_UpdatePosition puts it halfway and turns it, its turret with it), the points it stands
 // on (Engine_LeaveDots / Engine_OccupyDots), its patrol.
+// The ends of a car on the map: its points found again where they were (place_pos).
+void set_car_ends(uint8_t* o, const State& s) {
+    int front[4], rear[4];
+    std::memcpy(front, s.front, sizeof front);
+    std::memcpy(rear, s.rear, sizeof rear);
+    place_pos(front, s.front_at);
+    place_pos(rear, s.rear_at);
+    std::memcpy(o + E_FRONT_DOT, front, sizeof front);
+    std::memcpy(o + E_REAR_DOT, rear, sizeof rear);
+}
+
 void restore_car(uint8_t* o, const State& s) {
     car_call(ENGINE_LEAVE_DOTS, o);
     at<uint8_t*>(o, E_PREV) = s.prev;
     at<uint8_t*>(o, E_NEXT) = s.next;
     at<uint32_t>(o, E_FLAGS) = s.car_flags;
-    std::memcpy(o + E_FRONT_DOT, s.front, sizeof s.front);
-    std::memcpy(o + E_REAR_DOT, s.rear, sizeof s.rear);
-    pos_relink(o + E_FRONT_DOT, s.front_to);   // the rails put back or taken out next to it reorder the links
-    pos_relink(o + E_REAR_DOT, s.rear_to);
+    set_car_ends(o, s);
     Order now;
     const bool has = order_of(o, now);
     if (has != s.patrol || now.x != s.patrol_x || now.y != s.patrol_y || now.z != s.patrol_z || (has && now.task != s.order))
         set_order(o, s.patrol, {s.order, s.patrol_x, s.patrol_y, s.patrol_z});
-    if (at<uint8_t*>(o, E_FRONT_DOT) && at<uint8_t*>(o, E_REAR_DOT)) car_call(ENGINE_UPDATE_POSITION, o);
+    uint8_t* front = at<uint8_t*>(o, E_FRONT_DOT);
+    uint8_t* rear = at<uint8_t*>(o, E_REAR_DOT);
+    if (link_dot(front, at<int>(o, E_FRONT_DOT + POS_LINK)) && link_dot(rear, at<int>(o, E_REAR_DOT + POS_LINK)))
+        car_call(ENGINE_UPDATE_POSITION, o);
     car_call(ENGINE_OCCUPY_DOTS, o);
 }
 
 void apply(uint8_t* o, const State& s) {
     const bool rail = class_of(o) == B_RAIL, car = class_of(o) == B_ENGINE;
     const bool inserted = s.present && removed(o);
+    // ACT_UNDO_INSERT of a car occupies the points it has: the ones of the state, not the ones it
+    // was taken away with
+    if (inserted && car && s.car) set_car_ends(o, s);
     if (inserted) act(o, ACT_UNDO_INSERT);
     if (!car && (s.x != at<float>(o, O_X) || s.y != at<float>(o, O_Y) || s.z != at<float>(o, O_Z)))
         reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, s.x, s.y, s.z);
@@ -642,6 +711,39 @@ struct Operation {
 
 std::vector<Operation> g_undo, g_redo;
 bool g_dirty = false;
+
+// The history is bounded: a stroke of the ground's tools keeps the picture's rectangle it changed
+// before and after (10 bytes a pixel - a stroke across a big map tens of MB), and the game runs in
+// 2 GB. At most HISTORY_STEPS steps and HISTORY_BYTES of them are kept, the oldest going first.
+constexpr size_t HISTORY_STEPS = 500, HISTORY_BYTES = 256u << 20;
+bool g_history_full = false;   // the oldest steps have gone (logged once a level)
+
+size_t op_bytes(const Operation& op) {
+    size_t n = sizeof op + op.changes.size() * sizeof(Change) + op.grid.size() * sizeof(GridChange);
+    for (const Change& c : op.changes) n += (c.before.items.size() + c.after.items.size()) * sizeof(short);
+    if (op.paint) {
+        const PaintPatch& p = *op.paint;
+        n += (p.colour_before.size() + p.height_before.size() + p.colour_after.size() + p.height_after.size()) *
+                 sizeof(uint16_t) +
+             p.texture_before.size() + p.texture_after.size();
+    }
+    return n;
+}
+
+// After a step was added: the oldest steps of undo go while there are too many or they are too big.
+void trim_history() {
+    size_t bytes = 0;
+    for (const Operation& op : g_undo) bytes += op_bytes(op);
+    size_t drop = 0;
+    while (drop + 1 < g_undo.size() && (g_undo.size() - drop > HISTORY_STEPS || bytes > HISTORY_BYTES))
+        bytes -= op_bytes(g_undo[drop++]);
+    if (!drop) return;
+    g_undo.erase(g_undo.begin(), g_undo.begin() + static_cast<std::ptrdiff_t>(drop));
+    if (g_history_full) return;
+    g_history_full = true;
+    patch::log("edit: the history keeps the last %u steps (%u KB); the oldest %u gone",
+               static_cast<unsigned>(g_undo.size()), static_cast<unsigned>(bytes >> 10), static_cast<unsigned>(drop));
+}
 std::vector<uint8_t*> g_selection;   // the selected object and its group (a fort's guns)
 std::string g_message;               // shown in the status line for a while
 DWORD g_message_time = 0;
@@ -664,6 +766,7 @@ void commit(const UiText& what, const std::vector<uint8_t*>& objects, const std:
     for (size_t i = 0; i < objects.size(); ++i) op.changes.push_back({objects[i], before[i], state_of(objects[i])});
     g_undo.push_back(op);
     g_redo.clear();
+    trim_history();
     g_dirty = true;
 }
 
@@ -672,6 +775,7 @@ void commit_lines(const UiText& what, const std::vector<PushLine>& before) {
     Operation op{what, {}, {}, true, before, mission_push_lines()};
     g_undo.push_back(op);
     g_redo.clear();
+    trim_history();
     g_dirty = true;
 }
 
@@ -713,7 +817,15 @@ void undo(bool redo) {
     end_line();
     Operation op = from.back();
     from.pop_back();
-    for (const Change& c : op.changes) apply(c.object, redo ? c.after : c.before);
+    // the cars leave their points before the rails under them go (RailDot_Release deletes a point no
+    // rail uses, and a car taken away later would write into it) and come back after the rails
+    auto is_car_change = [](const Change& c) { return class_of(c.object) == B_ENGINE; };
+    for (const Change& c : op.changes)
+        if (is_car_change(c) && !(redo ? c.after : c.before).present) apply(c.object, redo ? c.after : c.before);
+    for (const Change& c : op.changes)
+        if (!is_car_change(c)) apply(c.object, redo ? c.after : c.before);
+    for (const Change& c : op.changes)
+        if (is_car_change(c) && (redo ? c.after : c.before).present) apply(c.object, redo ? c.after : c.before);
     // a car taken away or put back (ACT_UNDO_REMOVE / INSERT) unlinks or relinks its neighbours:
     // the couplings of the cars of the step once more, as they are to be
     for (const Change& c : op.changes) {
@@ -2095,11 +2207,13 @@ void delete_objects(const std::vector<uint8_t*>& chosen) {
     for (uint8_t* c : crates) objects.push_back(c);   // decided when the rails are out
     for (uint8_t* c : others) objects.push_back(c);
     const std::vector<State> before = states(objects);
-    for (size_t i = 0; i < going; ++i) {   // through apply: a rail leaves the rail network
-        State gone = before[i];
-        gone.present = false;
-        apply(objects[i], gone);
-    }
+    for (int cars_first = 1; cars_first >= 0; --cars_first)   // the cars before the rails under them
+        for (size_t i = 0; i < going; ++i) {   // through apply: a rail leaves the rail network
+            if ((class_of(objects[i]) == B_ENGINE) != (cars_first == 1)) continue;
+            State gone = before[i];
+            gone.present = false;
+            apply(objects[i], gone);
+        }
     unsigned crates_gone = 0;
     for (size_t i = going; i < going + crates.size(); ++i)
         if (crate_left(objects[i])) {
@@ -6838,13 +6952,37 @@ void edit_command(int id) {
     else if (id == ID_SEMAPHORE) toggle_semaphore();
 }
 
-// A level goes away (or comes): its objects with it.
+// A level goes away (or comes): its objects with it, and everything the editor kept of it - the
+// history, the selection, a stroke or a line under way (and the stroke's repeat timer), the panels,
+// the picks, the status line's texts and message, the hit boxes of the last frame, the heights'
+// view; the tool goes back to Select. Only the brushes' settings and the palette (objects.res) stay.
 void edit_reset() {
+    if (g_window) KillTimer(g_window, HEIGHT_TIMER);
+    g_stroke = Stroke();
+    g_entry = 0;
+    g_place_direction = 0;
+    g_post_flip = false;
+    g_push_begin = {};
+    g_line_level_known = false;
+    g_line_nvid = VID_RAIL;
+    g_order_task = TASK_PATROL;
+    g_show_heights = false;
+    g_region_start = {-1, -1};
+    g_message.clear();
+    g_message_time = 0;
+    for (std::string* s : {&g_place_status, &g_track_status, &g_push_status, &g_line_status, &g_enemy_status,
+                           &g_ground_status, &g_arrival_status})
+        s->clear();
+    g_line_hover = 0;
+    g_option_hits.clear();
+    g_option_rows.clear();
+    g_context_hits.clear();
     panel_reset();
     arrivals_reset();
     factory_reset();
     g_undo.clear();
     g_redo.clear();
+    g_history_full = false;
     g_selection.clear();
     g_drag = Drag();
     g_dirty = false;
@@ -6937,6 +7075,8 @@ void edit_saved() { g_dirty = false; }
 
 // editor_mission.cpp: a message of the status line (a save that could not write everything).
 void edit_message_text(const char* key, const char* english) { message_by([&] { return ui_text(key, english); }); }
+// editor.cpp: the map was saved as `map`.
+void edit_message_saved(const std::string& map) { MESSAGE("MsgSaved", "saved as %s", map.c_str()); }
 
 void install_editor_edit() {
     char value[8] = {};
@@ -7030,8 +7170,9 @@ void edit_level_held() {
 void edit_touch() { g_dirty = true; }
 
 // editor.cpp's File > Map size: the size of the held map, and the objects that a size w x h leaves
-// outside - counted, or deleted (one step of the history). The track goes on out of sight at the
-// ends of the main line, so rails, their beds and the cars on them up to 300 px past the new edge stay.
+// outside - counted, or deleted (one step of the history), the Water tool's tiles too. The track goes on
+// out of sight at the ends of the main line, so rails, their beds and the cars on them up to 300 px past
+// the new edge stay.
 void edit_map_size(int& w, int& h) {
     w = grid_width() * 8;
     h = grid_height() * 8;
@@ -7040,7 +7181,7 @@ void edit_map_size(int& w, int& h) {
 int edit_outside(int w, int h, bool remove) {
     std::vector<uint8_t*> out;
     for_each_object([&](uint8_t* o) {
-        if (!pickable(o) && !is_bed(nvid_of(o))) return;
+        if (!pickable(o) && !is_bed(nvid_of(o)) && !(is_water_tile(nvid_of(o)) && !removed(o))) return;
         const float x = at<float>(o, O_X), y = at<float>(o, O_Y);
         if (x >= 0 && y >= 0 && x < w && y < h) return;
         const bool track = class_of(o) == B_RAIL || class_of(o) == B_ENGINE || is_bed(nvid_of(o));
@@ -7048,7 +7189,13 @@ int edit_outside(int w, int h, bool remove) {
         if (track && beyond <= 300) return;
         out.push_back(o);
     });
-    if (remove && !out.empty()) delete_objects(out);
+    if (remove && !out.empty()) {
+        // the cars first: a rail is not deleted while a car stands on it
+        std::vector<uint8_t*> cars, rest;
+        for (uint8_t* o : out) (class_of(o) == B_ENGINE ? cars : rest).push_back(o);
+        delete_objects(cars);
+        delete_objects(rest);
+    }
     return static_cast<int>(out.size());
 }
 
@@ -7061,6 +7208,7 @@ void edit_commit_factories(const UiText& what, const FactoryState& before) {
     op.factories_after = mission_factories();
     g_undo.push_back(op);
     g_redo.clear();
+    trim_history();
     g_dirty = true;
     MESSAGE("MsgFactories", "factory: %s", what.get());
 }
@@ -7080,6 +7228,7 @@ void edit_commit_mission(const ArrivalsState& arrivals_before, const FactoryStat
     op.factories_after = mission_factories();
     g_undo.push_back(op);
     g_redo.clear();
+    trim_history();
     g_dirty = true;
 }
 
@@ -7137,6 +7286,7 @@ void edit_commit_arrivals(const UiText& what, const ArrivalsState& before) {
     op.arrivals_after = mission_arrivals();
     g_undo.push_back(op);
     g_redo.clear();
+    trim_history();
     g_dirty = true;
     MESSAGE("MsgArrivals", "arrivals: %s", what.get());
 }
