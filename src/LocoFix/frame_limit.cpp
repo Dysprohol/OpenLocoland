@@ -35,6 +35,7 @@ const char* test_map_replace(const char* requested);
 void test_map_check(void* world);
 // editor.cpp: editor mode holds every level it loads
 void editor_level_loading(void* world);
+const char* editor_level_redirect(const char* map);
 void editor_level_loaded(void* world);
 void restart_level_loading(const char* map);   // restart.cpp
 
@@ -157,7 +158,7 @@ const auto g_level_load = reinterpret_cast<LevelLoad_t>(LEVEL_LOAD);
 
 int __fastcall LevelLoad_measured(void* world, void* edx, const char* name) {
     report_level();
-    const char* map = test_map_replace(name);
+    const char* map = editor_level_redirect(test_map_replace(name));
     lstrcpynA(g_level, map ? map : "?", sizeof g_level);
     restart_level_loading(map);
     editor_level_loading(world);

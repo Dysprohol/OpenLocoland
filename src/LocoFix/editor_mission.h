@@ -48,8 +48,9 @@ bool mission_managed();
 // After a level is loaded in editor mode: reads the mission of the map's script.
 void mission_load(const std::string& map);
 // File > Mission settings...: true when the settings were changed; `open_arrivals` true when it
-// ended with its Arrivals... button (a map whose arrivals the editor runs).
-bool mission_dialog(HWND owner, bool* open_arrivals = nullptr);
+// ended with its Arrivals... button (a map whose arrivals the editor runs), `open_plan` with its
+// Plan... button (the enemy factory's panel).
+bool mission_dialog(HWND owner, bool* open_arrivals = nullptr, bool* open_plan = nullptr);
 // After the map was saved as `map`: its script (a new map gets one), the texts and its entry
 // on the custom maps page.
 void mission_save(const std::string& map);
@@ -87,6 +88,18 @@ enum ArrivalIf : int {
     IF_CAMPAIGN,         // no train and a neutral factory stands (the campaign's reinforcements)
     IF_COUNT
 };
+// The conditions as one list - the WHEN of an arrival and of a factory's plan entry (later of the
+// messages and objectives): the runner's MissionIf(code, n) tests them, the panels name them.
+struct Condition {
+    int code;               // ArrivalIf
+    const char* key;        // [Editor] key of its words, and the words in English
+    const char* english;
+    bool number;            // it takes n
+    int first, step;        // n when it is chosen, and the step of - n +
+    bool enemy;             // offered for the enemy's factory (the player paying is not)
+};
+const std::vector<Condition>& mission_conditions();
+const Condition& mission_condition(int code);
 struct Arrival {
     int army = 0;                      // 0 ours, 1 enemy, 2 neutral, 3 pirates
     std::vector<int> cars{5};          // VIDs, the first one in front
@@ -118,21 +131,53 @@ ArrivalsState& mission_arrivals();
 // ---- factories (a factory's panel, editor_factory.cpp) ----
 //
 // What the factories build is the map's: each factory's build list is its Unit.items (SPRD, the
-// order of its F keys). The script adds what the map cannot hold: the enemy's queue - the AI of
-// army 1 builds it in its first free factory (level_queue_*, ai_events.lgc DepoFree; it ignores
-// the build list, and the factories of the other armies build nothing by themselves) -, the units
-// a factory gets later in play and the player's unit limits (FactoryTact of the runner, so these
-// two need a map that runs arrivals).
+// order of its F keys). The script adds what the map cannot hold: the enemy's plan - the AI of
+// army 1 builds the authors' queue in its first free factory (level_queue_*, ai_events.lgc DepoFree;
+// it ignores the build list, and the factories of the other armies build nothing by themselves), and
+// in a map that runs arrivals the runner's PlanTact puts each entry of the plan into that queue when
+// it is due (its time, the previous entry built, a condition; again and again) -, the units a factory
+// gets later in play and the player's unit limits (FactoryTact of the runner, so these need a map
+// that runs arrivals).
+enum PlanWhen : int {
+    WHEN_AT = 0,   // `time` s from the start
+    WHEN_AFTER,    // `time` s after the previous entry's first train was built (the first entry: from the start)
+    WHEN_IF,       // while the condition holds, not before `time` s
+};
 struct FactoryTrain {
-    int time = 60;                    // s: the earliest it is built (level_queue_times)
-    std::vector<int> cars{5, 20, 20};
-    int type = -1;                    // the type it was read with (a difficulty's train), -1 none
-    std::vector<int> type_cars;       // the cars that type gave: while they are its cars, the type stays
-    int task = TASK_ATTACK;           // TASK_ATTACK, TASK_GUARD (tx, ty) or TASK_PATROL (tx ... ty2)
-    int tx = 0, ty = 0, tx2 = 0, ty2 = 0;
+    int time = 60;                    // s (WHEN_AT, WHEN_AFTER, WHEN_IF's earliest)
+    int when = WHEN_AT;
+    int cond = IF_NO_TRAIN, cond_n = 0;   // WHEN_IF: the condition (Condition)
+    int times = 1, every = 120;       // waves: 1 once, n, 0 without end; the next one `every` s after the previous was built
+    std::vector<int> cars{5, 20, 20}; // the train as it leaves the factory, its first car first
+    int type = -1;                    // the type it was read with, -1 none (the writer makes a type of the cars)
+    std::vector<int> type_cars;
+    // the enemy's (factory nullptr): TASK_ATTACK, TASK_GUARD (tx, ty) or TASK_PATROL (tx ... ty2), the AI's;
+    // the others': TASK_NONE (stays), TASK_DRIVE (tx, ty, tz) or TASK_PATROL (tx, ty, tz to tx2, ty2)
+    int task = TASK_ATTACK;
+    int tx = 0, ty = 0, tz = 0, tx2 = 0, ty2 = 0;
+    // a train of ours, the neutrals' or the pirates' factory: the runner orders that factory (by its
+    // place, fx, fy) to build it, car by car - the entry belongs to it; nullptr: the enemy's plan
+    void* factory = nullptr;
+    int fx = 0, fy = 0;
     bool operator==(const FactoryTrain& o) const {
-        return time == o.time && cars == o.cars && type == o.type && task == o.task && tx == o.tx && ty == o.ty &&
-               tx2 == o.tx2 && ty2 == o.ty2;
+        return time == o.time && when == o.when && cond == o.cond && cond_n == o.cond_n && times == o.times && every == o.every &&
+               cars == o.cars && type == o.type && task == o.task && tx == o.tx && ty == o.ty && tz == o.tz && tx2 == o.tx2 &&
+               ty2 == o.ty2 && factory == o.factory && fx == o.fx && fy == o.fy;
+    }
+};
+// The authors' knobs of the enemy's AI (TrainsTact.lgc, ai_events.lgc) as the map sets them.
+struct AiKnobs {
+    int limit = 2;         // LIMIT_ATACKERS: the factory builds while fewer of the AI's trains attack
+    int renew_wait = 45;   // RENEW_TIMEOUT: s before a lost start train is built again (+- half at random)
+    int raid_length = 15;  // FIRSTCONTACTTIME: s a raid lasts before the train goes back to its task
+    int raids_from = 30;   // FIRSTATTACKTIME: s from the start before raids (x2 on easy, x1.5 normal, x1 hard)
+    int all_attack = 20;   // STG_DESTROY_TIME: min - only mission 2's own code reads it
+    int renew = -1;        // start_trains_renew of every start train: -1 each its own, 0 no, 1 yes
+    int raid = -1;         // start_trains_random_task: -1 each its own, 0 none, else every n s (+- 15)
+    int clever = 1;        // SetCleverEnemyAttack: the engine's attack that counts with the weapons' range
+    bool operator==(const AiKnobs& o) const {
+        return limit == o.limit && renew_wait == o.renew_wait && raid_length == o.raid_length && raids_from == o.raids_from &&
+               all_attack == o.all_attack && renew == o.renew && raid == o.raid && clever == o.clever;
     }
 };
 struct UnitLimit {   // AddUnitLimit: the army has at most `max` of the VID on the map
@@ -147,10 +192,13 @@ struct UnitUnlock {   // the factory at the map point x, y gets the VID into its
     }
 };
 struct FactoryState {
-    std::vector<FactoryTrain> queue;
+    std::vector<FactoryTrain> queue;   // the enemy's plan
     std::vector<UnitLimit> limits;
     std::vector<UnitUnlock> unlocks;
-    bool operator==(const FactoryState& o) const { return queue == o.queue && limits == o.limits && unlocks == o.unlocks; }
+    AiKnobs ai;
+    bool operator==(const FactoryState& o) const {
+        return queue == o.queue && limits == o.limits && unlocks == o.unlocks && ai == o.ai;
+    }
 };
 FactoryState& mission_factories();
 // The authors' reinforcement of the script as it was read: waves and their train.
@@ -168,6 +216,16 @@ struct TrainTemplate {
     std::vector<int> cars;
 };
 const std::vector<TrainTemplate>& mission_train_templates();
+// The authors' trains as the game's scripts declare them (TrainsTactDeclares.lgc and the missions'
+// own this_trainNN[]), the cars in their order, for the panels' TEMPLATE... lists, and a train's name.
+struct AuthorTrain {
+    int type;                // ATT_... number
+    int mission;             // 0 TrainsTactDeclares.lgc, else the mission that declares it
+    std::vector<int> cars;
+    std::string att;         // its ATT_ name
+};
+const std::vector<AuthorTrain>& mission_author_trains();
+std::string mission_author_train_name(const AuthorTrain& t);
 // The AI's limits a map's arrivals and start trains share: patrols and posts (ATA_PATROL0-9,
 // ATA_STAND0-9), and the enemy trains at the start and from its factory. The patrols and posts
 // past ten are written as attacks (ATA_FIGHT); the panels warn of them.

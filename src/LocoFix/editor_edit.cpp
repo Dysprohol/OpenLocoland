@@ -66,6 +66,7 @@
 #include <functional>
 #include <map>
 #include <set>
+#include <tuple>
 #include <vector>
 
 void window_to_logical(POINT& p);   // screen_scaling.cpp
@@ -90,6 +91,7 @@ void panel_open_arrivals();         // editor_panel.cpp: the Arrivals panel (edi
 void arrivals_reset();
 void factory_reset();   // editor_factory.cpp
 int arrivals_selected();
+void arrivals_select(int i);
 void panel_open_factory(void* factory);   // editor_panel.cpp: a factory's panel (editor_factory.cpp)
 void edit_commit_arrivals(const UiText& what, const ArrivalsState& before);   // below
 bool edit_arrivals_track_gone(ArrivalsState& s);                                 // below
@@ -269,7 +271,8 @@ void set_red(uint8_t* o, bool on) {
 // The colours of the armies are not in objects.res: the mission script sets them when the level
 // starts - SetArmyGamma() of maps\script\setarmygamma.lgc, called by InitDefault - with
 // SetVid(nvid, VID_GAMMA + army, value) for the units, the buildings' flags (VID 175, 770-774) and
-// the state bar's icons (not set here: the editor's bar draws them untinted). A held level runs no
+// the state bar's icons (VID 455: the editor's bar draws them untinted, so the gammas a level run
+// from the editor gave them - lit for army 0 - are taken back). A held level runs no
 // script, so every army looked the same; the editor sets the same gammas (SetVidData 18-21: Gamma_FromScriptInt, then the VID's SetGamma, vtable
 // slot 7). The buildings' flags are their linked objects (Object_CreateLinked: the fort and the
 // mine link VID 175, the factory and the repair point a light that links it), coloured by army.
@@ -317,6 +320,7 @@ void set_army_gammas() {
         for (int nvid : ARMY_GAMMA_VIDS) set_vid_gamma(nvid, army, ARMY_GAMMA[army]);
         set_vid_gamma(95, army, ARMY_GAMMA[army == 3 ? 2 : army]);   // as the script has it
         for (int nvid : FLAG_VIDS) set_vid_gamma(nvid, army, FLAG_GAMMA[army]);
+        set_vid_gamma(VID_ICONS, army, 0);
     }
 }
 
@@ -1730,7 +1734,10 @@ void reverse_train(uint8_t* c) {
     const std::vector<uint8_t*> cars = all_cars();
     const std::vector<State> before = states(cars);
     car_call(ENGINE_LEAVE_DOTS, c);
+    // Train_Reverse only swaps the train's head: it toggles each car's "stands backwards" flag, so
+    // every car still faces the way it did - taken back, the cars really turn round (a lone car too)
     car_call(TRAIN_REVERSE, c);
+    for (uint8_t* k : train_of(c)) at<uint32_t>(k, E_FLAGS) ^= 1;
     for (uint8_t* k : train_of(c)) car_call(ENGINE_UPDATE_POSITION, k);
     occupy_all();
     commit_cars({"OpReverse", "turn round"}, cars, before);
@@ -5772,7 +5779,7 @@ void pick_queue_at(uint8_t* d) {
     FactoryTrain& t = f.queue[i];
     const POINT p = dot_screen(d);
     if (what == ArrivalPick::Second) t.tx2 = p.x, t.ty2 = p.y;
-    else t.tx = p.x, t.ty = p.y;
+    else t.tx = p.x, t.ty = p.y, t.tz = at<int>(d, DOT_Z);   // the height: a drive of ours, the neutrals' or the pirates'
     edit_commit_factories({"OpQueuePoint", "factory queue point"}, before);
     if (what == ArrivalPick::Point && t.task == TASK_PATROL) {
         g_arrival_pick = ArrivalPick::Second;
@@ -5907,6 +5914,47 @@ void draw_arrivals() {
             }
         }
     }
+}
+
+// The arrival whose marker is under the mouse (the view's point m), -1 none: an entry's square or its
+// "ENTRY n" - the chosen arrival when it comes from there, then the next one from there at each
+// click -, the chosen arrival's points and their "ARRIVAL n".
+int arrival_marker_at(POINT m) {
+    const ArrivalsState& s = mission_arrivals();
+    if (!s.on || s.list.empty()) return -1;
+    uint8_t* w = world();
+    const float mx = at<float>(w, W_CAMERA_X) + m.x, my = at<float>(w, W_CAMERA_Y) + m.y;
+    auto on = [&](int x, int y, float label) {   // the square, or the label right of it
+        const float dx = mx - x, dy = my - y;
+        return (std::fabs(dx) <= 9 && std::fabs(dy) <= 9) || (dx > 8 && dx < 8 + label && dy > -9 && dy < 9);
+    };
+    const int n = static_cast<int>(s.list.size()), chosen = arrivals_selected();
+    if (chosen >= 0 && chosen < n) {
+        const Arrival& a = s.list[chosen];
+        if ((a.tx || a.ty) && on(a.tx, a.ty, 80)) return chosen;
+        if (a.task == TASK_PATROL && (a.tx2 || a.ty2) && on(a.tx2, a.ty2, 0)) return chosen;
+    }
+    for (int i = 0; i < n; ++i) {
+        const Arrival& a = s.list[i];
+        if (!a.entry || !on(a.x, a.y, 70)) continue;
+        // from this entry: after the chosen one, the next (round), else the first
+        for (int k = 1; k <= n; ++k) {
+            const int j = ((chosen >= 0 ? chosen : -1) + k) % n;
+            if (s.list[j].entry && s.list[j].x == a.x && s.list[j].y == a.y) return j;
+        }
+        return i;
+    }
+    return -1;
+}
+
+// A click on an arrival's marker: that arrival in the Arrivals panel.
+bool arrival_marker_click(POINT m) {
+    const int i = arrival_marker_at(m);
+    if (i < 0) return false;
+    arrivals_select(i);
+    panel_open_arrivals();
+    patch::log("edit: arrival %d chosen on the map", i + 1);
+    return true;
 }
 
 // ---- the context panel ----
@@ -6747,6 +6795,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             pick_arrival_at(cursor_dot());
             return true;
         }
+        if (entry().tool == Tool::Select && arrival_marker_click(g_mouse)) return true;
         uint8_t* w0 = world();
         const float x = at<float>(w0, W_CAMERA_X) + g_mouse.x, y = at<float>(w0, W_CAMERA_Y) + g_mouse.y;
         if (entry().tool == Tool::Place) {
@@ -6872,6 +6921,10 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             return true;
         }
         if (entry().tool == Tool::Select && !on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
+            if (arrival_marker_click(g_mouse)) {
+                g_context = nullptr;
+                return true;
+            }
             uint8_t* w0 = world();
             const int li = line_at(static_cast<int>(at<float>(w0, W_CAMERA_X) + g_mouse.x), static_cast<int>(at<float>(w0, W_CAMERA_Y) + g_mouse.y));
             if (li >= 0 && li != g_context_line) {   // a push line's panel
@@ -7153,6 +7206,200 @@ void edit_bar_box(float& l, float& t, float& r, float& b) {
 }
 void edit_saved() { g_dirty = false; }
 
+// editor.cpp's Run the level: the chosen object, found again by its VID and place once the level is
+// loaded again (held); the tool stays as it is.
+std::vector<std::pair<int, std::pair<float, float>>> g_remembered;
+void edit_remember_selection() {
+    g_remembered.clear();
+    if (!g_selection.empty())
+        g_remembered.push_back({nvid_of(g_selection.front()), {at<float>(g_selection.front(), O_X), at<float>(g_selection.front(), O_Y)}});
+}
+// ... and the undo history over the load: before the run every object of the level (in the order the
+// world lists them, which the save keeps) and the rail points the history's cars stand on (by their
+// place and the place of the link's other point); after the load held again, the new objects are
+// matched by that order, VID and place, a deleted one the history can bring back is made again and
+// hidden, and the history's pointers - its objects, the cars' couplings and rail positions, the
+// factories of the later units - point at the new ones.
+struct KeptObject {
+    uint8_t* old;
+    int nvid;
+    float x, y, z;
+    int direction, army;
+    bool removed;
+};
+struct DotKey {
+    int x, y, z, ox, oy, oz;   // the point, and the link's other point (-1000000: none)
+    bool operator<(const DotKey& k) const {
+        return std::tie(x, y, z, ox, oy, oz) < std::tie(k.x, k.y, k.z, k.ox, k.oy, k.oz);
+    }
+};
+std::vector<KeptObject> g_kept;
+std::map<std::pair<uint8_t*, int>, DotKey> g_kept_dots;   // (dot, link) -> places
+std::vector<Operation> g_kept_undo, g_kept_redo;
+bool g_kept_valid = false;
+
+uint8_t* pos_dot(const int* pos) { return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(static_cast<uint32_t>(pos[0]))); }
+
+DotKey dot_key(uint8_t* dot, int link) {
+    DotKey k{at<int>(dot, DOT_X), at<int>(dot, DOT_Y), at<int>(dot, DOT_Z), -1000000, -1000000, -1000000};
+    if (link >= 0 && link < at<int>(dot, DOT_LINK_COUNT))
+        if (uint8_t* other = at<uint8_t*>(dot + DOT_LINKS + link * DOT_LINK_SIZE, LINK_DOT))
+            k.ox = at<int>(other, DOT_X), k.oy = at<int>(other, DOT_Y), k.oz = at<int>(other, DOT_Z);
+    return k;
+}
+
+void keep_position(const int* pos, const std::set<uint8_t*>& dots) {
+    uint8_t* dot = pos_dot(pos);
+    if (dot && dots.count(dot) && !g_kept_dots.count({dot, pos[3]})) g_kept_dots[{dot, pos[3]}] = dot_key(dot, pos[3]);
+}
+
+void edit_keep_history() {
+    g_kept.clear();
+    g_kept_dots.clear();
+    for_each_object([](uint8_t* o) {
+        g_kept.push_back({o, nvid_of(o), at<float>(o, O_X), at<float>(o, O_Y), at<float>(o, O_Z), at<int>(o, O_DIRECTION), army_of(o),
+                          removed(o)});
+    });
+    const std::vector<uint8_t*> all = rail_dots();
+    const std::set<uint8_t*> dots(all.begin(), all.end());
+    for (auto* ops : {&g_undo, &g_redo})
+        for (const Operation& op : *ops)
+            for (const Change& c : op.changes)
+                for (const State* st : {&c.before, &c.after})
+                    if (st->car) {
+                        keep_position(st->front, dots);
+                        keep_position(st->rear, dots);
+                    }
+    g_kept_undo = g_undo;
+    g_kept_redo = g_redo;
+    g_kept_valid = true;
+    patch::log("edit: run - %u objects and %u steps of the history kept", static_cast<unsigned>(g_kept.size()),
+               static_cast<unsigned>(g_undo.size() + g_redo.size()));
+}
+
+void edit_restore_history() {
+    if (!g_kept_valid) return;
+    g_kept_valid = false;
+    // the objects of the load, in the world's order: the old live ones matched in order, else by VID and place
+    std::vector<uint8_t*> now;
+    for_each_object([&](uint8_t* o) {
+        if (!removed(o)) now.push_back(o);
+    });
+    std::map<uint8_t*, uint8_t*> to;
+    std::set<uint8_t*> taken;
+    size_t k = 0;
+    std::vector<const KeptObject*> unmatched;
+    for (const KeptObject& o : g_kept) {
+        if (o.removed) continue;
+        if (k < now.size() && nvid_of(now[k]) == o.nvid && std::fabs(at<float>(now[k], O_X) - o.x) < 1 &&
+            std::fabs(at<float>(now[k], O_Y) - o.y) < 1) {
+            to[o.old] = now[k];
+            taken.insert(now[k++]);
+        } else {
+            unmatched.push_back(&o);
+        }
+    }
+    for (const KeptObject* o : unmatched) {
+        uint8_t* best = nullptr;
+        float best_d = 3;
+        for (uint8_t* n : now) {
+            if (taken.count(n) || nvid_of(n) != o->nvid) continue;
+            const float d = std::hypot(at<float>(n, O_X) - o->x, at<float>(n, O_Y) - o->y);
+            if (d < best_d) best_d = d, best = n;
+        }
+        if (best) {
+            to[o->old] = best;
+            taken.insert(best);
+        }
+    }
+    // the deleted ones the history refers to: made again, hidden
+    std::set<uint8_t*> referred;
+    for (auto* ops : {&g_kept_undo, &g_kept_redo})
+        for (const Operation& op : *ops)
+            for (const Change& c : op.changes) referred.insert(c.object);
+    int made = 0;
+    for (const KeptObject& o : g_kept) {
+        if (!o.removed || !referred.count(o.old) || to.count(o.old)) continue;
+        if (uint8_t* n = create(o.nvid, o.x, o.y, o.z, o.direction, o.army)) {
+            to[o.old] = n;
+            if (class_of(n) == B_RAIL) rail_take_out(n);
+            act(n, ACT_UNDO_REMOVE);
+            ++made;
+        }
+    }
+    // the rail points of the load by their places
+    std::map<DotKey, std::pair<uint8_t*, int>> dots;
+    for (uint8_t* d : rail_dots())
+        for (int l = -1; l < at<int>(d, DOT_LINK_COUNT); ++l) dots[dot_key(d, l)] = {d, l};
+    auto object = [&](uint8_t* o) -> uint8_t* {
+        auto it = o ? to.find(o) : to.end();
+        return it == to.end() ? nullptr : it->second;
+    };
+    auto position = [&](int* pos) {
+        auto it = g_kept_dots.find({pos_dot(pos), pos[3]});
+        auto d = it == g_kept_dots.end() ? dots.end() : dots.find(it->second);
+        if (d == dots.end()) {   // a point that is gone: no position (the car is put back by its place)
+            pos[0] = 0;
+            return;
+        }
+        pos[0] = static_cast<int>(reinterpret_cast<uintptr_t>(d->second.first));
+        pos[3] = d->second.second;
+    };
+    auto factories = [&](FactoryState& f) {
+        for (UnitUnlock& u : f.unlocks) u.factory = object(static_cast<uint8_t*>(u.factory));
+    };
+    int lost = 0;
+    for (auto* ops : {&g_kept_undo, &g_kept_redo}) {
+        for (Operation& op : *ops) {
+            std::vector<Change> changes;
+            for (Change& c : op.changes) {
+                uint8_t* n = object(c.object);
+                if (!n) {
+                    ++lost;
+                    continue;
+                }
+                c.object = n;
+                for (State* st : {&c.before, &c.after})
+                    if (st->car) {
+                        st->prev = object(st->prev);
+                        st->next = object(st->next);
+                        position(st->front);
+                        position(st->rear);
+                    }
+                changes.push_back(c);
+            }
+            op.changes = changes;
+            if (op.factories) {
+                factories(op.factories_before);
+                factories(op.factories_after);
+            }
+        }
+    }
+    g_undo = std::move(g_kept_undo);
+    g_redo = std::move(g_kept_redo);
+    g_kept.clear();
+    g_kept_dots.clear();
+    patch::log("edit: back from the run - %u steps of the history, %d objects made again, %d changes lost",
+               static_cast<unsigned>(g_undo.size() + g_redo.size()), made, lost);
+}
+
+void edit_restore_selection() {
+    for (const auto& r : g_remembered) {
+        uint8_t* best = nullptr;
+        float best_d = 4;
+        for_each_object([&](uint8_t* o) {
+            if (removed(o) || nvid_of(o) != r.first) return;
+            const float d = std::hypot(at<float>(o, O_X) - r.second.first, at<float>(o, O_Y) - r.second.second);
+            if (d < best_d) {
+                best_d = d;
+                best = o;
+            }
+        });
+        if (best) select(best);
+    }
+    g_remembered.clear();
+}
+
 // editor_mission.cpp: a message of the status line (a save that could not write everything).
 void edit_message_text(const char* key, const char* english) { message_by([&] { return ui_text(key, english); }); }
 // editor.cpp: the map was saved as `map`.
@@ -7197,6 +7444,42 @@ std::vector<UnitUnlock> edit_place_unlocks(std::vector<UnitUnlock>& unlocks) {
     return placed;
 }
 
+// A plan entry of ours, the neutrals' or the pirates' factory read from the script: its factory by its place.
+static void find_plan_factory(FactoryTrain& t) {
+    float best = 30;
+    for_each_object([&](uint8_t* o) {
+        const float d = std::hypot(at<float>(o, O_X) - t.fx, at<float>(o, O_Y) - t.fy);
+        if (nvid_of(o) == VID_DEPOT && d <= best) {
+            best = d;
+            t.factory = o;
+        }
+    });
+    if (!t.factory) patch::log("edit: no factory at %d,%d for its plan", t.fx, t.fy);
+}
+
+// editor_mission.cpp, writing the settings: each plan entry's army - the enemy's 1; one of a factory
+// 0, 2 or 3 with the factory's place as it stands now; -1 for one not to write: its factory is gone
+// (an undo brings it back) or is the enemy's now (whose AI builds the enemy's plan only).
+std::vector<int> edit_place_plans(std::vector<FactoryTrain>& plans) {
+    std::vector<int> armies;
+    for (FactoryTrain& t : plans) {
+        if (!t.factory && !(t.fx || t.fy)) {
+            armies.push_back(1);
+            continue;
+        }
+        if (!t.factory) find_plan_factory(t);
+        uint8_t* f = static_cast<uint8_t*>(t.factory);
+        if (!f || removed(f) || army_of(f) == 1) {
+            armies.push_back(-1);
+            continue;
+        }
+        t.fx = static_cast<int>(std::lround(at<float>(f, O_X)));
+        t.fy = static_cast<int>(std::lround(at<float>(f, O_Y)));
+        armies.push_back(army_of(f));
+    }
+    return armies;
+}
+
 // The trains' orders of the mission's script (and of a test file): each to the car of that VID
 // standing at its place.
 void edit_assign_orders() {
@@ -7219,6 +7502,8 @@ void edit_assign_orders() {
 // editor.cpp after a level is held: the decals it has, for the bar.
 void edit_level_held() {
     for (UnitUnlock& u : mission_factories().unlocks) find_unlock_factory(u);
+    for (FactoryTrain& t : mission_factories().queue)
+        if (!t.factory && (t.fx || t.fy)) find_plan_factory(t);
     set_army_gammas();
     // Reset palette cache so editor icons use correct frames after run mode
     reset_palette_cache();
@@ -7342,6 +7627,26 @@ void edit_factory_change(void* factory, const std::vector<int>& items, const Fac
     MESSAGE("MsgFactories", "factory: %s", what.get());
 }
 
+// Mission settings' Plan... button: the panel of the map's first enemy factory, where its plan is.
+void edit_open_enemy_factory() {
+    uint8_t* found = nullptr;
+    for_each_object([&](uint8_t* o) {
+        if (!found && nvid_of(o) == VID_DEPOT && army_of(o) == 1 && !removed(o)) found = o;
+    });
+    if (found) panel_open_factory(found);
+    else MESSAGE("MsgNoEnemyFactory", "the map has no enemy factory: its plan is built by one");
+}
+
+// Test mode: the panel of the factory within 60 px of a map point; false when there is none.
+bool edit_open_factory_at(float x, float y) {
+    uint8_t* found = nullptr;
+    for_each_object([&](uint8_t* o) {
+        if (!found && nvid_of(o) == VID_DEPOT && !removed(o) && std::hypot(at<float>(o, O_X) - x, at<float>(o, O_Y) - y) <= 60) found = o;
+    });
+    if (found) panel_open_factory(found);
+    return found != nullptr;
+}
+
 // A point of a train of the enemy's factory queue picked on the map, then the factory's panel again.
 void edit_pick_queue_point(void* factory, int train) {
     panel_reset();
@@ -7408,36 +7713,46 @@ int edit_entry_state(int i) {
     return has_entry_line(d) ? 1 : 2;
 }
 
-// "+ ENTRY LINE": the entry's push line into the map and its semaphores, one step of the history.
+// The lights on an entry's way into the map: the first pair of posts within ENTRY_LIGHTS px along the
+// track (edit_posts_on_way, the posts' side of the signals); `at` their rail point.
+constexpr int ENTRY_LIGHTS = 400;
+bool edit_posts_on_way(int x, int y, int max_px, POINT& at);   // below: the posts' side
+bool edit_place_entry_posts(int x, int y, PushLine& line);
+bool edit_entry_lights(int i, POINT& at) {
+    const ArrivalsState& s = mission_arrivals();
+    if (i < 0 || i >= static_cast<int>(s.list.size()) || !s.list[i].entry) return false;
+    return edit_posts_on_way(s.list[i].x, s.list[i].y, ENTRY_LIGHTS, at);
+}
+
+// "+ ENTRY LINE" - the entry's line and its lights are one thing, as in the missions (MAP_RULES.md 7):
+// with a pair of posts on the way in the line ends at them, else the pair is put the first place
+// inside the map with its line (edit_place_entry_posts). One step of the history.
 void edit_add_entry_line(int i) {
     const ArrivalsState& s = mission_arrivals();
     if (edit_entry_state(i) != 2) return;
-    uint8_t* begin = nearest_dot(s.list[i].x, s.list[i].y);
-    const Trace way = entry_way(begin);
-    if (way.error || way.path.size() < 2) {
+    const Arrival& a = s.list[i];
+    POINT at;
+    if (edit_entry_lights(i, at)) {
+        uint8_t* begin = nearest_dot(a.x, a.y);
+        const PushLine line{begin ? dot_screen(begin).x : a.x, begin ? dot_screen(begin).y : a.y, at.x, at.y, 1};
+        const Trace t = trace(line);
+        if (t.error || t.path.size() < 2) {
+            MESSAGE("MsgPushBad", "push line %d,%d -> %d,%d: %s", line.bx, line.by, line.ex, line.ey,
+                    t.error ? push_error(t.error) : ui_text("WordSamePoint", "the same point"));
+            return;
+        }
+        const std::vector<PushLine> before = mission_push_lines();
+        mission_push_lines().push_back(line);
+        commit_lines({"OpEntryLine", "entry line"}, before);
+        MESSAGE("MsgEntryLineLights", "arrival %d: entry line %d,%d -> the lights at %d,%d", i + 1, line.bx, line.by, at.x, at.y);
+        return;
+    }
+    PushLine line;
+    if (!edit_place_entry_posts(a.x, a.y, line)) {
         MESSAGE("MsgEntryNoWay", "arrival %d: no track from its entry into the map", i + 1);
         return;
     }
-    const POINT b = dot_screen(way.path.front()), e = dot_screen(way.path.back());
-    const PushLine line{b.x, b.y, e.x, e.y, 1};
-    const Trace t = trace(line);
-    if (t.error || t.path.size() < 2) {
-        MESSAGE("MsgPushBad", "push line %d,%d -> %d,%d: %s", line.bx, line.by, line.ex, line.ey,
-                t.error ? push_error(t.error) : ui_text("WordSamePoint", "the same point"));
-        return;
-    }
-    const std::vector<PushLine> lines_before = mission_push_lines();
-    mission_push_lines().push_back(line);
-    std::vector<uint8_t*> objects;
-    std::vector<State> before;
-    put_posts(line_posts(t), objects, before);
-    commit({"OpEntryLine", "entry line"}, objects, before);
-    Operation& op = g_undo.back();
-    op.lines = true;
-    op.lines_before = lines_before;
-    op.lines_after = mission_push_lines();
-    MESSAGE("MsgEntryLine", "arrival %d: entry line %d,%d -> %d,%d, flag 1, %u semaphores", i + 1, line.bx, line.by, line.ex, line.ey,
-            static_cast<unsigned>(objects.size()));
+    MESSAGE("MsgEntryLine", "arrival %d: entry line %d,%d -> %d,%d with its lights", i + 1, line.bx, line.by, line.ex, line.ey);
 }
 
 // The rail point nearest to a map point (world x, y), as an entry or a task's point: its screen x

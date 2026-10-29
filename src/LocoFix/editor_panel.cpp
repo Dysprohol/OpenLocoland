@@ -56,10 +56,14 @@ void edit_pick_object(int nvid, int army);
 void arrivals_draw(POINT mouse);
 bool arrivals_click(POINT mouse);
 void arrivals_add_car(int nvid);
+bool arrivals_back();   // a step back inside the panel (an arrival -> the list); false at the list
+bool arrivals_has_back();
 // editor_factory.cpp: a factory's panel
 void factory_draw(POINT mouse);
 bool factory_click(POINT mouse);
 void factory_add_car(int nvid);
+bool factory_back();   // the templates -> the queue; false at the queue
+bool factory_has_back();
 void factory_open(void* factory);
 bool edit_arrival_picking();   // editor_edit.cpp: a point for the Arrivals panel is being picked
 void edit_fill(float l, float t, float r, float b, uint32_t argb);
@@ -308,7 +312,9 @@ bool on_close(POINT m) {
 
 bool on_previous(POINT m) {
     const Place p = picture();
-    return g_panel == Panel::Help && g_page > 0 && inside(m, p.x + PREVIOUS_X, p.y + BUTTONS_Y, ARROW_W, BUTTON_H);
+    const bool shown = (g_panel == Panel::Help && g_page > 0) || (g_panel == Panel::Arrivals && arrivals_has_back()) ||
+                       (g_panel == Panel::Factory && factory_has_back());
+    return shown && inside(m, p.x + PREVIOUS_X, p.y + BUTTONS_Y, ARROW_W, BUTTON_H);
 }
 
 bool on_next(POINT m) {
@@ -561,9 +567,17 @@ void panel_draw(POINT m) {
     else if (g_panel == Panel::Arrivals) {
         arrivals_draw(m);
         draw_close(m);
+        if (arrivals_has_back()) {   // the arrow back to the list of arrivals
+            const Place p = picture();
+            edit_draw_picture(VID_PREVIOUS, 0, p.x + PREVIOUS_X, p.y + BUTTONS_Y, STEP + 2);
+        }
     } else if (g_panel == Panel::Factory) {
         factory_draw(m);
         draw_close(m);
+        if (factory_has_back()) {   // the arrow back to the queue
+            const Place p = picture();
+            edit_draw_picture(VID_PREVIOUS, 0, p.x + PREVIOUS_X, p.y + BUTTONS_Y, STEP + 2);
+        }
     }
 }
 
@@ -596,6 +610,8 @@ bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse) {
         if (on_circle(mouse, help_button(), HELP_R)) open(g_panel == Panel::Help ? Panel::None : Panel::Help);
         else if (on_circle(mouse, menu_button(), MENU_R)) open(g_panel == Panel::Menu ? Panel::None : Panel::Menu);
         else if (on_close(mouse)) open(g_for_train);
+        else if (on_previous(mouse) && g_panel == Panel::Arrivals) arrivals_back();
+        else if (on_previous(mouse) && g_panel == Panel::Factory) factory_back();
         else if (on_previous(mouse)) turn_page(-1);
         else if (on_next(mouse)) turn_page(1);
         else if (g_panel == Panel::Menu && row_at(mouse) >= 0) run(window, row_at(mouse));
@@ -625,7 +641,7 @@ bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse) {
         }
         return true;
     case WM_RBUTTONDOWN:
-        open(g_for_train);
+        if (!(g_panel == Panel::Arrivals && arrivals_back()) && !(g_panel == Panel::Factory && factory_back())) open(g_for_train);
         return true;
     case WM_MOUSEWHEEL:
         if (g_panel == Panel::Help) turn_page(GET_WHEEL_DELTA_WPARAM(w) > 0 ? -1 : 1);
@@ -638,7 +654,7 @@ bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse) {
             // closes Help/Palette without opening Menu
             if (g_panel == Panel::None) open(Panel::Menu);
             else if (g_panel == Panel::Menu) open(Panel::None);
-            else open(g_for_train);   // Help, Palette, Arrivals, Factory: close without opening Menu
+            else if (!(g_panel == Panel::Arrivals && arrivals_back()) && !(g_panel == Panel::Factory && factory_back())) open(g_for_train);   // Help, Palette, Arrivals, Factory: close without opening Menu
         } else if (w == VK_F1) open(Panel::None);
         else if (g_panel == Panel::Help && (w == VK_LEFT || w == VK_PRIOR || w == VK_UP)) turn_page(-1);
         else if (g_panel == Panel::Help && (w == VK_RIGHT || w == VK_NEXT || w == VK_DOWN)) turn_page(1);

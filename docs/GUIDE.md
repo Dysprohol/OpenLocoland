@@ -254,24 +254,33 @@ flatten it starting on the track. `B` picks the gravel bed under new rails. Del 
 ### 5. Train arrivals
 
 **Train arrivals** (key 0) opens a panel with the trains that come onto the map during the mission -
-the player's train at the start, reinforcements, enemy waves. **+ ADD** offers a recipe (the player's
-train at the start is the first one). For the arrival chosen in the top row:
+the player's train at the start, reinforcements, enemy waves. It first lists them, one arrival in two
+lines of plain words ("1. OURS, ENTRY 1: LOCOMOTIVE + CARS: 2", "AT THE START, ONCE"); a click on one
+opens it, **+ NEW** makes one, **COPY n** and **DELETE n** act on the one opened last. An arrival has
+one thing a row:
 
 - **WHO** - ours, the enemy, the neutrals or the pirates;
-- **TRAIN** - its cars: a click on a car takes it away, **+ CAR** adds one from the Vehicles palette,
-  **TEMPLATE** puts one of the authors' trains in;
-- **FROM** - **PICK**, then click the main line **past the west edge**: the train is made there.
-  **+ ENTRY LINE** lays the one-way line that pushes it onto the map, with its semaphores;
-- **FIRST**, **EVERY**, **TIMES** - when it comes, how often and how many times (or without end);
-- **IF** - a condition (the player has no train, the enemy has fewer trains than ..., the player pays
-  ...); the switch at the end of the **TIMES** row says whether it comes **ONLY THEN** or **ALSO EARLIER**;
-- **THEN** - the enemy's train attacks, guards a point or patrols between two points
-  (the game's AI does it; **PICK** the points), ours, the neutrals' and the pirates' drive to a point - pick one off the main line, a train standing at the entry holds the next ones;
-- the **MESSAGE** ("reinforcements have arrived", for ours and the enemy's).
+- **CARS** - in the train's order: **+ CAR** adds one at the end from the Vehicles palette,
+  **TEMPLATE...** lists the authors' trains by name; a click on a car chooses it - **<** and **>** move
+  it, **REMOVE** takes it away. The locomotive may stand anywhere in the train;
+- **ENTRY** - **PICK**, then click the main line **past the west edge**: the train is made
+  there;
+- **WHEN** - **AT THE START**, **AFTER** a time, **WHEN THE PLAYER HAS NO TRAIN** or **WHEN THE PLAYER
+  PAYS** an amount (those two **NOT BEFORE** a time);
+- **REPEAT** - **ONCE**, a number of **TIMES** or **WITHOUT END**, **EVERY** so many seconds;
+- **THEN** - ours, the neutrals' and the pirates' train **STAYS**, **DRIVES TO A POINT** or **PATROLS**
+  between two points; the enemy's **ATTACKS**, **GUARDS A POINT** or **PATROLS** (the game's AI does
+  it). **PICK** the points on the track, off the main line;
+- **MESSAGE** ("reinforcements have arrived", for ours and the enemy's).
 
-The line at the bottom warns about what is missing. A wave waits while a train stands at its entry.
-Every change is undone with Ctrl+Z. Maps made with an older version keep their reinforcement until
-**CONVERT TO ARRIVALS** in the panel.
+A last line names a real problem with the button that mends it - no entry yet (**PICK THE ENTRY**),
+no lights at the entry (**PUT LIGHTS**: a pair of posts the first place inside the map and their line,
+which pushes the train in - the entry's line and its lights are one thing, as in the missions) or lights
+on the way in without a line to them (**LINE TO THE LIGHTS**), no locomotive in the train, no point. A
+wave waits while a train stands at its entry. The arrow at the bottom left, Esc or the right button go
+back to the list; a click on an entry or a point on the map opens its arrival. Every change is undone
+with Ctrl+Z. Maps made with an older version keep their reinforcement until **CONVERT TO ARRIVALS** in
+the panel.
 
 ### 6. The factory, the repair point, one-way lines and semaphores
 
@@ -318,9 +327,23 @@ selected semaphore its own line all the same, and its panel's LINE row takes it 
 **What a factory builds**: the right button on a factory, **WHAT IT BUILDS...**. For your factory
 (and a neutral one, whose list is yours once you capture it) click the units it may build - they keep
 the game's order and keys F1-F12, [ and ]; for the unit clicked last **IN THE LIST** sets from when (at
-the start or after a time) and **AT MOST** how many of them the player may have. For the enemy's
-factory it shows the queue its AI builds (only the enemy has an AI): each train, **NOT BEFORE** when,
-and whether it attacks, guards a point or patrols.
+the start or after a time) and **AT MOST** how many of them the player may have.
+
+**What a factory builds by the script - its plan**: the enemy's factory shows the trains its AI
+builds (only the enemy has an AI), in the second tab **TRAINS IT BUILDS** of yours, a neutral one or a
+pirate one the trains the map's script orders it to build. A list of them, and a screen for each,
+like the Arrivals panel: the **TRAIN** (its cars in order - the locomotive anywhere -, **+ CAR**,
+**TEMPLATE...** the authors' trains), **WHEN** (**AT** a time, **AFTER ANOTHER** - so long after the
+train before it in the list is made -, or **WHILE** a condition holds, e.g. the player has fewer
+trains than n, not before a time), **REPEAT** (once, n times or without end, every so long after the
+last one) and **THEN** (the enemy's attacks, guards a point or patrols; the others' stay, drive to a
+point or patrol). A train of yours, the neutrals' or the pirates' is built car by car when the factory
+is free and its side has the money for the next car (the price under each), whatever the factory's
+list; the enemy builds one at a time while fewer of its trains attack than **AI...** allows. **AI...**
+has the authors' other settings of the enemy, a line on each: whether a lost start train is built
+again and after how long, the start trains' raids, when raids begin and how long they last, the clever
+attack. Everything except a train at a time once needs a map that runs arrivals (older maps: CONVERT
+in the Arrivals panel).
 
 **Orders of a train**: the right button on a train, **ORDERS**: yours, the neutrals' and the pirates'
 **DRIVE TO...** a point or **PATROL...** between where they stand and a point; the enemy's (with a gun car -
@@ -390,10 +413,10 @@ A **Region** (strip): drag its rectangle; its panel sets fog (mist, dust, haze, 
 
 ### 9. Look at it working
 
-Menu → **RUN THE LEVEL** (or `Ctrl+R`): the level comes to life in the editor - the trains drive,
-the guns shoot. `Ctrl+R` holds it again, and so does the game's own `Esc` menu: ABORT GAME → BACK TO
-THE EDITOR. (A level that has run is not as you placed it: load it again before saving if you
-changed things while it ran.)
+Menu → **RUN THE LEVEL** (or `Ctrl+R`): the map is saved and runs in the editor as it will in the
+game - the trains drive, the guns shoot, the arrivals come. `Ctrl+R` brings back the map as it was
+saved, and so do the game's own `Esc` menu (ABORT GAME → BACK TO THE EDITOR or YES) and the end of the
+level (won or lost).
 
 ### 10. Mission settings and texts
 
@@ -415,8 +438,8 @@ Menu → **MISSION SETTINGS** (or the gear in the strip):
   `very_hard_`, `diff_` or `defence_` with `gun`, `mortair`, `rocket`, `air`, `fire` or `desant`, e.g.
   `light_gun`. The points are screen points: the **Push line** tool shows the track's point under the
   cursor in the status line;
-- **Enemy trains from its factory**: `seconds type` (or with a patrol `seconds type x1 y1 x2 y2`) -
-  the earliest time it is built;
+- **Enemy factory's plan**: how many trains it has; **Plan...** opens an enemy factory's panel, where
+  they are set;
 - **Objectives**, the **win** and **loss** texts and the **briefing** (a line `---` starts the next
   page). They are written in capitals, 44 characters a line, when the map is saved.
 

@@ -210,6 +210,13 @@ void __fastcall handle_panel_action(void* player, void* edx, int object, int* in
 
 }  // namespace
 
+// A unit's price in a factory - what the factory's panel shows under its icon: its build time in
+// seconds, which the factory takes from the army's money (editor_mission.cpp: the runner's PlanPrice).
+int unit_price(int nvid) {
+    uint8_t* vid = vid_by_number(nvid);
+    return vid ? reinterpret_cast<BuildTime_t>(VID_GET_BUILD_TIME_SEC)(vid, nullptr) : 0;
+}
+
 void install_depot_rows() {
     // push -1 / push 0x473d38 / mov eax,fs:[0]
     const uint8_t set_panel_start[] = {0x6A, 0xFF, 0x68, 0x38, 0x3D, 0x47, 0x00,

@@ -187,7 +187,7 @@ not forced to 0.
 
 | VID | Rule | Source |
 |---|---|---|
-| 102 factory | At the dead end of a straight spur (6+ rails in the missions) that meets the line through a Y - a curve pair each way - standing on the track; direction = the way out (0 north, 64 east, 128 south, 192 west); a factory push line (5). The player's factory needs a build list (`items`): the game's 14 factory units, in the order of their hotkeys, are `5 10 20 25 80 85 45 30 35 82 97 90 75 62` (F1-F12, `[`, `]`); the panel shows ten in a row, LocoFix adds a second row for the 11th-20th. **[tool]** rail point within 100 px, build list. **[editor]** a new factory takes the build list of one of the same army on the map, or these 14; a warning without track within 100 px; its panel ticks the list (the game's order), the units it gets later and the player's limits (8). The enemy's AI (army 1 only) ignores the list and builds `level_queue_*`; a neutral or pirate factory builds nothing, and only a neutral one is captured - on an editor map a train of the player's within 100 px of a neutral factory or repair point captures it (the runner's `CaptureTact`; the missions call `LDepoCapture`/`LMasterCapture` themselves) | l02, l05 (spur, Y, 128/0); sandbox test: a built train leaves through the Y |
+| 102 factory | At the dead end of a straight spur (6+ rails in the missions) that meets the line through a Y - a curve pair each way - standing on the track; direction = the way out (0 north, 64 east, 128 south, 192 west); a factory push line (5). The player's factory needs a build list (`items`): the game's 14 factory units, in the order of their hotkeys, are `5 10 20 25 80 85 45 30 35 82 97 90 75 62` (F1-F12, `[`, `]`); the panel shows ten in a row, LocoFix adds a second row for the 11th-20th. **[tool]** rail point within 100 px, build list. **[editor]** a new factory takes the build list of one of the same army on the map, or these 14; a warning without track within 100 px; its panel ticks the list (the game's order), the units it gets later and the player's limits (8). The enemy's AI (army 1 only) ignores the list and builds `level_queue_*` (the editor's plan, 8); a neutral or pirate factory builds nothing by itself (a map's plan orders it, 8), and only a neutral one is captured - on an editor map a train of the player's within 100 px of a neutral factory or repair point captures it (the runner's `CaptureTact`; the missions call `LDepoCapture`/`LMasterCapture` themselves) | l02, l05 (spur, Y, 128/0); sandbox test: a built train leaves through the Y |
 | 104 repair point | On a track trains drive through (a loop leg), the gate over the rails, turned along the track (0/128 on vertical track); every end of the loop meets the line through a Y each way; the leg is one way (5). It repairs only the car nearest to it (50 px), so the one-way push line through it matters: the train is pushed through and every car is repaired fully as it passes; a train standing in a repair point without one gets only its nearest car repaired. **[tool]** within 20 px of track | l05; sandbox tests: without a push line the loco 45 -> 150 hp, the wagon behind stayed at 22; with it the loco 45 -> 150 and the wagon 22 -> 75 (full: the player's army has 1.5x hp) |
 | 162 fort | A gate standing on the track (0-6 px in all 20 forts), turned along it (0/128 vertical, 64/192 horizontal, 32/96/160/224 diagonal). Guns (VID 115) on its wall: x +-47, z +92/+93 for 0/128; (-32, -24) and (+33, +23), z +93 for 32/160. It cannot be destroyed (U_OBJECT, maxHp 0); its guns can. **[tool]** within 8 px of track. **[editor]** a new fort comes with its guns at these places (64/192: (0, -33) and (0, +34); 96/224: (-33, +23) and (+33, -24), measured in l16 and l20), they move, turn and go with it; it snaps onto the line of the nearest straight track within 60 px, turned along it (R / E turn it round there), and is refused elsewhere. Its sockets: below | l10-l20; sandbox test: trains drive through it |
 | 165 mining plant | Not on the track. One gun on its wall, on the side its direction picks (sockets below) | l09, l11, l14, l15, l18 (30) |
@@ -367,7 +367,10 @@ other armies; a marker's panel makes it a mine. The palette has the mine, not th
   fort, not the repair point) and the loss check `!NoArmyUnits(0) && IsNoDepo()`.
 - `level_queue` times are the earliest: an entry is built when its time has passed, the enemy
   factory is free and fewer than `LIMIT_ATACKERS` trains attack (sandbox: 240 / 420 s -> 280 /
-  456 s).
+  456 s). The AI's `BuildTrain` swaps a train's first two cars (LIGHT GUN `{5,20,20}` leaves the
+  factory as 20,5,20), the types ending in 5 change with the difficulty, and an enemy factory's
+  destruction drops the train the AI is building in another one. A factory needs its push line:
+  without it each new car is made on the last one, which is destroyed.
 - A script path needs two backslashes (`"music\\mus08.ogg"`, `BUGS.md` F11).
 - **[editor]** The editor keeps all of these settings - and the push lines of `main()` - in two
   marked blocks of the script, `// <editor>` ... `// </editor>` before `header.lgc` and
@@ -392,6 +395,18 @@ other armies; a marker's panel makes it a mine. The palette has the mine, not th
   towers, eyes and nests and logs `CITADEL`, `CHARYBDIS` and `NEST` lines in `error.log`. The win and loss of the template wait for `ArrivalsLeft(army)`. Limits: the AI
   has 16 trains (`ai_trains`), 10 patrols and 10 posts for the start trains, the queue and the
   arrivals together; only army 1 has an AI.
+- **[editor]** The factories' plans (a factory's panel): `PLANS`, `plan_*[]` and `PRICES`,
+  `price_vid/price_of[]` in the first block, run by `PlanTact()` of the same runner. The enemy's
+  entries go into `level_queue_*` (empty at the start, a place for each) when they are due - at a
+  time, after the entry before, while a condition holds, once, n times or without end - with their
+  cars' first two swapped so that `BuildTrain` makes the planned train, and never a type ending in
+  5. Ours, the neutrals' and the pirates' factory gets `AddCommand(f, ACT_BUILD_UNIT, v)` car by
+  car, each when the factory is free and its army has the price (a car the money does not cover
+  would be left out), whatever its build list; one entry at a time, and not while a train stands at
+  the factory's door (its cars would join it). An arrival's cars are made one at a time too: cars made
+  on one rail point at once push each other out of their order. The AI's knobs: `LIMIT_ATACKERS`, `RENEW_TIMEOUT`,
+  `start_trains_renew`, `start_trains_random_task`, `FIRSTATTACKTIME`, `FIRSTCONTACTTIME`,
+  `CLEVER_ATTACK` (`SetCleverEnemyAttack`) and `STG_DESTROY_TIME` (read only by mission 2's own code).
 
 ## 9. Ordering of objects
 

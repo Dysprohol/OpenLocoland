@@ -76,6 +76,10 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l);
 void edit_command(int id);
 void edit_reset();
 bool edit_dirty();
+void edit_remember_selection();   // editor_edit.cpp: Run the level's way back
+void edit_restore_selection();
+void edit_keep_history();
+void edit_restore_history();
 void edit_saved();
 void edit_message_saved(const std::string& map);
 void install_editor_edit();
@@ -84,6 +88,8 @@ void edit_touch();
 void edit_assign_orders();   // editor_edit.cpp
 void edit_commit_mission(const ArrivalsState& arrivals_before, const FactoryState& factories_before);
 void panel_open_arrivals();   // editor_panel.cpp
+void edit_open_enemy_factory();   // editor_edit.cpp: the panel of the map's first enemy factory
+bool edit_open_factory_at(float x, float y);   // editor_edit.cpp: the panel of the factory at a map point
 void new_map_dialog(HWND owner);                // editor_newmap.cpp
 bool new_map_for_test(const std::string& text);  // editor_newmap.cpp
 std::string make_start_map();                    // editor_newmap.cpp: maps\_new\, empty grass
@@ -109,6 +115,8 @@ constexpr uintptr_t ENTER_GDI_MODE = 0x411d40;
 constexpr uintptr_t LEAVE_GDI_MODE = 0x411db0;
 constexpr uintptr_t STRING_ASSIGN_CSTR = 0x426540;
 constexpr uintptr_t CRT_NEW = 0x456b11;
+constexpr uintptr_t CRT_DELETE = 0x456a00;
+constexpr uintptr_t EMPTY_STRING = 0x4a9d6c;   // the shared empty String, never freed
 constexpr uintptr_t IAT_RegisterClassA = 0x4751b8;
 constexpr size_t WORLD_FLAGS = 0x004;
 constexpr size_t WORLD_LEVEL_FILE = 0x014;
@@ -137,14 +145,19 @@ constexpr int TEST_NEW_MAP = 40043;   // test mode: WM_COPYDATA "<name> <ground>
 constexpr int TEST_RESIZE = 40044;    // test mode: WM_COPYDATA "<width> <height>" - File > Map size without the dialogs
 constexpr int TEST_EXPORT = 40045;    // test mode: WM_COPYDATA <zip> - File > Export map without the dialogs
 constexpr int TEST_IMPORT = 40046;    // test mode: WM_COPYDATA "<zip>|overwrite|rename|ask" - File > Import map
+constexpr int TEST_FACTORY = 40047;   // test mode: WM_COPYDATA "x y" - the panel of the factory there
 constexpr uintptr_t SET_POSITION = 0x41c680;   // SetPosition: the centre of the view, clamped
+constexpr uintptr_t G_SOUND = 0x5d3a54;        // g_sound: the sound object
+constexpr uintptr_t STOP_MUSIC = 0x444e50;     // StopMusic(g_sound)
 
 using GdiMode_t = void(__fastcall*)(void* graphics, void* edx);
 using SetPosition_t = void(__fastcall*)(void* world, void* edx, float x, float y, int mode);
 using PauseResume_t = void(__fastcall*)(uint8_t* world, void* edx);
+using StopMusic_t = bool(__fastcall*)(void* sound, void* edx);
 using AssignCStr_t = char**(__fastcall*)(char** string, void* edx, const char* text);
 using SaveLevel_t = void(__fastcall*)(uint8_t* world, void* edx, char* name);
 using New_t = char*(__cdecl*)(size_t size);
+using Delete_t = void(__cdecl*)(const void* memory);
 using RegisterClassA_t = ATOM(WINAPI*)(const WNDCLASSA*);
 using FileDialog_t = BOOL(WINAPI*)(OPENFILENAMEW*);
 
@@ -232,12 +245,26 @@ void hold_level(uint8_t* w, bool hold) {
     }
 }
 
-void set_running(HWND window, bool running) {
-    g_running = running;
-    uint8_t* w = world();
-    if (w && running && g_held) hold_level(w, false);
-    else if (w && !running && !g_held && current_format(level_file())) hold_level(w, true);
-    patch::log("editor: the level %s", running ? "runs" : "is held");
+// The game's music (the running level's script played it): StopMusic(g_sound), as script function 134.
+void stop_music() {
+    if (void* sound = *reinterpret_cast<void**>(G_SOUND)) reinterpret_cast<StopMusic_t>(STOP_MUSIC)(sound, nullptr);
+}
+
+// Run the level: the level runs from its saved file - the mission's script with what the panels set
+// (arrivals, orders, the factories' options) is compiled when the level loads, so the map is saved
+// first and loaded again, running. Back (Ctrl+R, BACK TO THE EDITOR in the Esc menu, or the level
+// ending: won, lost, ABORT GAME) loads it again, held - the state of the run does not stay.
+std::string g_run_map;   // the map that runs (game path)
+bool g_run_back = false;   // the next load is the way back: the view and the chosen object as they were
+float g_run_view_x = 0, g_run_view_y = 0;   // the view's top-left before the run
+
+void load_map(const std::string& path);
+
+void stop_running() {
+    g_running = false;
+    stop_music();
+    patch::log("editor: the level is held again - %s loaded", g_run_map.c_str());
+    load_map(g_run_map);
 }
 
 // ---- the Windows cursor ----
@@ -570,6 +597,49 @@ bool save_current(HWND window) {
 
 // Before the level goes away: with edits not saved, asks whether to save them. False when the
 // user cancels (or the save fails). Tests are never asked.
+bool game_folder_map(const std::string& map);
+bool asks();
+
+bool run_level(HWND window) {
+    if (!g_held) return false;
+    std::string map = game_path(current_map());
+    // written as a save writes it, without asking - also when nothing changed, so the script has the
+    // runner and the panels' settings of this version (an older map's script is brought up to date)
+    if (edit_dirty() || !game_folder_map(map)) {
+        if (game_folder_map(map)) {   // a campaign map or the template is not saved over
+            if (asks()) {
+                DialogScope scope;
+                ui_message_box(window,
+                               ui_text("RunCampaign", "Save the map under a name of its own first (File > Save): Run the level "
+                                                      "starts the saved map."),
+                               ui_text("RunTitle", "Run the level"), MB_OK | MB_ICONINFORMATION);
+            }
+            patch::log("editor: run: %s has changes and is the game's own map - not run", map.c_str());
+            return false;
+        }
+        if (!save_map(map)) {
+            if (asks()) {
+                DialogScope scope;
+                ui_message_box(window, ui_printf(ui_format("RunFailed", "The map could not be written (%s): it is not run."), map.c_str()).c_str(),
+                               ui_text("RunTitle", "Run the level"), MB_OK | MB_ICONWARNING);
+            }
+            return false;
+        }
+    }
+    if (uint8_t* w = world()) {
+        g_run_view_x = *reinterpret_cast<float*>(w + 0x44);
+        g_run_view_y = *reinterpret_cast<float*>(w + 0x48);
+    }
+    edit_remember_selection();
+    edit_keep_history();
+    g_run_back = true;
+    g_run_map = map;
+    g_running = true;
+    patch::log("editor: run %s", map.c_str());
+    load_map(map);
+    return true;
+}
+
 bool ask_save(HWND window) {
     if ((!edit_dirty() && !auto_folder_written(game_path(current_map()))) || (g_test && !g_test_ask)) return true;
     int answer;
@@ -801,17 +871,18 @@ void handle_command(HWND window, int id) {
         resize_current(window, w, h);
     } else if (id == ID_MISSION) {
         if (!g_held) return;
-        bool arrivals = false;
+        bool arrivals = false, plan = false;
         const ArrivalsState arrivals_before = mission_arrivals();
         const FactoryState factories_before = mission_factories();
         {
             DialogScope scope;
-            if (mission_dialog(window, &arrivals)) {
+            if (mission_dialog(window, &arrivals, &plan)) {
                 edit_touch();
                 edit_commit_mission(arrivals_before, factories_before);   // the queue is in the history too
             }
         }
         if (arrivals) panel_open_arrivals();   // its Arrivals... button
+        if (plan) edit_open_enemy_factory();   // its Plan... button
     } else if (id == ID_EXPORT) {
         export_current(window, "");
     } else if (id == ID_IMPORT) {
@@ -819,7 +890,8 @@ void handle_command(HWND window, int id) {
     } else if (id == ID_ABOUT) {
         about(window);
     } else if (id == ID_RUN) {
-        set_running(window, !g_running);
+        if (g_running) stop_running();
+        else run_level(window);
     } else if (id == ID_PLAY) {
         // the new map gets its name first: the played game must not run from the scratch folder
         if (auto_folder(folder_of(game_path(current_map())))) {
@@ -929,6 +1001,10 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
                 edit_assign_orders();   // its order: lines
                 return TRUE;
             }
+            if (data->dwData == TEST_FACTORY) {   // "x y": the panel of the factory there
+                float x = 0, y = 0;
+                return std::sscanf(path.c_str(), "%f %f", &x, &y) == 2 && edit_open_factory_at(x, y) ? TRUE : FALSE;
+            }
             if (data->dwData == TEST_RAIL_POINTS) {   // "x y": the rail points there into the log
                 float x = 0, y = 0;
                 if (std::sscanf(path.c_str(), "%f %f", &x, &y) != 2 || !world()) return FALSE;
@@ -975,16 +1051,26 @@ std::string editor_start_map(const std::string& map) { return start_map(map); }
 // otherwise carry the old level's pause time over) and the new one is held once it is loaded.
 void editor_level_loading(void* w) {
     if (g_enabled) edit_reset();   // the objects of the old level go away
-    // Run the level ends with its level: the next one is held for editing - a running level can
-    // leave through its own Esc menu for the main menu (the old-format menu runs as usual), and the
-    // map the menu's MAP EDITOR then loads here must not start running
-    if (g_enabled && g_running) {
-        g_running = false;
-        patch::log("editor: a new level - Run the level is off, the level will be held");
-    }
     if (!g_held) return;
     world_flags(static_cast<uint8_t*>(w)) &= ~(PAUSED | SCRIPTS_OFF);
     g_held = false;
+}
+
+// frame_limit.cpp's Level_Load wrapper, before the load: while the level runs (Run the level), the
+// same map again (RESTART) runs; any other - the menu after ABORT GAME, a won or lost level's next
+// map - is the editor's map again, held.
+const char* editor_level_redirect(const char* map) {
+    if (!g_enabled || !g_running || !map) return map;
+    if (lower_path(game_path(map)) == lower_path(g_run_map)) return map;
+    // the name is the game's string, which the load frees: the map's name in one of its own
+    char* name = reinterpret_cast<New_t>(CRT_NEW)(g_run_map.size() + 1);
+    if (!name) return map;
+    std::memcpy(name, g_run_map.c_str(), g_run_map.size() + 1);
+    g_running = false;
+    stop_music();
+    patch::log("editor: the run left for %s - %s is held again", map, g_run_map.c_str());
+    if (reinterpret_cast<uintptr_t>(map) != EMPTY_STRING) reinterpret_cast<Delete_t>(CRT_DELETE)(map);
+    return name;
 }
 
 void editor_level_loaded(void* w) {
@@ -996,6 +1082,13 @@ void editor_level_loaded(void* w) {
         g_current = game_path(map);
         mission_load(game_path(map));
         hold_level(world, true);
+        if (g_run_back && graphics()) {   // back from Run the level: the view and the chosen object as they were
+            g_run_back = false;
+            const float* screen = reinterpret_cast<const float*>(static_cast<uint8_t*>(graphics()) + 0x20c);
+            reinterpret_cast<SetPosition_t>(SET_POSITION)(world, nullptr, g_run_view_x + screen[0] / 2, g_run_view_y + screen[1] / 2, 0);
+            edit_restore_history();
+            edit_restore_selection();
+        }
         // the start's new map fills the view from its top-left corner (a new map's first view
         // would show it 300 px into the void around it)
         if (auto_folder(folder_of(game_path(map))) && graphics()) {
@@ -1026,7 +1119,7 @@ bool editor_level_running() { return g_enabled && g_running; }
 void editor_hold_level() {
     uint8_t* w = world();
     if (!editor_level_running() || !w) return;
-    set_running(*reinterpret_cast<HWND*>(w + WORLD_HWND), false);
+    stop_running();
 }
 
 // Install after screen scaling: the RegisterClassA chain is editor -> screen scaling -> test

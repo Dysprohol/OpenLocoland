@@ -250,22 +250,30 @@ wokół jej końca i wyrównaj go, zaczynając na torze. `B` wybiera podsypkę p
 ### 5. Przyjazdy pociągów
 
 **Przyjazdy pociagow** (klawisz 0) otwiera panel z pociągami, które w czasie misji wjeżdżają na mapę -
-pociąg gracza na start, posiłki, fale wroga. **+ DODAJ** podsuwa przepis (pierwszy to pociąg gracza na
-start). Dla przyjazdu wybranego w górnym wierszu:
+pociąg gracza na start, posiłki, fale wroga. Najpierw jest ich lista, każdy przyjazd w dwóch wierszach
+zwykłych słów („1. NASI, WJAZD 1: LOKOMOTYWA + WAGONY: 2”, „NA POCZATKU, RAZ”); kliknięcie otwiera
+przyjazd, **+ NOWY** tworzy nowy, **KOPIUJ n** i **USUN n** dotyczą ostatnio otwartego. W przyjeździe
+każdy wiersz to jedna rzecz:
 
 - **KTO** - nasi, wróg, neutralni albo piraci;
-- **POCIAG** - jego wagony: kliknięcie wagonu go usuwa, **+ WAGON** dodaje z palety Pojazdy,
-  **SZABLON** wstawia skład autorów;
-- **SKAD** - **WSKAZ**, potem kliknij główną linię **za zachodnią krawędzią**: tam powstaje pociąg.
-  **+ LINIA WJAZDU** kładzie linię jednokierunkową, która wpycha go na mapę, z semaforami;
-- **NAJPIERW**, **CO**, **ILE RAZY** - kiedy przyjeżdża, jak często i ile razy (albo bez końca);
-- **WARUNEK** - np. gracz nie ma pociągu, wróg ma mniej pociągów niż ..., gracz płaci ...; przełącznik na
-  końcu wiersza **ILE RAZY** mówi, czy pociąg przyjeżdża **TYLKO WTEDY**, czy **TAKZE WCZESNIEJ**;
-- **POTEM** - pociąg wroga atakuje, pilnuje punktu albo patroluje między dwoma punktami
-  (robi to AI gry; punkty **WSKAZ** na mapie), nasi, neutralni i piraci jadą do punktu - wskaż go poza główną linią, bo pociąg stojący na wjeździe zatrzymuje następne;
+- **SKLAD** - w kolejności pociągu: **+ WAGON** dodaje na koniec z palety Pojazdy, **SZABLON...**
+  pokazuje listę składów autorów z nazwami; kliknięcie wagonu go wybiera - **<** i **>** go przesuwają,
+  **USUN** go zabiera. Lokomotywa może stać w dowolnym miejscu składu;
+- **WJAZD** - **WSKAZ**, potem kliknij główną linię **za zachodnią krawędzią**: tam powstaje
+  pociąg;
+- **KIEDY** - **NA POCZATKU**, **PO** czasie, **GDY GRACZ NIE MA POCIAGU** albo **GDY GRACZ ZAPLACI**
+  kwotę (te dwa **NIE WCZESNIEJ NIZ** po czasie);
+- **POWTORZ** - **RAZ**, ileś **RAZY** albo **BEZ KONCA**, **CO** tyle sekund;
+- **POTEM** - pociąg naszych, neutralnych i piratów **STOI**, **JEDZIE DO PUNKTU** albo **PATROLUJE**
+  między dwoma punktami; wroga **ATAKUJE**, **PILNUJE PUNKTU** albo **PATROLUJE** (robi to AI gry).
+  Punkty **WSKAZ** na torze, poza główną linią;
 - **KOMUNIKAT** („przybyły posiłki”, dla naszych i wroga).
 
-Wiersz na dole ostrzega, czego brakuje. Fala czeka, gdy na wjeździe stoi pociąg. Każdą zmianę cofa
+Ostatni wiersz podaje prawdziwy problem z przyciskiem, który go naprawia - brak wjazdu (**WSKAZ
+WJAZD**), brak świateł na wjeździe (**POSTAW SWIATLA**: para semaforów w pierwszym miejscu w mapie i ich
+linia, która wpycha pociąg - linia wjazdu i jej światła to jedno, jak w misjach) albo światła na drodze
+bez linii do nich (**LINIA DO SWIATEL**), brak lokomotywy w składzie, brak punktu. Fala czeka, gdy na wjeździe stoi pociąg. Strzałka na dole po lewej, Esc albo prawy przycisk
+wracają do listy; kliknięcie wjazdu albo punktu na mapie otwiera jego przyjazd. Każdą zmianę cofa
 Ctrl+Z. Mapy ze starszej wersji zachowują swoje posiłki, dopóki w panelu nie wybierzesz **PRZESTAW NA
 PRZYJAZDY**.
 
@@ -314,9 +322,21 @@ jego panelu ją zabiera (BRAK).
 **Co buduje fabryka**: prawy przycisk na fabryce, **CO BUDUJE...**. Dla twojej fabryki (i neutralnej,
 której lista będzie twoja po jej zdobyciu) kliknij jednostki, które może budować - zachowują kolejność i
 klawisze gry F1-F12, [ i ]; dla ostatnio klikniętej **NA LISCIE** ustawia, od kiedy (od początku albo po
-czasie), a **NAJWYZEJ** - ile ich gracz może mieć. Dla fabryki wroga pokazuje kolejkę, którą buduje jego
-AI (AI ma tylko wróg): każdy pociąg, **NIE PRZED** - kiedy najwcześniej - i czy atakuje, pilnuje punktu, czy
-patroluje.
+czasie), a **NAJWYZEJ** - ile ich gracz może mieć.
+
+**Co fabryka buduje ze skryptu - jej plan**: fabryka wroga pokazuje pociągi, które buduje jego AI (AI ma
+tylko wróg), a druga zakładka **BUDOWANE POCIAGI** twojej, neutralnej albo pirackiej - pociągi, które
+skrypt mapy każe jej zbudować. Ich lista i ekran każdego, jak w panelu przyjazdów: **POCIAG** (jego
+wagony po kolei - lokomotywa gdziekolwiek -, **+ WAGON**, **SZABLON...** pociągi autorów), **KIEDY**
+(**O CZASIE**, **PO INNYM** - tyle po zrobieniu pociągu przed nim na liście - albo **GDY** zachodzi
+warunek, np. gracz ma mniej pociągów niż n, nie przed czasem), **POWTORZ** (raz, n razy albo bez końca,
+co tyle po ostatnim) i **POTEM** (wroga atakuje, pilnuje punktu albo patroluje; pozostałych stoi, jedzie
+do punktu albo patroluje). Pociąg twój, neutralnych albo piratów powstaje wagon po wagonie, gdy fabryka
+jest wolna, a jego strona ma pieniądze na następny wagon (cena pod każdym), niezależnie od listy fabryki;
+wróg buduje po jednym, gdy atakuje mniej jego pociągów, niż pozwala **AI...**. **AI...** ma pozostałe
+ustawienia wroga od autorów, każde z linijką opisu: czy stracony pociąg startowy jest budowany na nowo i
+po jakim czasie, wypady pociągów startowych, od kiedy są wypady i ile trwają, mądry atak. Wszystko poza
+pociągiem raz o czasie wymaga mapy z przyjazdami (starsze mapy: PRZESTAW w panelu przyjazdów).
 
 **Rozkazy pociągu**: prawy przycisk na pociągu, **ROZKAZY**: twoje, neutralne i pirackie **JEDZ DO...**
 punktu albo **PATROL...** między miejscem, gdzie stoją, a punktem; wroga (z wagonem z działem - jego AI z
@@ -387,10 +407,10 @@ opar, poświata) i rozpryski.
 
 ### 9. Zobacz, jak działa
 
-Menu → **URUCHOM POZIOM** (albo `Ctrl+R`): poziom ożywa w edytorze - pociągi jeżdżą, działa
-strzelają. `Ctrl+R` znowu go wstrzymuje, tak samo menu gry pod `Esc`: WYJDŹ Z GRY → WRÓĆ DO
-EDYTORA. (Poziom, który działał, nie jest już taki, jak go
-postawiłeś: jeśli coś zmieniało się w czasie działania, wczytaj go od nowa przed zapisem.)
+Menu → **URUCHOM POZIOM** (albo `Ctrl+R`): mapa zostaje zapisana i działa w edytorze tak jak w grze -
+pociągi jeżdżą, działa strzelają, przyjeżdżają pociągi z panelu Przyjazdy. `Ctrl+R` przywraca mapę taką,
+jaką zapisano, tak samo menu gry pod `Esc` (WYJDŹ Z GRY → WRÓĆ DO EDYTORA albo TAK) i koniec poziomu
+(wygrana albo przegrana).
 
 ### 10. Ustawienia misji i teksty
 
@@ -411,8 +431,8 @@ Menu → **USTAWIENIA MISJI** (albo zębatka na listwie):
   albo `defence_` z `gun`, `mortair`, `rocket`, `air`, `fire` albo `desant`, np. `light_gun`. Punkty są
   punktami ekranu: narzędzie **Linia jednokierunkowa** pokazuje w wierszu stanu punkt toru pod
   kursorem;
-- **pociągi wroga z jego fabryki**: `sekundy typ` (albo z patrolem `sekundy typ x1 y1 x2 y2`) -
-  najwcześniejszy czas zbudowania;
+- **plan fabryki wroga**: ile ma pociągów; **Plan...** otwiera panel fabryki wroga, gdzie się je
+  ustawia;
 - **zadania**, teksty **zwycięstwa** i **porażki** oraz **odprawa** (linia `---` zaczyna następną
   stronę). Przy zapisie mapy są zapisywane wielkimi literami, po 44 znaki w linii.
 

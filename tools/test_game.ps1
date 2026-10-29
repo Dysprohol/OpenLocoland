@@ -28,6 +28,7 @@
 #           dialog comes first, <Shot>_<n>_dialog.png);
 #           V<x>:<y> puts the top-left of the view at that map point (editor test mode);
 #           D<x>:<y> writes the rail points near that map point to LocoFix.log (editor test mode);
+#           F<x>:<y> opens the panel of the factory at that map point (editor test mode);
 #           M<file> sets the mission settings from a file (editor test mode, src/LocoFix/editor_mission.cpp);
 #           Z<w>:<h> resizes the map (editor test mode: File > Map size);
 #           E<zip> exports the map, I<zip>|overwrite|rename|ask imports one (File > Export / Import map);
@@ -320,6 +321,9 @@ if ($Steps) {
     } elseif ($vk -cmatch '^V(-?\d+):(-?\d+)$') {
       # editor test mode: the top-left of the view on the map
       "View $($Matches[1]),$($Matches[2]): " + [W]::Command($game, 40040, "$($Matches[1]) $($Matches[2])")
+    } elseif ($vk -cmatch '^F(-?\d+):(-?\d+)$') {
+      # editor test mode: the panel of the factory at a map point (its plan, its build list)
+      "Factory panel $($Matches[1]),$($Matches[2]): " + [W]::Command($game, 40047, "$($Matches[1]) $($Matches[2])")
     } elseif ($vk -cmatch '^D(-?\d+):(-?\d+)$') {
       # editor test mode: the rail points near a map point into LocoFix.log
       "Rail points $($Matches[1]),$($Matches[2]): " + [W]::Command($game, 40041, "$($Matches[1]) $($Matches[2])")

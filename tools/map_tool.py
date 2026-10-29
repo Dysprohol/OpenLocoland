@@ -610,19 +610,23 @@ ARRIVALS_RUNNER = r"""// ArrivalsTact() brings the trains of the arrays arrival_
 // second: a wave comes when its time is there (the first after arrival_first s, the next ones
 // arrival_every s after the one before, arrival_times of them or without end) and its condition
 // holds - or, with arrival_or, also earlier when the condition holds; a train the player pays for
-// comes only while the money is there and is paid once it is made. It waits while a train
+// comes only while the money is there and is paid as it starts to come. It waits while a train
 // stands at its entry (180 px) or the AI has its 16 trains. The cars are made on the entry's rail
-// point in the army; the enemy's train goes to the AI (TrainsTact) with its task, the others' last
-// car gets the order to drive to arrival_to. ArrivalsLeft(army): the waves of an army still to come.
+// point in the army, one at a time (ArrivalTry); the enemy's train goes to the AI (TrainsTact) with
+// its task, the others' last car gets the order to drive to arrival_to (arrival_part, arrival_car:
+// the cars made so far of a train under way, its last one). An arrival without its entry (0,0)
+// never comes.
+// ArrivalsLeft(army): the waves of an army still to come.
 ArrivalTrains(int army)
 {
   return GetVid(5,VID_COUNT0+army)+GetVid(10,VID_COUNT0+army)+GetVid(97,VID_COUNT0+army);
 }
-ArrivalIf(int i)
+// MissionIf(c,n): the condition c (the editor's list: 1 the player has no train, 2 fewer than n,
+// 3 fewer units than n, 4 no factory, 5 a neutral factory stands, 6 the enemy has fewer trains than
+// n, 7 fewer of the AI's trains attack than n, 8 the player has n money, 9 1 and 5), 0 always.
+MissionIf(int c,int n)
 {
-  int c,n,k,m;
-  c=arrival_if[i];
-  n=arrival_if_n[i];
+  int k,m;
   if( c==1 )
     return ArrivalTrains(0)==0;
   if( c==2 )
@@ -649,21 +653,179 @@ ArrivalIf(int i)
     return ArrivalTrains(0)==0 && GetVid(102,VID_COUNT2)>0;
   return 1;
 }
+ArrivalIf(int i)
+{
+  return MissionIf(arrival_if[i],arrival_if_n[i]);
+}
+// MissionCars(u): mission_cars gets the VIDs of the train of u, its first car first.
+string mission_cars;
+int mission_count=0;
+MissionCars(int u)
+{
+  int c;
+  mission_cars="";
+  mission_count=0;
+  for( c=Action(u,ACT_FIRST_ENGINE); c; c=Action(c,ACT_NEXT_ENGINE) )
+  {
+    mission_cars=mission_cars+itoa(GetUnitVid(c))+",";
+    mission_count++;
+  }
+}
+// MissionTypeCars(type,built): mission_cars gets the VIDs of a train type (arr_gettype, as this
+// difficulty makes it); built: in the order a factory builds them (BuildTrain swaps the first two).
+MissionTypeCars(int type,int built)
+{
+  int j;
+  arr_gettype(temp_array,type);
+  if( built && temp_array[0] && temp_array[1] )
+  {
+    j=temp_array[0];
+    temp_array[0]=temp_array[1];
+    temp_array[1]=j;
+  }
+  mission_cars="";
+  for( j=0; j<30 && temp_array[j]; j++ )
+    mission_cars=mission_cars+itoa(temp_array[j])+",";
+}
+// ArrivalMade(u,i) and ArrivalsMade(): an arrival's train just made (its last car u) is logged with
+// its cars once they are all linked (10 s at most).
+int arrival_made[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+int arrival_made_i[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+int arrival_made_w[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+ArrivalMade(int u,int i)
+{
+  int j;
+  for( j=0; j<16; j++ )
+    if( !arrival_made[j] )
+    {
+      arrival_made[j]=u;
+      arrival_made_i[j]=i+1;
+      arrival_made_w[j]=0;
+      return 1;
+    }
+  return 0;
+}
+ArrivalsMade()
+{
+  int j,k,n;
+  for( j=0; j<16; j++ )
+    if( arrival_made[j] )
+    {
+      if( GetUnitVid(arrival_made[j]) )
+      {
+        MissionCars(arrival_made[j]);
+        arr_gettype(temp_array,arrival_type[arrival_made_i[j]-1]);
+        n=0;
+        for( k=0; k<30 && temp_array[k]; k++ )
+          n++;
+        arrival_made_w[j]=arrival_made_w[j]+1;
+        if( mission_count>=n || arrival_made_w[j]>=10 )
+        {
+          Log("ARRIVAL "+itoa(arrival_made_i[j])+" made "+mission_cars);
+          arrival_made[j]=0;
+        }
+      }
+      else
+        arrival_made[j]=0;
+    }
+}
 ArrivalsLeft(int army)
 {
   int i,n;
   n=0;
   for( i=0; i<ARRIVALS; i++ )
-    if( arrival_army[i]==army )
+    if( arrival_army[i]==army && (arrival_x[i] || arrival_y[i]) )
       if( !arrival_times[i] || arrival_done[i]<arrival_times[i] )
         if( !arrival_if[i] || arrival_or[i] || ArrivalIf(i) )
           n++;
   return n;
 }
+// ArrivalCar(i,j): the car j of arrival i's train on its entry's rail point, in its army.
+ArrivalCar(int i,int j)
+{
+  int u;
+  arr_gettype(temp_array,arrival_type[i]);
+  u=Create(temp_array[j],arrival_x[i],arrival_y[i]+arrival_z[i],arrival_z[i]);
+  Action(u,ACT_SET_ARMY,arrival_army[i],0);
+  if( arrival_army[i] )
+    Action(u,ACT_SET_BEHAVE,Action(u,ACT_GET_BEHAVE)|1);
+  return u;
+}
+// ArrivalDone(i,t): the train of arrival i is made (its last car arrival_car): its order, its message.
+ArrivalDone(int i,int t)
+{
+  int j,k,u;
+  string s;
+  u=arrival_car[i];
+  arrival_part[i]=0;
+  arr_gettype(temp_array,arrival_type[i]);
+  s="";
+  for( j=0; j<30 && temp_array[j]; j++ )
+    s=s+itoa(temp_array[j])+",";
+  k=-1;
+  if( arrival_army[i]==1 )
+    k=find_num();
+  if( k>=0 )
+  {
+    ai_trains[k]=u;
+    ai_trains_type[k]=arrival_type[i];
+    ai_trains_task[k]=arrival_task[i];
+    ai_trains_task2[k]=ATA_NONE;
+    ai_trains_task_backup[k]=ATA_NONE;
+    ai_trains_behave[k]=0;
+    ai_trains_time[k]=GetTime();
+    ai_trains_random_task[k]=arrival_raid[i];
+  }
+  else if( arrival_task[i]==-2 || arrival_task[i]==-3 )
+    Action(u,ACT_MOVE,arrival_to_x[i],arrival_to_y[i]+arrival_to_z[i]);
+  if( arrival_task[i]==-3 )
+  {
+    if( arrival_unit[i] )
+      PatrolEngine(arrival_unit[i],arrival_to2_x[i],arrival_to2_y[i]);
+    arrival_unit[i]=u;
+  }
+  if( arrival_msg[i] )
+  {
+    PlaySFX(100);
+    if( arrival_army[i]==1 )
+      Message("EnemyReinforcementArrived",GetX(u),GetY(u));
+    else
+      Message("ReinforcementArrived",GetX(u),GetY(u));
+  }
+  arrival_done[i]=arrival_done[i]+1;
+  arrival_last[i]=t;
+  s=" cars "+s;
+  s="ARRIVAL "+itoa(i+1)+" army "+itoa(arrival_army[i])+" wave "+itoa(arrival_done[i])+" at "+itoa(t)+" s task "+itoa(arrival_task[i])+" slot "+itoa(k)+s;
+  Log(s);
+  ArrivalMade(u,i);
+  return 1;
+}
+// ArrivalTry(i,t): a wave of arrival i when it is due; its cars one at a time, the next once the
+// last one has left the rail point (the entry's push line moves it on; 5 s at most) - cars made on
+// one point all at once push each other apart out of their order.
 ArrivalTry(int i,int t)
 {
-  int j,k,u,go;
-  string s;
+  int u,go;
+  if( arrival_part[i] )   // a train being made: its next car
+  {
+    u=arrival_car[i];
+    if( GetUnitVid(u) )
+      if( SizeTo(u,arrival_x[i],arrival_y[i]+arrival_z[i])<36 && t-arrival_last[i]<5 )
+        return 0;
+    arr_gettype(temp_array,arrival_type[i]);
+    if( arrival_part[i]<30 && temp_array[arrival_part[i]] )
+    {
+      arrival_car[i]=ArrivalCar(i,arrival_part[i]);
+      arrival_part[i]=arrival_part[i]+1;
+      arrival_last[i]=t;
+      arr_gettype(temp_array,arrival_type[i]);
+      if( arrival_part[i]<30 && temp_array[arrival_part[i]] )
+        return 0;
+    }
+    return ArrivalDone(i,t);
+  }
+  if( !arrival_x[i] && !arrival_y[i] )
+    return 0;
   if( arrival_times[i] && arrival_done[i]>=arrival_times[i] )
     return 0;
   if( arrival_done[i] )
@@ -683,52 +845,247 @@ ArrivalTry(int i,int t)
     return 0;
   if( FindNearestSprite(GETSPRITE_CLASS+B_ENGINE,arrival_x[i],arrival_y[i]+arrival_z[i],180) )
     return 0;
-  k=-1;
   if( arrival_army[i]==1 )
-  {
-    k=find_num();
-    if( k<0 )
+    if( find_num()<0 )
       return 0;
-  }
-  arr_gettype(temp_array,arrival_type[i]);
-  u=0;
-  for( j=0; j<ARR_LENGTH && temp_array[j]; j++ )
-  {
-    u=Create(temp_array[j],arrival_x[i],arrival_y[i]+arrival_z[i],arrival_z[i]);
-    Action(u,ACT_SET_ARMY,arrival_army[i],0);
-    if( arrival_army[i] )
-      Action(u,ACT_SET_BEHAVE,Action(u,ACT_GET_BEHAVE)|1);
-  }
-  if( !u )
+  arrival_car[i]=ArrivalCar(i,0);
+  if( !arrival_car[i] )
     return 0;
-  if( arrival_if[i]==8 )
+  if( arrival_if[i]==8 )   // paid as the train starts to come
     SetMoney(0,GetMoney(0)-arrival_if_n[i]);
-  if( k>=0 )
-  {
-    ai_trains[k]=u;
-    ai_trains_type[k]=arrival_type[i];
-    ai_trains_task[k]=arrival_task[i];
-    ai_trains_task2[k]=ATA_NONE;
-    ai_trains_task_backup[k]=ATA_NONE;
-    ai_trains_behave[k]=0;
-    ai_trains_time[k]=GetTime();
-    ai_trains_random_task[k]=arrival_raid[i];
-  }
-  else if( arrival_task[i]==-2 )
-    Action(u,ACT_MOVE,arrival_to_x[i],arrival_to_y[i]+arrival_to_z[i]);
-  if( arrival_msg[i] )
-  {
-    PlaySFX(100);
-    if( arrival_army[i]==1 )
-      Message("EnemyReinforcementArrived",GetX(u),GetY(u));
-    else
-      Message("ReinforcementArrived",GetX(u),GetY(u));
-  }
-  arrival_done[i]=arrival_done[i]+1;
+  arrival_part[i]=1;
   arrival_last[i]=t;
-  s="ARRIVAL "+itoa(i+1)+" army "+itoa(arrival_army[i])+" wave "+itoa(arrival_done[i]);
-  Log(s+" at "+itoa(t)+" s task "+itoa(arrival_task[i])+" slot "+itoa(k));
+  arr_gettype(temp_array,arrival_type[i]);
+  if( temp_array[1] )
+    return 0;
+  return ArrivalDone(i,t);
+}
+// PlanTact(t): the factories' plans (plan_*[], a factory's panel). A wave is due - the first one by
+// plan_when (0: plan_first s from the start, 1: plan_first s after the first train of the entry
+// plan_prev was built, 2: while MissionIf(plan_if, plan_if_n) holds, not before plan_first s), the
+// next ones plan_every s after the one before was built (and while the condition holds), plan_times
+// of them or without end. The enemy's (plan_fx, plan_fy 0) goes into the authors' queue
+// (level_queue_*, which DepoFree of ai_events.lgc builds from its first place on, in the AI's first
+// free factory, while fewer than LIMIT_ATACKERS of its trains attack) at the first empty place, with
+// a time already past, and is followed from there to the AI's slot of the train being built
+// (ATT_DEPO_CREATED) to the train made; plan_type's cars are the train's with the first two swapped,
+// as BuildTrain swaps them back. The others' factory builds its train as PlanBuild says. The cars
+// planned and the cars made are logged ("ARRIVAL F<n>").
+int plan_queued=0;
+PlanTaken(int t)
+{
+  int i,j,k;
+  i=plan_fifo[0];
+  for( j=0; j<PLANS-1; j++ )
+    plan_fifo[j]=plan_fifo[j+1];
+  plan_state[i]=2;
+  plan_slot[i]=-1;
+  for( k=0; k<ARR_LENGTH; k++ )
+    if( ai_trains[k] && ai_trains_type[k]>=ATT_DEPO_CREATED )
+      plan_slot[i]=k;
+  Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i]+1)+" taken at "+itoa(t)+" s slot "+itoa(plan_slot[i]));
+}
+PlanFollow(int i,int t)
+{
+  int k,u;
+  k=plan_slot[i];
+  if( k>=0 )
+    if( ai_trains_type[k]>=ATT_DEPO_CREATED )
+      return 0;
+  plan_state[i]=0;
+  plan_done[i]=plan_done[i]+1;
+  plan_last[i]=t;
+  if( plan_done[i]==1 )
+    plan_since[i]=t;
+  u=0;
+  if( k>=0 )
+    u=ai_trains[k];
+  if( u )
+    if( GetUnitVid(u)==102 )
+      u=0;
+  if( u )
+  {
+    MissionCars(u);
+    Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i])+" built at "+itoa(t)+" s made "+mission_cars);
+  }
+  else
+    Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i])+" lost at "+itoa(t)+" s: the AI dropped its build");
   return 1;
+}
+// PlanPrice(v): what a car costs (price_*[], the factory's panel's prices).
+PlanPrice(int v)
+{
+  int j;
+  for( j=0; j<PRICES; j++ )
+    if( price_vid[j]==v )
+      return price_of[j];
+  return 0;
+}
+// A train of ours, the neutrals' or the pirates' factory (plan_fx, plan_fy, while it is plan_army's):
+// the runner orders the factory to build it car by car (AddCommand, as the AI's BuildTrain does, in
+// the train's order), a car once the factory is free and the army has its price - a car the money
+// does not cover would be left out -, then gives the train its order (plan_task -1 none, -2 drive
+// to plan_to, -3 drive there, then to and fro to plan_to2).
+PlanFactory(int i)
+{
+  int f;
+  f=FindNearestSprite(GETSPRITE_VID+102,plan_fx[i],plan_fy[i],30);
+  if( f )
+    if( Action(f,act_getarmy,0,0)!=plan_army[i] )
+      f=0;
+  return f;
+}
+PlanBuild(int i,int t)
+{
+  int f,v,u;
+  f=plan_slot[i];
+  if( GetUnitVid(f)!=102 )
+    f=0;
+  if( f )
+    if( Action(f,act_getarmy,0,0)!=plan_army[i] )
+      f=0;
+  if( !f )
+  {
+    plan_state[i]=0;
+    plan_done[i]=plan_done[i]+1;
+    plan_last[i]=t;
+    Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i])+" lost at "+itoa(t)+" s: its factory is gone or not of army "+itoa(plan_army[i]));
+    return 0;
+  }
+  arr_gettype(temp_array,plan_type[i]);
+  if( plan_state[i]==4 )   // all made: logged and sent off once the cars are linked (10 s at most)
+  {
+    if( t-plan_last[i]<3 )
+      return 0;
+    u=FindNearestSprite(GETSPRITE_VID+temp_array[plan_next[i]-1],GetX(f),GetY(f),160);
+    if( u )
+    {
+      MissionCars(u);
+      if( mission_count<plan_next[i] && t-plan_last[i]<10 )
+        return 0;
+    }
+    plan_state[i]=0;
+    plan_done[i]=plan_done[i]+1;
+    plan_last[i]=t;
+    if( plan_done[i]==1 )
+      plan_since[i]=t;
+    if( !u )
+    {
+      Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i])+" lost at "+itoa(t)+" s: no train at the factory");
+      return 0;
+    }
+    MissionCars(u);
+    Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i])+" built at "+itoa(t)+" s army "+itoa(plan_army[i])+" made "+mission_cars);
+    if( plan_task[i]==-2 || plan_task[i]==-3 )
+      Action(u,ACT_MOVE,plan_to_x[i],plan_to_y[i]+plan_to_z[i]);
+    if( plan_task[i]==-3 )
+      plan_unit[i]=u;
+    return 1;
+  }
+  if( Action(f,ACT_GET_COMMAND)==COM_BUILD )
+    return 0;
+  if( strlen(GetCommands(f))>plan_base[i] )
+    return 0;
+  v=temp_array[plan_next[i]];
+  if( !v )
+  {
+    plan_state[i]=4;
+    plan_last[i]=t;
+    return 0;
+  }
+  if( GetMoney(plan_army[i])<PlanPrice(v) )
+    return 0;
+  AddCommand(f,ACT_BUILD_UNIT,v);
+  plan_next[i]=plan_next[i]+1;
+  return 0;
+}
+// PlanOnPoint(i): a factory's train of a patrol (-3) that reached its point patrols from there.
+PlanOnPoint(int i)
+{
+  if( plan_task[i]!=-3 || !plan_unit[i] )
+    return 0;
+  if( !GetUnitVid(plan_unit[i]) )
+  {
+    plan_unit[i]=0;
+    return 0;
+  }
+  if( SizeTo(plan_unit[i],plan_to_x[i],plan_to_y[i]+plan_to_z[i])>=40 )
+    return 0;
+  PatrolEngine(plan_unit[i],plan_to2_x[i],plan_to2_y[i]);
+  plan_unit[i]=0;
+  return 1;
+}
+PlanTry(int i,int t)
+{
+  int go,n,f;
+  if( plan_times[i] && plan_done[i]>=plan_times[i] )
+    return 0;
+  if( plan_done[i] )
+    go=t-plan_last[i]>=plan_every[i];
+  else if( plan_when[i]==1 && plan_prev[i]>=0 )
+  {
+    go=0;
+    if( plan_done[plan_prev[i]] )
+      go=t-plan_since[plan_prev[i]]>=plan_first[i];
+  }
+  else
+    go=t>=plan_first[i];
+  if( plan_when[i]==2 && !MissionIf(plan_if[i],plan_if_n[i]) )
+    go=0;
+  if( !go )
+    return 0;
+  if( plan_fx[i] || plan_fy[i] )   // ours, the neutrals' or the pirates': when its factory is free
+  {
+    f=PlanFactory(i);
+    if( !f )
+      return 0;
+    if( Action(f,ACT_GET_COMMAND)==COM_BUILD )
+      return 0;
+    for( n=0; n<PLANS; n++ )   // one entry at a time in a factory
+      if( plan_state[n]>=3 && plan_slot[n]==f )
+        return 0;
+    if( FindNearestSprite(GETSPRITE_CLASS+B_ENGINE,GetX(f),GetY(f),250) )   // a train at its door or on its spur: the cars would join it
+      return 0;
+    plan_slot[i]=f;
+    plan_base[i]=strlen(GetCommands(f));
+    plan_next[i]=0;
+    plan_state[i]=3;
+    MissionTypeCars(plan_type[i],0);
+    Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i]+1)+" ordered at "+itoa(t)+" s army "+itoa(plan_army[i])+" task "+itoa(plan_task[i])+" cars "+mission_cars);
+    return 1;
+  }
+  n=plan_queued;
+  level_queue_times[n]=1;
+  level_queue_trains[n]=plan_type[i];
+  level_queue_task[n]=plan_task[i];
+  plan_fifo[n]=i;
+  plan_queued=n+1;
+  plan_state[i]=1;
+  MissionTypeCars(plan_type[i],1);
+  Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i]+1)+" queued at "+itoa(t)+" s place "+itoa(n)+" type "+itoa(plan_type[i])+" task "+itoa(plan_task[i])+" cars "+mission_cars);
+  return 1;
+}
+PlanTact(int t)
+{
+  int i,j,m,n;
+  n=0;
+  for( j=0; j<PLANS; j++ )
+    if( level_queue_times[j] )
+      n=j+1;
+  for( m=n; m<plan_queued; m++ )
+    PlanTaken(t);
+  if( plan_queued>n )
+    plan_queued=n;
+  for( i=0; i<PLANS; i++ )
+  {
+    PlanOnPoint(i);
+    if( plan_state[i]==2 )
+      PlanFollow(i,t);
+    else if( plan_state[i]>=3 )
+      PlanBuild(i,t);
+    else if( !plan_state[i] )
+      PlanTry(i,t);
+  }
 }
 // FactoryTact(t): the unit limits at the start (AddUnitLimit takes the limit first and the army
 // last), the units the factories get into their lists later (unlock_*[], the factory by its place).
@@ -800,6 +1157,22 @@ OrdersTact()
     }
     Log("ORDER "+itoa(i+1)+" task "+itoa(order_task[i])+" train "+itoa(u!=0)+" slot "+itoa(k));
   }
+}
+// ArrivalOnPoint(i): a train of a patrol (-3) that reached its point patrols to the other end from there.
+ArrivalOnPoint(int i)
+{
+  if( arrival_task[i]!=-3 || !arrival_unit[i] )
+    return 0;
+  if( !GetUnitVid(arrival_unit[i]) )
+  {
+    arrival_unit[i]=0;
+    return 0;
+  }
+  if( SizeTo(arrival_unit[i],arrival_to_x[i],arrival_to_y[i]+arrival_to_z[i])>=40 )
+    return 0;
+  PatrolEngine(arrival_unit[i],arrival_to2_x[i],arrival_to2_y[i]);
+  arrival_unit[i]=0;
+  return 1;
 }
 // PiecesTact(), every frame: the wholes the editor places work as in the missions. A citadel (VID
 // 149 with its tower 117) as l04 and l18 (pirates.lgc GratesTact): while its tower stands, the first
@@ -1137,11 +1510,21 @@ ArrivalsTact()
     return 0;
   t=(GetTime()-time_game_total)/1000;
   iff(1)
+  {
     OrdersTact();
+#ifdef CLEVER_ATTACK
+    SetCleverEnemyAttack(CLEVER_ATTACK);
+#endif
+  }
   FactoryTact(t);
+  PlanTact(t);
   CaptureTact();
+  ArrivalsMade();
   for( i=0; i<ARRIVALS; i++ )
+  {
+    ArrivalOnPoint(i);
     ArrivalTry(i,t);
+  }
   return 1;
 }
 """
@@ -1199,6 +1582,9 @@ int player_reinforcement_train[]={5,0};
 #define ORDERS 0
 #define UNLOCKS 0
 #define UNIT_LIMITS 0
+#define PLANS 0
+#define CLEVER_ATTACK 1
+#define PRICES 0
 #include "maps\script\TrainsTactDeclares.lgc"
 int start_trains[]={-1};
 int start_trains_task[]={0};
@@ -1224,10 +1610,15 @@ int arrival_task[]={0};
 int arrival_to_x[]={0};
 int arrival_to_y[]={0};
 int arrival_to_z[]={0};
+int arrival_to2_x[]={0};
+int arrival_to2_y[]={0};
 int arrival_raid[]={0};
 int arrival_msg[]={0};
 int arrival_done[]={0};
 int arrival_last[]={0};
+int arrival_unit[]={0};
+int arrival_part[]={0};
+int arrival_car[]={0};
 int order_vid[]={0};
 int order_x[]={0};
 int order_y[]={0};
@@ -1243,6 +1634,34 @@ int unlock_time[]={0};
 int limit_army[]={0};
 int limit_vid[]={0};
 int limit_max[]={0};
+int plan_type[]={0};
+int plan_task[]={0};
+int plan_when[]={0};
+int plan_first[]={0};
+int plan_every[]={0};
+int plan_times[]={0};
+int plan_if[]={0};
+int plan_if_n[]={0};
+int plan_prev[]={0};
+int plan_fx[]={0};
+int plan_fy[]={0};
+int plan_army[]={0};
+int plan_to_x[]={0};
+int plan_to_y[]={0};
+int plan_to_z[]={0};
+int plan_to2_x[]={0};
+int plan_to2_y[]={0};
+int plan_state[]={0};
+int plan_done[]={0};
+int plan_last[]={0};
+int plan_since[]={0};
+int plan_slot[]={0};
+int plan_fifo[]={0};
+int plan_next[]={0};
+int plan_base[]={0};
+int plan_unit[]={0};
+int price_vid[]={0};
+int price_of[]={0};
 // </editor>
 // What the settings mean: LEVEL the mission number (from 0), CUSTOM_MAP marks a map that is not
 // a campaign mission (no campaign progress or scores, the Esc menu's restart loads this map, the
@@ -1257,7 +1676,10 @@ int limit_max[]={0};
 // (0, 0), BUGS.md F10), level_queue_* the trains its depot builds later (the earliest times, s)
 // and ARRIVALS, arrival_*[] the trains that arrive from the entries of the map (the Arrivals panel),
 // ORDERS, order_*[] the trains' orders (a train's panel), UNLOCKS, unlock_*[] the units a factory
-// gets later, UNIT_LIMITS, limit_*[] the unit limits (a factory's panel; the next block runs them).
+// gets later, UNIT_LIMITS, limit_*[] the unit limits, PLANS, plan_*[] the enemy factory's plan (a
+// factory's panel: the next block puts each entry into level_queue_* when it is due), CLEVER_ATTACK
+// SetCleverEnemyAttack's value (RENEW_TIMEOUT, FIRSTCONTACTTIME, FIRSTATTACKTIME, start_trains_renew
+// and start_trains_random_task are the AI's other knobs of the panel).
 #include "maps\script\header.lgc"
 // <editor arrivals> the trains that arrive (the Arrivals panel) - written by the map editor when the map is saved
 @RUNNER@// </editor arrivals>
