@@ -73,6 +73,8 @@ const char* object_name(int nvid);  // editor_panel.cpp: the palette's names of 
 bool palette_state(int nvid, int& behave, std::vector<short>& items);   // editor_panel.cpp
 int palette_icon(int nvid);                                             // editor_panel.cpp
 void panel_open_palette(bool vehicles);   // editor_panel.cpp: All objects, or the vehicles
+int panel_palette_army(int which);   // editor_panel.cpp: the palette's army row, -1 the missions'
+void panel_set_palette_army(int which, int army);
 void load_palette();                                                    // editor_panel.cpp
 extern "C" void reset_palette_cache();                                  // editor_panel.cpp
 bool editor_level_held();           // editor.cpp
@@ -154,7 +156,8 @@ constexpr int ANI_STAND = 0, ANI_STAND_OPEN = 10;
 constexpr int CURSOR_ARROW = 0, CURSOR_MOVE = 2, CURSOR_SELECT = 7, CURSOR_DELETE = 14;
 // VIDs
 constexpr int VID_GROUND = 1024, VID_DEPOT = 102, VID_WORKSHOP = 104, VID_GUN = 115, VID_SEMAPHORE = 152,
-              VID_FORT = 162, VID_LOCOMOTIVE = 5, VID_CIRCLE = 460, VID_ICONS = 455, VID_CRATE = 169, VID_BLOCKER = 150;
+              VID_FORT = 162, VID_LOCOMOTIVE = 5, VID_CIRCLE = 460, VID_ICONS = 455, VID_CRATE = 169, VID_BLOCKER = 150,
+              VID_MINE = 86, VID_MINE_MARKER = 89;
 // the bar: the state bar's base, its side tiles (game/objects.override), the depot panel's strip,
 // the frame of the chosen slot, the editor's icons (patch_data.make_editor_icons) and two fonts:
 // the small one of the depot panel's keys and the mouse tips' one; the palette's icons (the chosen decal's)
@@ -685,6 +688,8 @@ bool on_track_vid(int nvid);
 bool snap(int nvid, float& x, float& y, int& direction, UiText& reason);
 void give_building_line(uint8_t* o);
 bool take_building_lines(uint8_t* o, std::vector<uint8_t*>& posts);
+void resnap_on_track(uint8_t* o, float x, float y, int direction, const UiText& what);
+bool rail_line_spot(float x, float y, float reach, bool diagonal, float& sx, float& sy, int& along);
 bool post_on_track(uint8_t* o);
 int post_facing_for(float x, float y);
 bool blocker_at_end(uint8_t* o);
@@ -773,8 +778,10 @@ std::vector<Socket> sockets_of(int nvid, int direction) {
 
 bool is_gun(int nvid) { return nvid == GUN_CANNON || nvid == GUN_MISSILE || nvid == GUN_PIRATE; }
 
+constexpr int VID_CHARYBDIS = 254;
+
 int gun_army(int host, int host_army) {
-    return host == VID_CITADEL && host_army == 0 ? 1 : host_army;
+    return (host == VID_CITADEL || host == VID_CHARYBDIS) && host_army == 0 ? 1 : host_army;
 }
 
 // What a socket of a host can hold (0: nothing) and what a new host comes with.
@@ -805,6 +812,76 @@ std::vector<uint8_t*> guns_on(uint8_t* host) {
     return out;
 }
 
+// ---- wholes: the citadel, Charybdis ----
+//
+// Two things of the missions are made of several objects that always stand the same way to each
+// other (measured on all three citadels of l04 and l18 and on l06's Charybdis, offsets rounded):
+// the citadel (149) with its two grates (146) on the two tracks through it, 33 below it (sunk: the
+// gate open), and four corkscrews (142) on its corners, 76-78 up - its tower in its socket above;
+// Charybdis's body (254) with its roots (266, a decal), teeth (255), eye (256), four mortars (258)
+// and two cannons (260). The editor places, moves, raises and deletes each as one object; the
+// runner's PiecesTact (editor_mission.cpp) makes them work in play as l04, l18 and l06 do. Their
+// faction is the army of what fights - the citadel's tower, Charybdis's teeth, eye and guns: the
+// enemy's on the missions' wholes, which are army 0 themselves (gun_army) -; the editor places a
+// whole in its faction's army and its ARMY row sets the faction. The other pieces are army 0, as in
+// the missions.
+
+struct Piece {
+    int nvid;
+    float dx, dy, dz;
+    int direction;
+    bool faction;
+};
+
+const std::vector<Piece>& pieces_of_kind(int host) {
+    static const std::vector<Piece> none, citadel = {{146, -34, 23, -33, 128, false}, {146, 36, 25, -33, 0, false},
+                                                      {142, 0, -49, 77, 0, false},    {142, 2, 57, 77, 0, false},
+                                                      {142, -73, 3, 77, 0, false},    {142, 77, 5, 77, 0, false}};
+    static const std::vector<Piece> charybdis = {{266, -12, -4, -11, 0, false}, {255, -40, 27, 15, 0, true}, {256, -34, 22, 56, 0, true},
+                                                 {258, 5, 27, 64, 0, true},     {258, -6, -28, 61, 0, true}, {258, 38, 6, 61, 0, true},
+                                                 {258, -42, -7, 64, 0, true},   {260, -9, 44, 45, 0, true},  {260, -67, 4, 45, 0, true}};
+    return host == VID_CITADEL ? citadel : host == VID_CHARYBDIS ? charybdis : none;
+}
+
+bool is_piece(int nvid) {
+    for (int host : {VID_CITADEL, VID_CHARYBDIS})
+        for (const Piece& p : pieces_of_kind(host))
+            if (p.nvid == nvid) return true;
+    return false;
+}
+
+// The pieces of a whole standing at their places (nullptr where one is missing).
+std::vector<uint8_t*> pieces_on(uint8_t* host) {
+    std::vector<uint8_t*> out;
+    for (const Piece& p : pieces_of_kind(nvid_of(host))) {
+        const float px = at<float>(host, O_X) + p.dx, py = at<float>(host, O_Y) + p.dy;
+        uint8_t* found = nullptr;
+        for_each_object([&](uint8_t* o) {
+            if (!found && !removed(o) && nvid_of(o) == p.nvid && std::fabs(at<float>(o, O_X) - px) < 10 &&
+                std::fabs(at<float>(o, O_Y) - py) < 10)
+                found = o;
+        });
+        out.push_back(found);
+    }
+    return out;
+}
+
+// A piece's army in a whole of the faction `army`.
+int piece_army(const Piece& p, int army) { return p.faction ? army : 0; }
+
+// The army a host's guns and fighting pieces have: a whole's faction (its tower's, its eye's...; with
+// none of them, the enemy's on one of army 0 as the missions have it), the host's own for the others.
+int faction_of(uint8_t* host) {
+    if (pieces_of_kind(nvid_of(host)).empty() && nvid_of(host) != VID_CITADEL) return army_of(host);
+    for (uint8_t* g : guns_on(host))
+        if (g) return army_of(g);
+    const std::vector<Piece>& kinds = pieces_of_kind(nvid_of(host));
+    const std::vector<uint8_t*> pieces = pieces_on(host);
+    for (size_t i = 0; i < kinds.size(); ++i)
+        if (pieces[i] && kinds[i].faction) return army_of(pieces[i]);
+    return gun_army(nvid_of(host), army_of(host));
+}
+
 // ---- train cars ----
 
 bool is_car(uint8_t* o) { return o && class_of(o) == B_ENGINE; }
@@ -820,7 +897,23 @@ std::vector<uint8_t*> train_of(uint8_t* c) {
     return out;
 }
 
-// The object and what goes with it: a host's guns in their sockets, a car's train (the car first).
+// The host (fort, mining plant, citadel, Charybdis) a gun stands in a socket of or a piece belongs
+// to, or nullptr.
+uint8_t* host_of(uint8_t* part) {
+    if (!part || (!is_gun(nvid_of(part)) && !is_piece(nvid_of(part)))) return nullptr;
+    uint8_t* found = nullptr;
+    for_each_object([&](uint8_t* h) {
+        if (found || removed(h) || (sockets_of(nvid_of(h), 0).empty() && pieces_of_kind(nvid_of(h)).empty())) return;
+        for (uint8_t* g : guns_on(h))
+            if (g == part) found = h;
+        for (uint8_t* p : pieces_on(h))
+            if (p == part) found = h;
+    });
+    return found;
+}
+
+// The object and what goes with it: a host's guns in their sockets and its pieces, a car's train
+// (the car first).
 std::vector<uint8_t*> group_of(uint8_t* o) {
     if (is_car(o)) {
         std::vector<uint8_t*> train{o};
@@ -831,11 +924,13 @@ std::vector<uint8_t*> group_of(uint8_t* o) {
     std::vector<uint8_t*> group{o};
     for (uint8_t* g : guns_on(o))
         if (g) group.push_back(g);
+    for (uint8_t* p : pieces_on(o))
+        if (p) group.push_back(p);
     return group;
 }
 
 // A gun put into a socket of a host: its place, height and direction, the host's army.
-uint8_t* fit_gun(uint8_t* host, const Socket& s, int nvid);
+uint8_t* fit_gun(uint8_t* host, const Socket& s, int nvid, int army);
 // ---- the gravel bed of the track ----
 //
 // The missions that have one put a decal of the bed under every rail (l02, l09, l15: VID 612,
@@ -889,8 +984,9 @@ bool pickable(uint8_t* o) {
     const int c = at<int>(v, V_CLASS);
     if (is_bed(at<int>(v, V_NVID))) return false;   // a rail's gravel bed goes with the rail
     if (is_water_tile(at<int>(v, V_NVID))) return false;   // the Water tool's
-    return at<int>(v, V_NVID) != VID_GROUND && !(at<uint32_t>(v, V_FLAGS) & VID_SCREEN) && c != B_FRAME &&
-           c != B_TEXT && c != B_LINKER;
+    // the mine has the screen flag too (0x800), but is an object of the map
+    return at<int>(v, V_NVID) != VID_GROUND && (!(at<uint32_t>(v, V_FLAGS) & VID_SCREEN) || at<int>(v, V_NVID) == VID_MINE) &&
+           c != B_FRAME && c != B_TEXT && c != B_LINKER;
 }
 
 // A point at a region's frame (inside it the objects under the region are picked).
@@ -900,8 +996,11 @@ bool on_region_frame(uint8_t* o, float x, float y) {
                                  y < b.b - 2 * REGION_BORDER);
 }
 
+uint8_t* host_of(uint8_t* gun);
+
 // The object at a point of the map (screen coordinates plus the camera): the smallest box that
-// holds the point, the rails only when nothing else is there.
+// holds the point, the rails only when nothing else is there; a gun in a socket is its host's part
+// (its panel sets the gun).
 uint8_t* pick(float x, float y) {
     uint8_t* best = nullptr;
     float best_area = 0;
@@ -918,6 +1017,7 @@ uint8_t* pick(float x, float y) {
             best_rail = rail;
         }
     });
+    if (uint8_t* host = host_of(best)) return host;
     return best;
 }
 
@@ -996,7 +1096,13 @@ int palette_of(const Entry& e) { return e.nvid == VEHICLES_NVID ? 1 : 0; }
 int place_nvid() {
     return is_palette(entry()) ? g_picked_nvid[palette_of(entry())] : entry().nvid != 0 ? entry().nvid : decal_nvid();
 }
-int place_army() { return is_palette(entry()) ? g_picked_army[palette_of(entry())] : entry().army; }
+// The army of what is placed: the palette's row (or the one the missions give the object picked), the
+// bar's entries their own.
+int place_army() {
+    if (!is_palette(entry())) return entry().army;
+    const int row = panel_palette_army(palette_of(entry()));
+    return row >= 0 ? row : g_picked_army[palette_of(entry())];
+}
 // The name of what is placed: the palette's object by its name, the bar's entries by theirs.
 const char* place_label() {
     if (!is_palette(entry())) return label_of(entry());
@@ -1648,39 +1754,45 @@ void end_drag() {
         if (!g_test && GetCapture()) ReleaseCapture();
         return;
     }
-    if (g_drag.active && g_drag.moved && g_drag.objects.size() == 1 && on_track_vid(nvid_of(g_drag.objects[0]))) {
-        // on the track: to the place there nearest to where it was dropped, with its line and posts
+    if (g_drag.active && g_drag.moved && g_drag.objects.size() > 1 && on_track_vid(nvid_of(g_drag.objects[0]))) {
+        // a fort, citadel or Charybdis with its guns and pieces: the whole onto the track where it was dropped
         uint8_t* o = g_drag.objects[0];
         float x = at<float>(o, O_X), y = at<float>(o, O_Y);
         int direction = at<int>(o, O_DIRECTION);
         UiText why;
-        apply(o, g_drag.before[0]);   // its old place first: the old line is found there
         if (!snap(nvid_of(o), x, y, direction, why)) {
+            for (size_t i = 0; i < g_drag.objects.size(); ++i) apply(g_drag.objects[i], g_drag.before[i]);
             MESSAGE("MsgStays", "%s - it stays where it was", why.get());
         } else {
-            const std::vector<PushLine> lines_before = mission_push_lines();
-            std::vector<uint8_t*> objects{o};
-            const int own = own_line(o);   // a post's, found at its old place
-            const bool lines_changed = take_building_lines(o, objects) || own >= 0;
-            std::vector<State> before = states(objects);
-            for (size_t i = 1; i < objects.size(); ++i) {
-                State gone = before[i];
-                gone.present = false;
-                apply(objects[i], gone);
+            const float dx = x - g_drag.before[0].x, dy = y - g_drag.before[0].y;
+            for (size_t i = 0; i < g_drag.objects.size(); ++i) {
+                uint8_t* m = g_drag.objects[i];
+                const float mx = g_drag.before[i].x + dx, my = g_drag.before[i].y + dy;
+                reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(m, nullptr, mx, my, ground_z(vid_of(m), mx, my) + g_drag.lift[i]);
             }
-            reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, x, y, ground_z(vid_of(o), x, y));
-            set_direction(o, direction);
-            remake_own_line(o, own);
-            commit({"OpMove", "move"}, objects, before);
-            if (lines_changed) {
-                Operation& op = g_undo.back();
-                op.lines = true;
-                op.lines_before = lines_before;
-                op.lines_after = mission_push_lines();
-            }
-            if (nvid_of(o) == VID_DEPOT || nvid_of(o) == VID_WORKSHOP) give_building_line(o);
-            else MESSAGE("MsgMovedTrack", "moved VID %d to %.0f,%.0f direction %d", nvid_of(o), x, y, direction);
+            const std::vector<uint8_t*> guns = guns_on(o);   // in their sockets before the turn
+            reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(o, nullptr, direction);
+            const std::vector<Socket> sockets = sockets_of(nvid_of(o), direction);
+            for (size_t i = 0; i < guns.size() && i < sockets.size(); ++i)
+                if (guns[i]) {
+                    reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(guns[i], nullptr, x + sockets[i].dx, y + sockets[i].dy,
+                                                                 at<float>(o, O_Z) + sockets[i].dz);
+                    reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(guns[i], nullptr, direction);
+                }
+            commit({"OpMove", "move"}, g_drag.objects, g_drag.before);
+            MESSAGE("MsgMovedTrack", "moved VID %d to %.0f,%.0f direction %d", nvid_of(o), x, y, direction);
         }
+        g_drag = Drag();
+        if (!g_test && GetCapture()) ReleaseCapture();
+        return;
+    }
+    if (g_drag.active && g_drag.moved && g_drag.objects.size() == 1 && on_track_vid(nvid_of(g_drag.objects[0]))) {
+        // on the track: to the place there nearest to where it was dropped, with its line and posts
+        uint8_t* o = g_drag.objects[0];
+        const float x = at<float>(o, O_X), y = at<float>(o, O_Y);
+        const int direction = at<int>(o, O_DIRECTION);
+        apply(o, g_drag.before[0]);   // its old place first: the old line is found there
+        resnap_on_track(o, x, y, direction, {"OpMove", "move"});
         g_drag = Drag();
         if (!g_test && GetCapture()) ReleaseCapture();
         return;
@@ -1692,6 +1804,40 @@ void end_drag() {
     }
     g_drag = Drag();
     if (!g_test && GetCapture()) ReleaseCapture();
+}
+
+// An object of the track (a factory, a repair point, a post, a crate) to the place there nearest to
+// (x, y), facing the way nearest to `direction`, its line and posts made anew - one step of the
+// history (a drag, a repair point turned round).
+void resnap_on_track(uint8_t* o, float x, float y, int direction, const UiText& what) {
+    UiText why;
+    if (!snap(nvid_of(o), x, y, direction, why)) {
+        MESSAGE("MsgStays", "%s - it stays where it was", why.get());
+        return;
+    }
+    const std::vector<PushLine> lines_before = mission_push_lines();
+    std::vector<uint8_t*> objects{o};
+    const int own = own_line(o);   // a post's, found at its old place
+    const bool lines_changed = take_building_lines(o, objects) || own >= 0;
+    std::vector<State> before = states(objects);
+    for (size_t i = 1; i < objects.size(); ++i) {
+        State gone = before[i];
+        gone.present = false;
+        apply(objects[i], gone);
+    }
+    reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, x, y, ground_z(vid_of(o), x, y));
+    set_direction(o, direction);
+    remake_own_line(o, own);
+    commit(what, objects, before);
+    if (lines_changed) {
+        Operation& op = g_undo.back();
+        op.lines = true;
+        op.lines_before = lines_before;
+        op.lines_after = mission_push_lines();
+    }
+    g_selection = group_of(o);
+    if (nvid_of(o) == VID_DEPOT || nvid_of(o) == VID_WORKSHOP) give_building_line(o);
+    else MESSAGE("MsgMovedTrack", "moved VID %d to %.0f,%.0f direction %d", nvid_of(o), x, y, direction);
 }
 
 // ---- changes of the selection ----
@@ -1740,6 +1886,24 @@ void turn(int steps) {
             MESSAGE("MsgDirection", "direction %d", g_place_direction);
             return;
         }
+        if (v && place_nvid() == VID_FORT) {   // a fort: round along its track
+            float x, y, z;
+            map_point(g_mouse, v, x, y, z);
+            int direction = g_place_direction;
+            UiText why;
+            g_place_direction = ((snap(VID_FORT, x, y, direction, why) ? direction : g_place_direction) + 128) & 255;
+            MESSAGE("MsgDirection", "direction %d", g_place_direction);
+            return;
+        }
+        if (v && place_nvid() == VID_WORKSHOP) {   // a repair point: round along its leg
+            float x, y, z;
+            map_point(g_mouse, v, x, y, z);
+            int direction = g_place_direction;
+            UiText why;
+            g_place_direction = ((snap(VID_WORKSHOP, x, y, direction, why) ? direction : g_place_direction) + 128) & 255;
+            MESSAGE("MsgRepairRound", "repair point: the line through it runs the other way (direction %d)", g_place_direction);
+            return;
+        }
         if (on_track_vid(place_nvid())) {
             MESSAGE("MsgPlaceByTrack", "%s: its track turns it", place_label());
             return;
@@ -1767,7 +1931,11 @@ void turn(int steps) {
         reverse_train(o);
         return;
     }
-    if (nvid_of(o) == VID_DEPOT || nvid_of(o) == VID_WORKSHOP || blocker_at_end(o)) {
+    if (nvid_of(o) == VID_WORKSHOP) {   // round along its leg, its line and posts with it
+        resnap_on_track(o, at<float>(o, O_X), at<float>(o, O_Y), (at<int>(o, O_DIRECTION) + 128) & 255, {"OpTurn", "turn"});
+        return;
+    }
+    if (nvid_of(o) == VID_DEPOT || blocker_at_end(o)) {
         MESSAGE("MsgTurnedByTrack", "VID %d is turned by its track (drag it to another place on the track)", nvid_of(o));
         return;
     }
@@ -1776,6 +1944,10 @@ void turn(int steps) {
         return;
     }
     if (wreck_on_track(o)) steps = (std::max)(1, at<int>(vid_of(o), V_ND_DIR)) / 2;   // a wreck on the track: round
+    float rx, ry;
+    int along;
+    if (nvid_of(o) == VID_FORT && rail_line_spot(at<float>(o, O_X), at<float>(o, O_Y), 8, false, rx, ry, along))
+        steps = (std::max)(1, at<int>(vid_of(o), V_ND_DIR)) / 2;   // a fort on its track: round
     const int dirs = (std::max)(1, at<int>(vid_of(o), V_ND_DIR));
     if (dirs <= 1) {
         MESSAGE("MsgOneDirection", "VID %d has one direction only", nvid_of(o));
@@ -1796,18 +1968,30 @@ void turn(int steps) {
     MESSAGE("MsgTurned", "turned VID %d to direction %d", nvid_of(o), direction);
 }
 
-// The army of the selection: the object's, and its guns' (gun_army).
+// The army of the selection: the object's and its guns' (a whole's: its faction, its other pieces army 0).
 void set_army(int army) {
     if (g_selection.empty() || class_of(g_selection[0]) == B_RAIL) return;
     const std::vector<State> before = states(g_selection);
     uint8_t* host = g_selection[0];
-    for (uint8_t* o : g_selection)
-        act(o, ACT_SET_ARMY, o != host && is_gun(nvid_of(o)) ? gun_army(nvid_of(host), army) : army);
+    const std::vector<Piece>& kinds = pieces_of_kind(nvid_of(host));
+    const std::vector<uint8_t*> pieces = pieces_on(host);
+    for (uint8_t* o : g_selection) {
+        const auto piece = std::find(pieces.begin(), pieces.end(), o);
+        if (o != host && piece != pieces.end())   // a piece of a whole: the faction's or army 0
+            act(o, ACT_SET_ARMY, piece_army(kinds[piece - pieces.begin()], army));
+        else   // the host and its guns (a whole's army is its faction)
+            act(o, ACT_SET_ARMY, army);
+    }
     commit({"OpArmy", "army"}, g_selection, before);
     MESSAGE("MsgArmy", "VID %d: army %d (%s)", nvid_of(host), army, army_name(army));
 }
 
 void next_army() {
+    if (entry().tool == Tool::Place && is_palette(entry())) {   // what the palette places next (its row agrees)
+        panel_set_palette_army(palette_of(entry()), (place_army() + 1) & 3);
+        MESSAGE("MsgPlaceArmy", "place: %s (VID %d), army %d (%s)", place_label(), place_nvid(), place_army(), army_name(place_army()));
+        return;
+    }
     if (!g_selection.empty()) set_army((army_of(g_selection[0]) + 1) & 3);
 }
 
@@ -2014,9 +2198,9 @@ uint8_t* create(int nvid, float x, float y, float z, int direction, int army) {
     return o;
 }
 
-uint8_t* fit_gun(uint8_t* host, const Socket& s, int nvid) {
+uint8_t* fit_gun(uint8_t* host, const Socket& s, int nvid, int army) {
     return create(nvid, at<float>(host, O_X) + s.dx, at<float>(host, O_Y) + s.dy, at<float>(host, O_Z) + s.dz,
-                  at<int>(host, O_DIRECTION), gun_army(nvid_of(host), army_of(host)));
+                  at<int>(host, O_DIRECTION), army);
 }
 
 std::vector<GridChange> flatten_under(uint8_t* o);   // the ground, below
@@ -2077,7 +2261,10 @@ void place(POINT p) {
     const std::vector<int> fit = default_fit(nvid);
     for (size_t i = 0; i < sockets.size() && i < fit.size(); ++i)
         if (fit[i])
-            if (uint8_t* g = fit_gun(o, sockets[i], fit[i])) objects.push_back(g);
+            if (uint8_t* g = fit_gun(o, sockets[i], fit[i], army_of(o))) objects.push_back(g);
+    for (const Piece& p : pieces_of_kind(nvid))   // a whole: its pieces
+        if (uint8_t* q = create(p.nvid, x + p.dx, y + p.dy, z + p.dz, p.direction, piece_army(p, army_of(o))))
+            objects.push_back(q);
     std::vector<State> before = states(objects);
     for (State& s : before) s.present = false;
     commit({"OpPlace", "place"}, objects, before);
@@ -3800,7 +3987,12 @@ bool straight(uint8_t* d) {
     return ax * bx + ay * by < -0.95f;
 }
 
-Snap snap_repair(float x, float y) {
+int direction_gap(int a, int b) { return (std::min)((a - b) & 255, (b - a) & 255); }
+
+// It faces one of the two ways of its leg: the one nearest to `wanted` (a tie - the direction chosen
+// is across the leg - the way of the link with the smaller direction, north on a vertical leg as in
+// l05). R / E turn it round: the line through it runs the other way.
+Snap snap_repair(float x, float y, int wanted) {
     Snap s;
     uint8_t* best = nullptr;
     float best_d = 100;
@@ -3816,15 +4008,15 @@ Snap snap_repair(float x, float y) {
         s.reason = {"SnapRepair", "a repair point stands on a straight piece of track - none near"};
         return s;
     }
-    // it faces the way of the link with the smaller direction (north on a vertical leg, as in l05)
     float ax, ay, bx, by;
     link_vector(best, 0, ax, ay);
     link_vector(best, 1, bx, by);
-    const int da = direction_of(ax, ay), db = direction_of(bx, by);
+    const int da = round32(direction_of(ax, ay)), db = round32(direction_of(bx, by));
+    const int ga = direction_gap(da, wanted), gb = direction_gap(db, wanted);
     s.ok = true;
     s.x = dot_wx(best);
     s.y = dot_wy(best);
-    s.direction = round32(da <= db ? da : db);
+    s.direction = ga < gb ? da : gb < ga ? db : (std::min)(da, db);
     return s;
 }
 
@@ -3888,6 +4080,95 @@ Snap snap_post(float x, float y, int wanted) {
     return s;
 }
 
+// A mine (or the authors' marker of one) on the rail point nearest within 40 px.
+Snap snap_mine(float x, float y) {
+    Snap s;
+    uint8_t* d = point_near(x, y, 1, 40);
+    if (!d) {
+        s.reason = {"SnapMine", "a mine lies on the track - no track near"};
+        return s;
+    }
+    s.ok = true;
+    s.x = dot_wx(d);
+    s.y = dot_wy(d);
+    return s;
+}
+
+// ---- gates on the track: the fort, the citadel, Charybdis ----
+//
+// The missions stand these on the line of a straight track (measured): all 20 forts 0-6 px from it,
+// turned along it (rails of direction 0 - north-south - forts of 0 / 128, 6 of 64 / 192, the
+// diagonals 13 and 20 of 32 / 160 and 96 / 224); the three citadels (l04, l18) over the crossing of
+// two diagonal tracks, which cross 8 px north of the citadel's middle - each grate on one of their
+// southern arms; l06's Charybdis with the diagonal track straight through its middle (1 px), its
+// teeth on it. Placing or dragging one puts it on the line of the straight rail nearest to the
+// cursor (a citadel: a diagonal one), where the cursor's point falls on it; elsewhere it is refused.
+
+// The point of a straight rail's line (shapes 0-3; `diagonal`: 2 and 3 only) nearest to (x, y) within
+// `reach`, and the direction along the rail.
+bool rail_line_spot(float x, float y, float reach, bool diagonal, float& sx, float& sy, int& along) {
+    float best = reach;
+    bool found = false;
+    for_each_object([&](uint8_t* o) {
+        if (class_of(o) != B_RAIL || removed(o)) return;
+        const rail::Rail r = rail::rail_of(at<float>(o, O_X), at<float>(o, O_Y), 0, at<int>(o, O_DIRECTION));
+        if (r.shape > 3 || (diagonal && r.shape < 2)) return;
+        const rail::Point a = rail::end_of(r, 0), b = rail::end_of(r, 1);
+        const float vx = static_cast<float>(b.x - a.x), vy = static_cast<float>(b.y - a.y);
+        const float t = (std::max)(0.0f, (std::min)(1.0f, ((x - static_cast<float>(a.x)) * vx + (y - static_cast<float>(a.y)) * vy) /
+                                                             (vx * vx + vy * vy)));
+        const float px = static_cast<float>(a.x) + t * vx, py = static_cast<float>(a.y) + t * vy;
+        const float d = std::hypot(px - x, py - y);
+        if (d < best) {
+            best = d;
+            found = true;
+            sx = px;
+            sy = py;
+            along = round32(direction_of(vx, vy));
+        }
+    });
+    return found;
+}
+
+// A fort on the line of the nearest straight track, along it the way nearest to `wanted`.
+Snap snap_fort(float x, float y, int wanted) {
+    Snap s;
+    int along;
+    if (!rail_line_spot(x, y, 60, false, s.x, s.y, along)) {
+        s.reason = {"SnapFort", "a fort stands on the track, a gate the trains drive through - no straight track near"};
+        return s;
+    }
+    s.ok = true;
+    const int back = (along + 128) & 255;
+    s.direction = direction_gap(along, wanted) <= direction_gap(back, wanted) ? along : back;
+    return s;
+}
+
+// A citadel over a diagonal track, the track crossing 8 px north of its middle as in l04 and l18.
+Snap snap_citadel(float x, float y) {
+    Snap s;
+    int along;
+    if (!rail_line_spot(x, y - 8, 80, true, s.x, s.y, along)) {
+        s.reason = {"SnapCitadel", "a citadel stands over a diagonal track (two cross under it in the missions) - none near"};
+        return s;
+    }
+    s.ok = true;
+    s.y += 8;
+    return s;
+}
+
+// Charybdis with a straight track through its middle, as in l06.
+Snap snap_charybdis(float x, float y) {
+    Snap s;
+    int along;
+    if (!rail_line_spot(x, y, 100, false, s.x, s.y, along)) {
+        s.reason = {"SnapCharybdis", "the track runs through Charybdis's mouth - no straight track near"};
+        return s;
+    }
+    s.ok = true;
+    return s;
+}
+
 // A buffer stop at the dead end nearest to the cursor within 150 px - not a factory's -, 5 px past
 // it, across the track.
 constexpr float BLOCKER_PAST = 5;
@@ -3945,17 +4226,22 @@ bool blocker_at_end(uint8_t* o) {
 }
 
 bool on_track_vid(int nvid) {
-    return nvid == VID_DEPOT || nvid == VID_WORKSHOP || nvid == VID_SEMAPHORE || nvid == VID_CRATE || nvid == VID_BLOCKER;
+    return nvid == VID_DEPOT || nvid == VID_WORKSHOP || nvid == VID_SEMAPHORE || nvid == VID_CRATE || nvid == VID_BLOCKER ||
+           nvid == VID_MINE || nvid == VID_MINE_MARKER || nvid == VID_CHARYBDIS || nvid == VID_FORT || nvid == VID_CITADEL;
 }
 
 // Where a VID of these goes for the cursor's map point; the others stay where they are.
 bool snap(int nvid, float& x, float& y, int& direction, UiText& reason) {
     Snap s;
     if (nvid == VID_DEPOT) s = snap_factory(x, y);
-    else if (nvid == VID_WORKSHOP) s = snap_repair(x, y);
+    else if (nvid == VID_WORKSHOP) s = snap_repair(x, y, direction);
     else if (nvid == VID_SEMAPHORE) s = snap_post(x, y, direction);
     else if (nvid == VID_CRATE) s = snap_crate(x, y);
     else if (nvid == VID_BLOCKER) s = snap_blocker(x, y);
+    else if (nvid == VID_MINE || nvid == VID_MINE_MARKER) s = snap_mine(x, y);
+    else if (nvid == VID_CHARYBDIS) s = snap_charybdis(x, y);
+    else if (nvid == VID_FORT) s = snap_fort(x, y, direction);
+    else if (nvid == VID_CITADEL) s = snap_citadel(x, y);
     else return true;
     if (!s.ok) {
         reason = s.reason;
@@ -3963,7 +4249,7 @@ bool snap(int nvid, float& x, float& y, int& direction, UiText& reason) {
     }
     x = s.x;
     y = s.y;
-    if (nvid != VID_CRATE) direction = s.direction;
+    if (nvid == VID_DEPOT || nvid == VID_WORKSHOP || nvid == VID_SEMAPHORE || nvid == VID_FORT) direction = s.direction;
     return true;
 }
 
@@ -5533,6 +5819,7 @@ void neutral_rows(uint8_t* o, std::vector<ContextRow>& rows) {
 void set_socket(uint8_t* host, size_t i, int nvid) {
     const std::vector<Socket> sockets = sockets_of(nvid_of(host), at<int>(host, O_DIRECTION));
     const std::vector<uint8_t*> guns = guns_on(host);
+    const int army = faction_of(host);   // before the old gun goes
     if (i >= sockets.size()) return;
     std::vector<uint8_t*> objects;
     std::vector<State> before;
@@ -5545,7 +5832,7 @@ void set_socket(uint8_t* host, size_t i, int nvid) {
         apply(guns[i], gone);
     }
     if (nvid)
-        if (uint8_t* g = fit_gun(host, sockets[i], nvid)) {
+        if (uint8_t* g = fit_gun(host, sockets[i], nvid, army)) {
             objects.push_back(g);
             State none = state_of(g);
             none.present = false;
@@ -5556,6 +5843,77 @@ void set_socket(uint8_t* host, size_t i, int nvid) {
     g_selection = group_of(host);
     MESSAGE("MsgSocket", "socket %d of VID %d: %s", static_cast<int>(i + 1), nvid_of(host),
             nvid ? (ui_unit_name(nvid) ? ui_unit_name(nvid) : std::to_string(nvid).c_str()) : ui_text("WordEmpty", "empty"));
+}
+
+// The pieces a whole is missing (a map made before, a piece deleted elsewhere) put at their places.
+void complete_whole(uint8_t* host) {
+    const std::vector<Piece>& kinds = pieces_of_kind(nvid_of(host));
+    const std::vector<uint8_t*> pieces = pieces_on(host);
+    std::vector<uint8_t*> objects;
+    for (size_t i = 0; i < kinds.size(); ++i)
+        if (!pieces[i]) {
+            const Piece& p = kinds[i];
+            if (uint8_t* q = create(p.nvid, at<float>(host, O_X) + p.dx, at<float>(host, O_Y) + p.dy, at<float>(host, O_Z) + p.dz,
+                                    p.direction, piece_army(p, faction_of(host))))
+                objects.push_back(q);
+        }
+    if (objects.empty()) return;
+    std::vector<State> before = states(objects);
+    for (State& s : before) s.present = false;
+    commit({"OpComplete", "complete"}, objects, before);
+    g_selection = group_of(host);
+    MESSAGE("MsgCompleted", "VID %d: %u pieces put back", nvid_of(host), static_cast<unsigned>(objects.size()));
+}
+
+// ---- the fly nest ----
+//
+// l06 has two nests (265) and spawns their flies in its script: the eastern one waves of green flies
+// (263) - 2 for every AA gun on the map, less up to as many, 2 to 4 -, 25 s after the last wave of
+// them was gone; the western one grey flies (262) on guard - 1 or 2 while a unit of the player's
+// (not a factory or repair point) is within 400 px and none of its flies is left, 3 s after, and 6
+// to 9 when it is destroyed. The flies are of the nest's army and find their targets themselves (the
+// AVIA weapon: 2000 px). The editor's nest is one of the two kinds - its direction, which a nest of one
+// direction (nDir 1) does not show: 0 waves, 64 on guard - and the runner's NestTact spawns them.
+constexpr int VID_NEST = 265, NEST_GUARD = 64;
+
+bool nest_guards(uint8_t* o) { return at<int>(o, O_DIRECTION) >= NEST_GUARD; }
+
+void set_nest_kind(uint8_t* o, bool guard) {
+    if (nest_guards(o) == guard) return;
+    const std::vector<State> before = states({o});
+    reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(o, nullptr, guard ? NEST_GUARD : 0);
+    commit({"OpNest", "fly nest"}, {o}, before);
+    MESSAGE("MsgNest", "fly nest: %s", guard ? ui_text("CtxNestGuard", "GREY, ON GUARD") : ui_text("CtxNestWaves", "GREEN, IN WAVES"));
+}
+
+// ---- mines ----
+//
+// The explosive mine (86) is what the repair car lays: a unit of the car's army that the engine
+// hides from the other armies (VID flag 0x20000: Object_Construct and Object_SetArmy hide one whose
+// army is not the player's) and that ai_default_event.lgc runs - F086_0 arms it once its car has
+// gone and closes its rail point to its own army (SetSemaphore 4 + army), any other train within
+// 30 px sets it off (1000 damage in 100 px, VID flag 0x4000000), a repair car of another army takes
+// it. The mine marker (89) is the authors' placeholder: TrainsTact makes the first five of a map an
+// enemy mine one time in three and deletes them all. The editor places the mine itself, in the army
+// chosen (the palette's row), on the rail point nearest within 40 px - a mine works on the track -
+// and marks every mine and marker with its army, since the engine hides a mine of another army than
+// the player's in the editor too; a marker's panel makes it a mine.
+void mine_from_marker(uint8_t* marker) {
+    std::vector<uint8_t*> objects{marker};
+    std::vector<State> before = states(objects);
+    State gone = before[0];
+    gone.present = false;
+    apply(marker, gone);
+    if (uint8_t* m = create(VID_MINE, at<float>(marker, O_X), at<float>(marker, O_Y), at<float>(marker, O_Z), 0, 1)) {
+        objects.push_back(m);
+        State none = state_of(m);
+        none.present = false;
+        before.push_back(none);
+        g_selection = {m};
+    }
+    commit({"OpMine", "mine"}, objects, before);
+    g_context = nullptr;
+    MESSAGE("MsgMineMade", "the marker is now a mine of army 1 (%s)", army_name(1));
 }
 
 std::vector<ContextRow> context_rows(uint8_t* o) {
@@ -5577,7 +5935,7 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
     } else if (class_of(o) != B_RAIL) {
         ContextRow army{{"CtxArmy", "ARMY:"}, {}};
         for (int a = 0; a < 4; ++a)
-            army.choices.push_back({{ARMY_CHOICE_KEYS[a], ARMY_CHOICES[a]}, army_of(o) == a, [a] { set_army(a); }});
+            army.choices.push_back({{ARMY_CHOICE_KEYS[a], ARMY_CHOICES[a]}, faction_of(o) == a, [a] { set_army(a); }});
         rows.push_back(army);
     }
     if (is_region(o)) {   // its size, splashes and fog
@@ -5671,7 +6029,9 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
         rows.push_back({{"CtxPostFor", "FOR TRAINS:"},
                         {{{WAY_CAPS_KEYS[way], WAY_CAPS[way]}, true, [] {}},
                          {{WAY_CAPS_KEYS[other], WAY_CAPS[other]}, false, [o] { turn_post(o); }}}});
-    } else if (nvid == VID_DEPOT || nvid == VID_WORKSHOP || blocker_at_end(o)) {
+    } else if (nvid == VID_WORKSHOP) {   // turned round on its leg
+        rows.push_back({{"CtxTurn", "TURN:"}, {{{"CtxTurnRound", "ROUND (R / E)"}, false, [] { turn(1); }}}});
+    } else if (nvid == VID_DEPOT || blocker_at_end(o)) {
         rows.push_back({{"CtxTurn", "TURN:"}, {{{"CtxTurnByTrack", "BY ITS TRACK (DRAG IT)"}, true, [] {}}}});
     } else if (wreck_on_track(o)) {
         rows.push_back({{"CtxTurn", "TURN:"}, {{{"CtxTurnRound", "ROUND (R / E)"}, false, [] { turn(1); }}}});
@@ -5694,6 +6054,27 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
                         {{is_red ? UiText{"CtxLineStops", "STOPS THEM"} : UiText{"CtxLineLetsIn", "LETS THEM IN"}, own,
                           [o] { post_line(red(o)); }},
                          {{"CtxLineNone", "NONE"}, !own, [] { post_line(false, true); }}}});
+    }
+    if (nvid == VID_CITADEL)
+        rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxCitadelPlay", "KILLS ALL BUT ITS TOWER'S ARMY"}, true, [] {}}}});
+    if (nvid == VID_CHARYBDIS)
+        rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxCharybdisPlay", "PULLS IN OTHERS, EATS YOURS"}, true, [] {}}}});
+    if (!pieces_of_kind(nvid).empty()) {
+        const std::vector<uint8_t*> pieces = pieces_on(o);
+        const long missing = std::count(pieces.begin(), pieces.end(), nullptr);
+        if (missing)
+            rows.push_back({{"CtxPieces", "PIECES:"},
+                            {{{"CtxComplete", "PUT THE MISSING BACK"}, false, [o] { complete_whole(o); }}}});
+    }
+    if (nvid == VID_NEST)
+        rows.push_back({{"CtxFlies", "FLIES:"},
+                        {{{"CtxNestWaves", "GREEN, IN WAVES"}, !nest_guards(o), [o] { set_nest_kind(o, false); }},
+                         {{"CtxNestGuard", "GREY, ON GUARD"}, nest_guards(o), [o] { set_nest_kind(o, true); }}}});
+    if (nvid == VID_MINE)
+        rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxMinePlay", "SEEN BY ITS ARMY ONLY"}, true, [] {}}}});
+    if (nvid == VID_MINE_MARKER) {
+        rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxMarkerPlay", "AN ENEMY MINE ONE TIME IN THREE"}, true, [] {}}}});
+        rows.push_back({{"CtxMakeIt", "MAKE IT:"}, {{{"CtxMakeMine", "A MINE"}, false, [o] { mine_from_marker(o); }}}});
     }
     if (nvid == VID_DEPOT)
         rows.push_back({{"CtxFactory", "FACTORY:"},
@@ -5725,7 +6106,8 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
     return rows;
 }
 
-// Where the panel goes: beside the object, inside the view.
+// Where the panel goes: beside the object and what goes with it (a fort's guns stay in sight), inside
+// the view.
 void context_box(uint8_t* o, int rows, float& x, float& y) {
     uint8_t* w = world();
     const Box v = view();
@@ -5737,9 +6119,17 @@ void context_box(uint8_t* o, int rows, float& x, float& y) {
         sx = at<float>(o, O_X) - at<float>(w, W_CAMERA_X);
         sy = at<float>(o, O_Y) - at<float>(o, O_Z) - at<float>(w, W_CAMERA_Y);
     }
+    float left = sx - 50, right = sx + 50;
+    if (o)   // and what goes with it: a fort's guns stay in sight
+        for (uint8_t* m : group_of(o))
+            if (!is_car(m)) {
+                const Box b = box_of(m);
+                left = (std::min)(left, b.l - at<float>(w, W_CAMERA_X) - 12);
+                right = (std::max)(right, b.r - at<float>(w, W_CAMERA_X) + 12);
+            }
     const float height = (rows + 1) * CONTEXT_ROW;
-    x = sx + 50;
-    if (x + CONTEXT_WIDTH > v.r) x = sx - 50 - CONTEXT_WIDTH;
+    x = right;
+    if (x + CONTEXT_WIDTH > v.r) x = left - CONTEXT_WIDTH;
     x = (std::max)(v.l, (std::min)(x, v.r - CONTEXT_WIDTH));
     y = (std::max)(v.t + 2 * LINE_HEIGHT, (std::min)(sy - height / 2, v.b - BASE_HEIGHT - SLOT - height));
 }
@@ -5820,6 +6210,54 @@ void draw_context() {
             g_context_hits.push_back({cx - 3, ry, cx + width + 3, ry + CONTEXT_ROW, static_cast<int>(r - 1), static_cast<int>(c)});
             cx += width + 2 * cw;
         }
+    }
+}
+
+// Every mine and mine marker with its army: a square in the army's colour (ours green, the enemy
+// red, the neutrals yellow, the pirates grey) and "MINE: ENEMY" / "MINE 1 IN 3: ENEMY" beside it -
+// drawn by the editor only. A mine the engine hides (another army than the player's) is drawn too.
+void draw_mines() {
+    uint8_t* w = world();
+    const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
+    static const uint32_t COLOURS[4] = {0xf030c030, 0xf0e03020, 0xf0e0d020, 0xf0909090};
+    auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
+    for_each_object([&](uint8_t* o) {
+        if (removed(o) || (nvid_of(o) != VID_MINE && nvid_of(o) != VID_MINE_MARKER)) return;
+        const float sx = at<float>(o, O_X) - cam_x, sy = at<float>(o, O_Y) - at<float>(o, O_Z) - cam_y;
+        if (at<uint32_t>(o, O_FLAGS) & 0x8000) draw_vid(vid_of(o), 0, sx, sy, at<float>(o, O_Z));   // hidden from the player
+        const bool marker = nvid_of(o) == VID_MINE_MARKER;
+        const int army = marker ? 1 : army_of(o);   // a marker becomes an enemy mine or nothing
+        fill(graphics(), nullptr, sx - 12, sy - 12, sx + 12, sy - 10, COLOURS[army]);
+        fill(graphics(), nullptr, sx - 12, sy + 10, sx + 12, sy + 12, COLOURS[army]);
+        fill(graphics(), nullptr, sx - 12, sy - 12, sx - 10, sy + 12, COLOURS[army]);
+        fill(graphics(), nullptr, sx + 10, sy - 12, sx + 12, sy + 12, COLOURS[army]);
+        const std::string label = ui_printf(marker ? ui_format("MapMineMarker", "MINE 1 IN 3: %s") : ui_format("MapMine", "MINE: %s"),
+                                            ui_text(ARMY_CHOICE_KEYS[army], ARMY_CHOICES[army]));
+        draw_text(FONT_TIPS, sx + 15, sy - 6, label.c_str(), false, 3);
+    });
+}
+
+// While a host's panel is open: each socket's number at its place on the wall (the panel's rows
+// SOCKET 1, SOCKET 2), an empty one framed.
+void draw_sockets() {
+    if (!g_context || removed(g_context)) return;
+    const std::vector<Socket> sockets = sockets_of(nvid_of(g_context), at<int>(g_context, O_DIRECTION));
+    if (sockets.empty()) return;
+    uint8_t* w = world();
+    const std::vector<uint8_t*> guns = guns_on(g_context);
+    for (size_t i = 0; i < sockets.size(); ++i) {
+        const float sx = at<float>(g_context, O_X) + sockets[i].dx - at<float>(w, W_CAMERA_X);
+        const float sy = at<float>(g_context, O_Y) + sockets[i].dy - at<float>(g_context, O_Z) - sockets[i].dz - at<float>(w, W_CAMERA_Y);
+        if (!guns[i]) {
+            const uint32_t c = 0xe0f0e080;
+            auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
+            fill(graphics(), nullptr, sx - 9, sy - 9, sx + 9, sy - 7, c);
+            fill(graphics(), nullptr, sx - 9, sy + 7, sx + 9, sy + 9, c);
+            fill(graphics(), nullptr, sx - 9, sy - 9, sx - 7, sy + 9, c);
+            fill(graphics(), nullptr, sx + 7, sy - 9, sx + 9, sy + 9, c);
+        }
+        if (sockets.size() > 1)   // above the gun, in front of the scene
+            draw_text(FONT_TIPS, sx - 4, sy - 44, (" " + std::to_string(i + 1) + " ").c_str(), false, CONTEXT_STEP);
     }
 }
 
@@ -5954,6 +6392,9 @@ void draw_overlay() {
                     if (uint8_t* gun = vid_by_number(fit[i]))
                         draw_vid(gun, frame_for(gun, direction), x + sockets[i].dx - cam_x, y + sockets[i].dy - cam_y,
                                  z + sockets[i].dz);
+                for (const Piece& piece : pieces_of_kind(place_nvid()))
+                    if (uint8_t* pv = vid_by_number(piece.nvid); shown && pv)
+                        draw_vid(pv, frame_for(pv, piece.direction), x + piece.dx - cam_x, y + piece.dy - cam_y, z + piece.dz);
             }
         } else if (entry().tool == Tool::Track) {
             draw_track();
@@ -5975,6 +6416,7 @@ void draw_overlay() {
     }
     set_cursor(cursor);
     draw_regions();
+    draw_mines();
     draw_push_lines(entry().tool == Tool::PushLine);
     draw_enemy_trains();
     draw_arrivals();
@@ -5990,7 +6432,7 @@ void draw_overlay() {
     // the cursor), the undo and redo counts, "not saved" and the last message
     const Box v = view();
     char status[400];
-    char tool[96];
+    char tool[160];
     const int hover = bar_entry_at(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y));
     const Entry& shown = hover >= 0 ? ENTRIES[hover] : entry();
     const bool palette = is_palette(shown);
@@ -6002,6 +6444,10 @@ void draw_overlay() {
                                                 : g_place_direction);
     else
         std::snprintf(tool, sizeof tool, "%s", label_of(shown));
+    if (shown.tool == Tool::Place && shown_nvid > 0 && palette && &shown == &entry()) {   // the palette's army
+        const size_t n = std::strlen(tool);
+        std::snprintf(tool + n, sizeof tool - n, ui_format("StatusToolArmy", ", army %d (%s)"), place_army(), army_name(place_army()));
+    }
     if (hover >= 0 && *shown.key) std::snprintf(tool + std::strlen(tool), sizeof tool - std::strlen(tool), " (%s)", shown.key);
     if (const char* tip = panel_tip(g_mouse)) std::snprintf(tool, sizeof tool, "%s", tip);   // the Help or Menu button
     std::snprintf(status, sizeof status, ui_format("StatusLine", "EDITOR - %s - undo %u, redo %u%s   %s"), tool,
@@ -6035,6 +6481,7 @@ void draw_overlay() {
     int below = entry().tool == Tool::Track ? 3 : 2;   // below the tool's lines (the Track tool has two)
     if (!g_line_status.empty()) status_line(v.l, v.t + below++ * LINE_HEIGHT, g_line_status.c_str());   // the push line under the cursor
     if (!g_enemy_status.empty()) status_line(v.l, v.t + below * LINE_HEIGHT, g_enemy_status.c_str());
+    draw_sockets();
     draw_context();
     panel_draw(g_mouse);   // the Help and Menu buttons, an open panel in front of everything
 }
@@ -6866,7 +7313,7 @@ void edit_pick_object(int nvid, int army) {
     end_line();
     g_selection.clear();
     g_context = nullptr;
-    MESSAGE("MsgPlace", "place: %s (VID %d)", place_label(), nvid);
+    MESSAGE("MsgPlaceArmy", "place: %s (VID %d), army %d (%s)", place_label(), nvid, place_army(), army_name(place_army()));
 }
 
 // ---- the posts' lines and the track, for the Arrivals panel (editor_arrivals.cpp) ----

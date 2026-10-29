@@ -188,9 +188,9 @@ not forced to 0.
 |---|---|---|
 | 102 factory | At the dead end of a straight spur (6+ rails in the missions) that meets the line through a Y - a curve pair each way - standing on the track; direction = the way out (0 north, 64 east, 128 south, 192 west); a factory push line (5). The player's factory needs a build list (`items`): the game's 14 factory units, in the order of their hotkeys, are `5 10 20 25 80 85 45 30 35 82 97 90 75 62` (F1-F12, `[`, `]`); the panel shows ten in a row, LocoFix adds a second row for the 11th-20th. **[tool]** rail point within 100 px, build list. **[editor]** a new factory takes the build list of one of the same army on the map, or these 14; a warning without track within 100 px; its panel ticks the list (the game's order), the units it gets later and the player's limits (8). The enemy's AI (army 1 only) ignores the list and builds `level_queue_*`; a neutral or pirate factory builds nothing, and only a neutral one is captured - on an editor map a train of the player's within 100 px of a neutral factory or repair point captures it (the runner's `CaptureTact`; the missions call `LDepoCapture`/`LMasterCapture` themselves) | l02, l05 (spur, Y, 128/0); sandbox test: a built train leaves through the Y |
 | 104 repair point | On a track trains drive through (a loop leg), the gate over the rails, turned along the track (0/128 on vertical track); every end of the loop meets the line through a Y each way; the leg is one way (5). It repairs only the car nearest to it (50 px), so the one-way push line through it matters: the train is pushed through and every car is repaired fully as it passes; a train standing in a repair point without one gets only its nearest car repaired. **[tool]** within 20 px of track | l05; sandbox tests: without a push line the loco 45 -> 150 hp, the wagon behind stayed at 22; with it the loco 45 -> 150 and the wagon 22 -> 75 (full: the player's army has 1.5x hp) |
-| 162 fort | A gate standing on the track (0-6 px in all 20 forts), turned along it (0/128 vertical, 64/192 horizontal, 32/96/160/224 diagonal). Guns (VID 115) on its wall: x +-47, z +92/+93 for 0/128; (-32, -24) and (+33, +23), z +93 for 32/160. It cannot be destroyed (U_OBJECT, maxHp 0); its guns can. **[tool]** within 8 px of track. **[editor]** a new fort comes with its guns at these places (64/192: (0, -33) and (0, +34); 96/224: (-33, +23) and (+33, -24), measured in l16 and l20), they move, turn and go with it; a warning without track within 40 px. Its sockets: below | l10-l20; sandbox test: trains drive through it |
+| 162 fort | A gate standing on the track (0-6 px in all 20 forts), turned along it (0/128 vertical, 64/192 horizontal, 32/96/160/224 diagonal). Guns (VID 115) on its wall: x +-47, z +92/+93 for 0/128; (-32, -24) and (+33, +23), z +93 for 32/160. It cannot be destroyed (U_OBJECT, maxHp 0); its guns can. **[tool]** within 8 px of track. **[editor]** a new fort comes with its guns at these places (64/192: (0, -33) and (0, +34); 96/224: (-33, +23) and (+33, -24), measured in l16 and l20), they move, turn and go with it; it snaps onto the line of the nearest straight track within 60 px, turned along it (R / E turn it round there), and is refused elsewhere. Its sockets: below | l10-l20; sandbox test: trains drive through it |
 | 165 mining plant | Not on the track. One gun on its wall, on the side its direction picks (sockets below) | l09, l11, l14, l15, l18 (30) |
-| 149 citadel | The pirates' keep (nDir 1, army 0 in the missions). One gun on its top: the pirates' missile tower (VID 117) at (0, 0), z +112, of army 1 | l04, l18 (3) |
+| 149 citadel | The pirates' keep (nDir 1, army 0 in the missions), a gate over the crossing of two diagonal tracks (they cross 8 px north of its middle). One gun on its top: the pirates' missile tower (VID 117) at (0, 0), z +112, of army 1. **[editor]** it snaps over the nearest diagonal track within 80 px, the track 8 px north of its middle; refused elsewhere | l04, l18 (3) |
 
 **Guns and their sockets.** Every one of the 73 guns of the missions stands in a socket of a fort
 (40), a mining plant (30) or a citadel (3) - a tower with a cannon (VID 110) or a missile tower (115),
@@ -209,6 +209,25 @@ its tower; the object's panel (a right click) puts a gun into each socket, takes
 it. A gun has its host's army - on a citadel of army 0, as the missions' are, the enemy's - and moves,
 turns, changes army and is deleted with it. A gun of the player's army fights for the player: in play
 the enemy's trains shoot it.
+**[editor]** A host is one object with its guns: a click on a gun selects the host and opens its
+panel, whose row for each socket (SOCKET 1, SOCKET 2, numbered on the wall while the panel is open)
+sets the gun in it at once.
+
+**The citadel and its gate** (l04, l18). The three citadels of the missions stand with the same
+pieces: the tower in its socket, two grates (146) on the two tracks through the citadel at (-34, +23)
+and (+36, +25), 33 below it (sunk: the gate open; directions 128 and 0), and four corkscrews (142) at
+(0, -49), (+2, +57), (-73, +3) and (+77, +5), 76-78 up; the citadel, the grates and the corkscrews are
+army 0, the tower army 1. Nothing in the engine ties them: the kill system is the missions' script
+(`pirates.lgc` `GratesTact`): while the tower stands, the first unit of the player's within 100 px of
+the citadel is stopped and gets 300 damage, the grates rise 34 px in 1 s, stay up 1 s and sink in 1 s
+(SFX 45); when the tower is destroyed the grates stay down and the corkscrews break (142 -> 147). The
+crushers of `pirates.lgc` (143 / 144) are made by the script at points of the track far from the
+citadels and are not part of them. **[editor]** a citadel is placed with all its pieces as one object
+(moved, raised and deleted with them; a click on a piece selects it; its panel puts missing pieces
+back); the faction is its tower's army (the missions' citadels are army 0 with an enemy tower): a new
+citadel is placed in its faction's army - the enemy's from the palette - and its panel's ARMY row shows
+and sets the faction; the runner's `CitadelTact` (8) works the gate of every citadel whose tower stands: the
+first unit within 100 px of another army than the tower's, the neutrals aside.
 
 Measured over the 20 missions: all 37 factories and repair points stand on the track (the nearest
 rail 1-38 px, one at 68); a factory's exit line runs 100-175 px from inside it along its spur, a
@@ -220,8 +239,9 @@ rising to the right, 128 horizontal, 192 (or 160) falling to the right - four fr
 **[editor]** Enforced when placing: a factory snaps to the nearest dead end (22 px inside, turned the
 way out) and gets its exit line (140 px, push_flag 1) and post; a repair point snaps to a straight
 piece, turned along it, and gets its line (120 px each side, flag 1, one way the way it faces) and
-posts; a crate snaps onto the track; a blocker to the nearest dead end, 5 px past it, turned by the
-track's way; elsewhere they are refused. Moving or deleting the building
+posts - R / E turn it round on its leg, its line and posts with it; a crate snaps onto the track; a
+blocker to the nearest dead end, 5 px past it, turned by the track's way; elsewhere they are refused.
+Moving or deleting the building
 moves or deletes its line and posts.
 
 ## 6a. Trains on the map
@@ -247,6 +267,47 @@ moves or deletes its line and posts.
   U / C uncouple and couple, R turns a train round, a drag moves it along the track, the panel sets
   a patrol: `PatrolEngine(FindNearestSprite(GETSPRITE_VID + <first car's VID>, x, y, 20), to_x,
   to_y)` in main()'s editor block of the script. The saved cars are the missions' 40-byte records.
+
+## 6b. Creatures and mines
+
+**Charybdis** (l06, the only map with it). The body (254, army 0) stands with its roots (266, a
+decal) at (-12, -4, -11), its teeth (255) at (-40, +27, +15), its eye (256, 100 hp - the only part
+that can be killed) at (-34, +22, +56), four mortars (258) at (+5, +27, +64), (-6, -28, +61),
+(+38, +6, +61), (-42, -7, +64) and two cannons (260) at (-9, +44, +45), (-67, +4, +45), all army 1
+in play; the swamp track (a diagonal) runs straight through its middle (1 px; the nearest rail's own
+middle is 26 px off). The script of l06 makes it work: every 500 ms
+a unit not of army 1 within 90 px is pulled in (`ACT_MOVE` to the body) while the teeth chew (SFX
+38), one of the player's within 40 px is eaten (`Destroy`); the guns sleep (behave bit 1 cleared)
+until a gun or the eye is down to 80 % or a gun is lost; the eye's death (`F256_15` of
+`ai_default_event.lgc`) blows it up and wins l06. **[editor]** placed from the palette (swamp) with
+all its pieces as one object, the line of the nearest straight track within 100 px through its
+middle as in l06, in its faction's army - the enemy's from the palette, its ARMY row the faction; the
+runner's `CharybdisTact` (8) does what l06 does for every Charybdis: it pulls in every other army's
+units and eats the player's (a Charybdis of the player's eats the enemy's).
+Scylla (252 / 253, l06's `scillas.lgc`) is not made a whole: the script makes its jaws.
+
+**Fly nests** (265, l06). A nest (a unit, 225 hp, army 1) spawns nothing by itself; l06's script
+does: the eastern nest waves of green flies (263) - 2 for every AA gun (VID 30) on the map, less up
+to as many, at least 2 and at most 4 -, one a second from 25 s after the last wave of them was gone;
+the western one grey flies (262) on guard - 1 or 2, 3 s after a unit of the player's (not a factory
+or repair point) came within 400 px while none of them was left, and 6-9 when it is destroyed. The
+flies (AVIA, weapon 28: 2000 px) find their targets themselves. **[editor]** a nest's panel sets
+which of the two it is - kept as its direction (a nest has one, nDir 1, so it does not show): 0
+waves, 64 on guard - and the runner's `NestTact` (8) spawns its flies in the nest's army.
+
+**Mines.** The explosive mine (86) is what the repair car (85, one mine) lays: after 2 s
+(`mineLayTime`) the engine makes the mine with the car as its parent - the car's army - and the lay
+effect 595. Its VID flag 0x20000 hides a mine of another army than the player's (`Object_Construct`,
+`Object_SetArmy`): **the engine shows a mine to its own army only**. `ai_default_event.lgc` runs it:
+`F086_14` makes it unarmed, `F086_0` arms it once its car has gone and closes its rail point to its
+own army (`SetSemaphore(x, y - z, 4 + army)`, 7), any other train within 30 px sets it off (VID flag
+0x4000000: 1000 damage in 100 px), a repair car of another army takes it (`F086_DESTROY` opens the
+point again). The mine marker (89, 23 on five maps) is the authors' placeholder: `TrainsTact` makes the
+first five of a map an enemy mine one time in three and deletes them all. One mine stands on a map
+(l12, army 1). **[editor]** the mine is placed itself, in the army chosen (the palette's army row),
+on the rail point nearest within 40 px; every mine and marker is marked on the map with its army
+(MINE: ENEMY, MINE 1 IN 3: ENEMY), the editor's drawing only - in play the engine hides it from the
+other armies; a marker's panel makes it a mine. The palette has the mine, not the marker.
 
 ## 7. Semaphores (VID 152)
 
@@ -322,7 +383,9 @@ moves or deletes its line and posts.
   `limit_*[]`: `AddUnitLimit(max, nvid, army)` - its arguments are swapped against export.lgc, and
   the `LIMITxx` defines `InitDefault` reads would set the wrong slot), run by `ArrivalsTact()`
   of a block `// <editor arrivals>` after `header.lgc` and called from `// <editor tact>` after
-  `TrainsTact();`. The win and loss of the template wait for `ArrivalsLeft(army)`. Limits: the AI
+  `TrainsTact();`. The same block's `PiecesTact()` (every frame, from `ArrivalsTact`) works the
+  citadels, Charybdis and the fly nests of the map (6, 6b); it finds them at the start by their
+  towers, eyes and nests and logs `CITADEL`, `CHARYBDIS` and `NEST` lines in `error.log`. The win and loss of the template wait for `ArrivalsLeft(army)`. Limits: the AI
   has 16 trains (`ai_trains`), 10 patrols and 10 posts for the start trains, the queue and the
   arrivals together; only army 1 has an AI.
 

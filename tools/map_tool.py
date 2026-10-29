@@ -801,9 +801,338 @@ OrdersTact()
     Log("ORDER "+itoa(i+1)+" task "+itoa(order_task[i])+" train "+itoa(u!=0)+" slot "+itoa(k));
   }
 }
+// PiecesTact(), every frame: the wholes the editor places work as in the missions. A citadel (VID
+// 149 with its tower 117) as l04 and l18 (pirates.lgc GratesTact): while its tower stands, the first
+// unit of another army than the tower's (the neutrals aside) within 100 px of it gets ACT_STOP and
+// 300 damage (SFX 45), its grates (146) rise 34 px in 1 s, stay 1 s and sink in 1 s; when the
+// tower is gone the grates stay down and its corkscrews (142) break (147). Charybdis (254 with its
+// eye 256) as l06: a unit of another army within 90 px is pulled in (ACT_MOVE to it) while its
+// teeth (255) chew (SFX 38), and one of the player's within 40 px is eaten - the enemy's, for a
+// Charybdis of the player's; its guns (258, 260) sleep until one of them or the eye is down to 80 %
+// or lost. A fly nest (265) as l06's two (its direction: 0 waves, 64 on
+// guard): green flies (263) in waves of 2-4 (2 for every AA gun of the map, less up to as many)
+// 25 s after the last of them is gone, or grey flies (262) on guard: 1-2 while a unit of another
+// army (not a factory or repair point) is within 400 px and none is left, 3 s after, and 6-9 when
+// the nest is destroyed; the flies are of the nest's army.
+int pc_n=-1,pc_x[8],pc_y[8],pc_z[8],pc_army[8],pc_g1[8],pc_g2[8],pc_mode[8],pc_time[8];
+int ch_n=-1,ch_x[4],ch_y[4],ch_army[4],ch_teeth[4],ch_guns[4],ch_peace[4],ch_ate[4],ch_time[4];
+int fn_n=-1,fn_x[8],fn_y[8],fn_army[8],fn_guard[8],fn_left[8],fn_vid[8],fn_time[8],fn_dead[8],fn_check=0;
+PieceFoe(int u,int army)
+{
+  int a;
+  a=Action(u,ACT_GET_ARMY);
+  return a!=army && a!=2;
+}
+PiecesGrates(int i,int z)
+{
+  if( pc_g1[i] )
+    Action(pc_g1[i],ACT_CHANGE_COOR,GetX(pc_g1[i]),GetY(pc_g1[i]),z);
+  if( pc_g2[i] )
+    Action(pc_g2[i],ACT_CHANGE_COOR,GetX(pc_g2[i]),GetY(pc_g2[i]),z);
+}
+CitadelTact()
+{
+  int i,k,u,c,t;
+  if( pc_n<0 )
+  {
+    pc_n=0;
+    for( u=FirstUnit(u_monster); u; u=NextUnit() )
+      if( GetUnitVid(u)==117 && pc_n<8 )
+      {
+        c=FindNearestSprite(GETSPRITE_VID+149,GetX(u),GetY(u),20);
+        if( c )
+        {
+          pc_x[pc_n]=GetX(c);
+          pc_y[pc_n]=GetY(c);
+          pc_z[pc_n]=GetZ(c);
+          pc_army[pc_n]=Action(u,ACT_GET_ARMY);
+          pc_g1[pc_n]=FindNearestSprite(GETSPRITE_VID+146,pc_x[pc_n]-34,pc_y[pc_n]+23,15);
+          pc_g2[pc_n]=FindNearestSprite(GETSPRITE_VID+146,pc_x[pc_n]+36,pc_y[pc_n]+25,15);
+          pc_mode[pc_n]=0;
+          pc_time[pc_n]=GetTime();
+          Log("CITADEL "+itoa(pc_n+1)+" at "+itoa(pc_x[pc_n])+","+itoa(pc_y[pc_n])+" army "+itoa(pc_army[pc_n])+" grates "+itoa((pc_g1[pc_n]!=0)+(pc_g2[pc_n]!=0)));
+          pc_n++;
+        }
+      }
+  }
+  t=GetTime();
+  for( i=0; i<pc_n; i++ )
+  {
+    if( pc_mode[i]>=0 && !FindNearestSprite(GETSPRITE_VID+117,pc_x[i],pc_y[i],20) )
+    {
+      PiecesGrates(i,pc_z[i]-33);
+      for( k=0; k<4; k++ )
+      {
+        c=FindNearestSprite(GETSPRITE_VID+142,pc_x[i],pc_y[i],90);
+        if( c )
+        {
+          CreateSprite(147,GetX(c),GetY(c),GetZ(c));
+          Destroy(c);
+        }
+      }
+      pc_mode[i]=-1;
+      Log("CITADEL "+itoa(i+1)+" tower down");
+    }
+    if( pc_mode[i]==0 && t-pc_time[i]>500 )
+    {
+      pc_time[i]=t;
+      for( u=FirstUnit(u_monster); u; u=NextUnit() )
+        if( SizeTo(u,pc_x[i],pc_y[i])<100 && PieceFoe(u,pc_army[i]) )
+        {
+          Action(u,ACT_STOP,1);
+          Action(u,ACT_DAMAGE,300);
+          PlaySFX(45);
+          pc_mode[i]=1;
+          Log("CITADEL "+itoa(i+1)+" gate hits vid "+itoa(GetUnitVid(u))+" army "+itoa(Action(u,ACT_GET_ARMY)));
+          break;
+        }
+    }
+    else if( pc_mode[i]==1 )
+    {
+      if( t-pc_time[i]>1000 )
+      {
+        pc_mode[i]=2;
+        pc_time[i]=t;
+      }
+      else
+        PiecesGrates(i,pc_z[i]-33+34*(t-pc_time[i])/1000);
+    }
+    else if( pc_mode[i]==2 )
+    {
+      if( t-pc_time[i]>1000 )
+      {
+        pc_mode[i]=3;
+        pc_time[i]=t;
+        PlaySFX(45);
+      }
+    }
+    else if( pc_mode[i]==3 )
+    {
+      if( t-pc_time[i]>1000 )
+      {
+        PiecesGrates(i,pc_z[i]-33);
+        pc_mode[i]=0;
+        pc_time[i]=t;
+      }
+      else
+        PiecesGrates(i,pc_z[i]+1-34*(t-pc_time[i])/1000);
+    }
+  }
+}
+CharybdisGuns(int i,int on)
+{
+  int u,v;
+  for( u=FirstUnit(u_monster); u; u=NextUnit() )
+  {
+    v=GetUnitVid(u);
+    if( (v==258 || v==260) && SizeTo(u,ch_x[i],ch_y[i])<90 )
+    {
+      if( on )
+        Action(u,ACT_SET_BEHAVE,Action(u,ACT_GET_BEHAVE)|1);
+      else
+        Action(u,ACT_SET_BEHAVE,Action(u,ACT_GET_BEHAVE)&(~1));
+    }
+  }
+}
+CharybdisTact()
+{
+  int i,u,v,b,n,found,t,prey;
+  if( ch_n<0 )
+  {
+    ch_n=0;
+    for( u=FirstUnit(u_monster); u; u=NextUnit() )
+      if( GetUnitVid(u)==256 && ch_n<4 )
+      {
+        b=FindNearestSprite(GETSPRITE_VID+254,GetX(u)+34,GetY(u)-22,20);
+        if( b )
+        {
+          ch_x[ch_n]=GetX(b);
+          ch_y[ch_n]=GetY(b);
+          ch_army[ch_n]=Action(u,ACT_GET_ARMY);
+          ch_teeth[ch_n]=FindNearestSprite(GETSPRITE_VID+255,ch_x[ch_n]-40,ch_y[ch_n]+27,15);
+          ch_peace[ch_n]=1;
+          ch_ate[ch_n]=0;
+          ch_time[ch_n]=GetTime();
+          ch_n++;
+        }
+      }
+    for( i=0; i<ch_n; i++ )
+    {
+      n=0;
+      for( u=FirstUnit(u_monster); u; u=NextUnit() )
+        if( (GetUnitVid(u)==258 || GetUnitVid(u)==260) && SizeTo(u,ch_x[i],ch_y[i])<90 )
+          n++;
+      ch_guns[i]=n;
+      CharybdisGuns(i,0);
+      Log("CHARYBDIS "+itoa(i+1)+" at "+itoa(ch_x[i])+","+itoa(ch_y[i])+" army "+itoa(ch_army[i])+" guns "+itoa(n)+" teeth "+itoa(ch_teeth[i]!=0));
+    }
+  }
+  t=GetTime();
+  for( i=0; i<ch_n; i++ )
+    if( ch_army[i]>=0 && t-ch_time[i]>500 )
+    {
+      ch_time[i]=t;
+      if( !FindNearestSprite(GETSPRITE_VID+256,ch_x[i]-34,ch_y[i]+22,20) )   // the eye is dead
+      {
+        CharybdisGuns(i,1);
+        ch_army[i]=-1;
+        Log("CHARYBDIS "+itoa(i+1)+" eye down");
+      }
+      else
+      {
+        if( ch_peace[i] )
+        {
+          n=0;
+          for( u=FirstUnit(u_monster); u; u=NextUnit() )
+          {
+            v=GetUnitVid(u);
+            if( (v==258 || v==260 || v==256) && SizeTo(u,ch_x[i],ch_y[i])<90 )
+            {
+              if( v!=256 )
+                n++;
+              if( Action(u,ACT_GET_PERCENT_HP)<=80 )
+                ch_peace[i]=0;
+            }
+          }
+          if( n<ch_guns[i] )
+            ch_peace[i]=0;
+          if( !ch_peace[i] )
+          {
+            CharybdisGuns(i,1);
+            Log("CHARYBDIS "+itoa(i+1)+" wakes");
+          }
+        }
+        found=0;
+        prey=0;
+        if( ch_army[i]==0 )
+          prey=1;
+        for( u=FirstUnit(u_monster); u; u=NextUnit() )
+          if( SizeTo(u,ch_x[i],ch_y[i])<90 && Action(u,ACT_GET_ARMY)!=ch_army[i] )
+          {
+            found=1;
+            Action(u,ACT_MOVE,ch_x[i],ch_y[i]);
+            if( SizeTo(u,ch_x[i],ch_y[i])<40 && Action(u,ACT_GET_ARMY)==prey )
+            {
+              Log("CHARYBDIS "+itoa(i+1)+" eats vid "+itoa(GetUnitVid(u)));
+              Destroy(u);
+              ch_ate[i]=1;
+            }
+          }
+        if( found && ch_teeth[i] )
+        {
+          Action(ch_teeth[i],ACT_CLEAR_STACK,0,0);
+          AddCommand(ch_teeth[i],act_open,0,0);
+          AddCommand(ch_teeth[i],act_stand_open,0,0);
+          AddCommand(ch_teeth[i],act_close,0,0);
+          AddCommand(ch_teeth[i],act_stand,0,0);
+          AddCommand(ch_teeth[i],ACT_CYCLE_STACK,4,0);
+          PlaySFX(38);
+        }
+        if( !found && ch_ate[i] && ch_teeth[i] )
+        {
+          Action(ch_teeth[i],ACT_CLEAR_STACK,0,0);
+          AddCommand(ch_teeth[i],act_close,0,0);
+          AddCommand(ch_teeth[i],act_stand,0,0);
+          AddCommand(ch_teeth[i],act_salut,0,0);
+          ch_ate[i]=0;
+        }
+      }
+    }
+}
+NestTact()
+{
+  int i,u,v,n,x,y,z,f,t;
+  if( fn_n<0 )
+  {
+    fn_n=0;
+    for( u=FirstUnit(u_monster); u; u=NextUnit() )
+      if( GetUnitVid(u)==265 && fn_n<8 )
+      {
+        fn_x[fn_n]=GetX(u);
+        fn_y[fn_n]=GetY(u);
+        fn_army[fn_n]=Action(u,ACT_GET_ARMY);
+        fn_guard[fn_n]=GetDirection(u)>=64;
+        fn_vid[fn_n]=263-fn_guard[fn_n];
+        fn_left[fn_n]=0;
+        fn_dead[fn_n]=0;
+        Log("NEST "+itoa(fn_n+1)+" at "+itoa(fn_x[fn_n])+","+itoa(fn_y[fn_n])+" army "+itoa(fn_army[fn_n])+" guard "+itoa(fn_guard[fn_n]));
+        fn_n++;
+      }
+  }
+  if( !OneTimeInSecond() )
+    return 0;
+  t=GetTime();
+  for( i=0; i<fn_n; i++ )
+  {
+    if( !fn_dead[i] && !FindNearestSprite(GETSPRITE_VID+265,fn_x[i],fn_y[i],10) )   // destroyed
+    {
+      fn_dead[i]=1;
+      fn_left[i]=0;
+      if( fn_guard[i] )
+      {
+        fn_left[i]=6+Random(3);
+        fn_time[i]=t-22000;
+      }
+      Log("NEST "+itoa(i+1)+" destroyed, last flies "+itoa(fn_left[i]));
+    }
+    if( !fn_dead[i] && fn_left[i]==0 && GetVid(fn_vid[i],VID_COUNT)==0 )
+    {
+      if( !fn_guard[i] )
+      {
+        n=0;
+        for( u=FirstUnit(u_monster); u; u=NextUnit() )
+          if( GetUnitVid(u)==30 )
+            n++;
+        fn_left[i]=n*2-Random(n);
+        if( fn_left[i]<2 )
+          fn_left[i]=2;
+        if( fn_left[i]>4 )
+          fn_left[i]=4;
+        fn_time[i]=t;
+      }
+      else
+      {
+        f=0;
+        for( u=FirstUnit(u_monster); u; u=NextUnit() )
+        {
+          v=GetUnitVid(u);
+          if( v!=102 && v!=104 && SizeTo(u,fn_x[i],fn_y[i])<400 && PieceFoe(u,fn_army[i]) )
+            f=1;
+        }
+        if( f )
+        {
+          fn_left[i]=1+Random(1);
+          fn_time[i]=t-22000;
+        }
+      }
+    }
+    if( fn_left[i]>0 && t-fn_time[i]>25000 )
+    {
+      x=fn_x[i]+5-Random(10);
+      y=fn_y[i]+5-Random(10);
+      z=120+5-Random(10);
+      if( !AskPlace(fn_vid[i],x,y,z) )
+      {
+        u=Create(fn_vid[i],x,y,z);
+        Action(u,act_changeaction,0,Random(255));
+        Action(u,act_setarmy,fn_army[i],0);
+        fn_left[i]--;
+        Log("NEST "+itoa(i+1)+" fly vid "+itoa(fn_vid[i])+", "+itoa(fn_left[i])+" to come");
+      }
+    }
+  }
+  return 1;
+}
+PiecesTact()
+{
+  CitadelTact();
+  CharybdisTact();
+  NestTact();
+}
 ArrivalsTact()
 {
   int i,t;
+  PiecesTact();
   if( !OneTimeInSecond() )
     return 0;
   t=(GetTime()-time_game_total)/1000;

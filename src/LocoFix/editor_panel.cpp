@@ -62,6 +62,7 @@ bool factory_click(POINT mouse);
 void factory_add_car(int nvid);
 void factory_open(void* factory);
 bool edit_arrival_picking();   // editor_edit.cpp: a point for the Arrivals panel is being picked
+void edit_fill(float l, float t, float r, float b, uint32_t argb);
 bool edit_escape();            // editor_edit.cpp: Esc ends what is under way there (true when it did)
 
 namespace {
@@ -163,8 +164,15 @@ const char VEHICLE_GROUP[] = "GroupTrain";
 
 bool vehicle_group(const std::string& g) { return g.compare(0, sizeof VEHICLE_GROUP - 1, VEHICLE_GROUP) == 0; }
 int g_group = 0, g_palette_page = 0;
-constexpr int VID_PALETTE_ICONS = 944, VID_FRAME = 456, PALETTE_COLUMNS = 4, PALETTE_ROWS = 4;
+constexpr int VID_PALETTE_ICONS = 944, VID_FRAME = 456, PALETTE_COLUMNS = 4, PALETTE_ROWS = 3;
 constexpr float GROUP_X = -165, GROUP_Y = -78, GROUP_DY = 13, GRID_X = -20, GRID_Y = -80, CELL = 41, NAME_Y = 92;
+// the army of what is placed next, under the icons: ARMY: (and AS IN THE MISSIONS for All objects),
+// then the four armies two a line
+constexpr float ARMY_Y = GRID_Y + PALETTE_ROWS * CELL + 4, ARMY_DY = 14, ARMY_DX = 92;
+// the army chosen in each palette (0 All objects, 1 Vehicles); -1: the one the missions give it
+int g_palette_army[2] = {-1, 0};
+const char* const ARMY_KEYS[] = {"CtxOurs", "CtxEnemy", "CtxNeutral", "CtxPirates"};
+const char* const ARMY_WORDS[] = {"OURS", "ENEMY", "NEUTRAL", "PIRATES"};
 
 std::vector<std::string> fields(const std::string& line) {
     std::vector<std::string> out;
@@ -425,6 +433,39 @@ const PaletteObject* object_at(POINT m) {
     return nullptr;
 }
 
+// The palette's army choices where they are drawn: -1 (as in the missions, All objects only), 0-3.
+struct ArmyChoice {
+    int army;
+    const char* text;
+    float x, y, w;
+};
+
+std::vector<ArmyChoice> army_choices() {
+    std::vector<ArmyChoice> out;
+    if (g_for_train != Panel::None) return out;   // a car for a train takes the train's army
+    const Place p = picture();
+    float w, h;
+    edit_font_size(FONT_TEXT, w, h);
+    const float label = text_width(FONT_TEXT, ui_text("CtxArmy", "ARMY:")) + w;
+    if (!g_vehicles) {
+        const char* missions = ui_text("PaletteArmyMissions", "AS IN THE MISSIONS");
+        out.push_back({-1, missions, p.x + GRID_X + label, p.y + ARMY_Y, text_width(FONT_TEXT, missions)});
+    }
+    for (int a = 0; a < 4; ++a) {
+        const char* text = ui_text(ARMY_KEYS[a], ARMY_WORDS[a]);
+        out.push_back({a, text, p.x + GRID_X + (a % 2) * ARMY_DX, p.y + ARMY_Y + (1 + a / 2) * ARMY_DY, text_width(FONT_TEXT, text)});
+    }
+    return out;
+}
+
+const ArmyChoice* army_at(POINT m, const std::vector<ArmyChoice>& choices) {
+    float w, h;
+    edit_font_size(FONT_TEXT, w, h);
+    for (const ArmyChoice& c : choices)
+        if (m.x >= c.x - 3 && m.x < c.x + c.w + 3 && m.y >= c.y - 1 && m.y < c.y + h + 1) return &c;
+    return nullptr;
+}
+
 bool on_palette_previous(POINT m) {
     const Place p = picture();
     return g_palette_page > 0 && inside(m, p.x + PREVIOUS_X, p.y + BUTTONS_Y, ARROW_W, BUTTON_H);
@@ -463,6 +504,18 @@ void draw_palette(POINT m) {
         char line[128];
         std::snprintf(line, sizeof line, "%s (VID %d)", name_of(*hover), hover->nvid);
         edit_draw_text(FONT_LIT, p.x + GRID_X, p.y + NAME_Y, line, STEP + 3);
+    }
+    const std::vector<ArmyChoice> armies = army_choices();
+    if (!armies.empty()) {   // the army of what is placed next, the chosen one underlined
+        float w, h;
+        edit_font_size(FONT_TEXT, w, h);
+        edit_draw_text(FONT_TEXT, p.x + GRID_X, p.y + ARMY_Y, ui_text("CtxArmy", "ARMY:"), STEP + 3);
+        const ArmyChoice* over = army_at(m, armies);
+        for (const ArmyChoice& c : armies) {
+            const bool chosen = g_palette_army[g_vehicles ? 1 : 0] == c.army;
+            edit_draw_text(chosen || &c == over ? FONT_LIT : FONT_TEXT, c.x, c.y, c.text, STEP + 3);
+            if (chosen) edit_fill(c.x, c.y + h + 1, c.x + c.w, c.y + h + 3, 0xe0f0e080);
+        }
     }
     if (g_palette_page > 0) edit_draw_picture(VID_PREVIOUS, 0, p.x + PREVIOUS_X, p.y + BUTTONS_Y, STEP + 2);
     if (g_palette_page + 1 < pages_of(g_group)) edit_draw_picture(VID_NEXT, 0, p.x + NEXT_X, p.y + BUTTONS_Y, STEP + 2);
@@ -551,7 +604,10 @@ bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse) {
         else if (g_panel == Panel::Palette) {
             if (on_palette_previous(mouse)) --g_palette_page;
             else if (on_palette_next(mouse)) ++g_palette_page;
-            else if (group_at(mouse) >= 0) {
+            else if (const ArmyChoice* a = army_at(mouse, army_choices())) {
+                g_palette_army[g_vehicles ? 1 : 0] = a->army;
+                patch::log("panel: palette army %d", a->army);
+            } else if (group_at(mouse) >= 0) {
                 g_group = group_at(mouse);
                 g_palette_page = 0;
             } else if (const PaletteObject* o = object_at(mouse)) {
@@ -563,7 +619,7 @@ bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse) {
                     else factory_add_car(o->nvid);
                 } else {
                     open(Panel::None);
-                    edit_pick_object(o->nvid, o->army);
+                    edit_pick_object(o->nvid, o->army);   // in the army of the row (palette_army)
                 }
             }
         }
@@ -602,6 +658,11 @@ bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse) {
         return false;   // the mouse moves (the view scrolls at the edge as usual)
     }
 }
+
+// The army the palette's row sets for what it places (0 All objects, 1 Vehicles; -1: the one the
+// missions give the object), and A in the Place tool setting it.
+int panel_palette_army(int which) { return g_palette_army[which & 1]; }
+void panel_set_palette_army(int which, int army) { g_palette_army[which & 1] = army; }
 
 // A level goes (editor.cpp's edit_reset): no panel over the next one.
 void panel_reset() { g_panel = Panel::None; }

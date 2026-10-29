@@ -160,7 +160,8 @@ What you see:
 
 The **object's panel** (right button) has its army, turning, its height (lower, raise, on the ground) and delete, a semaphore's colour and
 its line, and - for a fort, a mining plant or a citadel - the gun in each of its sockets (empty, a
-cannon or missiles). The right button elsewhere closes it.
+cannon or missiles; while the panel is open the sockets are numbered on the wall, and a click on a
+gun opens its host's panel). The right button elsewhere or Esc closes it.
 
 ![A fort's panel](img/editor-fort-panel-en.jpg)
 
@@ -279,6 +280,8 @@ shows where, and placing them elsewhere is refused with the reason:
   semaphore at it;
 - a **repair point** on a **straight piece** of track, turned along it like a gate. It comes with a
   one-way line through it (trains are pushed through and every car is repaired) and its semaphores.
+  `R` or `E` (or **TURN: ROUND** in its panel) turns it round on its leg: the line then
+  runs the other way and the semaphores change places.
 
 Dragging one of them moves it, with its line, to the nearest right place; deleting it deletes the
 line too. A **blocker** (the buffer stop, in the RAILWAY group of All objects) goes to the nearest
@@ -331,18 +334,33 @@ it quiet.
 
 ### 7. The enemy
 
-- **Fort** (key 6, the enemy's): put it **on the track** of the main line - it is a gate the trains
-  drive through. It comes armed: its panel (right button) sets the gun in each socket - a cannon or
+- **Fort** (key 6, the enemy's): it goes **onto the track**, turned along it - it is a gate the
+  trains drive through (`R` or `E` turns it round there). It comes armed: its panel (right button) sets the gun in each socket - a cannon or
   missiles. The fort itself cannot be destroyed; its guns can.
 - **All objects** (key 7) opens the palette with every object the missions use, by theme (meadow,
   forest, desert, ice, volcanic, swamp, park, pirates, city, industry, railway, flags and crates,
-  wrecks, units and creatures, effects): click one, then place it. Here are the **mining plant**
-  (two gun sockets, like the fort), the citadel, walls, buildings, robots. A **wreck** (a burnt
+  wrecks, units and creatures, effects): click one, then place it. Under the icons the **ARMY** row
+  sets whose it will be - AS IN THE MISSIONS, OURS, ENEMY, NEUTRAL or PIRATES (the Vehicles palette
+  starts on ours); `A` while placing does the same. Here are the **mining plant** (one gun socket),
+  the citadel, walls, buildings, robots. A **wreck** (a burnt
   cart or car) put or dragged near a rail goes onto the track, along it (`R` turns it round), as the
   missions have them; elsewhere it stays where you put it. In the game a train runs it over and
   crushes it - it does not stop the train.
 
   ![All objects](img/editor-palette-en.jpg)
+
+- **Citadel** (pirates): it stands over a **diagonal track**, with its tower, the grates of its gate
+  and its corkscrews, as one object. In the game, while its tower stands, its gate stops and hits whatever of another army than
+  the tower's comes near (the neutrals aside); without the tower it is harmless.
+- **Charybdis** (swamp): it goes **on the track** - the track runs through its mouth -, with its
+  eye, teeth and guns, as one object. It pulls in the trains of other armies that pass it and eats
+  yours; its guns sleep until it is hurt. Kill
+  its eye to destroy it.
+- **Fly nest** (units and creatures): its panel chooses **GREEN, IN WAVES** (waves of green flies)
+  or **GREY, ON GUARD** (grey flies when your trains come near, a swarm when it is destroyed).
+- **Mine** (units and creatures): it goes on the track, in the army of the palette's row. The editor
+  marks every mine with its army (MINE: ENEMY); in the game only its own army sees it - a train of
+  another army sets it off, its own trains stop in front of it.
 
 - **Trains**: the strip's **Vehicles** opens the cars - locomotives, combat cars, supply cars
   (ammunition, repair car, tankers), civil cars, obstacles. A car goes on the track under the

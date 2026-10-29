@@ -1434,8 +1434,8 @@ list; with none on the map, the state of one on a mission's map, from the palett
 player's factory without such an object the game's 14 factory units; a fort, a mining plant or a
 citadel comes with the missions' most common guns in its sockets (MAP_RULES.md 6), which move, turn,
 change army and are deleted with it; a reinforcement point is put on the nearest track by
-`Engine_Construct` itself; a factory, repair point or fort far from a track gets a warning in the
-status line. Rails are not moved or turned (a rail is laid again instead); train cars move with their train along the track (below) - a car
+`Engine_Construct` itself; a factory, repair point, fort or citadel snaps onto the track ("On the
+track" below). Rails are not moved or turned (a rail is laid again instead); train cars move with their train along the track (below) - a car
 stands on its rail points).
 
 Checked on the sandbox (`test_game.ps1 -Editor` with the steps of "Working with the code"):
@@ -1956,15 +1956,21 @@ elsewhere they are refused with the reason in the status line:
 | Object | Where it goes | With it |
 |---|---|---|
 | factory | the dead end (a rail point with one link) nearest to the cursor within 150 px, 22 px inside along the spur (the sandbox and l05), turned the way out (multiples of 32) | its exit push line as the missions have them: from the dead end along the spur, 140 px (they are 100-175), push_flag 1 - built cars appear in the factory and are pushed clear - with its post |
-| repair point | the point of a straight piece (two links going opposite ways) nearest within 100 px, turned along it, the way of its link with the smaller direction (north on a vertical leg, as l05's) | the push line through its leg, 120 px each side (they are 139-304), push_flag 1, one way in the direction it faces, with its posts |
+| repair point | the point of a straight piece (two links going opposite ways) nearest within 100 px, turned along it the way nearest to the direction chosen (at first the way of its link with the smaller direction: north on a vertical leg, as l05's); R / E turn it round | the push line through its leg, 120 px each side (they are 139-304), push_flag 1, one way in the direction it faces, with its posts |
 | post | 24 px beside the track point nearest to the cursor, on the cursor's side of the track (R / E or the wheel put the preview on the other side), facing along the track the way that has that side on the right of its trains - its side follows from its way (184 of the missions' 188 posts stand so, 12-40 px from the track, median 23); the status line names its trains ("for the trains going left"); R / E, the wheel or the panel's FOR TRAINS turn a post beside a track round and put it across the track, as far from it as it stood (the track a post is beside is the one its trains pass on their right: the rail point nearest to 24 px on the post's other side - at a junction other track is as near), a post with no track within 70 px turns a step of its 8 directions | its own line at once, as the missions' posts have theirs (measured: each of the 188 posts against the nearest end of its script's lines): a line ending at the post's rail point - a red post's coming from behind it (107 of the 124 red posts; 85 with push_flag 1), so the trains it faces would enter it at its end against it and stop at the post; a green post's coming from the trains it faces (29 of the 61 green ones; 26 more at the begin of a line going on), so they run along it, pushed, and leave it at the post. The editor's are 140 px long with push_flag 1 (the red post's then pushes the trains of the other way toward it, as the missions' do). A pair at an entry - green facing the edge for the trains coming in, red facing in for those going out - owns one line from past the edge to the pair: the missions' entry (l02: `SetPushLine(-107,1203,54,1465,1)` with its pair at 54,1465). A line is a post's own by that shape alone, of any length (`owns`), so a loaded map's posts keep theirs, a pair shares one and the line of S or the Arrivals panel's entry belongs to its posts; never a factory's or repair point's line. None for a post that owns one already or stands within 40 px of an end of a line no post owns (a building's, the script's). Turning the post round, T or moving it makes its line again (a line another post owns too stays, the post gets one beside it); deleting the post deletes its line unless another post owns it (one step of the history each); L / Shift+L give a selected post its line green / red, the panel's LINE row says what the line does - STOPS THEM (red) or LETS THEM IN (green), the trains of its FOR TRAINS row - or NONE; the preview draws the line it will get. Checked in play (`SANDBOX_DRIVE_TEST` on a copy of the sandbox): a red post on the main line for the trains going right, `SetPushLine(443,1299,301,1299,1)` - the reinforcement coming east onto that piece stopped at 387,1366 and stayed; the same post green, `SetPushLine(159,1299,301,1299,1)` - it went on east and reached its points; a pair at 194 (green south for the trains going right, red north for those going left) made one line, `SetPushLine(52,1299,194,1299,1)` - the reinforcement from past the west edge passed it east, and sent back west it stopped at 216,1375 and stayed |
 | money crate | the rail point nearest within 80 px | - |
 | blocker (150) | the dead end nearest to the cursor within 150 px (not a factory's: within 40 px of one), 5 px past it, across the track: its 4 frames (nDir 4) are the 4 ways of the rail lattice - 0 on a vertical track, 64 rising to the right, 128 horizontal, 192 falling to the right, as the missions turn them (their 32 and 160 are the same frames) | - (it is a sign: a train stops at the dead end anyway, the blocker's moveMask 0x10 has no bit of the cars') |
+| fort | the line of the straight rail nearest within 60 px (`rail_line_spot`: its two ends' segment), where the cursor falls on it, turned along it the way nearest to the direction chosen - all 20 forts of the missions stand 0-6 px from such a line (R / E turn it round there) | its guns |
+| Charybdis | the line of the straight rail nearest within 100 px through its middle - l06's diagonal passes 1 px from it, so what it pulls in comes within the 40 px it eats in | its pieces |
+| citadel | over the diagonal rail nearest within 80 px, the rail's line 8 px north of its middle - the three citadels of l04 and l18 stand over the crossing of two diagonal tracks, which cross there, a grate on each southern arm | its pieces and tower |
 
 Dragging one of them puts it at the place on the track nearest to where it is dropped (with a new
-line and posts for a factory or repair point); deleting a factory or a repair point takes its line
-and posts with it - each one step of the history. A factory or repair point is not turned by hand
-(its track turns it), nor is a blocker at a dead end. Checked in the game: a mission made on the template with the main line, a spur
+line and posts for a factory or repair point; a fort, a citadel or Charybdis with all that goes with
+it); deleting a factory or a repair point takes its line and posts with it - each one step of the
+history. A factory is not turned by hand (its spur turns it), nor is a blocker at a dead end; a repair
+point turns round on its leg - R / E, or TURN: ROUND in its panel, also while it is being placed -,
+and its line is made anew the other way with its posts (a green one at the new way in, a red one at
+the far end), one step of the history. Checked in the game: a mission made on the template with the main line, a spur
 with a factory at its dead end (line and red post made), a repair point on the main line (line,
 green and red posts), a crate on the line and the reinforcement point; played with a test script in
 the game folder's copy: the reinforcement, damaged to 60 hp, was pushed through the repair point and
@@ -1990,21 +1996,56 @@ neutrals (civil trains and robots) have the bit clear. Checked in play: a neutra
 the bit took a player's train from 320 to 15 hp in 60 s and was not fired at by it, one without the bit
 left a train beside it at 450. A, R, E, T, L and Del stay as the keys for them. A gun goes exactly into its socket (the
 missions' offsets, MAP_RULES.md 6), with the host's army (on a citadel of army 0 the enemy's, as in
-the missions) and direction, and follows it. The bar's entry 7, All objects, opens the palette: a
+the missions) and direction, and follows it. A gun in a socket is part of its host: a click on it
+selects the host (`pick`, `host_of`) and the right button opens the host's panel, where each socket
+has one row - SOCKET 1, SOCKET 2, numbered on the wall while the panel is open, an empty one framed -
+and a click on EMPTY, CANNON or MISSILES puts that gun in at once, underlined. The bar's entry 7, All objects, opens the palette: a
 panel like Help with the groups down the left (meadow, forest, desert, ice, volcanic, swamp, park,
 pirates, city, industry, railway, flags and crates, wrecks, units and creatures: the 236 kinds of
-object of the missions, trains and cars aside), 16 icons a page on the right (VID 944, made from the
+object of the missions, trains and cars aside), 12 icons a page on the right (VID 944, made from the
 objects' own sprites when the game is assembled), the arrows or the wheel for more and the name of the
 one under the mouse (a unit's from the game's `[Units]`, the others' from `[Editor]`); a click picks
 it and the map takes it in the army the missions give it, a unit with the behave and build list of
-one of its kind on the map or, with none there, of the first on the missions' maps. Checked in the
-game in Polish and English: a fort's panel with its army changed to ours and its sockets set to a
+one of its kind on the map or, with none there, of the first on the missions' maps. Under the icons
+an army row (ARMY: AS IN THE MISSIONS - All objects only, its first choice -, OURS, ENEMY, NEUTRAL,
+PIRATES; the Vehicles palette starts on OURS) sets the army of what is placed next, the chosen one
+underlined (`panel_palette_army`); A in the Place tool steps through the armies the same way, the
+status line names the one placed ("..., army 1 (enemy)"), and a car coupled to a train still takes the
+train's army. Checked in the game in Polish and English: a fort's panel with its army changed to ours and its sockets set to a
 cannon and a missile tower (both turned with it), a mining plant with its cannon, a citadel with
 its tower, a robot, a pirate wall and a bush picked from the palette and placed, decals clicked and
 dragged (a band of bushes 16 px apart, none stacked), the map saved, loaded and saved again (the same
 60 objects); played: the enemy's citadel, fort and mining plant fire on the player's factory and
 train, the enemy's train shoots the guns of the player's fort and its missile tower fires at an
 enemy robot.
+
+**Wholes, fly nests and mines** (`editor_edit.cpp`, the sections "wholes", "the fly nest" and
+"mines"; the runner's `PiecesTact`, `editor_mission.cpp`; MAP_RULES.md 6 and 6b). The citadel (149)
+and Charybdis (254) are placed with the pieces the missions always give them (`pieces_of_kind`: the
+citadel's two grates and four corkscrews, Charybdis's roots, teeth, eye, four mortars and two
+cannons, found again by their offsets - `pieces_on`), as one object: preview, place, drag, height,
+army and delete take them all, a click on a piece selects the whole, and its panel puts back missing
+pieces. The faction is the army of what fights (the tower; the teeth, eye and guns; on the missions'
+wholes, army 0 themselves, the enemy's - `faction_of`): a whole is placed in its faction's army (the
+enemy's from the palette) and its panel's ARMY row shows and sets the faction. Charybdis snaps with the
+line of the nearest straight track through its middle, as l06's stands, and eats the player's units. In play the
+runner does what the missions' scripts do: `CitadelTact` (l04 / l18 `GratesTact`) for every citadel
+whose tower stands, `CharybdisTact` (l06) for every Charybdis whose eye lives, `NestTact` (l06's two
+nests) for every nest - the panel's FLIES: GREEN, IN WAVES / GREY, ON GUARD, kept as the nest's
+direction (0 / 64), which a nest of one direction does not show.
+The explosive mine (86) snaps to the
+rail point nearest within 40 px, is placed in the army of the palette's row and is marked with its
+army by the editor (`draw_mines`: a square in the army's colour and MINE: ENEMY; the engine hides a
+mine of another army than the player's, also on the held level, so the editor draws its sprite, and
+`pick` takes it although its VID has the screen flag 0x800); the authors' marker (89) is marked MINE
+1 IN 3: ENEMY, and its panel makes it a mine of the enemy's. In play the engine shows a mine to its
+own army only (VID flag 0x20000), as it always did.
+Checked in the game (a map made in the editor: a line, four of our locomotives, a citadel, Charybdis
+beside the track, an enemy mine, a nest of each kind; played): the gate hit the locomotive beside
+the citadel (`CITADEL 1 gate hits vid 5 army 0` in `error.log`) while its tower fired, Charybdis
+pulled in and ate the one beside it, the mine blew up the two over it, the waves nest sent its green
+flies and the guard nest a grey one while a train of ours was within 400 px; the citadel's ARMY row
+set to OURS turned its tower green and back with Ctrl+Z.
 
 **The rows of the ground's tools** (`editor_edit.cpp`, the section of the same name). While the
 Ground height or the Paint tool is chosen, a row of buttons stands above the bar's strip: the depot
@@ -2204,9 +2245,9 @@ pictures (22 px right of the device's middle, 18 up), the title in the menu titl
 the text in the menu font (VID 2), the page arrows (VIDs 475/476) and the start button (VID 477)
 with "back to the map". **Help** (the ? button or F1) shows the editor's help pages the way the
 game shows its own (`maps\menu4.lst` -> `menu41.txt` ...): `maps\edithelp.lst` lists
-`maps\edithelp1.txt` ... `edithelp15.txt` - the mouse, the keys, the bar, laying track, the mission,
+`maps\edithelp1.txt` ... `edithelp16.txt` - the mouse, the keys, the bar, laying track, the mission,
 the buttons, the object's panel, all objects and decals, trains and rails, water, painting and
-regions, heights, the ground tools' rows, the train arrivals, a factory's panel, turning - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
+regions, heights, the ground tools' rows, the train arrivals, a factory's panel, turning, the citadel, Charybdis, fly nests and mines - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
 44 characters a line - the ESC pairs not counted, so a line with lit words is longer in the file - and 14
 lines, ESC 7 / ESC 2 switch to the lit font VID 7 and back to VID 2):
 English in `game/maps/` (the fallback of every pack) and the others in `lang/<code>/game/editor/`; the files are

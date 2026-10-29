@@ -116,6 +116,7 @@ GroupSwamp	214	0	Obj214	Nails
 GroupSwamp	212	0	Obj212	Yellow swamp grass
 GroupSwamp	925	0	Obj925	Tussock
 GroupSwamp	911	0	Obj911	Swamp reeds
+GroupSwamp	254	1		
 GroupPark	923	0	Obj923	Round tree
 GroupPark	858	0	Obj858	Park teat tree
 GroupPark	932	0	Obj932	Yellow tree
@@ -140,7 +141,7 @@ GroupPirates	145	0	Obj145	Border post
 GroupPirates	142	0	Obj142	Corkscrew
 GroupPirates	147	0	Obj147	Broken corkscrew
 GroupPirates	146	0	Obj146	Citadel grate
-GroupPirates	149	0		
+GroupPirates	149	1		
 GroupPirates	148	1		
 GroupCity	816	0	Obj816	Tall building 1
 GroupCity	808	0	Obj808	Tall building 2
@@ -229,7 +230,6 @@ GroupUnits	70	1
 GroupUnits	72	2		
 GroupUnits	77	2		
 GroupUnits	86	1		
-GroupUnits	89	0	Obj89	Mine marker
 GroupUnits	87	2	Obj87	Detonator
 GroupUnits	265	1		
 GroupUnits	517	2		

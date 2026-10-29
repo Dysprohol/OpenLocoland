@@ -158,7 +158,8 @@ Co widać:
 
 **Panel obiektu** (prawy przycisk) ma jego armię, obrót, wysokość (niżej, wyżej, na ziemi) i usuwanie, kolor semafora i linię przy
 nim, a dla fortyfikacji, kopalni i cytadeli - działo w każdym gnieździe (puste, działo albo
-rakiety). Prawy przycisk gdzie indziej go zamyka.
+rakiety; gdy panel jest otwarty, gniazda są ponumerowane na murze, a kliknięcie działa otwiera panel
+jego budowli). Prawy przycisk gdzie indziej albo Esc go zamyka.
 
 ![Panel fortyfikacji](img/editor-fort-panel-pl.jpg)
 
@@ -276,7 +277,8 @@ podgląd pokazuje gdzie, a postawienie gdzie indziej jest odrzucane z podaniem p
   wypychane) i czerwony semafor przy niej;
 - **punkt naprawczy** na **prostym odcinku** toru, obrócony wzdłuż niego jak brama. Dostaje linię
   jednokierunkową przez siebie (pociągi są przez niego przepychane, a każdy wagon naprawiany) i
-  swoje semafory.
+  swoje semafory. `R` albo `E` (albo **OBROT: ZAWROC** w jego panelu) obraca go na torze:
+  linia biegnie wtedy w drugą stronę, a semafory zamieniają się miejscami.
 
 Przeciągnięcie przenosi je razem z linią na najbliższe właściwe miejsce; usunięcie usuwa też linię.
 **Bloker** (kozioł oporowy, w grupie KOLEJ we Wszystkich obiektach) staje na najbliższym końcu toru,
@@ -328,18 +330,35 @@ Przyjazdy nie wybierzesz **PRZESTAW NA PRZYJAZDY**.
 
 ### 7. Wróg
 
-- **Fortyfikacja** (klawisz 6, wroga): postaw ją **na torze** głównej linii - to brama, przez którą
-  przejeżdżają pociągi. Jest od razu uzbrojona: jej panel (prawy przycisk) ustawia działo w każdym
+- **Fortyfikacja** (klawisz 6, wroga): staje **na torze**, obrócona wzdłuż niego - to brama, przez
+  którą przejeżdżają pociągi (`R` albo `E` obraca ją tam). Jest od razu uzbrojona: jej panel (prawy przycisk) ustawia działo w każdym
   gnieździe - działo albo rakiety. Samej fortyfikacji nie da się zniszczyć; jej działa tak.
 - **Wszystkie obiekty** (klawisz 7) otwiera paletę ze wszystkimi obiektami z misji, według tematów
   (łąka, las, pustynia, lód, wulkan, bagno, park, piraci, miasto, przemysł, kolej, flagi i skrzynie,
-  wraki, jednostki i stworzenia, efekty): kliknij jeden, potem postaw go na mapie. Są tu **kopalnia**
-  (dwa gniazda na działa, jak fortyfikacja), cytadela, mury, budynki, roboty. **Wrak** (spalony wóz
+  wraki, jednostki i stworzenia, efekty): kliknij jeden, potem postaw go na mapie. Wiersz **ARMIA**
+  pod ikonami ustala, czyj będzie - JAK W MISJACH, NASI, WROG, NEUTRALNI albo PIRACI (paleta Pojazdy
+  zaczyna od naszych); `A` przy stawianiu robi to samo. Są tu **kopalnia** (jedno gniazdo na
+  działo), cytadela, mury, budynki, roboty. **Wrak** (spalony wóz
   albo wagon) postawiony albo przeciągnięty przy szynie staje na torze, wzdłuż niego (`R` go
   odwraca), tak jak w misjach; gdzie indziej zostaje tam, gdzie go postawisz. W grze pociąg najeżdża
   na niego i go miażdży - wrak pociągu nie zatrzymuje.
 
   ![Wszystkie obiekty](img/editor-palette-pl.jpg)
+
+- **Cytadela** (piraci): staje nad **ukośnym torem**, razem z wieżą, kratami bramy i świdrami, jako
+  jeden obiekt. W grze,
+  dopóki stoi jej wieża, brama zatrzymuje i rani wszystko z innej armii niż wieża, co podjedzie
+  blisko (poza neutralnymi); bez wieży jest niegroźna.
+- **Charybda** (bagno): staje **na torze** - tor biegnie przez jej paszczę -, z okiem, zębami i
+  działami, jako jeden obiekt. Wciąga pociągi innych armii, które ją mijają, a twoje zjada; jej działa
+  śpią, dopóki jej nie zranisz. Zabij jej
+  oko, żeby ją zniszczyć.
+- **Gniazdo much** (jednostki i stworzenia): jego panel wybiera **ZIELONE, FALAMI** (fale zielonych
+  much) albo **SZARE, NA STRAZY** (szare muchy, gdy twoje pociągi podjadą blisko, rój, gdy je
+  zniszczysz).
+- **Mina** (jednostki i stworzenia): staje na torze, w armii z wiersza palety. Edytor oznacza każdą
+  minę jej armią (MINA: WROG); w grze widzi ją tylko jej armia - pociąg innej armii ją odpala, jej
+  własne pociągi zatrzymują się przed nią.
 
 - **Pociągi**: **Pojazdy** z listwy otwierają wagony - lokomotywy, wagony bojowe, zaopatrzenie
   (wóz z amunicją, pojazd naprawczy, cysterny), wagony cywilne, przeszkody. Wagon staje na torze
