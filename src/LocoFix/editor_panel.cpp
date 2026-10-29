@@ -62,6 +62,7 @@ bool factory_click(POINT mouse);
 void factory_add_car(int nvid);
 void factory_open(void* factory);
 bool edit_arrival_picking();   // editor_edit.cpp: a point for the Arrivals panel is being picked
+bool edit_escape();            // editor_edit.cpp: Esc ends what is under way there (true when it did)
 
 namespace {
 
@@ -527,7 +528,9 @@ bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse) {
         if (m == WM_LBUTTONDOWN && on_circle(mouse, help_button(), HELP_R)) open(Panel::Help);
         else if (m == WM_LBUTTONDOWN && on_circle(mouse, menu_button(), MENU_R)) open(Panel::Menu);
         else if (m == WM_KEYDOWN && w == VK_F1) open(Panel::Help);
-        else if (m == WM_KEYDOWN && w == VK_ESCAPE && !edit_arrival_picking()) open(Panel::Menu);   // Esc opens Menu when no panel is open
+        else if (m == WM_KEYDOWN && w == VK_ESCAPE && !edit_arrival_picking()) {
+            if (!edit_escape()) open(Panel::Menu);   // Esc opens Menu when no panel is open and nothing is under way
+        }
         else return false;
         return true;
     }

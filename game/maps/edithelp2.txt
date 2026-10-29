@@ -1,7 +1,7 @@
 KEYS
 
 TOOLS OF THE BAR        1-9, 0
-TURN RIGHT / LEFT       R / E
+TURN, TURN ROUND (P.15) R / E, WHEEL
 NEXT ARMY               A
 SEMAPHORE RED/GREEN     T
 PUSH LINE AT SEMAPHORE  L / SHIFT+L

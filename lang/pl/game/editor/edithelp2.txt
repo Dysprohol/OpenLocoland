@@ -1,7 +1,7 @@
 KLAWISZE EDYTORA
 
 NARZÊDZIA PASKA         1-9, 0
-OBRÓÆ W PRAWO / W LEWO  R / E
+OBRÓÆ, ZAWRÓÆ (STR. 15) R / E, KÓ£KO
 NASTÊPNA ARMIA          A
 SEMAFOR CZERW./ZIELONY  T
 LINIA PRZY SEMAFORZE    L / SHIFT+L

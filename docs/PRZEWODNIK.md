@@ -224,7 +224,8 @@ Kilka jednostek i dział gra zawsze sama stawia na ziemi; wiersz stanu to mówi.
 ### 4. Główna linia
 
 **Tory** (klawisz 3). Kliknij, żeby zacząć linię - na końcu szyny mapy albo gdziekolwiek - a każde
-następne kliknięcie kładzie **jedną szynę** w stronę kursora; prawy przycisk kończy linię. Podgląd
+następne kliknięcie kładzie **jedną szynę** w stronę kursora; Esc kończy linię, a prawy przycisk usuwa
+szynę pod kursorem (Ctrl+Z ją przywraca; nie tę, na której stoi pociąg). Podgląd
 pokazuje następną szynę: **zielone** końce - pasuje, **czerwone** - wiersz stanu mówi, którą
 zasadę łamie:
 
@@ -278,10 +279,14 @@ podgląd pokazuje gdzie, a postawienie gdzie indziej jest odrzucane z podaniem p
   swoje semafory.
 
 Przeciągnięcie przenosi je razem z linią na najbliższe właściwe miejsce; usunięcie usuwa też linię.
+**Bloker** (kozioł oporowy, w grupie KOLEJ we Wszystkich obiektach) staje na najbliższym końcu toru,
+w poprzek niego, tak jak w misjach.
 
 **Linie jednokierunkowe** (**Linia jednokierunkowa** z listwy): linia na torze, na którą żaden
 pociąg nie wjedzie pod prąd - tak misje oznaczają wjazd na mapę, wyjazd, fabryki i punkty naprawcze.
-Kliknij jej początek i koniec na torze; potem na zaznaczonej linii `T` włącza albo wyłącza
+Kliknij jej początek i koniec na torze - na mapie linia ma kreskę na początku i strzałki w stronę,
+w którą biegnie, a mysz nad nią mówi, co robi; potem na zaznaczonej linii - wiersz stanu podaje jej początek, koniec i to, co robi; także narzędziem
+Zaznacz kliknięcie kreski lub strzałki linii ją zaznacza, a prawy przycisk otwiera jej panel - `T` włącza albo wyłącza
 pchanie, `R` ją odwraca, `S` stawia jej semafory, Del ją usuwa. Zrób dwie:
 
 - **wjazd na mapę**: od końca głównej linii za krawędzią na mapę, z pchaniem;
@@ -289,9 +294,18 @@ pchanie, `R` ją odwraca, `S` stawia jej semafory, Del ją usuwa. Zrób dwie:
   pociąg nie wyjechał poza mapę.
 
 **Semafory** (klawisze 8 zielony, 9 czerwony) są tylko znakami - pokazują kierunek linii
-jednokierunkowych i stoją obok toru; `T` zmienia kolor. Na zaznaczonym semaforze `L` robi przy nim
-linię, która wpuszcza pociągi, na które patrzy (zielony), a `Shift+L` taką, która je zatrzymuje
-(czerwony).
+jednokierunkowych i stoją obok toru, po prawej stronie pociągów, na które patrzą, jak w misjach:
+staje po tej stronie toru, którą wskażesz (`R` / `E` albo kółko: po drugiej), a na postawionym `R` / `E`
+obracają go - przechodzi na drugą stronę toru, do pociągów jadących w drugą stronę; wiersz stanu i jego
+panel (DLA POCIAGOW) mówią, dla których jest. `T` zmienia kolor. Postawiony semafor od razu dostaje własną linię
+jednokierunkową, tak jak mają je semafory misji, a podgląd ją rysuje - linię kończącą się przy semaforze:
+**zielony** wpuszcza pociągi, na które patrzy (linia biegnie od nich i przepycha je obok niego),
+**czerwony** zatrzymuje je przy sobie (linia biegnie zza niego, a pod prąd nie wolno). Zielony i
+czerwony naprzeciw siebie po dwóch stronach toru dzielą jedną linię - to wjazd na mapę, jeśli postawisz
+je tam, gdzie wchodzi główna linia. Obrót, `T` albo przesunięcie zmieniają linię, usunięcie semafora
+ją usuwa (chyba że ma ją jeszcze drugi z pary). Semafor postawiony przy końcu innej linii należy do niej i własnej nie dostaje;
+`L` (zielony) i `Shift+L` (czerwony) i tak dają zaznaczonemu semaforowi własną linię, a wiersz LINIA
+jego panelu ją zabiera (BRAK).
 
 **Co buduje fabryka**: prawy przycisk na fabryce, **CO BUDUJE...**. Dla twojej fabryki (i neutralnej,
 której lista będzie twoja po jej zdobyciu) kliknij jednostki, które może budować - zachowują kolejność i
@@ -431,7 +445,7 @@ misji, Wysokosc terenu, Skrzynka z pieniedzmi, Pojazdy, Malowanie terenu, Woda i
 
 | Klawisz | |
 |---|---|
-| R / E, kółko | obrót (pociąg: odwrócenie) |
+| R / E, kółko | obrót: o krok kierunków obiektu (R w prawo, E w lewo); zawrócenie pociągu, wraku na torze, semafora przy torze, a w narzędziu Linia jednokierunkowa linii; fabrykę, punkt naprawczy i bloker obraca ich tor (strona pomocy 15) |
 | A | następna armia |
 | T | semafor czerwony / zielony; na linii: pchanie tak / nie |
 | L / Shift+L | linia przy zaznaczonym semaforze: wpuszcza / zatrzymuje |
@@ -450,7 +464,7 @@ misji, Wysokosc terenu, Skrzynka z pieniedzmi, Pojazdy, Malowanie terenu, Woda i
 | W | woda, bagno albo lawa |
 | S | semafory zaznaczonej linii (narzędzie Linia jednokierunkowa) |
 | Shift (z pędzlem) | usuwanie |
-| Esc, prawy przycisk | powrót do Zaznacz; koniec linii toru |
+| Esc, prawy przycisk | powrót do Zaznacz; Esc kończy linię toru (w narzędziu Tor prawy przycisk usuwa szynę pod kursorem) |
 | Ctrl+R | uruchom / wstrzymaj poziom |
 | F1 | pomoc |
 | Alt+F2 / Alt+F3 | zapisz / wczytaj |

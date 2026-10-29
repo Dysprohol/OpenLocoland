@@ -227,7 +227,8 @@ A few units and guns are always put on the ground by the game itself; the status
 ### 4. The main line
 
 **Track** (key 3). Click to start a line - at the end of a rail of the map or anywhere - and every
-next click lays **one rail** toward the cursor; the right button ends the line. The preview shows
+next click lays **one rail** toward the cursor; Esc ends the line, and the right button deletes the
+rail under the cursor (Ctrl+Z puts it back; not one a train stands on). The preview shows
 the next rail: **green** ends - it fits, **red** - the status line says which rule it breaks:
 
 - one step is 71 x 50 px or its half (the rails' lattice);
@@ -280,11 +281,14 @@ shows where, and placing them elsewhere is refused with the reason:
   one-way line through it (trains are pushed through and every car is repaired) and its semaphores.
 
 Dragging one of them moves it, with its line, to the nearest right place; deleting it deletes the
-line too.
+line too. A **blocker** (the buffer stop, in the RAILWAY group of All objects) goes to the nearest
+end of a track, across it, as the missions have theirs.
 
 **One-way lines** (the strip's **Push line**): a line on the track no train may enter against its
 direction, as the missions mark the entry onto the map, the exit, the factories and the repair
-points. Click its beginning and its end on the track; then, on a selected line, `T` switches
+points. Click its beginning and its end on the track - on the map a line has a bar at its beginning
+and arrows the way it runs, and the mouse over it tells what it does; then, on a selected line - the status line names its beginning, its end and what it does; in the
+Select tool too a click on a line's bar or arrow selects it, and the right button opens its panel -, `T` switches
 pushing on or off, `R` turns it round, `S` puts its semaphores, Del deletes it. Make two:
 
 - the **map's entry**: from the main line's end past the edge onto the map, pushing on;
@@ -292,8 +296,18 @@ pushing on or off, `R` turns it round, `S` puts its semaphores, Del deletes it. 
   drives off the map.
 
 **Semaphores** (keys 8 green, 9 red) are signs only - they show the way of the one-way lines and
-stand beside the track; `T` switches the colour. On a selected semaphore `L` makes a line at it that
-lets in the trains it faces (green), `Shift+L` one that keeps them out (red).
+stand beside the track, to the right of the trains they face, as in the missions: one goes on the
+side of the track you point at (`R` / `E` or the wheel: the other side), and on a placed one `R` / `E`
+turn it round - it goes across the track to the trains of the other way; the status line and its
+panel (FOR TRAINS) say whose it is.
+`T` switches the colour. A semaphore you place gets its own one-way line at once, as the missions'
+semaphores have them, and the preview draws it - a line that ends at the semaphore: a **green** one
+lets the trains it faces in (the line comes from them and pushes them past it), a **red** one stops
+them at it (the line comes from behind it, and they may not go against it). A green and a red one
+across the track from each other share one line - the map's entry, if you put them where the main
+line comes in. Turning it round, `T` or moving it changes the line, deleting it deletes it (unless the
+other one of a pair still has it). One put at an end of another line belongs to that line and gets none; `L` (green) and `Shift+L` (red) give a
+selected semaphore its own line all the same, and its panel's LINE row takes it away (NONE).
 
 **What a factory builds**: the right button on a factory, **WHAT IT BUILDS...**. For your factory
 (and a neutral one, whose list is yours once you capture it) click the units it may build - they keep
@@ -436,7 +450,7 @@ Mission settings, Ground height, Money crate, Vehicles, Paint the ground, Water 
 
 | Key | |
 |---|---|
-| R / E, wheel | turn (a train: turn round) |
+| R / E, wheel | turn: a step of the object's directions (R right, E left); turn round a train, a wreck on the track, a semaphore beside the track and, in the Push line tool, the line; a factory, a repair point and a blocker follow their track (help page 15) |
 | A | next army |
 | T | semaphore red / green; on a line: pushing on / off |
 | L / Shift+L | a line at the selected semaphore: lets in / keeps out |
@@ -455,7 +469,7 @@ Mission settings, Ground height, Money crate, Vehicles, Paint the ground, Water 
 | W | water, swamp or lava |
 | S | the selected line's semaphores (Push line tool) |
 | Shift (with a brush) | take away |
-| Esc, right button | back to Select; ends a line of track |
+| Esc, right button | back to Select; Esc ends a line of track (in the Track tool the right button deletes the rail under the cursor) |
 | Ctrl+R | run / hold the level |
 | F1 | help |
 | Alt+F2 / Alt+F3 | save / load |

@@ -213,11 +213,15 @@ the enemy's trains shoot it.
 Measured over the 20 missions: all 37 factories and repair points stand on the track (the nearest
 rail 1-38 px, one at 68); a factory's exit line runs 100-175 px from inside it along its spur, a
 repair point's line 139-304 px through its leg; money crates (VID 169, army 3; `F169_8` gives the
-player 100 when a unit of theirs takes it) lie on the track, 1-46 px from a rail (median 17).
+player 100 when a unit of theirs takes it) lie on the track, 1-46 px from a rail (median 17); the
+blockers (VID 150, the buffer stop, nDir 4) stand at dead ends - all 99 within 16 px of a rail point
+with one link, median 5 px past it -, turned by the track's way: 0 on a vertical track, 64 (or 32)
+rising to the right, 128 horizontal, 192 (or 160) falling to the right - four frames.
 **[editor]** Enforced when placing: a factory snaps to the nearest dead end (22 px inside, turned the
 way out) and gets its exit line (140 px, push_flag 1) and post; a repair point snaps to a straight
 piece, turned along it, and gets its line (120 px each side, flag 1, one way the way it faces) and
-posts; a crate snaps onto the track; elsewhere they are refused. Moving or deleting the building
+posts; a crate snaps onto the track; a blocker to the nearest dead end, 5 px past it, turned by the
+track's way; elsewhere they are refused. Moving or deleting the building
 moves or deletes its line and posts.
 
 ## 6a. Trains on the map
@@ -249,7 +253,8 @@ moves or deletes its line and posts.
 - A post with a lamp (halo VID 154, light spot VID 155), army 0, on the ground, 16-29 px
   beside the track, turned along it. Two states: green (`ANI_STAND`, the default) and red
   (`ANI_STAND_OPEN`).
-- Beside the track: 15-58 px from the nearest rail's centre (median 31) in the missions. **[editor]** A post placed snaps 31 px beside the nearest track, facing along it; L / Shift+L on a post attach a line that lets its trains in (green) or keeps them out (red).
+- Beside the track: 15-58 px from the nearest rail's centre (median 31) in the missions. **[editor]** A post placed snaps 24 px beside the nearest track point on the cursor's side (R / E: the other side), facing along the track so that it stands on the right of the trains it faces (as 184 of the missions' 188 posts: 12-40 px from the track, median 23); turned (R / E, the panel) it turns round and goes across the track.
+- **Its line** (measured: each of the 188 posts with a push line end within 90 px - 3 have none - against the nearest end of its script's lines): of the 124 red posts, 107 stand at the end of a line coming from behind them (85 of them push_flag 1, 22 push_flag 0) - the trains a post faces would enter there against the line, so they stop at the post -, 10 at the begin of a push_flag 0 line toward their trains, 6 at an end with the line running across, 1 otherwise; of the 61 green ones, 29 stand at the end of a line coming from the trains they face (14 push_flag 1, 15 push_flag 0), 26 at the begin of a line going on (21 push_flag 1), 5 with the line across, 1 otherwise. An entry's pair shares one line: from past the edge to the pair, push_flag 1 (l02). **[editor]** A post placed gets such a line at once, 140 px, push_flag 1, unless it owns one already (a pair's) or stands at an end of a line no post owns; turning it, T and moving it make the line again, deleting it deletes it unless another post owns it; L / Shift+L give a post its line green / red. Checked in play: a red post stopped the trains it faces, the same post green let them through, and a pair on the main line (one line, 52,1299 -> 194,1299, flag 1) let a train in from the west edge and stopped it at the pair when it was sent back out.
 - **Where:** at the ends of every one-way section (5) - 192 of the 196 posts of the missions
   stand within 90 px of one: a pair either side of the track at the level entry and at the
   exit, one at the end of each factory line, one at each end of a repair point line.

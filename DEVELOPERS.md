@@ -1394,9 +1394,9 @@ with the engine's own pieces (scripts and object updates are off, so nothing els
 | its panel | the right button on an object (Select tool) | the object's panel (below): army, turn, delete, a semaphore's colour and line, the gun in each socket |
 | move | drag a selected object | `Object_MoveTo` (what `ACT_CHANGE_COOR` 63 calls); the height follows the ground (`World_GetGroundZForVid`), keeping the object's own height above it |
 | height | PgUp / PgDn by 4 (Shift: 16) or Shift+wheel, Home back on the ground; HEIGHT: LOWER / RAISE / ON THE GROUND in its panel | the object and its guns `Object_MoveTo` by the change of its height above the ground (z less `World_GetGroundZForVid` under it), -32 to 400; shown in the status line ("height above the ground: N") and after "selected"; saved as its SPR z ("The relief and the heights of objects" below) |
-| turn | R / E or the mouse wheel | `Object_SetDirection` by one of the VID's `nDir` directions; the guns in its sockets go to their new places |
+| turn | R / E, the mouse wheel, Edit > Turn right / left or the panel's TURN | by what is turned (`turn` in `editor_edit.cpp`, help page 15): `Object_SetDirection` by one of the VID's `nDir` directions, R right and E left - the guns in its sockets go to their new places, a semaphore's lamp halo (VID 154) is turned with it so the light spot it links (155) moves with it, a decal's directions are its looks, an object of one direction (the citadel, a crate, a region) says so; turned round, R and E alike - a train (`Train_Reverse`), a wreck on the track, a post beside a track (across the track, below), in the Push line tool the selected line; turned by its track - a factory, a repair point, a blocker at a dead end (drag it along the track; the panel's TURN row says BY ITS TRACK); a rail is not turned (laid again), and the Track tool turns nothing. Before placing, R / E turn the preview: a step of the VID's directions (the direction placed is one of its frames: a direction left from an object of more directions is rounded to them), round for a car or a post, and an object the track turns says so |
 | army | A (0 -> 1 -> 2 -> 3: ours, enemy, neutral, pirates) | `ACT_SET_ARMY` 97; the armies' colours as in play (below) |
-| semaphore red / green | T | red is the command `10,0,0,0` (MAP_RULES.md 7), shown with that animation - also the red posts of a loaded map, whose first command never runs on a held level (the command stays as it is) |
+| semaphore red / green | T | red is the command `10,0,0,0` (MAP_RULES.md 7), shown with that animation - also the red posts of a loaded map, whose first command never runs on a held level (the command stays as it is); a post's own line changes with it ("On the track") |
 | delete | Del, or the Delete tool of the bar (the filled circle marks what a click takes, the cursor is the game's delete cursor); Shift+Del or Shift+click on a rail: its section, as far as one rail continues it at each end (up to a junction or an end) | `ACT_UNDO_REMOVE` 132 - made for the authors' MapEdit: the object leaves the layer lists (not drawn, not updated, not saved; a train car leaves its rail points and couplings); a rail also leaves the rail network (below) |
 | undo / redo | Ctrl+Z / Ctrl+Y | every change keeps the state of the objects it touched before and after (position, direction, army, present, red); undo puts the "before" back - a deleted object returns with `ACT_UNDO_INSERT` 133 - and redo the "after" |
 | place | the bar at the bottom: 1-0 or a click picks an entry, a click on the map places it, Esc or the right button go back to selecting | World `CreateObject` at the point under the cursor on the ground, after `AskPlace` (161) - a place another object with a common `moveMask` takes is refused; a preview of the object (its own sprite in the chosen direction, `Graphics_DrawVid`) follows the cursor |
@@ -1454,7 +1454,12 @@ the nearest rail end - and every next click lays one rail toward the cursor: the
 lattice (one of the 12 shapes of VID 610, 71 x 50 px or their halves) whose end is nearest to
 it. The preview draws that rail and marks its ends green, or marks them red and names the rule
 in the status line ("does not join the rail before it - a turn needs a curve", "turns more than
-45 degrees", "this rail is already there"...). The right button or Esc ends the line. The rules
+45 degrees", "this rail is already there"...). Esc ends the line (a second Esc the tool). The right
+button deletes the rail under the cursor (of the rails whose box holds it, the one whose middle is
+nearest), with its bed, as one step of the history - refused, as the Delete tool refuses it, when a
+train car stands on it or next to it; when it was the last rail of the line being laid, the line goes
+on from the point before at that point's height. The right button stays with the tool (it no longer
+goes back to Select). The rules
 are those of `map_tool.py track` (MAP_RULES.md 3) in C++: `rail_rules.h` mirrors `plan_track`,
 `rail_candidates`, `rail_ends_at` and `track_cells` of map_tool.py, and `tools\test_rail_rules.py`
 compares the two on generated cases (see "Working with the code"). A rail is created with World
@@ -1476,9 +1481,17 @@ footprint, not the cells along a track.
 points and their links in the rail network and trains would go on driving there. The editor
 removes the rail's own link and releases its points (`RailDot_Release` deletes a point no other
 rail uses, with its links - a junction's shared point stays with the other rail's links), and
-undo runs `ACT_CHANGE_DIRECTION` again. A rail is not deleted when a train car stands on one of
-its points or on a point linked to them (`RailDot_RemoveLink` reorders a point's links, which a
-car's rail position indexes). Checked with the rail points logged before and after (the test
+undo runs `ACT_CHANGE_DIRECTION` again. Rails deleted (Del, the Delete and Section tools, the
+Track tool's right button) take along what depends on their points, in the same step of the
+history: the train cars with an end on one of their links (an earlier version refused the deletion
+instead, which left a car hanging in the grass when it did go), the money crates on a point that
+goes, the editor's push lines with an end on a point that goes or whose way is cut (`SetPushLine`
+would take the nearest other point - the line would jump onto other track; the script's own lines
+are only counted in the status line), and an arrival's entry or task point there
+(`edit_arrivals_track_gone`); the semaphores beside them and a blocker stay. `RailDot_RemoveLink`
+reorders the links of a point next to a deleted rail, which a car's rail position indexes, so the
+editor keeps with each car the point its ends' links lead to and finds the link again after the
+deletion and after an undo or redo (`pos_relink`). Checked with the rail points logged before and after (the test
 command `D`): a rail of a new loop deleted - its two points gone, the neighbours' links to them
 too - and undone; the loop's section (8 rails, 14 points) deleted with Shift+Del and undone, the
 junction's point keeping the main line's links.
@@ -1576,10 +1589,17 @@ needs a link ("Can't SetPushLine"), an end on the same point as the begin moves 
 nearest to the end, and there must be a way between them (`RailDot_Flood`: "Can't PushLineFindDot").
 A line that would fail is refused with the engine's reason; the lines of a loaded map are checked
 and logged too (`LocoFix.log`: "push line ... ok"). The lines are drawn over the track: green for
-push_flag 1, yellow for 0, light blue for the script's own lines, small squares along the way, a
-bigger one at the begin and a ringed one at the end. A click on an end of a line selects it
-(white): T switches its flag (a new line has 1: the level entry, factory exits, repair point legs; the
-level exit has 0), R turns it round, Del deletes it - all undoable - and S puts its semaphores
+push_flag 1, yellow for 0, light blue for the script's own lines, each with a bar across the track
+at its begin, a small arrow on every link pointing the way it runs and an arrowhead at its end, on a
+dark outline; the mouse over a line names it in a status line, in any tool: its begin and end and
+what it does (push_flag 1: the trains on it are pushed the way of the arrows and none may go
+against them; 0: none may go against them, none is pushed). A click on an end of a line selects it - its bar or arrow, in the
+Select tool too, where a line is an object like the others: it turns white, the status line names it
+(its begin, end, what it does and whose it is - a semaphore's, a factory's or repair point's, the
+level's entry or exit) while the mouse is over no other, and the right button opens its panel in the
+game's style (DIRECTION: TURN ROUND (R), ACTION (T): PUSHES TRAINS / ONE WAY ONLY, DELETE (DEL)): T switches its flag
+(a new line has 1: the level entry, factory exits, repair point legs; the level exit has 0), R (or E,
+the wheel) turns it round, Del deletes it - all undoable - and S puts its semaphores
 the way the missions have them (MAP_RULES.md 7): a post faces the trains it is for and stands
 24 px to their right, a red one at the line's end for the trains that would enter it against
 its way, a green one at its begin for those it lets in (none at a dead end - a factory's); a line
@@ -1927,21 +1947,24 @@ sandbox's factory, A three times). The status line names the army ("army 1 (enem
 track (measured over the 20 missions): every factory (VID 102) at the dead end of a straight spur,
 turned the way out along it (the nearest rail 1-38 px away), every repair point (104) on a straight
 leg, turned along it like a gate, a post (152) 15-58 px beside the track (median 31), facing the
-trains it is for, and a money crate (169, army 3; `F169_8` gives the player 100 when a unit of
-theirs takes it) on the track (1-46 px from a rail, median 17). Placing them snaps there - the
-preview shows where -, elsewhere they are refused with the reason in the status line:
+trains it is for, a money crate (169, army 3; `F169_8` gives the player 100 when a unit of
+theirs takes it) on the track (1-46 px from a rail, median 17) and a blocker - the buffer stop, 150
+("Blocker", the palette's Railway group) - at a dead end (all 99 of them within 16 px of a rail point
+with one link, median 5 px past it). Placing them snaps there - the preview shows where -,
+elsewhere they are refused with the reason in the status line:
 
 | Object | Where it goes | With it |
 |---|---|---|
 | factory | the dead end (a rail point with one link) nearest to the cursor within 150 px, 22 px inside along the spur (the sandbox and l05), turned the way out (multiples of 32) | its exit push line as the missions have them: from the dead end along the spur, 140 px (they are 100-175), push_flag 1 - built cars appear in the factory and are pushed clear - with its post |
 | repair point | the point of a straight piece (two links going opposite ways) nearest within 100 px, turned along it, the way of its link with the smaller direction (north on a vertical leg, as l05's) | the push line through its leg, 120 px each side (they are 139-304), push_flag 1, one way in the direction it faces, with its posts |
-| post | 31 px beside the nearest track on the cursor's side, facing along the track the way nearest to the direction chosen (R / E or the wheel turn it round) | L on a selected post: a push line at it that lets the trains it faces in (from 140 px out toward the post, flag 1: green), Shift+L one that keeps them out (from the post away from them, flag 0: red) |
+| post | 24 px beside the track point nearest to the cursor, on the cursor's side of the track (R / E or the wheel put the preview on the other side), facing along the track the way that has that side on the right of its trains - its side follows from its way (184 of the missions' 188 posts stand so, 12-40 px from the track, median 23); the status line names its trains ("for the trains going left"); R / E, the wheel or the panel's FOR TRAINS turn a post beside a track round and put it across the track, as far from it as it stood (the track a post is beside is the one its trains pass on their right: the rail point nearest to 24 px on the post's other side - at a junction other track is as near), a post with no track within 70 px turns a step of its 8 directions | its own line at once, as the missions' posts have theirs (measured: each of the 188 posts against the nearest end of its script's lines): a line ending at the post's rail point - a red post's coming from behind it (107 of the 124 red posts; 85 with push_flag 1), so the trains it faces would enter it at its end against it and stop at the post; a green post's coming from the trains it faces (29 of the 61 green ones; 26 more at the begin of a line going on), so they run along it, pushed, and leave it at the post. The editor's are 140 px long with push_flag 1 (the red post's then pushes the trains of the other way toward it, as the missions' do). A pair at an entry - green facing the edge for the trains coming in, red facing in for those going out - owns one line from past the edge to the pair: the missions' entry (l02: `SetPushLine(-107,1203,54,1465,1)` with its pair at 54,1465). A line is a post's own by that shape alone, of any length (`owns`), so a loaded map's posts keep theirs, a pair shares one and the line of S or the Arrivals panel's entry belongs to its posts; never a factory's or repair point's line. None for a post that owns one already or stands within 40 px of an end of a line no post owns (a building's, the script's). Turning the post round, T or moving it makes its line again (a line another post owns too stays, the post gets one beside it); deleting the post deletes its line unless another post owns it (one step of the history each); L / Shift+L give a selected post its line green / red, the panel's LINE row says what the line does - STOPS THEM (red) or LETS THEM IN (green), the trains of its FOR TRAINS row - or NONE; the preview draws the line it will get. Checked in play (`SANDBOX_DRIVE_TEST` on a copy of the sandbox): a red post on the main line for the trains going right, `SetPushLine(443,1299,301,1299,1)` - the reinforcement coming east onto that piece stopped at 387,1366 and stayed; the same post green, `SetPushLine(159,1299,301,1299,1)` - it went on east and reached its points; a pair at 194 (green south for the trains going right, red north for those going left) made one line, `SetPushLine(52,1299,194,1299,1)` - the reinforcement from past the west edge passed it east, and sent back west it stopped at 216,1375 and stayed |
 | money crate | the rail point nearest within 80 px | - |
+| blocker (150) | the dead end nearest to the cursor within 150 px (not a factory's: within 40 px of one), 5 px past it, across the track: its 4 frames (nDir 4) are the 4 ways of the rail lattice - 0 on a vertical track, 64 rising to the right, 128 horizontal, 192 falling to the right, as the missions turn them (their 32 and 160 are the same frames) | - (it is a sign: a train stops at the dead end anyway, the blocker's moveMask 0x10 has no bit of the cars') |
 
 Dragging one of them puts it at the place on the track nearest to where it is dropped (with a new
 line and posts for a factory or repair point); deleting a factory or a repair point takes its line
 and posts with it - each one step of the history. A factory or repair point is not turned by hand
-(its track turns it). Checked in the game: a mission made on the template with the main line, a spur
+(its track turns it), nor is a blocker at a dead end. Checked in the game: a mission made on the template with the main line, a spur
 with a factory at its dead end (line and red post made), a repair point on the main line (line,
 green and red posts), a crate on the line and the reinforcement point; played with a test script in
 the game folder's copy: the reinforcement, damaged to 60 hp, was pushed through the repair point and
@@ -1953,8 +1976,9 @@ right button on an object in the Select tool opens its panel beside it - drawn i
 not a Windows menu: rows of the factory panel's strip (VID 497, 41 px), the label in the menu font
 (VID 2) and the choices in the lit font (VID 7), the current one underlined; a click on a choice
 applies it as one step of the history, the right button elsewhere closes it. Its rows: the army
-(ours, enemy, neutral, pirates), turn left / right, for a semaphore its colour and the line at it
-(lets in / keeps out, as L / Shift+L), a row for each socket of a fort, a mining plant or a citadel
+(ours, enemy, neutral, pirates), turn left / right, for a semaphore the trains it is for (FOR
+TRAINS: the way they go, the other way turns it round), its colour and what its own line does (STOPS THEM / LETS THEM IN, or NONE;
+L / Shift+L), a row for each socket of a fort, a mining plant or a citadel
 (empty, a tower with a cannon 110, a missile tower 115; the citadel's the pirates' tower 117), and
 delete. A neutral object (army 2) has two more: IN A FIGHT - no one fires at it on its own
 (`Object_FindTarget` 0x449ea0 takes a target of any other army but army 2, unless the shooter's weapon
@@ -2180,9 +2204,9 @@ pictures (22 px right of the device's middle, 18 up), the title in the menu titl
 the text in the menu font (VID 2), the page arrows (VIDs 475/476) and the start button (VID 477)
 with "back to the map". **Help** (the ? button or F1) shows the editor's help pages the way the
 game shows its own (`maps\menu4.lst` -> `menu41.txt` ...): `maps\edithelp.lst` lists
-`maps\edithelp1.txt` ... `edithelp14.txt` - the mouse, the keys, the bar, laying track, the mission,
+`maps\edithelp1.txt` ... `edithelp15.txt` - the mouse, the keys, the bar, laying track, the mission,
 the buttons, the object's panel, all objects and decals, trains and rails, water, painting and
-regions, heights, the ground tools' rows, the train arrivals, a factory's panel - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
+regions, heights, the ground tools' rows, the train arrivals, a factory's panel, turning - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
 44 characters a line - the ESC pairs not counted, so a line with lit words is longer in the file - and 14
 lines, ESC 7 / ESC 2 switch to the lit font VID 7 and back to VID 2):
 English in `game/maps/` (the fallback of every pack) and the others in `lang/<code>/game/editor/`; the files are
@@ -2193,7 +2217,11 @@ columns of seven), Play the map, Undo, Redo, Run the level, Back to the menu and
 window menu's command (`WM_COMMAND` with `ID_NEW` ... of `editor.cpp`), so it does exactly what
 File, Edit and Options do and the panel adds no logic of its own - the way to reach every command
 when the Windows menu bar does not open. A panel is modal: Esc, the right button or "back to the
-map" close it; Left / Right, Page Up / Down, the wheel and the arrows turn the help's pages.
+map" close it; Left / Right, Page Up / Down, the wheel and the arrows turn the help's pages. Esc
+with no panel open opens Menu only when nothing is under way in the editor (`edit_escape`): it first
+closes an object's or a line's panel, drops a train's point being picked, ends a line of track being
+laid or a push line whose begin is picked, or leaves a tool for Select - before, Esc always opened
+Menu and none of these could be done with it.
 **Ctrl+R** runs the level or holds it again (Options > Run the level): the bar and its buttons are
 not there while the level runs. Checked in the game in Polish and English: the bar with both
 buttons, the six help pages and back, the Menu panel; from it Save (the dialog titled "Zapisz mape"

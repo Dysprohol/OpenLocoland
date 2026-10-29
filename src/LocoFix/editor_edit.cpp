@@ -90,6 +90,7 @@ void factory_reset();   // editor_factory.cpp
 int arrivals_selected();
 void panel_open_factory(void* factory);   // editor_panel.cpp: a factory's panel (editor_factory.cpp)
 void edit_commit_arrivals(const UiText& what, const ArrivalsState& before);   // below
+bool edit_arrivals_track_gone(ArrivalsState& s);                                 // below
 void edit_commit_factories(const UiText& what, const FactoryState& before);
 
 namespace {
@@ -153,7 +154,7 @@ constexpr int ANI_STAND = 0, ANI_STAND_OPEN = 10;
 constexpr int CURSOR_ARROW = 0, CURSOR_MOVE = 2, CURSOR_SELECT = 7, CURSOR_DELETE = 14;
 // VIDs
 constexpr int VID_GROUND = 1024, VID_DEPOT = 102, VID_WORKSHOP = 104, VID_GUN = 115, VID_SEMAPHORE = 152,
-              VID_FORT = 162, VID_LOCOMOTIVE = 5, VID_CIRCLE = 460, VID_ICONS = 455, VID_CRATE = 169;
+              VID_FORT = 162, VID_LOCOMOTIVE = 5, VID_CIRCLE = 460, VID_ICONS = 455, VID_CRATE = 169, VID_BLOCKER = 150;
 // the bar: the state bar's base, its side tiles (game/objects.override), the depot panel's strip,
 // the frame of the chosen slot, the editor's icons (patch_data.make_editor_icons) and two fonts:
 // the small one of the depot panel's keys and the mouse tips' one; the palette's icons (the chosen decal's)
@@ -224,6 +225,22 @@ template <typename F> void for_each_object(F f) {
         for (int i = 0; i < count; ++i)
             if (items && items[i]) f(items[i]);
     }
+}
+
+// ---- directions: an object turned, a semaphore's light with it ----
+//
+// Object_SetDirection turns an object and puts its linked object at its new place - for a post
+// (152) the halo of its lamp (154) - but does not turn that one, so the light spot the halo links
+// (155, 50 px in front of it) stayed where it was: after R the post faced one way and its light lay
+// on the other side. The halo is turned with its post, which brings its spot along.
+constexpr size_t O_LINK = 0x40;
+constexpr int VID_POST_HALO = 154;
+
+void set_direction(uint8_t* o, int direction) {
+    reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(o, nullptr, direction);
+    uint8_t* halo = at<uint8_t*>(o, O_LINK);
+    if (at<int>(vid_of(o), V_NVID) == VID_SEMAPHORE && halo && at<int>(vid_of(halo), V_NVID) == VID_POST_HALO)
+        reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(halo, nullptr, direction);
 }
 
 // ---- semaphores: red is the command 10,0,0,0 ----
@@ -313,6 +330,8 @@ struct State {
     uint8_t* next = nullptr;
     uint32_t car_flags = 0;
     int front[4] = {}, rear[4] = {};
+    uint8_t* front_to = nullptr;   // the rail point the link of each end leads to (the link's index in its
+    uint8_t* rear_to = nullptr;    // point changes when a rail next to it is deleted or put back)
     bool patrol = false;   // an order (a patrol, a drive, the enemy's AI task)
     int patrol_x = 0, patrol_y = 0, patrol_z = 0, order = 0;
     // a region: its size, flags, fog and what it turns explosions into (regions, below)
@@ -426,6 +445,21 @@ void set_order(uint8_t* o, bool on, const Order& order) {
     else g_patrols.erase(o);
 }
 
+// The rail point the link of a RailPos leads to, and its link to that point found again.
+uint8_t* pos_target(uint8_t* pos) {
+    uint8_t* dot = at<uint8_t*>(pos, POS_DOT);
+    const int link = at<int>(pos, POS_LINK);
+    if (!dot || link < 0 || link >= (std::min)(6, at<int>(dot, DOT_LINK_COUNT))) return nullptr;
+    return at<uint8_t*>(dot + DOT_LINKS + link * DOT_LINK_SIZE, LINK_DOT);
+}
+
+void pos_relink(uint8_t* pos, uint8_t* target) {
+    uint8_t* dot = at<uint8_t*>(pos, POS_DOT);
+    if (!dot || !target) return;
+    for (int k = 0; k < (std::min)(6, at<int>(dot, DOT_LINK_COUNT)); ++k)
+        if (at<uint8_t*>(dot + DOT_LINKS + k * DOT_LINK_SIZE, LINK_DOT) == target) at<int>(pos, POS_LINK) = k;
+}
+
 State state_of(uint8_t* o) {
     State s{at<float>(o, O_X), at<float>(o, O_Y), at<float>(o, O_Z), at<int>(o, O_DIRECTION), army_of(o),
             !removed(o), red(o)};
@@ -436,6 +470,8 @@ State state_of(uint8_t* o) {
         s.car_flags = at<uint32_t>(o, E_FLAGS);
         std::memcpy(s.front, o + E_FRONT_DOT, sizeof s.front);
         std::memcpy(s.rear, o + E_REAR_DOT, sizeof s.rear);
+        s.front_to = pos_target(o + E_FRONT_DOT);
+        s.rear_to = pos_target(o + E_REAR_DOT);
         Order order;
         s.patrol = order_of(o, order);
         s.patrol_x = order.x, s.patrol_y = order.y, s.patrol_z = order.z, s.order = s.patrol ? order.task : 0;
@@ -480,29 +516,12 @@ void restore_region(uint8_t* o, const State& s) {
 // So the rail's own link (between its points) is removed and its points are released
 // (RailDot_Release: a point no other rail uses goes with its links), and putting it back runs
 // ACT_CHANGE_DIRECTION again, which adds the points and links them the way loading does
-// (Rail_Construct does the same for a new rail). A point a train car stands on, or one whose
-// link table would change under a car (RailDot_RemoveLink moves the last link into the hole),
-// is not touched: such a rail is not deleted.
+// (Rail_Construct does the same for a new rail). The train cars on a rail deleted go with it; the
+// link table of a point next to it changes under the cars standing there (RailDot_RemoveLink moves
+// the last link into the hole), so their ends find their link again by the point it leads to
+// (pos_relink) - after the deletion and after an undo or redo of it.
 
 uint8_t*& rail_node(uint8_t* r, int i) { return at<uint8_t*>(r, i ? R_NODE1 : R_NODE0); }
-
-bool rail_held_by_train(uint8_t* r) {
-    std::vector<uint8_t*> dots;
-    for (int i = 0; i < 2; ++i) {
-        uint8_t* d = rail_node(r, i);
-        if (!d) continue;
-        dots.push_back(d);
-        const int links = at<int>(d, DOT_LINK_COUNT);
-        for (int k = 0; k < links && k < 6; ++k) dots.push_back(at<uint8_t*>(d, DOT_LINKS + k * DOT_LINK_SIZE));
-    }
-    bool held = false;
-    for_each_object([&](uint8_t* o) {
-        if (held || class_of(o) != B_ENGINE) return;
-        for (uint8_t* d : dots)
-            if (at<uint8_t*>(o, E_FRONT_DOT) == d || at<uint8_t*>(o, E_REAR_DOT) == d) held = true;
-    });
-    return held;
-}
 
 void rail_take_out(uint8_t* r) {
     uint8_t* n0 = rail_node(r, 0);
@@ -548,6 +567,8 @@ void restore_car(uint8_t* o, const State& s) {
     at<uint32_t>(o, E_FLAGS) = s.car_flags;
     std::memcpy(o + E_FRONT_DOT, s.front, sizeof s.front);
     std::memcpy(o + E_REAR_DOT, s.rear, sizeof s.rear);
+    pos_relink(o + E_FRONT_DOT, s.front_to);   // the rails put back or taken out next to it reorder the links
+    pos_relink(o + E_REAR_DOT, s.rear_to);
     Order now;
     const bool has = order_of(o, now);
     if (has != s.patrol || now.x != s.patrol_x || now.y != s.patrol_y || now.z != s.patrol_z || (has && now.task != s.order))
@@ -563,7 +584,7 @@ void apply(uint8_t* o, const State& s) {
     if (!car && (s.x != at<float>(o, O_X) || s.y != at<float>(o, O_Y) || s.z != at<float>(o, O_Z)))
         reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, s.x, s.y, s.z);
     if (!car && s.direction != at<int>(o, O_DIRECTION))
-        reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(o, nullptr, s.direction);
+        set_direction(o, s.direction);
     if (rail && inserted) rail_put_back(o);
     if (s.army != army_of(o)) act(o, ACT_SET_ARMY, s.army);
     if (s.red != red(o)) set_red(o, s.red);
@@ -664,6 +685,17 @@ bool on_track_vid(int nvid);
 bool snap(int nvid, float& x, float& y, int& direction, UiText& reason);
 void give_building_line(uint8_t* o);
 bool take_building_lines(uint8_t* o, std::vector<uint8_t*>& posts);
+bool post_on_track(uint8_t* o);
+int post_facing_for(float x, float y);
+bool blocker_at_end(uint8_t* o);
+void turn_post(uint8_t* o);
+const char* way_name(int direction);
+int own_line(uint8_t* o);
+void remake_own_line(uint8_t* o, int index);
+void lines_into_step(const std::vector<PushLine>& before);
+const char* post_line_text(uint8_t* o);
+void give_post_line(uint8_t* o);
+std::vector<int> lines_going_with(const std::vector<uint8_t*>& objects);
 
 void undo(bool redo) {
     auto& from = redo ? g_redo : g_undo;
@@ -890,7 +922,6 @@ uint8_t* pick(float x, float y) {
 }
 
 bool movable(uint8_t* o) { return class_of(o) != B_RAIL; }   // a car moves with its train along the track
-bool deletable(uint8_t* o) { return class_of(o) != B_RAIL || !rail_held_by_train(o); }
 
 // ---- the bar ----
 
@@ -947,6 +978,7 @@ int g_entry = 0;
 std::vector<int> g_decals;   // the class 8 VIDs, for the decal entry
 int g_decal = 0;
 int g_place_direction = 0;
+bool g_post_flip = false;   // R / E: the post to place goes to the other side of the track than the cursor
 // the Push line tool: the begin is picked and the end is next; the selected line (mission_push_lines())
 bool g_push_started = false;
 POINT g_push_begin = {};
@@ -1129,6 +1161,7 @@ bool is_marker(uint8_t* o);   // the context panel, below
 
 void select(uint8_t* o) {
     g_selection = o ? group_of(o) : std::vector<uint8_t*>();
+    if (entry().tool != Tool::PushLine) g_push_selected = -1;   // a line selected in the Select tool
     if (o && is_marker(o)) {   // its parking army 3 is not what it is in play
         MESSAGE("MsgSelectedMarker", "selected the reinforcement's point locomotive at %.0f,%.0f - in play: %s", at<float>(o, O_X),
                 at<float>(o, O_Y),
@@ -1141,6 +1174,7 @@ void select(uint8_t* o) {
             std::string text = ui_printf(ui_format("MsgSelected", "selected VID %d at %.0f,%.0f direction %d army %d (%s)%s"), nvid_of(o),
                                          at<float>(o, O_X), at<float>(o, O_Y), at<int>(o, O_DIRECTION), army_of(o),
                                          army_name(army_of(o)), red(o) ? ui_text("WordRedSuffix", " red") : "");
+            if (post_on_track(o)) text += ui_printf(ui_format("MsgPostFor", ", for the trains going %s"), way_name(at<int>(o, O_DIRECTION)));
             if (liftable(o))
                 text += ui_printf(ui_format("MsgAboveGround", ", %d above the ground"), static_cast<int>(std::lround(lift_of(o))));
             return text;
@@ -1495,7 +1529,7 @@ bool move_train(uint8_t* c, float sx, float sy) {
     for (uint8_t* t : train) car_call(ENGINE_LEAVE_DOTS, t);
     for (uint8_t* t : train) car_prev(t) = car_next(t) = nullptr;
     reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(c, nullptr, spot.x, spot.y, spot.z);
-    reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(c, nullptr, turn_toward(spot.direction, at<int>(c, O_DIRECTION)));
+    set_direction(c, turn_toward(spot.direction, at<int>(c, O_DIRECTION)));
     car_call(ENGINE_PUT_ON_RAILS, c);
     unlink_car(c);   // not coupled to whatever stands there
     for (size_t i = k + 1; i < train.size(); ++i) attach_car(train[i], c, false);
@@ -1584,10 +1618,10 @@ void continue_drag(POINT p) {
             mouse_on_map(sx, sy);
             if (wreck_spot(nvid_of(o), sx, sy, s.direction, wx, wy, wz, direction)) {
                 reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, wx, wy, wz);
-                reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(o, nullptr, direction);
+                set_direction(o, direction);
             } else {
                 reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, x, y, ground_z(vid_of(o), x, y));
-                reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(o, nullptr, s.direction);
+                set_direction(o, s.direction);
             }
             continue;
         }
@@ -1626,7 +1660,8 @@ void end_drag() {
         } else {
             const std::vector<PushLine> lines_before = mission_push_lines();
             std::vector<uint8_t*> objects{o};
-            const bool lines_changed = take_building_lines(o, objects);
+            const int own = own_line(o);   // a post's, found at its old place
+            const bool lines_changed = take_building_lines(o, objects) || own >= 0;
             std::vector<State> before = states(objects);
             for (size_t i = 1; i < objects.size(); ++i) {
                 State gone = before[i];
@@ -1634,7 +1669,8 @@ void end_drag() {
                 apply(objects[i], gone);
             }
             reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, x, y, ground_z(vid_of(o), x, y));
-            reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(o, nullptr, direction);
+            set_direction(o, direction);
+            remake_own_line(o, own);
             commit({"OpMove", "move"}, objects, before);
             if (lines_changed) {
                 Operation& op = g_undo.back();
@@ -1660,46 +1696,101 @@ void end_drag() {
 
 // ---- changes of the selection ----
 
+// The direction of a VID of `dirs` directions nearest to `direction` (one of its frames).
+int to_step(int direction, int dirs) {
+    const int step = 256 / (std::max)(1, dirs);
+    return dirs > 1 ? ((direction + step / 2) / step * step) & 255 : 0;
+}
+
+void push_change(int key);   // push lines, below
+
+// R, E, the wheel, Edit > Turn right / left and the panel's TURN, by what is turned (DEVELOPERS.md
+// "Editing objects", help page 15) - the preview of the object to place, else the selected object:
+//  - a step of its nDir directions (R right, E left), a host's guns going to their sockets' new
+//    places; a decal's directions are its looks; an object of one direction stays,
+//  - turned round, R and E alike: a train, a wreck on the track, a post beside a track (it goes
+//    across to the trains of the other way), a car or a post to place; in the Push line tool the
+//    selected line,
+//  - a factory, a repair point and a blocker at a dead end are turned by their track (dragged along
+//    it), and so is a factory, repair point, crate or blocker to place; rails are not turned (the
+//    Track tool lays them again).
 void turn(int steps) {
+    if (entry().tool == Tool::PushLine) {
+        push_change('R');
+        return;
+    }
+    if (entry().tool == Tool::Track) {
+        MESSAGE("MsgTurnTrack", "track: a rail goes the way of its line - R / E turn nothing here");
+        return;
+    }
     if (entry().tool == Tool::Place) {
         float sx, sy, wx, wy, wz;
         int wd;
         mouse_on_map(sx, sy);
-        if (wreck_spot(place_nvid(), sx, sy, g_place_direction, wx, wy, wz, wd)) {   // on the track: round
+        uint8_t* v = vid_by_number(place_nvid());
+        if (place_nvid() == VID_SEMAPHORE) {   // a post: the other side of the track, for the trains of the other way
+            g_post_flip = !g_post_flip;
+            MESSAGE("MsgPostFlip", "semaphore to place: %s", g_post_flip ? ui_text("PostFlipOther", "on the other side of the track")
+                                                                          : ui_text("PostFlipCursor", "on the cursor's side of the track"));
+            return;
+        }
+        if ((v && at<int>(v, V_CLASS) == B_ENGINE) ||   // a car one way or the other on the rails
+            wreck_spot(place_nvid(), sx, sy, g_place_direction, wx, wy, wz, wd)) {   // on the track: round
             g_place_direction = (g_place_direction + 128) & 255;
             MESSAGE("MsgDirection", "direction %d", g_place_direction);
             return;
         }
-        uint8_t* v = vid_by_number(place_nvid());
+        if (on_track_vid(place_nvid())) {
+            MESSAGE("MsgPlaceByTrack", "%s: its track turns it", place_label());
+            return;
+        }
         const int dirs = v ? (std::max)(1, at<int>(v, V_ND_DIR)) : 8;
-        g_place_direction = (g_place_direction + steps * (256 / dirs) + 256) & 255;
+        if (dirs <= 1) {
+            MESSAGE("MsgOneDirection", "VID %d has one direction only", place_nvid());
+            return;
+        }
+        g_place_direction = to_step(g_place_direction + steps * (256 / dirs) + 256, dirs);
         MESSAGE("MsgDirection", "direction %d", g_place_direction);
         return;
     }
-    if (g_selection.empty() || !movable(g_selection[0])) return;
+    if (g_selection.empty() && g_push_selected >= 0) {   // a push line selected in the Select tool
+        push_change('R');
+        return;
+    }
+    if (g_selection.empty()) return;
     uint8_t* o = g_selection[0];
+    if (class_of(o) == B_RAIL) {
+        MESSAGE("MsgTurnRail", "a rail is not turned - lay it again with the Track tool");
+        return;
+    }
     if (is_car(o)) {   // a train turns round
         reverse_train(o);
         return;
     }
-    if (nvid_of(o) == VID_DEPOT || nvid_of(o) == VID_WORKSHOP || nvid_of(o) == VID_CRATE) {
+    if (nvid_of(o) == VID_DEPOT || nvid_of(o) == VID_WORKSHOP || blocker_at_end(o)) {
         MESSAGE("MsgTurnedByTrack", "VID %d is turned by its track (drag it to another place on the track)", nvid_of(o));
         return;
     }
-    if (nvid_of(o) == VID_SEMAPHORE) steps *= 4;   // a post faces one way or the other along the track
+    if (post_on_track(o)) {   // a post faces one way or the other along the track
+        turn_post(o);
+        return;
+    }
     if (wreck_on_track(o)) steps = (std::max)(1, at<int>(vid_of(o), V_ND_DIR)) / 2;   // a wreck on the track: round
     const int dirs = (std::max)(1, at<int>(vid_of(o), V_ND_DIR));
-    if (dirs <= 1) return;
+    if (dirs <= 1) {
+        MESSAGE("MsgOneDirection", "VID %d has one direction only", nvid_of(o));
+        return;
+    }
     const std::vector<State> before = states(g_selection);
     const std::vector<uint8_t*> guns = guns_on(o);   // in their sockets before the turn
     const int direction = (at<int>(o, O_DIRECTION) + steps * (256 / dirs) + 256) & 255;
-    reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(o, nullptr, direction);
+    set_direction(o, direction);
     const std::vector<Socket> sockets = sockets_of(nvid_of(o), direction);
     for (size_t i = 0; i < guns.size() && i < sockets.size(); ++i) {   // each gun to its socket's new place
         if (!guns[i]) continue;
         const float x = at<float>(o, O_X) + sockets[i].dx, y = at<float>(o, O_Y) + sockets[i].dy;
         reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(guns[i], nullptr, x, y, at<float>(o, O_Z) + sockets[i].dz);
-        reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(guns[i], nullptr, direction);
+        set_direction(guns[i], direction);
     }
     commit({"OpTurn", "turn"}, g_selection, before);
     MESSAGE("MsgTurned", "turned VID %d to direction %d", nvid_of(o), direction);
@@ -1725,10 +1816,15 @@ void toggle_semaphore() {
         MESSAGE("MsgSemaphoreOnly", "T switches a semaphore (VID 152)");
         return;
     }
+    uint8_t* o = g_selection[0];
     const std::vector<State> before = states(g_selection);
-    set_red(g_selection[0], !red(g_selection[0]));
+    const std::vector<PushLine> lines_before = mission_push_lines();
+    const int own = own_line(o);
+    set_red(o, !red(o));
+    remake_own_line(o, own);   // a red post's line keeps its trains out, a green one's lets them in
     commit({"OpSemaphore", "semaphore"}, g_selection, before);
-    MESSAGE("MsgSemaphore", "semaphore %s", red(g_selection[0]) ? ui_text("WordRed", "red") : ui_text("WordGreen", "green"));
+    if (own >= 0) lines_into_step(lines_before);
+    MESSAGE("MsgSemaphore", "semaphore %s, %s", red(o) ? ui_text("WordRed", "red") : ui_text("WordGreen", "green"), post_line_text(o));
 }
 
 // ---- the height of an object ----
@@ -1775,40 +1871,88 @@ void lift(int by, bool to_ground) {
     MESSAGE("MsgLift", "VID %d: %d above the ground", nvid_of(o), static_cast<int>(std::lround(lift_of(o))));
 }
 
+// Rails deleted take along what depends on their points (track_goes, below): the train cars standing
+// on them, the money crates on their points, the editor's push lines they leave without a way (the
+// script's own lines are only named) and the arrivals' points there (edit_arrivals_track_gone); the
+// semaphores beside them stay. The other cars of the map are in the step too: a rail taken out or
+// put back reorders the links of the points next to it, which a car's ends index (pos_relink).
+std::vector<POINT> lines_ok();
+unsigned remove_broken_lines(const std::vector<POINT>& before, unsigned& script);
+void track_goes(std::vector<uint8_t*>& objects, unsigned& cars, std::vector<uint8_t*>& crates);
+bool crate_left(uint8_t* crate);
+
 void delete_objects(const std::vector<uint8_t*>& chosen) {
     if (chosen.empty()) return;
     std::vector<uint8_t*> objects = chosen;   // with the beds of the rails
     for (uint8_t* o : chosen)
         if (class_of(o) == B_RAIL)
             if (uint8_t* b = bed_of(o)) objects.push_back(b);
-    for (uint8_t* o : objects)
-        if (!deletable(o)) {
-            MESSAGE("MsgTrainOnTrack", "a train car stands on this track or next to it: not deleted");
-            return;
-        }
+    const bool rails = std::any_of(chosen.begin(), chosen.end(), [](uint8_t* o) { return class_of(o) == B_RAIL; });
+    unsigned cars = 0;
+    std::vector<uint8_t*> crates;   // on the rails' points: they go if the point does
+    if (rails) track_goes(objects, cars, crates);
+    std::vector<uint8_t*> others;   // the cars that stay (their links are found again)
+    if (rails)
+        for (uint8_t* c : all_cars())
+            if (std::find(objects.begin(), objects.end(), c) == objects.end()) others.push_back(c);
+    const ArrivalsState arrivals_before = mission_arrivals();
     // a factory's or repair point's push line and its posts go with it
     const std::vector<PushLine> lines_before = mission_push_lines();
     bool lines_changed = false;
     std::vector<uint8_t*> posts;
     for (uint8_t* o : chosen) lines_changed |= take_building_lines(o, posts);
+    const std::vector<int> own = lines_going_with(objects);   // the posts' own lines no other post owns
+    for (int i : own) mission_push_lines().erase(mission_push_lines().begin() + i);
+    lines_changed |= !own.empty();
     for (uint8_t* p : posts)
         if (std::find(objects.begin(), objects.end(), p) == objects.end()) objects.push_back(p);
+    const std::vector<POINT> ok_before = rails ? lines_ok() : std::vector<POINT>();   // the lines' ends before the rails go
+    const size_t going = objects.size();
+    for (uint8_t* c : crates) objects.push_back(c);   // decided when the rails are out
+    for (uint8_t* c : others) objects.push_back(c);
     const std::vector<State> before = states(objects);
-    for (size_t i = 0; i < objects.size(); ++i) {   // through apply: a rail leaves the rail network
+    for (size_t i = 0; i < going; ++i) {   // through apply: a rail leaves the rail network
         State gone = before[i];
         gone.present = false;
         apply(objects[i], gone);
     }
+    unsigned crates_gone = 0;
+    for (size_t i = going; i < going + crates.size(); ++i)
+        if (crate_left(objects[i])) {
+            State gone = before[i];
+            gone.present = false;
+            apply(objects[i], gone);
+            ++crates_gone;
+        }
+    for (size_t i = going + crates.size(); i < objects.size(); ++i) {   // the cars that stay
+        pos_relink(objects[i] + E_FRONT_DOT, before[i].front_to);
+        pos_relink(objects[i] + E_REAR_DOT, before[i].rear_to);
+    }
+    unsigned script_lines = 0, lines_gone = 0;
+    if (rails) {
+        lines_gone = remove_broken_lines(ok_before, script_lines);
+        lines_changed |= lines_gone > 0;
+    }
     commit({"OpDelete", "delete"}, objects, before);
+    Operation& op = g_undo.back();
     if (lines_changed) {
-        Operation& op = g_undo.back();
         op.lines = true;
         op.lines_before = lines_before;
         op.lines_after = mission_push_lines();
     }
-    MESSAGE("MsgDeleted", "deleted VID %d at %.0f,%.0f%s", nvid_of(objects[0]), before[0].x, before[0].y,
-            objects.size() > 1 ? ui_printf(ui_format("MsgAndMore", " and %u more"), static_cast<unsigned>(objects.size() - 1)).c_str()
-                               : "");
+    if (rails && edit_arrivals_track_gone(mission_arrivals())) {
+        op.arrivals = true;
+        op.arrivals_before = arrivals_before;
+        op.arrivals_after = mission_arrivals();
+    }
+    if (rails && (cars || crates_gone || lines_gone || script_lines))
+        MESSAGE("MsgDeletedTrack", "deleted %u rails with %u train cars, %u money crates and %u push lines on them%s",
+                static_cast<unsigned>(std::count_if(chosen.begin(), chosen.end(), [](uint8_t* o) { return class_of(o) == B_RAIL; })),
+                cars, crates_gone, lines_gone,
+                script_lines ? ui_printf(ui_format("MsgScriptLinesBroken", " - %u lines of the script have no way now"), script_lines).c_str() : "");
+    else
+        MESSAGE("MsgDeleted", "deleted VID %d at %.0f,%.0f%s", nvid_of(objects[0]), before[0].x, before[0].y,
+                going > 1 ? ui_printf(ui_format("MsgAndMore", " and %u more"), static_cast<unsigned>(going - 1)).c_str() : "");
     if (!g_selection.empty() && g_selection[0] == objects[0]) g_selection.clear();
 }
 
@@ -1897,12 +2041,13 @@ void place(POINT p) {
     float x, y, z;
     map_point(p, v, x, y, z);
     const int dirs = (std::max)(1, at<int>(v, V_ND_DIR));
-    int direction = dirs > 1 ? g_place_direction : 0;
+    int direction = to_step(g_place_direction, dirs);
     float wsx, wsy;
     mouse_on_map(wsx, wsy);
     const bool wreck_on_rails = wreck_spot(nvid, wsx, wsy, g_place_direction, x, y, z, direction);   // near a rail: on it
     if (on_track_vid(nvid)) {   // the authors' places on the track
         UiText why;
+        if (nvid == VID_SEMAPHORE) direction = post_facing_for(x, y);
         if (!snap(nvid, x, y, direction, why)) {
             MESSAGE("MsgLabelReason", "%s: %s", place_label(), why.get());
             return;
@@ -1946,6 +2091,13 @@ void place(POINT p) {
         give_building_line(o);
         return;
     }
+    if (nvid == VID_SEMAPHORE) {   // its own line (posts, below)
+        give_post_line(o);
+        MESSAGE("MsgPostPlaced", "placed a semaphore (%s) at %.0f,%.0f for the trains going %s, %s",
+                red(o) ? ui_text("WordRed", "red") : ui_text("WordGreen", "green"), at<float>(o, O_X), at<float>(o, O_Y),
+                way_name(at<int>(o, O_DIRECTION)), post_line_text(o));
+        return;
+    }
     const float track = track_distance(at<float>(o, O_X), at<float>(o, O_Y));
     const float limit = nvid == VID_DEPOT ? 100.0f : nvid == VID_WORKSHOP || nvid == VID_FORT ? 40.0f : 0.0f;
     MESSAGE("MsgPlaced", "placed VID %d at %.0f,%.0f,%.0f direction %d army %d%s%s", nvid, at<float>(o, O_X),
@@ -1962,7 +2114,8 @@ void place(POINT p) {
 // map's rails are on), every next click lays the rail to the point of the lattice nearest to
 // the cursor - one of the steps of the 12 shapes - when the rules of rail_rules.h (the same
 // as map_tool.py's) let it; the preview shows that rail and its ends green, or red with the
-// reason. The right button or Esc ends the line. A rail is created with World CreateObject:
+// reason. Esc ends the line (and then the tool); the right button deletes the rail under the cursor
+// (delete_rail_at_cursor - a line being laid goes back with its last rail). A rail is created with World CreateObject:
 // Rail_Construct runs ACT_CHANGE_DIRECTION, which puts its points and links them to the rails
 // at its ends. The ground under it is flattened as map_tool.py track does (the cells it
 // crosses to the track's level, the cells around half way), through World_SetGroundZ, and the
@@ -2258,6 +2411,53 @@ void lay_step() {
     g_ramp = 0;
     MESSAGE("MsgTrackRail", "track: rail of shape %d at %.1f,%.1f z %d (%u cells of ground)", s.segment.shape, s.segment.x,
             s.segment.y, static_cast<int>(z), static_cast<unsigned>(changes.size()));
+}
+
+// The rail under a point of the map (screen coordinates plus the camera): of the rails whose box
+// holds it, the one whose middle is nearest.
+uint8_t* rail_at(float x, float y) {
+    uint8_t* best = nullptr;
+    float best_d = 0;
+    for_each_object([&](uint8_t* o) {
+        if (class_of(o) != B_RAIL || !pickable(o) || !box_of(o).contains(x, y)) return;
+        const float d = std::hypot(at<float>(o, O_X) - x, at<float>(o, O_Y) - at<float>(o, O_Z) - y);
+        if (!best || d < best_d) {
+            best = o;
+            best_d = d;
+        }
+    });
+    return best;
+}
+
+// The right button of the Track tool: the rail under the cursor goes (with its bed, one step of the
+// history; not one a train car stands on or next to - delete_objects refuses it). When it was the
+// last rail of the line being laid, the line goes on from the point before, at that point's height.
+void delete_rail_at_cursor() {
+    float x, y;
+    mouse_on_map(x, y);
+    uint8_t* r = rail_at(x, y);
+    if (!r) {
+        MESSAGE("MsgTrackNoRail", "track: no rail under the cursor (the right button deletes one, Esc ends the line)");
+        return;
+    }
+    bool last = false;   // the line's last rail
+    int level = g_line_level;
+    if (g_line.size() >= 2)
+        for (const RailObject& o : map_rails())
+            if (o.object == r) {
+                const std::vector<RailObject> one{o};
+                int at_back = 0;
+                last = rail_ending_at(one, g_line.back(), &at_back) && rail_ending_at(one, g_line[g_line.size() - 2], &level);
+            }
+    const size_t steps = g_undo.size();
+    delete_objects({r});
+    if (g_undo.size() == steps) return;   // refused (a train car)
+    if (last) {
+        g_line.pop_back();
+        g_line_level = level;
+        g_ramp = 0;
+    }
+    MESSAGE("MsgTrackRailDeleted", "track: the rail at %.0f,%.0f deleted (Ctrl+Z puts it back)", at<float>(r, O_X), at<float>(r, O_Y));
 }
 
 // The rails of a section: from a rail along the track as long as one other rail continues it,
@@ -3284,6 +3484,33 @@ bool push_lines_editable() {
     return false;
 }
 
+std::string line_effect(const PushLine& l, bool script);   // what a line does, for the status line (drawing, below)
+std::string line_owner(int index);
+bool outside_map(int x, int y);   // arrivals on the map, below
+
+// The editor's line with its begin or end within 10 px of a screen point of the map (-1: none).
+int line_at(int x, int y) {
+    const std::vector<PushLine>& lines = mission_push_lines();
+    int best = -1;
+    float best_d = 10;
+    for (int i = 0; i < static_cast<int>(lines.size()); ++i)
+        for (const POINT e : {POINT{lines[i].bx, lines[i].by}, POINT{lines[i].ex, lines[i].ey}}) {
+            const float d = std::hypot(static_cast<float>(e.x - x), static_cast<float>(e.y - y));
+            if (d < best_d) {
+                best_d = d;
+                best = i;
+            }
+        }
+    return best;
+}
+
+// A line selected - in the Push line tool, or in the Select tool like an object (its bar or arrow
+// clicked): drawn white, named in the status line; Del, T, R / E / the wheel and its panel act on it.
+void select_line(int i) {
+    g_push_selected = i;
+    MESSAGE("MsgPushSelected", "push line selected: Del deletes it, T switches the flag, R / E turn it round, the right button: its panel");
+}
+
 // A click of the Push line tool at a point of the map (screen coordinates plus the camera).
 void push_click(int x, int y) {
     if (!push_lines_editable()) return;
@@ -3295,15 +3522,10 @@ void push_click(int x, int y) {
     const POINT p = dot_screen(d);
     if (!g_push_started) {
         // a click on an end of a line selects it
-        const std::vector<PushLine>& lines = mission_push_lines();
-        for (int i = 0; i < static_cast<int>(lines.size()); ++i)
-            if ((std::abs(lines[i].bx - x) < 10 && std::abs(lines[i].by - y) < 10) ||
-                (std::abs(lines[i].ex - x) < 10 && std::abs(lines[i].ey - y) < 10)) {
-                g_push_selected = i;
-                MESSAGE("MsgPushSelected", "push line %d,%d -> %d,%d, flag %d: T switches the flag, R turns it round, S puts its "
-                        "semaphores, Del deletes it", lines[i].bx, lines[i].by, lines[i].ex, lines[i].ey, lines[i].flag);
-                return;
-            }
+        if (const int i = line_at(x, y); i >= 0) {
+            select_line(i);
+            return;
+        }
         g_push_started = true;
         g_push_begin = p;
         g_push_selected = -1;
@@ -3322,8 +3544,8 @@ void push_click(int x, int y) {
     commit_lines({"OpPushLine", "push line"}, before);
     g_push_started = false;
     g_push_selected = static_cast<int>(mission_push_lines().size()) - 1;
-    MESSAGE("MsgPushMade", "push line %d,%d -> %d,%d over %u rail points, flag 1 (T switches it, S puts its semaphores)", line.bx,
-            line.by, line.ex, line.ey, static_cast<unsigned>(t.path.size()));
+    MESSAGE("MsgPushMade", "%s, over %u rail points (T switches the flag, S puts its semaphores)", line_effect(line, false).c_str(),
+            static_cast<unsigned>(t.path.size()));
 }
 
 // Del, T and R of the tool on the selected line.
@@ -3346,7 +3568,7 @@ void push_change(int key) {
     if (key == 'T') l.flag = l.flag ? 0 : 1;
     if (key == 'R') l = {l.ex, l.ey, l.bx, l.by, l.flag};
     commit_lines(key == 'T' ? UiText{"OpPushFlag", "push flag"} : UiText{"OpPushTurn", "turn push line"}, before);
-    MESSAGE("MsgPushLine", "push line %d,%d -> %d,%d, flag %d", l.bx, l.by, l.ex, l.ey, l.flag);
+    MESSAGE("MsgPushLine", "now: %s", line_effect(l, false).c_str());
 }
 
 // The direction (0 north, 64 east, 128 south, 192 west) of a vector, in the 8 of a semaphore.
@@ -3426,7 +3648,7 @@ void put_posts(const std::vector<Post>& posts, std::vector<uint8_t*>& objects, s
             objects.push_back(found);
             before.push_back(state_of(found));
             reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(found, nullptr, p.x, p.y, z);
-            reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(found, nullptr, p.direction);
+            set_direction(found, p.direction);
         } else {
             found = create(VID_SEMAPHORE, p.x, p.y, z, p.direction, 0);
             if (!found) continue;
@@ -3461,13 +3683,17 @@ void push_semaphores() {
             posts.size() > 1 ? ui_text("SemBoth", "red at its end, green at its begin") : ui_text("SemEnd", "red at its end"));
 }
 
-// ---- on the track: the factory, the repair point, posts, money crates ----
+// ---- on the track: the factory, the repair point, posts, money crates, buffer stops ----
 //
 // The authors put these on the track (measured over the 20 missions): every factory (VID 102) at the
 // dead end of a straight spur, turned the way out along it (the nearest rail 1-38 px away), every
 // repair point (104) on a straight leg, turned along it like a gate; a post (152) 15-58 px beside the
 // track (median 31), facing the trains it is for; a money crate (169, army 3) on the track (1-46 px
-// from a rail, median 17). Placing them snaps there - elsewhere they are refused with the reason. A
+// from a rail, median 17); a buffer stop (150, "Blocker") at a dead end of the track (all 99 of the
+// missions' within 16 px of a rail point with one link, median 5 px past it), turned by the track's
+// way: its 4 frames are the 4 ways of the lattice - 0 on a vertical track, 64 on one rising to the
+// right, 128 on a horizontal one, 192 on one falling to the right (32 and 160 of some missions are
+// the same frames). Placing them snaps there - elsewhere they are refused with the reason. A
 // factory gets its exit push line as the missions have them - from inside the building along the
 // spur, 140 px (they are 100-175), push_flag 1: built cars appear in the factory and are pushed out -
 // and a repair point the line through its leg, 240 px (139-304), flag 1, one way in the direction it
@@ -3475,7 +3701,7 @@ void push_semaphores() {
 // posts with it; all of it is one step of the history.
 
 constexpr float FACTORY_INSIDE = 22;     // the factory's middle from the dead end (sandbox, l05)
-constexpr float FACTORY_LINE = 140, REPAIR_LINE_HALF = 120, POST_SIDE = 31;
+constexpr float FACTORY_LINE = 140, REPAIR_LINE_HALF = 120, POST_SIDE = 24, POST_REACH = 70;
 
 struct Snap {
     bool ok = false;
@@ -3602,8 +3828,49 @@ Snap snap_repair(float x, float y) {
     return s;
 }
 
-// A post beside the nearest track, on the side of the cursor, facing along the track the way
-// nearest to `wanted`.
+// The way a direction points (0 up the screen, 64 right), a unit vector.
+void facing_of(int direction, float& fx, float& fy) {
+    const float a = direction * 6.2831853f / 256;
+    fx = std::sin(a);
+    fy = -std::cos(a);
+}
+
+// The link of a point that runs nearest to a way, one way or the other; its unit vector turned to
+// that way.
+void track_way(uint8_t* d, float fx, float fy, float& tx, float& ty) {
+    float best = -1;
+    tx = fx, ty = fy;
+    for (int k = 0; k < dot_links(d); ++k) {
+        float lx, ly;
+        link_vector(d, k, lx, ly);
+        const float dot = lx * fx + ly * fy;
+        if (std::fabs(dot) > best) {
+            best = std::fabs(dot);
+            tx = dot < 0 ? -lx : lx;
+            ty = dot < 0 ? -ly : ly;
+        }
+    }
+}
+
+// The direction a post placed at the cursor's map point faces: it stands on the cursor's side of the
+// nearest track (the other side after R / E), to the right of the trains it is for, so it faces
+// along the track the way that puts that side on their right.
+int post_facing_for(float x, float y) {
+    uint8_t* d = point_near(x, y, 1, 100);
+    if (!d || dot_links(d) < 1) return g_place_direction;
+    float tx, ty;
+    link_vector(d, 0, tx, ty);
+    float nx = -ty, ny = tx;   // a normal of the track
+    if ((x - dot_wx(d)) * nx + (y - dot_wy(d)) * ny < 0) nx = -nx, ny = -ny;
+    if (g_post_flip) nx = -nx, ny = -ny;
+    return direction_of(-ny, nx);   // the way whose trains have that side on their right
+}
+
+// A post (MAP_RULES.md 7) faces the trains it is for - its direction points at them - and stands
+// to their right, beside the track: 184 of the missions' 188 posts, 12-40 px from the track (median
+// 23; 24 here, as S puts them). So the way it faces decides its side: placed, it goes beside the
+// track point nearest to the cursor, facing along the track the way nearest to `wanted` (R / E
+// turn the preview round), to the right of its trains.
 Snap snap_post(float x, float y, int wanted) {
     Snap s;
     uint8_t* d = point_near(x, y, 1, 100);
@@ -3611,15 +3878,49 @@ Snap snap_post(float x, float y, int wanted) {
         s.reason = {"SnapSemaphore", "a semaphore stands beside the track - no track near"};
         return s;
     }
-    float tx, ty;
-    link_vector(d, 0, tx, ty);
-    const float side = tx * (y - dot_wy(d)) - ty * (x - dot_wx(d)) >= 0 ? 1.0f : -1.0f;
+    float wx, wy, fx, fy;
+    facing_of(wanted, wx, wy);
+    track_way(d, wx, wy, fx, fy);
     s.ok = true;
-    s.x = dot_wx(d) - ty * side * POST_SIDE;
-    s.y = dot_wy(d) + tx * side * POST_SIDE;
-    const int along = round32(direction_of(tx, ty)), back = (along + 128) & 255;
-    auto gap = [](int a, int b) { return (std::min)((a - b) & 255, (b - a) & 255); };
-    s.direction = gap(along, wanted) <= gap(back, wanted) ? along : back;
+    s.x = dot_wx(d) + fy * POST_SIDE;   // the right of the trains going (-fx, -fy)
+    s.y = dot_wy(d) - fx * POST_SIDE;
+    s.direction = round32(direction_of(fx, fy));
+    return s;
+}
+
+// A buffer stop at the dead end nearest to the cursor within 150 px - not a factory's -, 5 px past
+// it, across the track.
+constexpr float BLOCKER_PAST = 5;
+Snap snap_blocker(float x, float y) {
+    Snap s;
+    std::vector<uint8_t*> factories;
+    for_each_object([&](uint8_t* o) {
+        if (!removed(o) && nvid_of(o) == VID_DEPOT) factories.push_back(o);
+    });
+    uint8_t* end = nullptr;
+    float best = 150;
+    for (uint8_t* d : rail_dots()) {
+        if (dot_links(d) != 1) continue;
+        if (std::any_of(factories.begin(), factories.end(), [&](uint8_t* f) {
+                return std::hypot(at<float>(f, O_X) - dot_wx(d), at<float>(f, O_Y) - dot_wy(d)) < 40;
+            }))
+            continue;
+        const float dist = std::hypot(dot_wx(d) - x, dot_wy(d) - y);
+        if (dist < best) {
+            best = dist;
+            end = d;
+        }
+    }
+    if (!end) {
+        s.reason = {"SnapBlocker", "a blocker (buffer stop) stands at the end of a track - no end of track near"};
+        return s;
+    }
+    float vx, vy;   // into the track
+    link_vector(end, 0, vx, vy);
+    s.ok = true;
+    s.x = dot_wx(end) - vx * BLOCKER_PAST;
+    s.y = dot_wy(end) - vy * BLOCKER_PAST;
+    s.direction = ((direction_of(vx, vy) % 128) * 2) & 255;   // the way of the track: 0, 32, 64, 96 -> 0, 64, 128, 192
     return s;
 }
 
@@ -3636,8 +3937,15 @@ Snap snap_crate(float x, float y) {
     return s;
 }
 
+// A buffer stop standing at a dead end (where snap_blocker puts one, give or take the missions' 16 px).
+bool blocker_at_end(uint8_t* o) {
+    if (nvid_of(o) != VID_BLOCKER) return false;
+    const Snap s = snap_blocker(at<float>(o, O_X), at<float>(o, O_Y));
+    return s.ok && std::hypot(s.x - at<float>(o, O_X), s.y - at<float>(o, O_Y)) < 20;
+}
+
 bool on_track_vid(int nvid) {
-    return nvid == VID_DEPOT || nvid == VID_WORKSHOP || nvid == VID_SEMAPHORE || nvid == VID_CRATE;
+    return nvid == VID_DEPOT || nvid == VID_WORKSHOP || nvid == VID_SEMAPHORE || nvid == VID_CRATE || nvid == VID_BLOCKER;
 }
 
 // Where a VID of these goes for the cursor's map point; the others stay where they are.
@@ -3647,6 +3955,7 @@ bool snap(int nvid, float& x, float& y, int& direction, UiText& reason) {
     else if (nvid == VID_WORKSHOP) s = snap_repair(x, y);
     else if (nvid == VID_SEMAPHORE) s = snap_post(x, y, direction);
     else if (nvid == VID_CRATE) s = snap_crate(x, y);
+    else if (nvid == VID_BLOCKER) s = snap_blocker(x, y);
     else return true;
     if (!s.ok) {
         reason = s.reason;
@@ -3715,41 +4024,347 @@ bool take_building_lines(uint8_t* o, std::vector<uint8_t*>& posts) {
     return true;
 }
 
-// L / Shift+L on a selected post: a push line at it - L lets the trains it faces in (a line from
-// 140 px out toward the post, push_flag 1: the post green), Shift+L keeps them out (a line from the
-// post away from them, push_flag 0, one way: the post red).
-void post_line(bool against) {
+// ---- what goes with deleted rails (delete_objects) ----
+
+// Every line, the editor's then the script's, as it is now: the screen points of the rail points its
+// two ends take (SetPushLine: the nearest ones), or none when it has no way (-1).
+std::vector<POINT> lines_ok() {
+    std::vector<POINT> out;
+    auto add = [&](const PushLine& l) {
+        const Trace t = trace(l);
+        out.push_back(t.error || t.path.empty() ? POINT{-1, -1} : dot_screen(t.path.front()));
+        out.push_back(t.error || t.path.empty() ? POINT{-1, -1} : dot_screen(t.path.back()));
+    };
+    for (const PushLine& l : mission_push_lines()) add(l);
+    for (const PushLine& l : mission_script_push_lines()) add(l);
+    return out;
+}
+
+// After the rails went: the editor's lines that had a way and now have none, or an end whose rail
+// point went (the nearest point now is another - the line would jump onto other track), are deleted;
+// the script's are counted in `script` (it is not the editor's to change).
+unsigned remove_broken_lines(const std::vector<POINT>& before, unsigned& script) {
+    const std::vector<POINT> now = lines_ok();
+    auto broken = [&](size_t i) {
+        if (2 * i + 1 >= before.size() || before[2 * i].x == -1) return false;
+        for (size_t k = 2 * i; k <= 2 * i + 1; ++k)
+            if (now[k].x == -1 || std::abs(now[k].x - before[k].x) > 4 || std::abs(now[k].y - before[k].y) > 4) return true;
+        return false;
+    };
+    std::vector<PushLine>& lines = mission_push_lines();
+    const size_t n = lines.size();
+    unsigned gone = 0;
+    for (size_t i = n; i-- > 0;)
+        if (broken(i)) {
+            lines.erase(lines.begin() + i);
+            ++gone;
+        }
+    for (size_t i = 0; i < mission_script_push_lines().size(); ++i)
+        if (broken(n + i)) ++script;
+    if (gone) g_push_selected = -1;
+    return gone;
+}
+
+// What stands on the rails of `objects`: the train cars with an end on one of their links join them
+// (counted in `cars`), the money crates on one of their points are candidates (crate_left).
+void track_goes(std::vector<uint8_t*>& objects, unsigned& cars, std::vector<uint8_t*>& crates) {
+    std::vector<std::pair<uint8_t*, uint8_t*>> links;   // the rails' own links
+    std::vector<uint8_t*> points;
+    for (uint8_t* o : objects)
+        if (class_of(o) == B_RAIL && rail_node(o, 0) && rail_node(o, 1)) {
+            links.push_back({rail_node(o, 0), rail_node(o, 1)});
+            points.push_back(rail_node(o, 0));
+            points.push_back(rail_node(o, 1));
+        }
+    auto on = [&](uint8_t* pos) {
+        uint8_t* a = at<uint8_t*>(pos, POS_DOT);
+        uint8_t* b = pos_target(pos);
+        for (const auto& l : links)
+            if ((a == l.first && b == l.second) || (a == l.second && b == l.first)) return true;
+        return false;
+    };
+    for (uint8_t* c : all_cars())
+        if ((on(c + E_FRONT_DOT) || on(c + E_REAR_DOT)) && std::find(objects.begin(), objects.end(), c) == objects.end()) {
+            objects.push_back(c);
+            ++cars;
+        }
+    for_each_object([&](uint8_t* o) {
+        if (nvid_of(o) != VID_CRATE || removed(o)) return;
+        for (uint8_t* d : points)
+            if (std::hypot(dot_wx(d) - at<float>(o, O_X), dot_wy(d) - at<float>(o, O_Y)) < 6) {
+                crates.push_back(o);
+                return;
+            }
+    });
+}
+
+// A crate whose rail point went with the rails.
+bool crate_left(uint8_t* crate) { return !point_near(at<float>(crate, O_X), at<float>(crate, O_Y), 1, 6); }
+
+// ---- posts: the way they face and their own line ----
+//
+// A post beside a track is for the trains of one way along it. The trains of the other way get a
+// post turned round: R, E, the wheel and the panel's other way turn it round and put it across the
+// track, as far from it as it stood, so it stays to the right of its trains. A post with no track
+// within 70 px turns as any object, a step of its eight directions.
+//
+// Its own line is a push line ending at its rail point, as the missions' posts have theirs
+// (MAP_RULES.md 7, measured on the 188 posts of the 20 missions and their scripts' lines): a red post
+// at the end of a line coming from behind it - the trains it faces would enter there against it, so
+// they stop at the post (107 of the 124 red posts); a green one at the end of a line coming from
+// the trains it faces - they run along it, pushed, and leave it at the post (29 of the 61 green; 26
+// more at the begin of a line going on). Both lines have push_flag 1 (85 of the red posts' lines). So a pair at a level entry -
+// green facing the edge for the trains coming in, red facing in for those going out - owns ONE line,
+// the missions' entry: from past the edge to the pair, trains pushed in, none out. A line is a post's
+// own by that shape alone (owns), of any length, so the script needs no mark for it and a pair shares
+// one; the line of a factory or a repair point is never a post's. A post placed by hand gets its line
+// at once (140 px), unless it owns one already or stands within 40 px of an end of a line no post
+// owns (S's, a building's, the script's); turning it round, recolouring it (T) or moving it makes it
+// again - a line another post owns too stays, the post gets a line of its own beside it -, deleting
+// it deletes it unless another post owns it, each in the post's step of the history. L / Shift+L
+// give the selected post its line green / red, the panel's LINE row takes it away.
+
+// The ways of the screen, as the trains a post is for go: a post points at them, so they go the
+// other way. 0 is up the screen, then clockwise.
+const char* const WAY_KEYS[8] = {"WayUp", "WayUpRight", "WayRight", "WayDownRight", "WayDown", "WayDownLeft", "WayLeft", "WayUpLeft"};
+const char* const WAY_NAMES[8] = {"up", "up and right", "right", "down and right", "down", "down and left", "left", "up and left"};
+const char* const WAY_CAPS_KEYS[8] = {"CtxWayUp", "CtxWayUpRight", "CtxWayRight", "CtxWayDownRight",
+                                      "CtxWayDown", "CtxWayDownLeft", "CtxWayLeft", "CtxWayUpLeft"};
+const char* const WAY_CAPS[8] = {"GOING UP", "UP AND RIGHT", "GOING RIGHT", "DOWN AND RIGHT",
+                                 "GOING DOWN", "DOWN AND LEFT", "GOING LEFT", "UP AND LEFT"};
+int trains_way(int direction) { return ((direction + 128 + 16) & 255) / 32; }   // of the trains a post faces
+const char* way_name(int direction) { return ui_text(WAY_KEYS[trains_way(direction)], WAY_NAMES[trains_way(direction)]); }
+
+// The rail point of the track a post standing at (x, y) facing `direction` is beside: its trains pass
+// it on their right, so that track is on the post's other side - the point nearest to where it would
+// be 24 px away (a junction has other track as near), within 50 px of it and 70 of the post.
+uint8_t* post_dot_at(float x, float y, int direction) {
+    float fx, fy;
+    facing_of(direction, fx, fy);
+    uint8_t* d = point_near(x - fy * POST_SIDE, y + fx * POST_SIDE, 1, 50);
+    return d && std::hypot(dot_wx(d) - x, dot_wy(d) - y) < POST_REACH ? d : nullptr;
+}
+
+uint8_t* post_dot(uint8_t* o) { return post_dot_at(at<float>(o, O_X), at<float>(o, O_Y), at<int>(o, O_DIRECTION)); }
+bool post_on_track(uint8_t* o) { return o && nvid_of(o) == VID_SEMAPHORE && post_dot(o); }
+
+// The line of a post standing at (x, y) facing `direction`, green or red: 140 px along the track
+// to its rail point - from the trains it faces (green), from behind it (red); false without track.
+bool post_line_at(float x, float y, int direction, bool is_red, PushLine& line) {
+    uint8_t* d = post_dot_at(x, y, direction);
+    if (!d) return false;
+    float fx, fy;
+    facing_of(direction, fx, fy);
+    uint8_t* from = is_red ? walk(d, -fx, -fy, FACTORY_LINE) : walk(d, fx, fy, FACTORY_LINE);
+    if (from == d) return false;
+    const POINT p = dot_screen(d), q = dot_screen(from);
+    line = PushLine{q.x, q.y, p.x, p.y, 1};
+    return !trace(line).error;
+}
+
+bool post_line_for(uint8_t* o, bool is_red, PushLine& line) {
+    return post_line_at(at<float>(o, O_X), at<float>(o, O_Y), at<int>(o, O_DIRECTION), is_red, line);
+}
+
+bool same_line(const PushLine& a, const PushLine& b) {
+    return a.flag == b.flag && std::abs(a.bx - b.bx) <= 2 && std::abs(a.by - b.by) <= 2 && std::abs(a.ex - b.ex) <= 2 &&
+           std::abs(a.ey - b.ey) <= 2;
+}
+
+// The lines of the factories and repair points of the map (never a post's own).
+std::set<int> building_lines() {
+    std::set<int> out;
+    for_each_object([&](uint8_t* o) {
+        if (!removed(o) && (nvid_of(o) == VID_DEPOT || nvid_of(o) == VID_WORKSHOP))
+            for (int i : lines_of(o)) out.insert(i);
+    });
+    return out;
+}
+
+// A line is a post's own when it ends at the post's rail point coming from the side its colour
+// says: from behind a red post, from the trains a green one faces.
+bool owns(uint8_t* o, const PushLine& l) {
+    if (!o || removed(o) || nvid_of(o) != VID_SEMAPHORE) return false;
+    uint8_t* d = post_dot(o);
+    if (!d) return false;
+    const POINT p = dot_screen(d);
+    if (std::abs(l.ex - p.x) > 3 || std::abs(l.ey - p.y) > 3) return false;
+    const Trace t = trace(l);
+    if (t.error || t.path.size() < 2 || t.path.back() != d) return false;
+    uint8_t* prev = t.path[t.path.size() - 2];
+    float fx, fy;
+    facing_of(at<int>(o, O_DIRECTION), fx, fy);
+    const float along = (dot_wx(d) - dot_wx(prev)) * fx + (dot_wy(d) - dot_wy(prev)) * fy;   // its last link, the way it runs
+    return red(o) ? along > 0 : along < 0;
+}
+
+// The post's own line among the editor's (its index), -1 for none.
+int own_line(uint8_t* o) {
+    if (!o || nvid_of(o) != VID_SEMAPHORE || !post_dot(o)) return -1;
+    const std::vector<PushLine>& lines = mission_push_lines();
+    std::set<int> buildings;
+    bool known = false;
+    for (int i = 0; i < static_cast<int>(lines.size()); ++i) {
+        if (!owns(o, lines[i])) continue;
+        if (!known) buildings = building_lines(), known = true;
+        if (!buildings.count(i)) return i;
+    }
+    return -1;
+}
+
+// Another post than `o` (and those of `but`) that owns line `index`.
+bool owned_by_other(int index, uint8_t* o, const std::vector<uint8_t*>& but = {}) {
+    const std::vector<PushLine>& lines = mission_push_lines();
+    if (index < 0 || index >= static_cast<int>(lines.size())) return false;
+    bool found = false;
+    for_each_object([&](uint8_t* p) {
+        if (!found && p != o && std::find(but.begin(), but.end(), p) == but.end() && owns(p, lines[index])) found = true;
+    });
+    return found;
+}
+
+// The index of a line of the editor's equal to `l`, -1 for none.
+int find_line(const PushLine& l) {
+    const std::vector<PushLine>& lines = mission_push_lines();
+    for (int i = 0; i < static_cast<int>(lines.size()); ++i)
+        if (same_line(lines[i], l)) return i;
+    return -1;
+}
+
+// A post at (x, y) facing `direction` within 40 px of an end of a line no post owns - the script's,
+// or one of the editor's (S, a factory's, a repair point's).
+bool at_line_end(float x, float y, int direction) {
+    uint8_t* d = post_dot_at(x, y, direction);
+    if (!d) return false;
+    const POINT p = dot_screen(d);
+    auto near_end = [&](const PushLine& l) {
+        return std::hypot(static_cast<float>(l.bx - p.x), static_cast<float>(l.by - p.y)) < 40 ||
+               std::hypot(static_cast<float>(l.ex - p.x), static_cast<float>(l.ey - p.y)) < 40;
+    };
+    const std::vector<PushLine>& lines = mission_push_lines();
+    for (int i = 0; i < static_cast<int>(lines.size()); ++i)
+        if (near_end(lines[i]) && !owned_by_other(i, nullptr)) return true;
+    for (const PushLine& l : mission_script_push_lines())
+        if (near_end(l)) return true;
+    return false;
+}
+
+// After a change of a post: its own line - `index` before the change, -1 for none - made again for
+// the post as it is now. A line another post owns too stays as it is (and the post gets a line of its
+// own beside it, unless that is there already); otherwise it is replaced, or goes with the post or
+// when there is no way for it now.
+void remake_own_line(uint8_t* o, int index) {
+    std::vector<PushLine>& lines = mission_push_lines();
+    if (index < 0 || index >= static_cast<int>(lines.size())) return;
+    PushLine l;
+    const bool now = !removed(o) && post_line_for(o, red(o), l);
+    const bool shared = owned_by_other(index, o);
+    if (now && own_line(o) >= 0) {   // it owns a line where it is now (a pair's)
+        if (!shared && own_line(o) != index) lines.erase(lines.begin() + index);
+    } else if (shared) {
+        if (now && find_line(l) < 0) lines.push_back(l);
+    } else if (now && find_line(l) < 0) {
+        lines[index] = l;
+    } else {
+        lines.erase(lines.begin() + index);
+    }
+    g_push_selected = -1;
+}
+
+// The push lines into the last step of the history: they were `before`.
+void lines_into_step(const std::vector<PushLine>& before) {
+    Operation& op = g_undo.back();
+    if (!op.lines) {
+        op.lines = true;
+        op.lines_before = before;
+    }
+    op.lines_after = mission_push_lines();
+}
+
+// What a post's line does, for the messages: lets its trains in, keeps them out, or none.
+const char* post_line_text(uint8_t* o) {
+    if (own_line(o) < 0) return ui_text("PostNoLine", "no line of its own");
+    return red(o) ? ui_text("PostKeepsOut", "its line keeps them out") : ui_text("PostLetsIn", "its line lets them in");
+}
+
+// A post just placed (the last step of the history is its placing): its own line into that step,
+// unless it owns one already (the other post of a pair has made it), stands at an end of a line no
+// post owns or the map's script has no editor blocks.
+void give_post_line(uint8_t* o) {
+    PushLine l;
+    if (!mission_managed() || own_line(o) >= 0 || at_line_end(at<float>(o, O_X), at<float>(o, O_Y), at<int>(o, O_DIRECTION)) ||
+        !post_line_for(o, red(o), l) || find_line(l) >= 0)
+        return;
+    const std::vector<PushLine> before = mission_push_lines();
+    mission_push_lines().push_back(l);
+    lines_into_step(before);
+}
+
+// The posts' own lines among `objects` (being deleted) that no other post owns, from the last.
+std::vector<int> lines_going_with(const std::vector<uint8_t*>& objects) {
+    std::vector<int> out;
+    for (uint8_t* o : objects) {
+        const int i = own_line(o);
+        if (i >= 0 && std::find(out.begin(), out.end(), i) == out.end() && !owned_by_other(i, o, objects)) out.push_back(i);
+    }
+    std::sort(out.rbegin(), out.rend());
+    return out;
+}
+
+// L / Shift+L, the panel's LINE: the selected post's own line, green (it lets its trains in) or red
+// (it keeps them out) - the post takes that colour -, or none.
+void post_line(bool against, bool none = false) {
     if (g_selection.empty() || nvid_of(g_selection[0]) != VID_SEMAPHORE) {
         MESSAGE("MsgLSelect", "L: select a semaphore first");
         return;
     }
     if (!push_lines_editable()) return;
     uint8_t* o = g_selection[0];
-    uint8_t* d = point_near(at<float>(o, O_X), at<float>(o, O_Y), 1, 70);
-    if (!d) {
+    if (!post_dot(o)) {
         MESSAGE("MsgLNoTrack", "L: the semaphore has no track beside it");
         return;
     }
-    const float a = at<int>(o, O_DIRECTION) * 6.2831853f / 256;
-    const float fx = std::sin(a), fy = -std::cos(a);   // where its trains come from
-    uint8_t* out = walk(d, fx, fy, FACTORY_LINE);
-    if (out == d) {
-        MESSAGE("MsgLNoWay", "L: no track toward the trains the semaphore faces");
+    PushLine line{};
+    if (!none && !post_line_at(at<float>(o, O_X), at<float>(o, O_Y), at<int>(o, O_DIRECTION), against, line)) {
+        MESSAGE("MsgLNoWay", "L: no track the way its trains go");
         return;
     }
-    const POINT p = dot_screen(d), q = dot_screen(out);
-    const PushLine line = against ? PushLine{p.x, p.y, q.x, q.y, 0} : PushLine{q.x, q.y, p.x, p.y, 1};
+    const int own = own_line(o);
+    if (none && own < 0) return;
     const std::vector<PushLine> lines_before = mission_push_lines();
     const std::vector<State> before = states({o});
-    mission_push_lines().push_back(line);
-    if (red(o) != against) set_red(o, against);
+    std::vector<PushLine>& lines = mission_push_lines();
+    if (none) lines.erase(lines.begin() + own);
+    else if (own >= 0 && !owned_by_other(own, o)) lines[own] = line;
+    else if (find_line(line) < 0) lines.push_back(line);
+    if (!none && red(o) != against) set_red(o, against);
     commit({"OpSemaphoreLine", "semaphore line"}, {o}, before);
-    Operation& op = g_undo.back();
-    op.lines = true;
-    op.lines_before = lines_before;
-    op.lines_after = mission_push_lines();
-    MESSAGE("MsgLLine", "push line %d,%d -> %d,%d flag %d at the semaphore, which is %s", line.bx, line.by, line.ex, line.ey,
-            line.flag, against ? ui_text("WordRed", "red") : ui_text("WordGreen", "green"));
+    lines_into_step(lines_before);
+    if (none) MESSAGE("MsgLNone", "the semaphore has no line of its own now");
+    else MESSAGE("MsgLLine", "%s at the semaphore, which is %s", line_effect(line, false).c_str(),
+                 against ? ui_text("WordRed", "red") : ui_text("WordGreen", "green"));
+}
+
+void turn_post(uint8_t* o) {
+    uint8_t* d = post_dot(o);
+    float fx, fy, tx, ty;
+    facing_of(at<int>(o, O_DIRECTION), fx, fy);
+    track_way(d, fx, fy, tx, ty);
+    // to the right of the trains of the other way (going (tx, ty)), as far from the track as it stood
+    const float x = at<float>(o, O_X), y = at<float>(o, O_Y);
+    const float away = (std::max)(16.0f, (std::min)(40.0f, std::hypot(x - dot_wx(d), y - dot_wy(d))));
+    const float nx = dot_wx(d) - ty * away, ny = dot_wy(d) + tx * away;
+    const std::vector<State> before = states({o});
+    const std::vector<PushLine> lines_before = mission_push_lines();
+    const int own = own_line(o);
+    const float lift = at<float>(o, O_Z) - ground_z(vid_of(o), x, y);
+    reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, nx, ny, ground_z(vid_of(o), nx, ny) + lift);
+    set_direction(o, (at<int>(o, O_DIRECTION) + 128) & 255);
+    remake_own_line(o, own);
+    commit({"OpTurn", "turn"}, {o}, before);
+    if (own >= 0) lines_into_step(lines_before);
+    MESSAGE("MsgPostTurned", "semaphore turned round: now for the trains going %s, %s", way_name(at<int>(o, O_DIRECTION)),
+            post_line_text(o));
 }
 
 // After a factory or repair point is placed or moved (the last step of the history is its change):
@@ -3861,7 +4476,7 @@ void draw_track() {
         mark(static_cast<float>(p.x), static_cast<float>(p.y), z, 0xc0ffff00);
         std::snprintf(text, sizeof text, ui_format("StatusTrackStart", "Track: click a start point (%.1f,%.1f%s)"), p.x, p.y,
                       r ? ui_text("StatusRailEnd", ", the end of a rail") : "");
-        g_track_status = text;
+        g_track_status = std::string(text) + ui_text("StatusTrackKeys", " - the right button deletes the rail under the cursor, Esc ends the line");
         return;
     }
     const TrackStep s = next_step(rails);
@@ -3879,46 +4494,159 @@ void draw_track() {
     std::snprintf(text, sizeof text, ui_format("StatusTrack", "Track: %u rails - %.1f,%.1f -> %.1f,%.1f %s"),
                   static_cast<unsigned>(g_line.size() - 1), g_line.back().x, g_line.back().y, s.to.x, s.to.y,
                   s.valid ? ui_text("WordOk", "ok") : s.reason.get());
-    g_track_status = text;
+    g_track_status = std::string(text) + ui_text("StatusTrackKeys", " - the right button deletes the rail under the cursor, Esc ends the line");
 }
 
-// The push lines over the track: small squares along each line's way (green for push_flag 1,
-// yellow for 0, grey for the script's own lines the editor does not write), a bigger one at its
-// begin and a ringed one at its end; the selected line in white, a line without a way red at its
-// two ends. With the tool, the rail point under the cursor in cyan with its screen coordinates.
-std::string g_push_status;
+// A filled triangle on the screen, a row of pixels at a time (Graphics_FillRect has rectangles only).
+void fill_triangle(float x0, float y0, float x1, float y1, float x2, float y2, uint32_t argb) {
+    const float xs[3] = {x0, x1, x2}, ys[3] = {y0, y1, y2};
+    const float top = std::floor((std::min)({y0, y1, y2})), bottom = (std::max)({y0, y1, y2});
+    for (float y = top; y < bottom; y += 1) {
+        const float mid = y + 0.5f;
+        float l = 1e9f, r = -1e9f;
+        for (int i = 0; i < 3; ++i) {
+            const int j = (i + 1) % 3;
+            if ((ys[i] <= mid) == (ys[j] <= mid)) continue;   // the edge does not cross this row
+            const float x = xs[i] + (mid - ys[i]) * (xs[j] - xs[i]) / (ys[j] - ys[i]);
+            l = (std::min)(l, x);
+            r = (std::max)(r, x);
+        }
+        if (l < r) reinterpret_cast<FillRect_t>(FILL_RECT)(graphics(), nullptr, l, y, r, y + 1, argb);
+    }
+}
+
+// An arrowhead with its tip at (x, y) pointing the way (ux, uy) (a unit vector), on a dark outline.
+void arrowhead(float x, float y, float ux, float uy, float length, float half, uint32_t argb) {
+    auto head = [&](float tx, float ty, float len, float w, uint32_t colour) {
+        const float bx = tx - ux * len, by = ty - uy * len;
+        fill_triangle(tx, ty, bx - uy * w, by + ux * w, bx + uy * w, by - ux * w, colour);
+    };
+    head(x + ux * 2, y + uy * 2, length + 4, half + 2.5f, 0xe0000000);
+    head(x, y, length, half, argb);
+}
+
+// A bar across the way (ux, uy) at (x, y): the begin of a line, its tail.
+void tail_bar(float x, float y, float ux, float uy, float half, uint32_t argb) {
+    auto bar = [&](float w, float t, uint32_t colour) {
+        const float ax = x - uy * w, ay = y + ux * w, bx = x + uy * w, by = y - ux * w;   // its two ends
+        fill_triangle(ax - ux * t, ay - uy * t, ax + ux * t, ay + uy * t, bx + ux * t, by + uy * t, colour);
+        fill_triangle(ax - ux * t, ay - uy * t, bx + ux * t, by + uy * t, bx - ux * t, by - uy * t, colour);
+    };
+    bar(half + 2, 4.5f, 0xe0000000);
+    bar(half, 2.5f, argb);
+}
+
+// What a line does, for the status line: the push (flag 1) or one-way (flag 0) line from its begin
+// (the bar) to its end (the arrow).
+std::string line_effect(const PushLine& l, bool script) {
+    std::string text = l.flag ? ui_printf(ui_format("StatusLinePush", "push line %d,%d (bar) -> %d,%d (arrow), flag 1: pushes "
+                                                                     "trains the arrows' way, none may go against"),
+                                          l.bx, l.by, l.ex, l.ey)
+                              : ui_printf(ui_format("StatusLineOneWay", "push line %d,%d (bar) -> %d,%d (arrow), flag 0: no train may "
+                                                                        "go against the arrows"),
+                                          l.bx, l.by, l.ex, l.ey);
+    if (script) text += ui_text("StatusLineScript", " - the script's own (read only)");
+    return text;
+}
+
+// Whose an editor line is, for the status line: a semaphore's own (the first owner), a factory's or
+// repair point's, the level entry (beginning past the map's edge); "" for none of them.
+std::string line_owner(int index) {
+    const std::vector<PushLine>& lines = mission_push_lines();
+    if (index < 0 || index >= static_cast<int>(lines.size())) return "";
+    std::string out;
+    for_each_object([&](uint8_t* o) {
+        if (out.empty() && owns(o, lines[index]))
+            out = ui_printf(ui_format("LineOfPost", " - the semaphore's at %.0f,%.0f"), at<float>(o, O_X),
+                            at<float>(o, O_Y));
+    });
+    if (out.empty() && building_lines().count(index)) out = ui_text("LineOfBuilding", " - a factory's or repair point's");
+    if (out.empty() && outside_map(lines[index].bx, lines[index].by)) out = ui_text("LineEntry", " - the level's entry or exit");
+    return out;
+}
+
+// The push lines over the track, each in its colour (green for push_flag 1, yellow for 0, light
+// blue for the script's own lines the editor does not write; the selected one white): a bar across
+// the track at its begin, a small arrow on every link of its way pointing the way it runs and a big
+// arrowhead at its end; a line without a way red at its two ends. The line under the cursor is
+// described in a status line (g_line_status), the selected one with the tool. With the tool, the
+// rail point under the cursor in cyan with its screen coordinates.
+std::string g_push_status, g_line_status;
+float g_line_hover = 0;   // the cursor's distance to the line described in g_line_status
+
+// One line; the cursor near it (within g_line_hover) describes it in g_line_status when `hover`.
+void draw_line(const PushLine& l, uint32_t colour, bool script, bool hover, int index = -1) {
+    uint8_t* w = world();
+    const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
+    float mx, my;
+    mouse_on_map(mx, my);
+    auto dot_mark = [&](uint8_t* d, float size, uint32_t argb) {
+        const float sx = at<int>(d, DOT_X) - cam_x, sy = screen_y(d) - cam_y;
+        reinterpret_cast<FillRect_t>(FILL_RECT)(graphics(), nullptr, sx - size, sy - size, sx + size, sy + size, argb);
+    };
+    const Trace t = trace(l);
+    if (t.error || t.path.size() < 2) {
+        for (const POINT p : {POINT{l.bx, l.by}, POINT{l.ex, l.ey}}) {
+            const float sx = p.x - cam_x, sy = p.y - cam_y;
+            reinterpret_cast<FillRect_t>(FILL_RECT)(graphics(), nullptr, sx - 6, sy - 6, sx + 6, sy + 6, 0xe0ff2020);
+        }
+        return;
+    }
+    auto point = [&](size_t i, float& x, float& y) {
+        x = static_cast<float>(at<int>(t.path[i], DOT_X));
+        y = static_cast<float>(screen_y(t.path[i]));
+    };
+    for (size_t i = 0; i + 1 < t.path.size(); ++i) {
+        float ax, ay, bx, by;
+        point(i, ax, ay);
+        point(i + 1, bx, by);
+        const float len = std::hypot(bx - ax, by - ay);
+        if (len < 1) continue;
+        const float ux = (bx - ax) / len, uy = (by - ay) / len;
+        // the cursor's distance to this link (on the screen)
+        const float along = (std::max)(0.0f, (std::min)(len, (mx - ax) * ux + (my - ay) * uy));
+        const float d = std::hypot(mx - (ax + ux * along), my - (ay + uy * along));
+        if (hover && d < g_line_hover) {
+            g_line_hover = d;
+            g_line_status = line_effect(l, script) + line_owner(index);
+        }
+        if (i + 2 < t.path.size() && len > 14)   // the last link has the big arrowhead
+            arrowhead((ax + bx) / 2 - cam_x + ux * 4, (ay + by) / 2 - cam_y + uy * 4, ux, uy, 8, 5, colour);
+    }
+    for (uint8_t* d : t.path) dot_mark(d, 2, colour);
+    float x0, y0, x1, y1;
+    point(0, x0, y0);
+    point(1, x1, y1);
+    float len = (std::max)(1.0f, std::hypot(x1 - x0, y1 - y0));
+    tail_bar(x0 - cam_x, y0 - cam_y, (x1 - x0) / len, (y1 - y0) / len, 10, colour);
+    point(t.path.size() - 2, x0, y0);
+    point(t.path.size() - 1, x1, y1);
+    len = (std::max)(1.0f, std::hypot(x1 - x0, y1 - y0));
+    arrowhead(x1 - cam_x, y1 - cam_y, (x1 - x0) / len, (y1 - y0) / len, 18, 10, colour);
+}
+
+uint32_t line_colour(const PushLine& l) { return l.flag ? 0xd000ff00 : 0xd0ffff00; }
 
 void draw_push_lines(bool tool) {
-    auto dot_mark = [](uint8_t* d, float size, uint32_t argb) {
-        uint8_t* w = world();
+    uint8_t* w = world();
+    float mx, my;
+    mouse_on_map(mx, my);
+    g_line_hover = 9;   // the line nearest to the cursor within this
+    g_line_status.clear();
+    for (const PushLine& l : mission_script_push_lines()) draw_line(l, 0xd0b0b0ff, true, true);
+    const std::vector<PushLine>& lines = mission_push_lines();
+    for (int i = 0; i < static_cast<int>(lines.size()); ++i)
+        draw_line(lines[i], i == g_push_selected ? 0xf0ffffff : line_colour(lines[i]), false, true, i);
+    if (g_line_status.empty() && g_push_selected >= 0 && g_push_selected < static_cast<int>(lines.size()))
+        g_line_status = ui_printf(ui_format("StatusLineSelected", "selected: %s"),
+                                  (line_effect(lines[g_push_selected], false) + line_owner(g_push_selected)).c_str());
+    if (!tool) return;
+    auto dot_mark = [&](uint8_t* d, float size, uint32_t argb) {
         const float sx = at<int>(d, DOT_X) - at<float>(w, W_CAMERA_X), sy = screen_y(d) - at<float>(w, W_CAMERA_Y);
         reinterpret_cast<FillRect_t>(FILL_RECT)(graphics(), nullptr, sx - size, sy - size, sx + size, sy + size, argb);
     };
-    auto draw = [&](const PushLine& l, uint32_t colour) {
-        const Trace t = trace(l);
-        if (t.error || t.path.empty()) {
-            uint8_t* w = world();
-            for (const POINT p : {POINT{l.bx, l.by}, POINT{l.ex, l.ey}}) {
-                const float sx = p.x - at<float>(w, W_CAMERA_X), sy = p.y - at<float>(w, W_CAMERA_Y);
-                reinterpret_cast<FillRect_t>(FILL_RECT)(graphics(), nullptr, sx - 6, sy - 6, sx + 6, sy + 6, 0xe0ff2020);
-            }
-            return;
-        }
-        for (uint8_t* d : t.path) dot_mark(d, 3, colour);
-        dot_mark(t.path.front(), 6, colour);
-        dot_mark(t.path.back(), 8, colour);
-        dot_mark(t.path.back(), 4, 0xe0000000);
-    };
-    for (const PushLine& l : mission_script_push_lines()) draw(l, 0xd0b0b0ff);
-    const std::vector<PushLine>& lines = mission_push_lines();
-    for (int i = 0; i < static_cast<int>(lines.size()); ++i)
-        draw(lines[i], i == g_push_selected && tool ? 0xf0ffffff : lines[i].flag ? 0xd000ff00 : 0xd0ffff00);
-    if (!tool) return;
-    uint8_t* w = world();
-    float fx, fy;
-    mouse_on_map(fx, fy);
     char text[160];
-    if (uint8_t* d = nearest_dot(static_cast<int>(fx), static_cast<int>(fy))) {
+    if (uint8_t* d = nearest_dot(static_cast<int>(mx), static_cast<int>(my))) {
         dot_mark(d, 5, 0xe000ffff);
         const POINT p = dot_screen(d);
         std::snprintf(text, sizeof text, ui_format("StatusPush", "Push line: rail point %d,%d%s"), p.x, p.y,
@@ -4736,6 +5464,7 @@ struct ContextRow {
 };
 
 uint8_t* g_context = nullptr;   // the object of the open panel
+int g_context_line = -1;        // or the push line (an index of the editor's lines)
 
 // The point locomotive of the authors' reinforcement (reinforcement.lgc): VID 5 in army 3, which
 // ReinforcementInit takes away at the start, keeping its place and its commands for the waves.
@@ -4937,7 +5666,16 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
                           }}}});
         return rows;
     }
-    if (movable(o) && at<int>(vid_of(o), V_ND_DIR) > 1)
+    if (post_on_track(o)) {   // the trains of one way or the other along its track
+        const int way = trains_way(at<int>(o, O_DIRECTION)), other = (way + 4) & 7;
+        rows.push_back({{"CtxPostFor", "FOR TRAINS:"},
+                        {{{WAY_CAPS_KEYS[way], WAY_CAPS[way]}, true, [] {}},
+                         {{WAY_CAPS_KEYS[other], WAY_CAPS[other]}, false, [o] { turn_post(o); }}}});
+    } else if (nvid == VID_DEPOT || nvid == VID_WORKSHOP || blocker_at_end(o)) {
+        rows.push_back({{"CtxTurn", "TURN:"}, {{{"CtxTurnByTrack", "BY ITS TRACK (DRAG IT)"}, true, [] {}}}});
+    } else if (wreck_on_track(o)) {
+        rows.push_back({{"CtxTurn", "TURN:"}, {{{"CtxTurnRound", "ROUND (R / E)"}, false, [] { turn(1); }}}});
+    } else if (movable(o) && at<int>(vid_of(o), V_ND_DIR) > 1)
         rows.push_back({{"CtxTurn", "TURN:"},
                         {{{"CtxTurnLeft", "LEFT (E)"}, false, [] { turn(-1); }},
                          {{"CtxTurnRight", "RIGHT (R)"}, false, [] { turn(1); }}}});
@@ -4951,9 +5689,11 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
         rows.push_back({{"CtxColour", "COLOUR (T):"},
                         {{{"CtxGreen", "GREEN"}, !is_red, [o] { if (red(o)) toggle_semaphore(); }},
                          {{"CtxRed", "RED"}, is_red, [o] { if (!red(o)) toggle_semaphore(); }}}});
+        const bool own = own_line(o) >= 0;
         rows.push_back({{"CtxLine", "LINE (L):"},
-                        {{{"CtxLetIn", "LET IN"}, false, [] { post_line(false); }},
-                         {{"CtxKeepOut", "KEEP OUT"}, false, [] { post_line(true); }}}});
+                        {{is_red ? UiText{"CtxLineStops", "STOPS THEM"} : UiText{"CtxLineLetsIn", "LETS THEM IN"}, own,
+                          [o] { post_line(red(o)); }},
+                         {{"CtxLineNone", "NONE"}, !own, [] { post_line(false, true); }}}});
     }
     if (nvid == VID_DEPOT)
         rows.push_back({{"CtxFactory", "FACTORY:"},
@@ -4989,7 +5729,14 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
 void context_box(uint8_t* o, int rows, float& x, float& y) {
     uint8_t* w = world();
     const Box v = view();
-    const float sx = at<float>(o, O_X) - at<float>(w, W_CAMERA_X), sy = at<float>(o, O_Y) - at<float>(o, O_Z) - at<float>(w, W_CAMERA_Y);
+    float sx, sy;
+    if (!o && g_context_line >= 0 && g_context_line < static_cast<int>(mission_push_lines().size())) {   // a line: by its end
+        sx = mission_push_lines()[g_context_line].ex - at<float>(w, W_CAMERA_X);
+        sy = mission_push_lines()[g_context_line].ey - at<float>(w, W_CAMERA_Y);
+    } else {
+        sx = at<float>(o, O_X) - at<float>(w, W_CAMERA_X);
+        sy = at<float>(o, O_Y) - at<float>(o, O_Z) - at<float>(w, W_CAMERA_Y);
+    }
     const float height = (rows + 1) * CONTEXT_ROW;
     x = sx + 50;
     if (x + CONTEXT_WIDTH > v.r) x = sx - 50 - CONTEXT_WIDTH;
@@ -4997,13 +5744,43 @@ void context_box(uint8_t* o, int rows, float& x, float& y) {
     y = (std::max)(v.t + 2 * LINE_HEIGHT, (std::min)(sy - height / 2, v.b - BASE_HEIGHT - SLOT - height));
 }
 
+// A push line's panel: its way, what it does, delete.
+std::vector<ContextRow> line_rows(int i) {
+    std::vector<ContextRow> rows;
+    const PushLine& l = mission_push_lines()[i];
+    rows.push_back({{"CtxLineWay", "DIRECTION:"}, {{{"CtxLineTurn", "TURN ROUND (R)"}, false, [i] {
+                                                         g_push_selected = i;
+                                                         push_change('R');
+                                                     }}}});
+    rows.push_back({{"CtxLineAction", "ACTION (T):"},
+                    {{{"CtxLinePushes", "PUSHES TRAINS"}, l.flag != 0, [i] {
+                          g_push_selected = i;
+                          if (!mission_push_lines()[i].flag) push_change('T');
+                      }},
+                     {{"CtxLineOneWay", "ONE WAY ONLY"}, l.flag == 0, [i] {
+                          g_push_selected = i;
+                          if (mission_push_lines()[i].flag) push_change('T');
+                      }}}});
+    rows.push_back({{"CtxDelete", "DELETE (DEL):"}, {{{"CtxDeleteIt", "DELETE"}, false, [i] {
+                                                         g_push_selected = i;
+                                                         push_change(VK_DELETE);
+                                                         g_context_line = -1;
+                                                     }}}});
+    return rows;
+}
+
+std::vector<ContextRow> open_rows() {
+    if (g_context) return context_rows(g_context);
+    if (g_context_line >= 0 && g_context_line < static_cast<int>(mission_push_lines().size())) return line_rows(g_context_line);
+    return {};
+}
+
 void draw_context() {
     g_context_hits.clear();
-    if (!g_context || removed(g_context)) {
-        g_context = nullptr;
-        return;
-    }
-    const std::vector<ContextRow> rows = context_rows(g_context);
+    if (g_context && removed(g_context)) g_context = nullptr;
+    if (g_context_line >= static_cast<int>(mission_push_lines().size())) g_context_line = -1;
+    if (!g_context && g_context_line < 0) return;
+    const std::vector<ContextRow> rows = open_rows();
     float x, y;
     context_box(g_context, static_cast<int>(rows.size()), x, y);
     float cw = 8, ch = 13;
@@ -5011,10 +5788,14 @@ void draw_context() {
         cw = at<float>(font, V_SIZE_X);
         ch = at<float>(font, V_SIZE_Y);
     }
-    const int nvid = nvid_of(g_context);
     char title[128];
-    const char* name = ui_unit_name(nvid) ? ui_unit_name(nvid) : object_name(nvid);
-    std::snprintf(title, sizeof title, "%s (VID %d)", name ? name : "", nvid);
+    if (g_context) {
+        const int nvid = nvid_of(g_context);
+        const char* name = ui_unit_name(nvid) ? ui_unit_name(nvid) : object_name(nvid);
+        std::snprintf(title, sizeof title, "%s (VID %d)", name ? name : "", nvid);
+    } else {
+        std::snprintf(title, sizeof title, "%s", ui_text("CtxLineTitle", "PUSH LINE"));
+    }
     // Convert title to uppercase for visual consistency
     for (char* p = title; *p; ++p) *p = static_cast<char>(std::toupper(static_cast<unsigned char>(*p)));
     for (size_t r = 0; r <= rows.size(); ++r) {   // the title's row, then the rows
@@ -5042,10 +5823,14 @@ void draw_context() {
     }
 }
 
-void close_context() { g_context = nullptr; }
+void close_context() {
+    g_context = nullptr;
+    g_context_line = -1;
+}
 
 void open_context(uint8_t* o) {
     g_context = o;
+    g_context_line = -1;
     if (o) {
         g_selection = group_of(o);
         patch::log("edit: context panel of VID %d", nvid_of(o));
@@ -5054,22 +5839,23 @@ void open_context(uint8_t* o) {
 
 // A click while the panel is open: true when it was the panel's.
 bool context_click(POINT m) {
-    if (!g_context) return false;
+    if (!g_context && g_context_line < 0) return false;
     for (const Hit& h : g_context_hits)
         if (m.x >= h.l && m.x < h.r && m.y >= h.t && m.y < h.b) {
-            const std::vector<ContextRow> rows = context_rows(g_context);
+            const std::vector<ContextRow> rows = open_rows();
             if (h.row < static_cast<int>(rows.size()) && h.choice < static_cast<int>(rows[h.row].choices.size())) {
                 patch::log("edit: context %s %s", rows[h.row].label.english, rows[h.row].choices[h.choice].text.english);
-                g_selection = group_of(g_context);
+                if (g_context) g_selection = group_of(g_context);
                 rows[h.row].choices[h.choice].act();
                 if (g_context && !removed(g_context)) g_selection = group_of(g_context);
             }
             return true;
         }
     float x, y;
-    context_box(g_context, static_cast<int>(context_rows(g_context).size()), x, y);
-    const bool inside = m.x >= x && m.x < x + CONTEXT_WIDTH && m.y >= y && m.y < y + (context_rows(g_context).size() + 1) * CONTEXT_ROW;
-    if (!inside) g_context = nullptr;   // a click elsewhere closes it
+    const size_t n = open_rows().size();
+    context_box(g_context, static_cast<int>(n), x, y);
+    const bool inside = m.x >= x && m.x < x + CONTEXT_WIDTH && m.y >= y && m.y < y + (n + 1) * CONTEXT_ROW;
+    if (!inside) close_context();   // a click elsewhere closes it
     return true;
 }
 
@@ -5135,7 +5921,7 @@ void draw_overlay() {
             if (v) {
                 float x, y, z;
                 map_point(g_mouse, v, x, y, z);
-                int direction = at<int>(v, V_ND_DIR) > 1 ? g_place_direction : 0;
+                int direction = to_step(g_place_direction, at<int>(v, V_ND_DIR));
                 bool shown = true;
                 if (wreck_vid(place_nvid())) {   // near a rail: on it
                     float sx, sy;
@@ -5146,9 +5932,20 @@ void draw_overlay() {
                 }
                 if (on_track_vid(place_nvid())) {
                     UiText why;
+                    if (place_nvid() == VID_SEMAPHORE) direction = post_facing_for(x, y);
                     shown = snap(place_nvid(), x, y, direction, why);
                     if (shown) z = ground_z(v, x, y);
                     else g_place_status = std::string(place_label()) + ": " + why.get();
+                    PushLine line;
+                    if (shown && place_nvid() == VID_SEMAPHORE) {
+                        const bool own = mission_managed() && !at_line_end(x, y, direction) && post_line_at(x, y, direction, entry().red, line);
+                        if (own) draw_line(line, line_colour(line), false, false);
+                        g_place_status = ui_printf(ui_format("StatusPostFor", "%s: for the trains going %s (R / E: the other side) - %s"),
+                                                   place_label(), way_name(direction),
+                                                   !own ? ui_text("PostNoLine", "no line of its own")
+                                                   : entry().red ? ui_text("PostKeepsOut", "its line keeps them out")
+                                                                 : ui_text("PostLetsIn", "its line lets them in"));
+                    }
                 }
                 if (shown) draw_vid(v, frame_for(v, direction), x - cam_x, y - cam_y, z);
                 const std::vector<Socket> sockets = sockets_of(place_nvid(), direction);
@@ -5200,7 +5997,9 @@ void draw_overlay() {
     const int shown_nvid = palette ? g_picked_nvid[palette_of(shown)] : shown.nvid != 0 ? shown.nvid : decal_nvid();
     if (shown.tool == Tool::Place && shown_nvid > 0)
         std::snprintf(tool, sizeof tool, ui_format("StatusToolVid", "%s: VID %d, direction %d"),
-                      palette && object_name(shown_nvid) ? object_name(shown_nvid) : label_of(shown), shown_nvid, g_place_direction);
+                      palette && object_name(shown_nvid) ? object_name(shown_nvid) : label_of(shown), shown_nvid,
+                      vid_by_number(shown_nvid) ? to_step(g_place_direction, at<int>(vid_by_number(shown_nvid), V_ND_DIR))
+                                                : g_place_direction);
     else
         std::snprintf(tool, sizeof tool, "%s", label_of(shown));
     if (hover >= 0 && *shown.key) std::snprintf(tool + std::strlen(tool), sizeof tool - std::strlen(tool), " (%s)", shown.key);
@@ -5233,8 +6032,9 @@ void draw_overlay() {
                       swamp_rail(RAIL_KINDS[g_rail_kind]) ? "602" : g_bed ? std::to_string(g_bed).c_str() : ui_text("WordNone", "none"));
         status_line(v.l, v.t + 2 * LINE_HEIGHT, bed);
     }
-    if (!g_enemy_status.empty())   // below the tool's lines (the Track tool has two)
-        status_line(v.l, v.t + (entry().tool == Tool::Track ? 3 : 2) * LINE_HEIGHT, g_enemy_status.c_str());
+    int below = entry().tool == Tool::Track ? 3 : 2;   // below the tool's lines (the Track tool has two)
+    if (!g_line_status.empty()) status_line(v.l, v.t + below++ * LINE_HEIGHT, g_line_status.c_str());   // the push line under the cursor
+    if (!g_enemy_status.empty()) status_line(v.l, v.t + below * LINE_HEIGHT, g_enemy_status.c_str());
     draw_context();
     panel_draw(g_mouse);   // the Help and Menu buttons, an open panel in front of everything
 }
@@ -5372,6 +6172,9 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             uint8_t* c = g_patrol_train;
             g_patrol_train = nullptr;
             set_train_patrol(c, true, x, y);
+        } else if (const int li = entry().tool == Tool::Select ? line_at(static_cast<int>(x), static_cast<int>(y)) : -1; li >= 0) {
+            select(nullptr);   // a push line, by its bar or its arrow
+            select_line(li);
         } else {
             uint8_t* o = pick(x, y);
             select(o);
@@ -5409,8 +6212,8 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             g_patrol_train = nullptr;
             return true;
         }
-        if (entry().tool == Tool::Track && !g_line.empty()) {
-            end_line();   // the right button ends the line first, then the tool
+        if (entry().tool == Tool::Track && !on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
+            delete_rail_at_cursor();   // the right button stays with the tool: Esc ends the line, then the tool
             return true;
         }
         if (entry().tool == Tool::PushLine && g_push_started) {
@@ -5437,6 +6240,14 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         }
         if (entry().tool == Tool::Select && !on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
             uint8_t* w0 = world();
+            const int li = line_at(static_cast<int>(at<float>(w0, W_CAMERA_X) + g_mouse.x), static_cast<int>(at<float>(w0, W_CAMERA_Y) + g_mouse.y));
+            if (li >= 0 && li != g_context_line) {   // a push line's panel
+                select(nullptr);
+                select_line(li);
+                g_context = nullptr;
+                g_context_line = li;
+                return true;
+            }
             uint8_t* o = pick(at<float>(w0, W_CAMERA_X) + g_mouse.x, at<float>(w0, W_CAMERA_Y) + g_mouse.y);
             if (o && o != g_context) {   // its context panel (another right click closes it)
                 open_context(o);
@@ -5444,6 +6255,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             }
         }
         g_context = nullptr;
+        g_context_line = -1;
         choose_entry(0);
         select(nullptr);
         return true;
@@ -5512,7 +6324,10 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             g_bed = g_bed == 0 ? BEDS[0] : (at_bed + 1 == std::end(BEDS) ? 0 : *(at_bed + 1));
             MESSAGE("MsgBed", "gravel bed of new track: %s", g_bed ? std::to_string(g_bed).c_str() : ui_text("WordNone", "none"));
         }
-        else if (w == VK_DELETE && !g_selection.empty() && is_car(g_selection[0]))   // the car; with Shift its train
+        else if ((w == VK_DELETE || w == 'T') && g_selection.empty() && g_push_selected >= 0) {   // a push line selected
+            push_change(static_cast<int>(w));
+            if (w == VK_DELETE) g_context_line = -1;
+        } else if (w == VK_DELETE && !g_selection.empty() && is_car(g_selection[0]))   // the car; with Shift its train
             delete_objects(shift_down() ? g_selection : std::vector<uint8_t*>{g_selection[0]});
         else if (w == VK_DELETE)
             delete_objects(shift_down() && !g_selection.empty() && class_of(g_selection[0]) == B_RAIL
@@ -5568,6 +6383,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
 void edit_command(int id) {
     if (id == ID_UNDO) undo(false);
     else if (id == ID_REDO) undo(true);
+    else if (id == ID_DELETE && g_selection.empty() && g_push_selected >= 0) push_change(VK_DELETE);
     else if (id == ID_DELETE) delete_objects(g_selection);
     else if (id == ID_ROTATE_RIGHT) turn(1);
     else if (id == ID_ROTATE_LEFT) turn(-1);
@@ -5890,6 +6706,19 @@ void edit_pick_arrival(int what) {
 
 bool edit_arrival_picking() { return g_arrival_pick != ArrivalPick::None; }
 
+// Esc in the editor, before the Menu panel would open: it ends what is under way - an object's or a
+// line's panel, a line of track being laid, a push line's begin picked, a train's point being picked
+// -, else it leaves a tool for Select; true when it did one of them (the Menu opens otherwise).
+bool edit_escape() {
+    if (g_context || g_context_line >= 0) close_context();
+    else if (g_patrol_train) g_patrol_train = nullptr;
+    else if (entry().tool == Tool::Track && !g_line.empty()) end_line();
+    else if (entry().tool == Tool::PushLine && g_push_started) g_push_started = false;
+    else if (entry().tool != Tool::Select) choose_entry(0);
+    else return false;
+    return true;
+}
+
 // The entry of an arrival: 0 on the map (no line needed), 1 its entry line is there, 2 none yet,
 // -1 no track there.
 int edit_entry_state(int i) {
@@ -6038,4 +6867,99 @@ void edit_pick_object(int nvid, int army) {
     g_selection.clear();
     g_context = nullptr;
     MESSAGE("MsgPlace", "place: %s (VID %d)", place_label(), nvid);
+}
+
+// ---- the posts' lines and the track, for the Arrivals panel (editor_arrivals.cpp) ----
+
+// The line a post owns now (posts, above: a line ending at its rail point from the side its colour
+// says; a pair at an entry shares one); false for none.
+bool edit_post_line(void* post, PushLine& line) {
+    const int i = own_line(static_cast<uint8_t*>(post));
+    if (i < 0) return false;
+    line = mission_push_lines()[i];
+    return true;
+}
+
+// From the rail point nearest to the screen point (x, y) along the track into the map - each step to
+// the neighbour farthest inside it -, at most max_px: the first rail point a post stands beside
+// (`at`, its screen point).
+bool edit_posts_on_way(int x, int y, int max_px, POINT& at) {
+    uint8_t* d = nearest_dot(x, y);
+    std::set<uint8_t*> beside;
+    for_each_object([&](uint8_t* o) {
+        if (!removed(o) && nvid_of(o) == VID_SEMAPHORE)
+            if (uint8_t* p = post_dot(o)) beside.insert(p);
+    });
+    uint8_t* prev = nullptr;
+    float done = 0;
+    while (d && done <= max_px) {
+        if (beside.count(d)) {
+            at = dot_screen(d);
+            return true;
+        }
+        uint8_t* next = nullptr;
+        float best = -1e9f;
+        for (int k = 0; k < dot_links(d); ++k) {
+            uint8_t* o = dot_link(d, k);
+            if (!o || o == prev) continue;
+            const POINT q = dot_screen(o);
+            if (inside_by(q.x, q.y) > best) {
+                best = inside_by(q.x, q.y);
+                next = o;
+            }
+        }
+        if (!next) break;
+        done += std::hypot(dot_wx(next) - dot_wx(d), static_cast<float>(screen_y(next) - screen_y(d)));
+        prev = d;
+        d = next;
+    }
+    return false;
+}
+
+// From the entry rail point at the screen point (x, y) along the track to the first rail point
+// ENTRY_INSIDE inside the map: the line (x, y) -> there, push_flag 1, and the pair of posts at its
+// end as S puts them (green facing the entry for the trains coming in, red facing in for those
+// going out - both own the line). One step of the history; false (nothing done) without such a way.
+bool edit_place_entry_posts(int x, int y, PushLine& line) {
+    uint8_t* begin = nearest_dot(x, y);
+    if (!begin || !mission_managed()) return false;
+    const Trace way = entry_way(begin);
+    if (way.error || way.path.size() < 2) return false;
+    const POINT b = dot_screen(way.path.front()), e = dot_screen(way.path.back());
+    line = PushLine{b.x, b.y, e.x, e.y, 1};
+    const Trace t = trace(line);
+    if (t.error || t.path.size() < 2) return false;
+    const std::vector<PushLine> lines_before = mission_push_lines();
+    if (find_line(line) < 0) mission_push_lines().push_back(line);
+    std::vector<uint8_t*> objects;
+    std::vector<State> before;
+    put_posts(line_posts(t), objects, before);
+    commit({"OpEntryLine", "entry line"}, objects, before);
+    lines_into_step(lines_before);
+    return true;
+}
+
+// After rails went: an arrival whose entry has no rail point within 4 px loses its entry, a task's
+// point with none is cleared; true when anything changed (delete_objects keeps it in its step).
+bool edit_arrivals_track_gone(ArrivalsState& s) {
+    auto gone = [](int x, int y) {
+        uint8_t* d = nearest_dot(x, y);
+        return !d || std::abs(dot_screen(d).x - x) > 4 || std::abs(dot_screen(d).y - y) > 4;
+    };
+    bool changed = false;
+    for (Arrival& a : s.list) {
+        if (a.entry && gone(a.x, a.y)) {
+            a.entry = false;
+            changed = true;
+        }
+        if ((a.tx || a.ty) && gone(a.tx, a.ty)) {
+            a.tx = a.ty = a.tz = 0;
+            changed = true;
+        }
+        if ((a.tx2 || a.ty2) && gone(a.tx2, a.ty2)) {
+            a.tx2 = a.ty2 = 0;
+            changed = true;
+        }
+    }
+    return changed;
 }
