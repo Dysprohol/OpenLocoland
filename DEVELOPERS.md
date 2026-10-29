@@ -2310,7 +2310,9 @@ crusher's host is its first stand (144): it snaps across the straight track near
 its form by the track's way; Scylla's stand (252) onto a diagonal track; the track turns both. The
 runner's `CrusherTact` bites as `Pirate_Crasher` (all the map's crushers together every 25 s, the
 units of other armies within 20 px, paused while one of its own is within 60 px; dead drums once
-its army's towers 117 are all gone - the map had some), `ScyllaTact` as `scillas.lgc` (every 15 s,
+its army's towers 117 are all gone - the map had some -, or never: the panel's STOPS WHEN: row,
+`crusher_end`, kept as 8 * the choice past the stand's 64 * form, NEVER for one placed on a map
+without a tower of its army, which the status line says), `ScyllaTact` as `scillas.lgc` (every 15 s,
 every ground unit within 50 px; a Scylla given an army spares it), and `CitadelTact` breaks every
 corkscrew of the map once no tower stands, as `ReplaceUnit` in l04 and l18. A mission's own records
 are found by their offsets (10 px, the slot's height within 30), so editing l20 moves a flag with its

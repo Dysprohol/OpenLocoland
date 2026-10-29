@@ -1113,6 +1113,32 @@ int faction_of(uint8_t* host) {
     return gun_army(nvid_of(host), army_of(host));
 }
 
+// A crusher's end in play, kept in its first stand's direction past its form (64 * form + 8 * end,
+// the same frame): when its army's pirates' towers (117) are all down - as in l04 and l18, where the
+// crushers stand with the citadels - or never. A crusher placed on a map without a tower of its army
+// never stops, and the status line says so.
+constexpr int CRUSHER_TOWERS = 0, CRUSHER_NEVER = 1;
+
+int crusher_end(uint8_t* o) { return (at<int>(o, O_DIRECTION) & 63) / 8 ? CRUSHER_NEVER : CRUSHER_TOWERS; }
+
+bool army_has_tower(int army) {
+    bool found = false;
+    for_each_object([&](uint8_t* o) {
+        if (!found && !removed(o) && nvid_of(o) == 117 && army_of(o) == army) found = true;
+    });
+    return found;
+}
+
+const UiText CRUSHER_ENDS[] = {{"CtxStopsTowers", "ITS ARMY'S TOWERS FALL"}, {"CtxStopsNever", "NEVER"}};
+
+void set_crusher_end(uint8_t* o, int end) {
+    if (crusher_end(o) == end) return;
+    const std::vector<State> before = states({o});
+    reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(o, nullptr, (at<int>(o, O_DIRECTION) & ~63) + 8 * end);
+    commit({"OpCrusherEnd", "crusher"}, {o}, before);
+    MESSAGE("MsgCrusherEnd", "crusher: stops when %s", CRUSHER_ENDS[end].get());
+}
+
 uint8_t* create(int nvid, float x, float y, float z, int direction, int army);   // placing, below
 
 // A piece made at its place by the host (its height for the VID of the slot chosen).
@@ -2022,11 +2048,13 @@ void end_drag() {
         uint8_t* o = g_drag.objects[0];
         float x = at<float>(o, O_X), y = at<float>(o, O_Y);
         int direction = at<int>(o, O_DIRECTION);
+        const int end = nvid_of(o) == VID_CRUSHER ? crusher_end(o) : 0;
         UiText why;
         if (!snap(nvid_of(o), x, y, direction, why)) {
             for (size_t i = 0; i < g_drag.objects.size(); ++i) apply(g_drag.objects[i], g_drag.before[i]);
             MESSAGE("MsgStays", "%s - it stays where it was", why.get());
         } else {
+            direction += 8 * end;   // a crusher keeps its end
             const float dx = x - g_drag.before[0].x, dy = y - g_drag.before[0].y;
             for (size_t i = 0; i < g_drag.objects.size(); ++i) {
                 uint8_t* m = g_drag.objects[i];
@@ -2520,6 +2548,7 @@ void place(POINT p) {
             return;
         }
         z = ground_z(v, x, y);
+        if (nvid == VID_CRUSHER) direction += 8 * (army_has_tower(place_army()) ? CRUSHER_TOWERS : CRUSHER_NEVER);
     }
     if (uint8_t* map = *reinterpret_cast<uint8_t**>(G_OBJECT_MAP)) {
         uint8_t* blocker = reinterpret_cast<AskPlace_t>(ASK_PLACE)(map, nullptr, v, x, y, z);
@@ -2565,6 +2594,10 @@ void place(POINT p) {
         MESSAGE("MsgPostPlaced", "placed a semaphore (%s) at %.0f,%.0f for the trains going %s, %s",
                 red(o) ? ui_text("WordRed", "red") : ui_text("WordGreen", "green"), at<float>(o, O_X), at<float>(o, O_Y),
                 way_name(at<int>(o, O_DIRECTION)), post_line_text(o));
+        return;
+    }
+    if (nvid == VID_CRUSHER && crusher_end(o) == CRUSHER_NEVER) {
+        MESSAGE("MsgCrusherNoTower", "no tower of its army - the crusher never stops; place a citadel or a tower");
         return;
     }
     const float track = track_distance(at<float>(o, O_X), at<float>(o, O_Y));
@@ -6784,8 +6817,13 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
         rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxCitadelPlay", "KILLS ALL BUT ITS TOWER'S ARMY"}, true, [] {}}}});
     if (nvid == VID_CHARYBDIS)
         rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxCharybdisPlay", "PULLS IN OTHERS, EATS YOURS"}, true, [] {}}}});
-    if (nvid == VID_CRUSHER)
+    if (nvid == VID_CRUSHER) {
         rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxCrusherPlay", "BITES ALL BUT ITS ARMY EVERY 25 S"}, true, [] {}}}});
+        ContextRow stops{{"CtxCrusherStops", "STOPS WHEN:"}, {}};
+        for (int end = 0; end < 2; ++end)
+            stops.choices.push_back({CRUSHER_ENDS[end], crusher_end(o) == end, [o, end] { set_crusher_end(o, end); }});
+        rows.push_back(stops);
+    }
     if (nvid == VID_SCYLLA)   // l06's are neutral and bite every army, one of an army spares it
         rows.push_back({{"CtxInPlay", "IN PLAY:"},
                         {{faction_of(o) == 2 ? UiText{"CtxScyllaPlay", "BITES EVERYONE EVERY 15 S"}

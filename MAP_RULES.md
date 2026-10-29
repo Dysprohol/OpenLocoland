@@ -309,7 +309,11 @@ the drums die (143 -> 139) and the crushers stop. **[editor]** the crusher (pira
 first stand) is placed across the straight track nearest within 60 px, its form by the track's way
 (turned by its track), in its faction's army - the enemy's from the palette: the runner's
 `CrusherTact` (8) bites the units of other armies (the neutrals aside), pauses while a unit of its own
-army is within 60 px, and stops with dead drums once the map had towers of its army and none is left.
+army is within 60 px, and - its panel's STOPS WHEN: - stops with dead drums once the map had towers of
+its army and none is left (ITS ARMY'S TOWERS FALL, as the missions', where the crushers stand with the
+citadels; a crusher placed on a map with a tower of its army) or never stops (NEVER; one placed on a
+map without such a tower, which the status line says) - kept in its first stand's direction, 8 * the
+choice past 64 * its form.
 
 **Scylla** (l06 2; `scillas.lgc`). The map holds the two stands (252) only - the designer's marks; the
 script makes a stand 20 below its point and two jaws (253) +-(15, 10) beside it across the swamp
