@@ -773,6 +773,22 @@ way was tried and dropped: with the height right, its objects at the GRID's heig
 grounded as the missions' (their shadows attached, side by side with missions 2, 5 and 10), so
 the editor and `place` keep putting an object at the ground's height.
 
+**A picture painted as the editor paints** (`map_tool.py paint <folder> <game folder>`). POLIGON's
+picture was painted by `map_tool` with colours of its own (a meadow, gravel, earth), which the
+editor's pipette could not name and which looked like nothing a player paints. `paint` paints an
+unpacked map's `vid\ground.png` the way the Paint tool does (`editor_ground.cpp`, the arithmetic
+ported - doubles where the editor has floats, so an edge pixel may differ by a step): the 128 x 128
+patches that the game folder's `editor	extures.tsv` names in the campaign grounds (read with
+`ground_picture`), laid mirrored at the pixel's place - the grass everywhere, light grass in soft
+strokes of 3-6 dabs (an LCG of its own, so the picture comes out the same every time), the sand as
+packed earth under the factories, repair points and forts (three dabs of 72 px across each) - and
+the meadow gravel bed under every plain rail (`paint_bed`, as `ground_bed`: the band of the decal's
+top along each rail's line, 28 px across, 7 px up the screen). The height stays as it is (POLIGON's
+1586, its GRID 70). `game/maps.new/sandbox/vid/ground.png` is painted so: in the editor Alt+click
+names the grass, the light grass, the sand and the meadow bed, and in play the factories' shadows
+lie on the ground as before and `SANDBOX_DRIVE_TEST` reaches its points 0-4 (the train stops at
+the west edge).
+
 The repository keeps such maps in `game/maps.new/<name>/`: `build.py` packs the folder as
 `maps\<name>\<name>.map`, its `vid/` folder (an unpacked image, optional) as
 `maps\<name>\<name>.vid`, and copies every other file (the script, briefing texts) next to
@@ -1296,8 +1312,20 @@ front of the game's:
   its line on the custom maps page ("Mission settings and push lines" below); the status line says
   "saved as ...",
 - Ctrl+S: the same save into the map's own file without the dialog - the file it was loaded from or
-  last saved as -, and with the dialog when it has none: a campaign map or the template (not saved
-  over) or the editor's new map; a Yes to "Save the changes?" saves the same way,
+  last saved as -, and with the dialog when it has none: a campaign map, a map of the release or the
+  editor's new map; a Yes to "Save the changes?" saves the same way. The maps of the release,
+  POLIGON (`maps\sandbox\`) and the template, are written again by every Setup update, so edits
+  saved into them were lost (a user's track added to POLIGON went with the next update): the editor
+  treats them as the campaign's maps (`release_map`, part of `game_folder_map`) - the save dialog
+  opens in `maps\` with the first free `poligon<n>.map` (POLIGON) or `map<n>.map` and says why in
+  its title and the status line ("POLIGON is a map of the release - save it under a name of its
+  own, an update would overwrite it"), a release map chosen in it is not saved over (the same text
+  in a box), Run the level with edits not saved asks for the save first (`RunCampaign`) and an
+  unchanged one runs without being written, and Map size, Export and Import leave them alone.
+  Checked in the game (Polish and English): POLIGON painted, Ctrl+R refused, Ctrl+S opening the
+  dialog titled with the reason and `poligon1.map`, saved as `maps\poligon1\poligon1.map` (its
+  ground, script and texts; on the custom maps page), then Ctrl+S there saving without the dialog
+  and Ctrl+R running it; the template loaded, Ctrl+S proposing `map1.map` with its reason,
 - File > New...: a new map in its own folder, on a campaign map's terrain or a meadow (below),
 - File > Map size...: the map's size (below),
 - File > Mission settings...: the mission's settings and texts in a dialog (below),
@@ -2296,19 +2324,61 @@ Ground height or the Paint tool is chosen, a row of buttons stands above the bar
 panel's strip (VID 497) laid as long as the row, centred on the view, the menu font (VID 2; VID 7 lit
 for what is set and what is under the mouse, the set choice underlined). Ground height: the modes
 RAISE/LOWER, FLATTEN, SMOOTH, RAMP, ROUGH, SIZE - n +, STRENGTH - n +, EDGE SOFT / HARD; Paint: a
-swatch of each texture (its mean colour, the chosen one framed), SIZE, STRENGTH (a fifth to all of the
-texture a pass: `ground_paint`'s strength), EDGE (`weight` full to the edge). A group that does not fit
+swatch of each texture (its mean colour, the chosen one framed), GRAVEL BED (below: then KIND and WIDTH
+too, and UNDER THE WHOLE TRACK), SIZE, STRENGTH (a fifth to all of the texture a pass: `ground_paint`'s
+strength), EDGE (`weight` full to the edge). A group that does not fit
 beside the others goes into a row above (the window's or the screen's width). A click on a button
 sets it; nothing under the rows is painted, raised or picked (`on_options`, as `on_bar`). The right
 button stays with the Ground height, Paint and Water tools (Esc leaves them): Raise lowers with it,
 Paint and Water put the original back with it. Paint's pipette, Alt+click, reads `ground_texture_at`:
 the editor keeps the texture of each pixel it paints (a byte a pixel, `NO_TEXTURE` for the original;
-in each stroke's `PaintPatch` for undo, carried by the relief), so it knows the textures painted in
-this session, not those of a picture saved before. Checked in the game (English and Polish): the
+in each stroke's `PaintPatch` for undo, carried by the relief); a pixel it did not paint in this
+session is recognized by the picture itself - a texture laid at full strength is its sample at the
+pixel's place (mirrored every 128 px), so the texture whose sample 13 or more of the 25 pixels around
+match (within a step of each 565 channel) is the one there: a picture painted and saved before, or
+painted by `map_tool.py paint`, names its textures too. Checked in the game (English and Polish): the
 rows of both tools, HARD and STRENGTH set, the right button lowering, the wheel, a hill, a ramp from
 level 70 up to it (106), rough ground, the level taken with Alt+click and Flatten (also with Shift)
 going to it, undo; sand chosen in the row and painted, the right button putting the original back,
 Alt+click on the sand ("texture: Sand (taken from the picture)") and on the original picture.
+
+**The gravel bed in the Paint tool** (`editor_edit.cpp` "the gravel bed in the Paint tool",
+`editor_ground.cpp` "the gravel bed's band"). How the authors bedded their track: l02/l09/l15, l11,
+l12 and l18 put a decal under every rail and have nothing under the track in the picture; l10
+(desert), l16 (ice) and l14 (volcanic) painted the band into the picture and have no decals (l10's
+~28 px across, l16's ~20, centred on the rails seen); l13 has neither. In play l02's decal beds show
+as a band ~28 px across, darker than the sprite (~110, 100, 60 where the sprite's top is ~140, 115,
+60). No campaign ground has a patch of gravel to sample, and a patch mirrored out of the decal's
+60 x 36 px top repeats like a kaleidoscope, so the band is laid along the rail instead: GRAVEL BED in
+the Paint tool's row (then KIND - meadow 612, ice 615, volcanic 616, desert 617, the same variable as
+the Track tool's B -, WIDTH 8-64 px, 28 by default, SIZE, STRENGTH, EDGE and UNDER THE WHOLE TRACK)
+beds the plain and destroyed rails whose line comes within the brush, each once a stroke. A rail's
+line is the quadratic curve from its end 0 through its middle to its end 1 (ENDS of `rail_rules.h`,
+so curves, switches and ramps - each end at its point's height - are followed), 16 straight pieces,
+7 px up the screen: the rail's sprite shows its sleepers 7 px above its place (frame 1's middle row
+68 of a 150 px cell), and the band centred on the place looked 7 px low beside them. A pixel within
+half the width of a line takes the nearest line's colour: the row of the decal's top (frame 1 of
+`vid\<nvid>.vid`, columns 45-104, rows 52-87, each row brought to the mean brightness and darkened
+to 13/16) by its distance from the line - the same either side, so rails joined either way round
+match - and the column by the place along the rail, laid mirrored a whole number of 60 px to the
+rail, so every rail's ends are on the same column. The rails beside those being painted share the
+pixels without being painted, so a rail painted in a later stroke meets its neighbour without a
+seam. On a picture of the map's own (`ground_own`) the band is painted (a pixel's texture becomes
+`BED_TEXTURE` + the kind) and the rails' decal beds are taken away - the band is their bed now, and a
+decal over it would show the bed twice; on a campaign terrain whose `lNN.vid` is not yet the map's
+own the decal of the kind is laid under each rail instead (one of another kind replaced). The right
+button puts the original picture back in the band, or takes the decals away; Alt+click takes the
+kind painted there, else the kind of the nearest rail's decal, else the kind whose mean colour the
+picture has near a rail (`ground_bed_at`). A stroke or the button is one step of the history (the
+picture's rectangle and the decals laid and taken). New track still gets the decal of the kind (B),
+the band's look and width in play. Checked in the game (Polish and English): POLIGON's junctions
+and curves bedded with a stroke (meadow), the kind ICE and WIDTH 40 over the main line, undone and
+redone, desert UNDER THE WHOLE TRACK (166 rails, one step), the right button putting POLIGON's
+original back over three rails, Alt+click naming meadow and ice; on mission 2 (a campaign terrain)
+a stroke replaced 18 meadow decals with ice ones, undone and redone, Alt+click "taken from the
+decal"; ICE chosen in the Paint tool and the Track tool's status line showing the bed 615, B
+cycling it on; Alt+click on a band of a picture saved before (POLIGON's, painted by
+`map_tool.py paint`) - also in the texture mode, near a rail - naming its kind.
 
 **Wrecks on the track** (`editor_edit.cpp`, the section of the same name). The palette's Wrecks group
 has five objects - the burnt carts and cars 13, 94, 57, 22 and 92 (class OBJECT, flags 0x4040,
@@ -2496,11 +2566,11 @@ pictures (22 px right of the device's middle, 18 up), the title in the menu titl
 the text in the menu font (VID 2), the page arrows (VIDs 475/476) and the start button (VID 477)
 with "back to the map". **Help** (the ? button or F1) shows the editor's help pages the way the
 game shows its own (`maps\menu4.lst` -> `menu41.txt` ...): `maps\edithelp.lst` lists
-`maps\edithelp1.txt` ... `edithelp18.txt` - in the order a new user needs them: what the editor
+`maps\edithelp1.txt` ... `edithelp19.txt` - in the order a new user needs them: what the editor
 is (the bar, the status line, the two buttons), the bar's tools, selecting and placing (the mouse,
 undo), the keys, laying track, trains, the object's panel, all objects and decals, the mission,
 saving and playing, the ground (height, paint, water, regions, map size), the ground tools' rows,
-then the train arrivals and the orders (13, 14) turning (15) and the citadel, Charybdis, fly nests and mines (16; page 1 names 13-16), a factory's plan (17), the crusher, Scylla and the decorations' sets (18) - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
+then the train arrivals and the orders (13, 14) turning (15) and the citadel, Charybdis, fly nests and mines (16; page 1 names 13-16), a factory's plan (17), the crusher, Scylla and the decorations' sets (18), the gravel bed (19) - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
 44 characters a line - the ESC pairs not counted, so a line with lit words is longer in the file - and 14
 lines, ESC 7 / ESC 2 switch to the lit font VID 7 and back to VID 2):
 English in `game/maps/` (the fallback of every pack) and the others in `lang/<code>/game/editor/`; the files are

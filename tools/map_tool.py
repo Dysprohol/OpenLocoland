@@ -4,6 +4,7 @@ r"""Maps and images (.map, .vid) as editable files: unpack, pack back, apply ove
     python tools\map_tool.py pack <folder> <file>
     python tools\map_tool.py new <folder> <template.map> [--vid <image>] [--script] [--size 2048x1536] [--objects <objects.res>]
     python tools\map_tool.py ground <folder> <width> <height>
+    python tools\map_tool.py paint <folder> <game folder>
     python tools\map_tool.py apply <file.map> <override folder> <output.map> [--objects <objects.res>]
     python tools\map_tool.py list <file.map> [--objects <objects.res>]
     python tools\map_tool.py vids <objects.res> [--grep <text>]
@@ -21,6 +22,11 @@ ground), `--script` writes `<folder name>.lgc`, a mission that runs as it is, an
 
 `ground` writes the image of a map ground: the empty picture of the given size, its
 height and the tiles that cut it up - the terrain is painted into the picture.
+
+`paint` paints the picture of an unpacked map (its vid\ground.png) with the editor's textures, as
+the editor's Paint tool paints: the textures that the game folder's editor	extures.tsv names in the
+campaign grounds - grass, patches of light grass, sand as packed earth under the bases -, and the
+gravel bed's band (the meadow bed decal's top) under every rail; the height is left as it is.
 
 `list` prints what a map holds, `vids` the objects of objects.res (the ones to place),
 `place` puts an object into an unpacked map: its state (behave, items, data) is
@@ -66,6 +72,7 @@ have adds an object (needs nvid), a row with `remove` = 1 deletes one. build.py 
 game/maps.override/<map name>/ this way (see DEVELOPERS.md "Data formats").
 """
 import argparse
+import array
 import concurrent.futures
 import json
 import math
@@ -2112,6 +2119,243 @@ def new_ground(folder, width, height, tile=256, level=70):
     return meta
 
 
+# ------------------------------------------------------------------ paint ----
+#
+# The picture of a map painted as the editor's Paint tool paints it (src/LocoFix/editor_ground.cpp,
+# DEVELOPERS.md "The ground's picture, water, regions" and "The gravel bed in the Paint tool"): the
+# textures are the 128 x 128 patches that the game folder's editor\textures.tsv names in the campaign
+# grounds, laid mirrored at the pixel's place, so the editor's pipette names them; a dab blends a
+# texture into a circle with the brush's soft, grainy edge; the gravel bed's band is laid along each
+# rail from the top of the bed decal. The same arithmetic as the editor's, in doubles where it has
+# floats (an edge pixel may differ by a step; a pixel laid at full strength is the sample itself).
+
+PATCH = 128
+BED_KINDS = {612: "meadow", 615: "ice", 616: "volcanic", 617: "desert"}
+BED_U0, BED_U, BED_V0, BED_V, BED_SEGMENTS, BED_RISE, BED_WIDTH = 45, 60, 52, 36, 16, 7, 28
+BED_RAILS = (610, 611)                  # the plain and destroyed rails (a swamp rail has its embankment)
+
+
+def ground_picture(path):
+    """(width, height, pixels) of a map ground's image: its picture as R5G6B5 values, row by row."""
+    records, _ = read_container(open(path, "rb").read(), b"VID ")
+    flags, _, _, w, h = HEAD.unpack(records[b"HEAD"][0])
+    textures = read_textures(records[b"SURF"][0], flags)
+    (data,) = records[b"DATA"]
+    ts = tile_struct(flags)
+    tiles = [ts.unpack_from(data, k) for k in range(0, len(data), ts.size)]
+    order = ground_textures(tiles, flags, len(textures))
+    if order is None:
+        raise DataError(f"{path}: not a map ground")
+    pixels = array.array("H", bytes(2 * w * h))
+    for k, t in zip(order, tiles):
+        tw, th, colour, _ = textures[k]
+        source = array.array("H", colour)
+        for y in range(min(th, h - t[7])):
+            n = min(tw, w - t[6])
+            pixels[(t[7] + y) * w + t[6]:(t[7] + y) * w + t[6] + n] = source[y * tw:y * tw + n]
+    return w, h, pixels
+
+
+def editor_textures(game):
+    """{key: 128 x 128 patch} of the editor's textures (editor\\textures.tsv of the game folder)."""
+    rows = load_table(os.path.join(game, "editor", "textures.tsv"), ["key", "map", "x", "y"])
+    by_map, out = {}, {}
+    for r in rows:
+        by_map.setdefault(r["map"], []).append(r)
+    for name, entries in by_map.items():
+        w, h, pixels = ground_picture(os.path.join(game, "maps", name, name + ".vid"))
+        for r in entries:
+            x0, y0 = int(r["x"]), int(r["y"])
+            if x0 < 0 or y0 < 0 or x0 + PATCH > w or y0 + PATCH > h:
+                continue
+            out[r["key"]] = [pixels[(y0 + y) * w + x0 + x] for y in range(PATCH) for x in range(PATCH)]
+    return out
+
+
+def bed_patch(game, nvid):
+    """The band's colours of a bed kind (editor_ground.cpp read_beds): the decal's top, frame 1 of
+    vid\\<nvid>.vid, BED_U x BED_V px, each row brought to the mean brightness and darkened to 13/16."""
+    records, _ = read_container(open(os.path.join(game, "vid", f"{nvid}.vid"), "rb").read(), b"VID ")
+    flags = HEAD.unpack(records[b"HEAD"][0])[0]
+    palette = records[b"PAL "][0]
+    depth = 2 if flags & 4 else 0
+    rec = records[b"DATA"][1]
+    _, _, runs = parse_frame(rec, 1 + depth)
+    image = {}
+    for y, x, count, o in runs:
+        o += depth * count
+        for k in range(count):
+            i = rec[o + k]
+            if len(palette) == 1024:
+                image[(x + k, y)] = (palette[4 * i + 2], palette[4 * i + 1], palette[4 * i])
+            else:
+                image[(x + k, y)] = (palette[3 * i], palette[3 * i + 1], palette[3 * i + 2])
+    cells = [[image.get((BED_U0 + u, BED_V0 + v)) for u in range(BED_U)] for v in range(BED_V)]
+    if any(c is None for row in cells for c in row):
+        raise DataError(f"vid\\{nvid}.vid: frame 1 does not cover the bed's top")
+    sums = [sum(sum(c) for c in row) for row in cells]
+    total = sum(sums)
+    out = []
+    for v, row in enumerate(cells):
+        div = BED_V * (sums[v] or 1) * 16
+        for c in row:
+            r, g, b = (min(255, x * total * 13 // div) for x in c)
+            out.append(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3))
+    return out
+
+
+def _hash(x, y):
+    h = (x * 374761393 + y * 668265263) & 0xffffffff
+    h = ((h ^ (h >> 13)) * 1274126177) & 0xffffffff
+    return h ^ (h >> 16)
+
+
+def _weight(distance, radius, x, y, hard=False):
+    """The brush's weight at a distance (editor_ground.cpp weight): full inside, falling off over
+    the outer 45 %, the edge broken by a grain; a hard brush is full to its edge."""
+    d = distance / radius + ((_hash(x, y) & 255) / 255.0 - 0.5) * (0.03 if hard else 0.12)
+    if d >= 1:
+        return 0.0
+    if hard:
+        return 1.0
+    t = 1.0 if d <= 0.55 else (1 - d) / 0.45
+    return t * t * (3 - 2 * t)
+
+
+def _blend(a, b, t):
+    if t <= 0:
+        return a
+    if t >= 1:
+        return b
+    ar, ag, ab = a >> 11, (a >> 5) & 63, a & 31
+    br, bg, bb = b >> 11, (b >> 5) & 63, b & 31
+    return (int(ar + (br - ar) * t + 0.5) << 11) | (int(ag + (bg - ag) * t + 0.5) << 5) | \
+        int(ab + (bb - ab) * t + 0.5)
+
+
+def _sample(patch, x, y):
+    u, v = x & 255, y & 255             # mirrored every 128 px: no seams
+    if u >= PATCH:
+        u = 255 - u
+    if v >= PATCH:
+        v = 255 - v
+    return patch[v * PATCH + u]
+
+
+def paint_dab(pixels, w, h, x, y, radius, patch, strength=1.0, hard=False):
+    """A dab of the Paint tool (ground_paint) at the picture's point x, y."""
+    cx, cy, r = math.floor(x), math.floor(y), math.ceil(radius)
+    for py in range(max(0, cy - r), min(h, cy + r + 1)):
+        for px in range(max(0, cx - r), min(w, cx + r + 1)):
+            a = _weight(math.hypot(px - cx, py - cy), radius, px, py, hard) * strength
+            if a > 0:
+                i = py * w + px
+                pixels[i] = _blend(pixels[i], _sample(patch, px, py), a)
+
+
+def bed_line(x, y, z, direction):
+    """A rail's line on the picture (editor_ground.cpp bed_line): BED_SEGMENTS pieces of the
+    quadratic curve from its end 0 through its middle to its end 1 at its points' heights, BED_RISE
+    px up the screen where its sprite shows the sleepers; the points and their lengths along it."""
+    _, _, shape, z0, z1 = rail_of(x, y, z, direction)
+    za, zc = z0 - RAIL_ALTITUDE + BED_RISE, z1 - RAIL_ALTITUDE + BED_RISE
+    (e0x, e0y), (e1x, e1y) = RAIL_ENDS[shape]
+    ax, ay = x + e0x * RAIL_HALF[0], y + e0y * RAIL_HALF[1] - za
+    bx, by = x, y - (za + zc) / 2
+    cx, cy = x + e1x * RAIL_HALF[0], y + e1y * RAIL_HALF[1] - zc
+    points, lengths = [], []
+    for i in range(BED_SEGMENTS + 1):
+        t = i / BED_SEGMENTS
+        m = 1 - t
+        p = (m * m * ax + 2 * t * m * bx + t * t * cx, m * m * ay + 2 * t * m * by + t * t * cy)
+        lengths.append(lengths[-1] + math.hypot(p[0] - points[-1][0], p[1] - points[-1][1]) if points else 0.0)
+        points.append(p)
+    return points, lengths
+
+
+def paint_bed(pixels, w, h, rails, patch, width=BED_WIDTH, strength=1.0, hard=False):
+    """The gravel bed's band under the rails (ground_bed): a pixel within half the width of a line
+    takes the nearest line's colour - the decal's row by its distance from the line, its column by
+    the place along the rail, mirrored, a whole number of BED_U to the rail."""
+    hw = width / 2
+    nearest, along = {}, {}
+    for rail in rails:
+        points, lengths = bed_line(*rail)
+        length = lengths[-1]
+        scale = max(1.0, float(round(length / BED_U))) * BED_U / length if length > 0 else 0
+        for i in range(BED_SEGMENTS):
+            ax, ay = points[i]
+            ux, uy = points[i + 1][0] - ax, points[i + 1][1] - ay
+            len2 = ux * ux + uy * uy
+            for py in range(max(0, math.floor(min(ay, ay + uy) - hw)), min(h, math.ceil(max(ay, ay + uy) + hw) + 1)):
+                for px in range(max(0, math.floor(min(ax, ax + ux) - hw)), min(w, math.ceil(max(ax, ax + ux) + hw) + 1)):
+                    qx, qy = px + 0.5 - ax, py + 0.5 - ay
+                    t = max(0.0, min(1.0, (qx * ux + qy * uy) / len2)) if len2 > 0 else 0.0
+                    d = math.hypot(qx - ux * t, qy - uy * t)
+                    k = py * w + px
+                    if d < hw and d < nearest.get(k, hw):
+                        nearest[k] = d
+                        along[k] = (lengths[i] + t * (lengths[i + 1] - lengths[i])) * scale
+    for k, d in nearest.items():
+        px, py = k % w, k // w
+        a = _weight(d, hw, px, py, hard) * strength
+        if a <= 0:
+            continue
+        v = min(BED_V - 1, int(d / hw * BED_V))
+        u = math.floor(along[k]) % (2 * BED_U)
+        if u >= BED_U:
+            u = 2 * BED_U - 1 - u
+        pixels[k] = _blend(pixels[k], patch[v * BED_U + u], a)
+
+
+# What POLIGON's picture is painted with: the editor's grass, light grass in soft patches, packed
+# earth (the editor's sand) under the bases - the factories, repair points and forts -, the meadow
+# bed under the whole track.
+PAINT_BASE, PAINT_PATCHES, PAINT_EARTH = "TexGrass", "TexLightGrass", "TexSand"
+PAINT_BASES = (102, 104, 162)
+
+
+def paint_map(folder, game, bed=612, seed=7):
+    """Paints the picture of the unpacked map `folder` (its vid\\ground.png) with the editor's
+    textures sampled in the game folder `game`, as the Paint tool would: the grass base, patches
+    of light grass, the earth under the bases and the gravel bed of the kind `bed` under every
+    rail. The height (vid\\height.png) is left as it is."""
+    vid = os.path.join(folder, "vid")
+    meta = load_json(os.path.join(vid, "vid.json"))
+    w, h = meta["width"], meta["height"]
+    textures = editor_textures(game)
+    for key in (PAINT_BASE, PAINT_PATCHES, PAINT_EARTH):
+        if key not in textures:
+            raise DataError(f"{game}: the texture {key} cannot be sampled")
+    model = load_map(folder)
+    objects = model["objects"]
+    ground = next(o for o in objects if int(o["nvid"]) == 1024)
+    left, top = float(ground["x"]) - w / 2, float(ground["y"]) - h / 2
+    base = textures[PAINT_BASE]
+    pixels = array.array("H", (_sample(base, x, y) for y in range(h) for x in range(w)))
+    state = seed
+    def random(n):                      # an LCG of its own: the same picture every time
+        nonlocal state
+        state = (state * 1103515245 + 12345) & 0x7fffffff
+        return state % n
+    for _ in range(w * h // 150000):    # strokes of a few dabs, each patch its own shape
+        x, y, r, angle = random(w), random(h), 60 + random(70), random(360) * math.pi / 180
+        for _ in range(3 + random(4)):
+            paint_dab(pixels, w, h, x, y, r, textures[PAINT_PATCHES])
+            angle += (random(91) - 45) * math.pi / 180
+            x, y = x + math.cos(angle) * r * 0.7, y + math.sin(angle) * r * 0.7
+    for o in objects:
+        if int(o["nvid"]) in PAINT_BASES:
+            x, y = float(o["x"]) - left, float(o["y"]) - float(o["z"]) - top + 10
+            for dx in (-36, 0, 36):
+                paint_dab(pixels, w, h, x + dx, y, 72, textures[PAINT_EARTH])
+    rails = [(float(o["x"]) - left, float(o["y"]) - top, float(o["z"]), int(o["direction"]))
+             for o in objects if int(o["nvid"]) in BED_RAILS]
+    paint_bed(pixels, w, h, rails, bed_patch(game, bed))
+    rgb565_image(pixels.tobytes(), w, h).save(os.path.join(vid, "ground.png"))
+    return len(rails)
+
+
 def new_map(template, folder, objects_res=None, vid=None, script=False, size=None):
     """Writes `folder` as a new map made from `template`: its terrain (the ground object,
     the ground's OBJ record, GRPH, HEAD and GRID) and nothing else - no other objects, no
@@ -3324,7 +3568,7 @@ def main(argv):
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0],
                                 formatter_class=argparse.RawDescriptionHelpFormatter,
                                 epilog=__doc__.split("\n\n")[1])
-    p.add_argument("command", choices=["unpack", "pack", "new", "ground", "apply", "check",
+    p.add_argument("command", choices=["unpack", "pack", "new", "ground", "paint", "apply", "check",
                                        "list", "vids", "place", "copy", "delete", "track",
                                        "check-track"])
     p.add_argument("paths", nargs="+")
@@ -3344,7 +3588,7 @@ def main(argv):
     p.add_argument("--shapes", help="track: the sprite shape of each step, e.g. 2,2,3")
     p.add_argument("--rail", type=int, default=610, help="track: VID of the rail (610)")
     a = p.parse_args(argv)
-    counts = {"unpack": 2, "pack": 2, "new": 2, "ground": 3, "apply": 3, "check": 1,
+    counts = {"unpack": 2, "pack": 2, "new": 2, "ground": 3, "paint": 2, "apply": 3, "check": 1,
               "list": 1, "vids": 1, "place": 4, "copy": 3, "delete": 2, "track": 2,
               "check-track": 1}
     if a.command == "track":
@@ -3374,6 +3618,8 @@ def main(argv):
         elif a.command == "ground":
             meta = new_ground(a.paths[0], int(a.paths[1]), int(a.paths[2]))
             print(f"ground {meta['width']}x{meta['height']}: {meta['textures']} tiles")
+        elif a.command == "paint":
+            print(f"painted: the gravel bed under {paint_map(a.paths[0], a.paths[1])} rails")
         elif a.command == "apply":
             print(f"{apply_map(*a.paths, a.objects)} values changed")
         elif a.command == "list":

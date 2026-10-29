@@ -83,6 +83,7 @@ void edit_restore_history();
 void edit_saved();
 void edit_message_saved(const std::string& map);
 void panel_saved(const std::string& file);   // editor_panel.cpp: the SAVED notice
+void edit_message_line(const std::string& text);
 void install_editor_edit();
 void edit_level_held();
 void edit_touch();
@@ -511,27 +512,48 @@ std::string file_dialog(HWND owner, bool save, const std::string& folder, const 
     return path;
 }
 
+// A map of the release that Setup writes again with every update - POLIGON (maps\sandbox\) and the
+// template: the editor saves it only under a name of its own, as it does a campaign map.
+bool release_map(const std::string& map) {
+    const std::string lower = lower_path(map);
+    return lower.compare(0, 13, "maps\\sandbox\\") == 0 || lower.compare(0, 14, "maps\\template\\") == 0;
+}
+
+// Why a map of the release is saved under another name (the status line, the save dialog's title).
+std::string release_reason(const std::string& map) {
+    const bool sandbox = lower_path(map).compare(0, 13, "maps\\sandbox\\") == 0;
+    return ui_printf(ui_format("SaveRelease", "%s is a map of the release - save it under a name of its own, an update would overwrite it"),
+                     sandbox ? ui_text("ReleaseSandbox", "POLIGON") : ui_text("ReleaseTemplate", "The template"));
+}
+
 // A file chosen in a Windows dialog, as a game path; empty when cancelled. The editor's new map has
-// no name yet: the dialog opens in maps\ with the first free name mapN. A map saved straight into
-// maps\ (where the game keeps only its menu and intro scenes) goes into a folder of its name,
-// maps\<name>\<name>.map, so it is on the custom maps page; a map there already is overwritten only
-// when the user says so.
+// no name yet: the dialog opens in maps\ with the first free name mapN; a map of the release opens it
+// with the first free poligonN (POLIGON) or mapN and says why in its title and the status line, and
+// is not saved over. A map saved straight into maps\ (where the game keeps only its menu and intro
+// scenes) goes into a folder of its name, maps\<name>\<name>.map, so it is on the custom maps page; a
+// map there already is overwritten only when the user says so.
 std::string choose_map(HWND owner, bool save) {
     const std::string current = full_path(g_current.empty() ? level_file() : g_current);
     const size_t slash = current.find_last_of('\\');
     std::string folder = slash == std::string::npos ? "" : current.substr(0, slash);
     std::string file = slash == std::string::npos ? "" : current.substr(slash + 1);
-    if (save && auto_folder(folder_of(game_path(current)))) {
+    const bool release = save && release_map(game_path(current));
+    std::string title = save ? ui_text("FileSaveTitle", "Save map") : ui_text("FileLoadTitle", "Load map");
+    if (save && (release || auto_folder(folder_of(game_path(current))))) {
+        // a name of its own proposed: the first free maps\poligon<n>\ for POLIGON, maps\map<n>\ else
+        const std::string base = release && lower_path(game_path(current)).compare(0, 13, "maps\\sandbox\\") == 0 ? "poligon" : "map";
         folder.clear();
         int n = 1;
-        while (n < 1000 && GetFileAttributesA(("maps\\map" + std::to_string(n)).c_str()) != INVALID_FILE_ATTRIBUTES) ++n;
-        file = "map" + std::to_string(n) + ".map";
+        while (n < 1000 && GetFileAttributesA(("maps\\" + base + std::to_string(n)).c_str()) != INVALID_FILE_ATTRIBUTES) ++n;
+        file = base + std::to_string(n) + ".map";
+    }
+    if (release) {
+        title = release_reason(game_path(current));
+        edit_message_line(title);
     }
     if (folder.empty() || GetFileAttributesA(folder.c_str()) == INVALID_FILE_ATTRIBUTES)
         folder = patch::game_folder() + "maps";
-    const std::string chosen = file_dialog(owner, save, folder, file,
-                                           save ? ui_text("FileSaveTitle", "Save map") : ui_text("FileLoadTitle", "Load map"),
-                                           ui_text("FileMaps", "Maps (*.map)"), L"*.map", L"map");
+    const std::string chosen = file_dialog(owner, save, folder, file, title.c_str(), ui_text("FileMaps", "Maps (*.map)"), L"*.map", L"map");
     if (chosen.empty()) return "";
     std::string map = game_path(chosen);
     if (save && map.find(':') != std::string::npos) {   // a map's script and texts are found by game paths
@@ -551,6 +573,16 @@ std::string choose_map(HWND owner, bool save) {
                 return "";
         }
         patch::log("editor: saved into a folder of its own: %s", map.c_str());
+    }
+    if (save && release_map(map)) {   // chosen again: not saved where the next update writes
+        const std::string why = release_reason(map);
+        edit_message_line(why);
+        if (!g_test || g_test_ask) {
+            DialogScope scope;
+            ui_message_box(owner, why.c_str(), ui_text("FileSaveTitle", "Save map"), MB_OK | MB_ICONINFORMATION);
+        }
+        patch::log("editor: not saved over a map of the release: %s", map.c_str());
+        return "";
     }
     return map;
 }
@@ -581,8 +613,8 @@ std::string current_map() { return g_current.empty() ? std::string(level_file())
 bool game_folder_map(const std::string& map);
 
 // The file Ctrl+S saves the map into without asking: the one it was loaded from or last saved as -
-// not a map of the game's own folders (the campaign, the template) nor the start's new map, which
-// has no name yet; empty when the name is to be asked.
+// not a map of the game's own folders (the campaign, POLIGON, the template) nor the start's new map,
+// which has no name yet; empty when the name is to be asked.
 std::string own_file() {
     const std::string map = game_path(current_map());
     if (map.empty() || game_folder_map(map) || auto_folder(folder_of(map))) return "";
@@ -608,7 +640,7 @@ bool run_level(HWND window) {
     // written as a save writes it, without asking - also when nothing changed, so the script has the
     // runner and the panels' settings of this version (an older map's script is brought up to date)
     if (edit_dirty() || !game_folder_map(map)) {
-        if (game_folder_map(map)) {   // a campaign map or the template is not saved over
+        if (game_folder_map(map)) {   // a campaign map, POLIGON or the template is not saved over
             if (asks()) {
                 DialogScope scope;
                 ui_message_box(window,
@@ -676,12 +708,12 @@ bool resize_current(HWND window, int w, int h) {
     }();
     const bool campaign = lower.size() > 9 && lower.compare(0, 6, "maps\\l") == 0 && std::isdigit(static_cast<unsigned char>(lower[6])) &&
                           std::isdigit(static_cast<unsigned char>(lower[7])) && lower[8] == '\\';
-    if (campaign || lower.compare(0, 14, "maps\\template\\") == 0) {
+    if (campaign || release_map(map)) {
         DialogScope scope;
         if (window && !g_test)
             ui_message_box(window,
                         ui_text("ResizeCampaign", "Save the map under a name of its own first (File > Save): the "
-                                                  "campaign's maps and the template are not resized."),
+                                                  "campaign's maps, POLIGON and the template are not resized."),
                         ui_text("ResizeTitle", "Map size"), MB_OK | MB_ICONINFORMATION);
         patch::log("editor: map size: %s is not resized", map.c_str());
         return false;
@@ -719,14 +751,15 @@ bool resize_current(HWND window, int w, int h) {
 // says so, otherwise - or when the folder is the game's own (a campaign map, the template) - the
 // map comes as <name>_2, _3 ...; it is added to the custom maps page and offered to be opened.
 
-// A map of the game's own folders (the campaign's maps\lNN\, the template): not exported, not
+// A map of the game's own folders (the campaign's maps\lNN\, POLIGON and the template, which an update
+// writes again): not saved over by Ctrl+S or Run the level, not resized, not exported, not
 // overwritten by an import.
 bool game_folder_map(const std::string& map) {
     std::string lower = map;
     for (char& c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     const bool campaign = lower.size() > 9 && lower.compare(0, 6, "maps\\l") == 0 && std::isdigit(static_cast<unsigned char>(lower[6])) &&
                           std::isdigit(static_cast<unsigned char>(lower[7])) && lower[8] == '\\';
-    return campaign || lower.compare(0, 14, "maps\\template\\") == 0 || lower.compare(0, 12, "maps\\script\\") == 0;
+    return campaign || release_map(map) || lower.compare(0, 12, "maps\\script\\") == 0;
 }
 
 bool asks() { return !g_test || g_test_ask; }
@@ -759,7 +792,7 @@ bool export_current(HWND window, const std::string& zip_given) {
     if (game_folder_map(map)) {
         patch::log("exchange: %s is a map of the game - not exported", map.c_str());
         if (asks())
-            ask(window, ui_text("ExportGameMap", "Save the map under a name of its own first (File > Save): the campaign's maps and "
+            ask(window, ui_text("ExportGameMap", "Save the map under a name of its own first (File > Save): the campaign's maps, POLIGON and "
                                                 "the template are not exported."),
                 MB_OK | MB_ICONINFORMATION);
         return false;

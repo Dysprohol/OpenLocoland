@@ -42,8 +42,40 @@ void ground_stroke_begin();
 // Paints a texture into a circle of the picture (screen coordinates of the map: x, y - z) - `strength`
 // (0-1) of it a pass, the edge soft or hard; `restore` puts the original picture back there instead.
 void ground_paint(float x, float y, float radius, int texture, bool restore, float strength = 1, bool hard = false);
-// The texture painted at a screen point of the map (its index), -1 where the picture is the original.
+// The texture painted at a screen point of the map (its index; BED_TEXTURE + a kind for a bed's band),
+// -1 where the picture is the original. A picture saved before is recognized by its pixels: a texture
+// laid at full strength is its sample at the pixel's place (mirrored every 128 px).
 int ground_texture_at(float x, float y);
+// The gravel bed's band under the track: the four kinds of the missions' bed decals (VID 612 meadow,
+// 615 ice, 616 volcanic, 617 desert), the band's colours taken from the top of the decal itself
+// (vid\<nvid>.vid, frame 1); a pixel of a band keeps BED_TEXTURE + its kind as its texture.
+constexpr int BED_KINDS = 4;
+constexpr uint8_t BED_TEXTURE = 200;
+constexpr int BED_WIDTH = 28;   // px across: the missions' band (l10's painted one, l02's decals in play)
+struct BedKind {
+    int nvid;
+    const char* key;
+    const char* english;
+    uint16_t mean = 0;   // R5G6B5, for the swatch and the pipette
+    bool available = false;
+};
+const BedKind* ground_bed_kinds();
+struct BedRail {   // a rail of the map (its object's place and direction)
+    float x, y, z;
+    int direction;
+};
+// Paints the band of a bed kind along the rails, `width` px across and centred on each rail's line
+// (a quadratic curve through its two ends at the rail's height, a ramp's climbing with it); where
+// two rails' bands meet a pixel takes the nearer line's. Only the first `paint` rails are painted; the
+// others (rails beside them) only keep their own pixels, so a rail painted later meets its neighbour
+// without a seam. `strength` and `hard` as ground_paint, `restore` puts the original picture back in
+// the band instead.
+void ground_bed(const std::vector<BedRail>& rails, size_t paint, int kind, float width, float strength, bool hard,
+                bool restore);
+// The distance of a screen point of the map (x, y - z) from a rail's line.
+float ground_bed_distance(const BedRail& rail, float x, float y);
+// The bed kind whose colour the picture has around a screen point (a band saved before), -1 when none.
+int ground_bed_at(float x, float y);
 // Lowers the picture in a circle to `bed` (a GRID level) with a sloping shore, painting the bed
 // with a texture (-1: none); `restore` puts the original heights and colours back.
 void ground_lower(float x, float y, float radius, int bed, int texture, bool restore);

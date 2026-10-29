@@ -622,6 +622,72 @@ bool read_ground_picture(const std::string& image, int& w, int& h, std::vector<u
     return true;
 }
 
+// A frame of a sprite image (DEVELOPERS.md "Data formats": RLE rows of palette indices, each run's
+// heights first with imageFlags 4) as ARGB, 0 where it is transparent; w x h is the image's cell.
+bool read_sprite_frame(const std::string& image, int frame, int& w, int& h, std::vector<uint32_t>& argb) {
+    std::vector<Chunk> chunks;
+    if (!read_res(read_file(image), "VID ", chunks)) return false;
+    const std::vector<std::string>* frames = nullptr;
+    std::string head, palette;
+    for (const Chunk& c : chunks) {
+        if (c.id == "HEAD" && !c.records.empty()) head = c.records[0];
+        else if (c.id == "PAL " && !c.records.empty()) palette = c.records[0];
+        else if (c.id == "DATA") frames = &c.records;
+    }
+    if (head.size() < 10 || !frames || (palette.size() != 768 && palette.size() != 1024)) return false;
+    uint16_t flags, cw, ch;
+    std::memcpy(&flags, &head[0], 2);
+    std::memcpy(&cw, &head[6], 2);
+    std::memcpy(&ch, &head[8], 2);
+    if ((flags & 0xa0) || !(flags & 8)) return false;   // a sprite with a palette
+    const size_t depth = (flags & 4) ? 2 : 0;
+    for (int guard = 0; guard < 4 && frame >= 0 && frame < static_cast<int>(frames->size()); ++guard) {
+        const std::string& r = (*frames)[frame];
+        if (r.size() == 6 && u32(r, 0) == 2) {   // a reference to another frame
+            int16_t to;
+            std::memcpy(&to, &r[4], 2);
+            frame = to;
+            continue;
+        }
+        if (r.size() < 6 || u32(r, 0) != r.size() - 4) return false;
+        int16_t n, top, rows;
+        std::memcpy(&n, &r[4], 2);
+        size_t o = 6 + 6 * static_cast<size_t>((std::max)(static_cast<int16_t>(0), n));
+        if (o + 4 > r.size()) return false;
+        std::memcpy(&top, &r[o], 2);
+        std::memcpy(&rows, &r[o + 2], 2);
+        o += 4;
+        w = cw;
+        h = ch;
+        argb.assign(static_cast<size_t>(w) * h, 0);
+        for (int y = 0; y < rows; ++y)
+            for (int x = 0;;) {
+                if (o + 2 > r.size()) return false;
+                const int skip = static_cast<uint8_t>(r[o]), count = static_cast<uint8_t>(r[o + 1]);
+                o += 2;
+                if (!skip && !count) break;
+                x += skip;
+                o += depth * count;
+                if (o + count > r.size()) return false;
+                for (int k = 0; k < count; ++k, ++x) {
+                    const int i = static_cast<uint8_t>(r[o + k]), py = top + y;
+                    if (x >= w || py < 0 || py >= h) continue;
+                    uint32_t rgb;
+                    if (palette.size() == 1024)   // B, G, R, A
+                        rgb = (static_cast<uint8_t>(palette[4 * i + 2]) << 16) | (static_cast<uint8_t>(palette[4 * i + 1]) << 8) |
+                              static_cast<uint8_t>(palette[4 * i]);
+                    else
+                        rgb = (static_cast<uint8_t>(palette[3 * i]) << 16) | (static_cast<uint8_t>(palette[3 * i + 1]) << 8) |
+                              static_cast<uint8_t>(palette[3 * i + 2]);
+                    argb[static_cast<size_t>(py) * w + x] = 0xff000000 | rgb;
+                }
+                o += count;
+            }
+        return true;
+    }
+    return false;
+}
+
 // Writes a picture as a ground image of its own (the layout of File > New's grounds).
 bool write_ground_picture(const std::string& image, int w, int h, const std::vector<uint16_t>& pixels,
                           const std::vector<uint16_t>& heights) {

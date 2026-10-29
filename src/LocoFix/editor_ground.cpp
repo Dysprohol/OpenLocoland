@@ -23,6 +23,7 @@
 // is hidden by it.
 #include "patch.h"
 #include "editor_ground.h"
+#include "rail_rules.h"
 
 #include <ddraw.h>
 #include <algorithm>
@@ -40,6 +41,7 @@ bool read_ground_picture(const std::string& image, int& w, int& h, std::vector<u
 bool write_ground_picture(const std::string& image, int w, int h, const std::vector<uint16_t>& pixels,
                           const std::vector<uint16_t>& heights);
 bool set_map_ground_image(const std::string& map, const std::string& image);
+bool read_sprite_frame(const std::string& image, int frame, int& w, int& h, std::vector<uint32_t>& argb);
 
 namespace {
 
@@ -204,6 +206,96 @@ void touch(int x, int y) {
     g_y0 = (std::min)(g_y0, y);
     g_x1 = (std::max)(g_x1, x);
     g_y1 = (std::max)(g_y1, y);
+}
+
+// ---- the gravel bed's band ----
+//
+// Its colours are the top of the bed decal of the kind: frame 1 of the decal (a straight piece across
+// the screen) from column BED_U0 and row BED_V0, BED_U x BED_V px, each row brought to the mean
+// brightness (the decal is a rounded embankment, lit from above) and darkened to 13/16 - what the
+// engine shows of the decal baked into the ground in play (l02: ~110, 100, 60 where the sprite is
+// ~140, 115, 60). Along a rail the columns are laid mirrored, a whole number of BED_U to the rail
+// (its ends meet the next rail's on the same column); across it the rows go from the line out to the
+// band's edge on either side, so two rails joined either way round match. map_tool.py paint lays
+// the band the same way.
+constexpr int BED_U0 = 45, BED_U = 60, BED_V0 = 52, BED_V = 36, BED_SEGMENTS = 16, BED_RISE = 7;
+BedKind g_bed_kinds[BED_KINDS] = {{612, "BedMeadow", "meadow"}, {615, "BedIce", "ice"}, {616, "BedVolcanic", "volcanic"},
+                                  {617, "BedDesert", "desert"}};
+std::vector<uint16_t> g_bed_patch[BED_KINDS];   // BED_V rows of BED_U
+bool g_beds_read = false;
+
+void read_beds() {
+    if (g_beds_read) return;
+    g_beds_read = true;
+    for (int k = 0; k < BED_KINDS; ++k) {
+        int w = 0, h = 0;
+        std::vector<uint32_t> argb;
+        const std::string image = "vid\\" + std::to_string(g_bed_kinds[k].nvid) + ".vid";
+        if (!read_sprite_frame(image, 1, w, h, argb) || w < BED_U0 + BED_U || h < BED_V0 + BED_V) {
+            patch::log("ground: %s cannot be read - no bed of that kind", image.c_str());
+            continue;
+        }
+        bool whole = true;
+        long long rows[BED_V] = {}, total = 0;
+        for (int v = 0; v < BED_V; ++v)
+            for (int u = 0; u < BED_U; ++u) {
+                const uint32_t c = argb[static_cast<size_t>(BED_V0 + v) * w + BED_U0 + u];
+                whole = whole && (c >> 24) != 0;
+                rows[v] += ((c >> 16) & 255) + ((c >> 8) & 255) + (c & 255);
+            }
+        for (long long r : rows) total += r;
+        if (!whole || total == 0) continue;
+        std::vector<uint16_t>& p = g_bed_patch[k];
+        uint32_t r5 = 0, g6 = 0, b5 = 0;
+        for (int v = 0; v < BED_V; ++v)
+            for (int u = 0; u < BED_U; ++u) {
+                const uint32_t c = argb[static_cast<size_t>(BED_V0 + v) * w + BED_U0 + u];
+                const long long div = static_cast<long long>(BED_V) * (rows[v] ? rows[v] : 1) * 16;
+                auto level = [&](uint32_t x) { return static_cast<uint32_t>((std::min)(255LL, x * total * 13 / div)); };
+                const uint32_t r = level((c >> 16) & 255), g = level((c >> 8) & 255), b = level(c & 255);
+                p.push_back(static_cast<uint16_t>(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)));
+                r5 += r >> 3;
+                g6 += g >> 2;
+                b5 += b >> 3;
+            }
+        const uint32_t n = BED_U * BED_V;
+        g_bed_kinds[k].mean = static_cast<uint16_t>(((r5 / n) << 11) | ((g6 / n) << 5) | (b5 / n));
+        g_bed_kinds[k].available = true;
+    }
+}
+
+// A rail's line on the picture: BED_SEGMENTS straight pieces of the quadratic curve from its end 0
+// through its middle to its end 1 (a straight rail's middle is on the line between its ends), each
+// end at its point's height less the rail's altitude - the rail's own height, a ramp's raised end
+// 11 higher -, the middle half way; all of it BED_RISE px up the screen, where the rail's sprite
+// shows its sleepers (the middle of frame 1 is 7 px above the cell's), so the band is centred on
+// the rail seen and not on its place.
+struct BedLine {
+    float x[BED_SEGMENTS + 1], y[BED_SEGMENTS + 1], s[BED_SEGMENTS + 1];
+    float l, t, r, b;   // its box
+};
+
+BedLine bed_line(const BedRail& rail, float left, float top) {
+    const rail::Rail q = rail::rail_of(rail.x, rail.y, rail.z, rail.direction);
+    const rail::Point a = rail::end_of(q, 0), c = rail::end_of(q, 1);
+    const float za = static_cast<float>(q.z0 - rail::ALTITUDE + BED_RISE), zc = static_cast<float>(q.z1 - rail::ALTITUDE + BED_RISE);
+    const float ax = static_cast<float>(a.x) - left, ay = static_cast<float>(a.y) - za - top;
+    const float bx = rail.x - left, by = rail.y - (za + zc) / 2 - top;
+    const float cx = static_cast<float>(c.x) - left, cy = static_cast<float>(c.y) - zc - top;
+    BedLine line;
+    line.l = line.t = 1e9f;
+    line.r = line.b = -1e9f;
+    for (int i = 0; i <= BED_SEGMENTS; ++i) {
+        const float t = static_cast<float>(i) / BED_SEGMENTS, m = 1 - t;
+        line.x[i] = m * m * ax + 2 * t * m * bx + t * t * cx;
+        line.y[i] = m * m * ay + 2 * t * m * by + t * t * cy;
+        line.s[i] = i ? line.s[i - 1] + std::hypot(line.x[i] - line.x[i - 1], line.y[i] - line.y[i - 1]) : 0;
+        line.l = (std::min)(line.l, line.x[i]);
+        line.t = (std::min)(line.t, line.y[i]);
+        line.r = (std::max)(line.r, line.x[i]);
+        line.b = (std::max)(line.b, line.y[i]);
+    }
+    return line;
 }
 
 // ---- the live image ----
@@ -452,7 +544,160 @@ int ground_texture_at(float x, float y) {
     int px, py;
     if (!g_ready || !to_picture(x, y, px, py)) return -1;
     const uint8_t t = g_textures_of[static_cast<size_t>(py) * g_w + px];
-    return t == NO_TEXTURE ? -1 : t;
+    if (t != NO_TEXTURE) return t;
+    // not painted in this session: the texture whose sample most of the pixels around are (within
+    // a step of each channel)
+    read_textures();
+    int best = -1, best_count = 12;   // of 25
+    for (size_t k = 0; k < g_textures.size(); ++k) {
+        if (!g_textures[k].sampled) continue;
+        int count = 0;
+        for (int yy = (std::max)(0, py - 2); yy <= (std::min)(g_h - 1, py + 2); ++yy)
+            for (int xx = (std::max)(0, px - 2); xx <= (std::min)(g_w - 1, px + 2); ++xx) {
+                const uint16_t a = g_pixels[static_cast<size_t>(yy) * g_w + xx], b = sample(g_textures[k], xx, yy);
+                if (std::abs((a >> 11) - (b >> 11)) <= 1 && std::abs(((a >> 5) & 63) - ((b >> 5) & 63)) <= 1 &&
+                    std::abs((a & 31) - (b & 31)) <= 1)
+                    ++count;
+            }
+        if (count > best_count) {
+            best_count = count;
+            best = static_cast<int>(k);
+        }
+    }
+    return best;
+}
+
+const BedKind* ground_bed_kinds() {
+    read_beds();
+    return g_bed_kinds;
+}
+
+float ground_bed_distance(const BedRail& rail, float x, float y) {
+    const BedLine l = bed_line(rail, 0, 0);
+    float best = 1e9f;
+    for (int i = 0; i < BED_SEGMENTS; ++i) {
+        const float ux = l.x[i + 1] - l.x[i], uy = l.y[i + 1] - l.y[i], len2 = ux * ux + uy * uy;
+        float t = len2 > 0 ? ((x - l.x[i]) * ux + (y - l.y[i]) * uy) / len2 : 0;
+        t = (std::max)(0.0f, (std::min)(1.0f, t));
+        best = (std::min)(best, std::hypot(x - l.x[i] - ux * t, y - l.y[i] - uy * t));
+    }
+    return best;
+}
+
+void ground_bed(const std::vector<BedRail>& rails, size_t paint, int kind, float width, float strength, bool hard,
+                bool restore) {
+    read_beds();
+    if (!g_ready || kind < 0 || kind >= BED_KINDS || (!restore && !g_bed_kinds[kind].available) || width < 2) return;
+    const double began = ground_clock();
+    const float hw = width / 2;
+    const int x0 = 0, y0 = 0, x1 = g_w, y1 = g_h;
+    std::vector<BedLine> lines;
+    std::vector<bool> painted;   // a line of the rails to paint, else one that only shares the pixels
+    for (size_t n = 0; n < rails.size(); ++n) {
+        const BedLine l = bed_line(rails[n], g_left, g_top);
+        if (l.r + hw >= x0 && l.l - hw <= x1 && l.b + hw >= y0 && l.t - hw <= y1) {
+            lines.push_back(l);
+            painted.push_back(n < paint);
+        }
+    }
+    if (lines.empty()) return;
+    const std::vector<uint16_t>& patch = g_bed_patch[kind];
+    int px0 = g_w, py0 = g_h, px1 = -1, py1 = -1;
+    // a square of the picture at a time: the nearest line of each pixel, its distance and the place
+    // along its rail (in the decal's columns)
+    constexpr int SQUARE = 128;
+    std::vector<float> nearest(SQUARE * SQUARE), along(SQUARE * SQUARE);
+    std::vector<uint8_t> mine(SQUARE * SQUARE);
+    for (int sy = y0; sy < y1; sy += SQUARE)
+        for (int sx = x0; sx < x1; sx += SQUARE) {
+            const int ex = (std::min)(x1, sx + SQUARE), ey = (std::min)(y1, sy + SQUARE);
+            std::fill(nearest.begin(), nearest.end(), hw);
+            bool any = false;
+            for (size_t n = 0; n < lines.size(); ++n) {
+                const BedLine& l = lines[n];
+                if (l.r + hw < sx || l.l - hw > ex || l.b + hw < sy || l.t - hw > ey) continue;
+                const float length = l.s[BED_SEGMENTS];
+                const float scale = length > 0 ? (std::max)(1.0f, std::round(length / BED_U)) * BED_U / length : 0;
+                for (int i = 0; i < BED_SEGMENTS; ++i) {
+                    const float ax = l.x[i], ay = l.y[i], ux = l.x[i + 1] - ax, uy = l.y[i + 1] - ay;
+                    const float len2 = ux * ux + uy * uy;
+                    const int lx = (std::max)(sx, static_cast<int>(std::floor((std::min)(ax, ax + ux) - hw)));
+                    const int rx = (std::min)(ex, static_cast<int>(std::ceil((std::max)(ax, ax + ux) + hw)) + 1);
+                    const int ty = (std::max)(sy, static_cast<int>(std::floor((std::min)(ay, ay + uy) - hw)));
+                    const int by = (std::min)(ey, static_cast<int>(std::ceil((std::max)(ay, ay + uy) + hw)) + 1);
+                    for (int py = ty; py < by; ++py)
+                        for (int px = lx; px < rx; ++px) {
+                            const float qx = px + 0.5f - ax, qy = py + 0.5f - ay;
+                            float t = len2 > 0 ? (qx * ux + qy * uy) / len2 : 0;
+                            t = (std::max)(0.0f, (std::min)(1.0f, t));
+                            const float d = std::hypot(qx - ux * t, qy - uy * t);
+                            const size_t k = static_cast<size_t>(py - sy) * SQUARE + (px - sx);
+                            if (d >= nearest[k]) continue;
+                            nearest[k] = d;
+                            along[k] = (l.s[i] + t * (l.s[i + 1] - l.s[i])) * scale;
+                            mine[k] = painted[n];
+                            any = any || painted[n];
+                        }
+                }
+            }
+            if (!any) continue;
+            for (int py = sy; py < ey; ++py)
+                for (int px = sx; px < ex; ++px) {
+                    const size_t k = static_cast<size_t>(py - sy) * SQUARE + (px - sx);
+                    const float d = nearest[k];
+                    if (d >= hw || !mine[k]) continue;
+                    const float a = weight(d, hw, px, py, hard) * strength;
+                    if (a <= 0) continue;
+                    const size_t i = static_cast<size_t>(py) * g_w + px;
+                    if (restore) {
+                        g_pixels[i] = blend(g_pixels[i], g_original_pixels[i], a);
+                        if (a >= 0.5f) g_textures_of[i] = NO_TEXTURE;
+                    } else {
+                        const int v = (std::min)(BED_V - 1, static_cast<int>(d / hw * BED_V));
+                        int u = static_cast<int>(std::floor(along[k])) % (2 * BED_U);
+                        if (u < 0) u += 2 * BED_U;
+                        if (u >= BED_U) u = 2 * BED_U - 1 - u;
+                        g_pixels[i] = blend(g_pixels[i], patch[static_cast<size_t>(v) * BED_U + u], a);
+                        if (a >= 0.5f) g_textures_of[i] = static_cast<uint8_t>(BED_TEXTURE + kind);
+                    }
+                    px0 = (std::min)(px0, px);
+                    py0 = (std::min)(py0, py);
+                    px1 = (std::max)(px1, px);
+                    py1 = (std::max)(py1, py);
+                }
+        }
+    g_times.paint += ground_clock() - began;
+    ++g_times.paints;
+    if (px1 < px0) return;
+    touch(px0, py0);
+    touch(px1, py1);
+    upload(px0, py0, px1 + 1, py1 + 1);
+}
+
+int ground_bed_at(float x, float y) {
+    read_beds();
+    int px, py;
+    if (!g_ready || !to_picture(x, y, px, py)) return -1;
+    int r = 0, g = 0, b = 0, n = 0;
+    for (int yy = (std::max)(0, py - 3); yy <= (std::min)(g_h - 1, py + 3); ++yy)
+        for (int xx = (std::max)(0, px - 3); xx <= (std::min)(g_w - 1, px + 3); ++xx) {
+            const uint16_t c = g_pixels[static_cast<size_t>(yy) * g_w + xx];
+            r += c >> 11;
+            g += (c >> 5) & 63;
+            b += c & 31;
+            ++n;
+        }
+    int best = -1, best_d = 12;   // 565 steps, green counted in halves
+    for (int k = 0; k < BED_KINDS; ++k) {
+        if (!g_bed_kinds[k].available) continue;
+        const uint16_t m = g_bed_kinds[k].mean;
+        const int d = std::abs(r / n - (m >> 11)) + std::abs(g / n - ((m >> 5) & 63)) / 2 + std::abs(b / n - (m & 31));
+        if (d < best_d) {
+            best_d = d;
+            best = k;
+        }
+    }
+    return best;
 }
 
 void ground_lower(float x, float y, float radius, int bed, int texture, bool restore) {

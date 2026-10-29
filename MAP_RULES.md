@@ -42,7 +42,14 @@ the editor of the game (DEVELOPERS.md "Editor mode", `editor_edit.cpp`) applies 
   (script `ReCalcGridZ(unit)`, function 81, does the same in the game).
 - The gravel bed: the missions that have one put a decal under every rail - VID 612 (l02, l09,
   l15), 615 ice (l18), 616 volcanic (l12), 617 desert (l11) - at the rail's x, y and direction,
-  18 below it. **[editor]** new track gets one (B picks which), deleted with its rail.
+  18 below it. **[editor]** new track gets one (B picks which), deleted with its rail. Other maps
+  have the band painted into their picture instead, without decals: l10 (desert, ~28 px across),
+  l16 (ice, ~20 px), l14 (volcanic); l13 has none. In play a decal bed shows as a band ~28 px
+  across. **[editor]** The Paint tool's GRAVEL BED mode paints that band (28 px by default, the
+  colours of the decal's top) into a picture of the map's own under the rails the brush goes over,
+  centred on the rail seen (the sprite's sleepers are 7 px above its place) and taking their decal
+  beds away, or lays the decals on a campaign terrain; UNDER THE WHOLE TRACK does every rail.
+  **[tool]** `paint` repaints a map's picture with the editor's textures and this band.
 - **[editor]** A new map (File > New) is an empty map - a plain ground of one texture of the
   painting's, flat, nothing on it -, a generated meadow, or a campaign map's terrain with only the
   ground object; an empty map or a meadow is any size from 512 to 4096 in steps of 256 (the ground's

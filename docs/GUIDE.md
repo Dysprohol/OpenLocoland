@@ -135,7 +135,9 @@ in the Esc menu plays it again, and after it the menu comes back on the custom m
 
 The editor is the engine's own editor mode, which the authors used for their maps and which the
 game never offered: what you place is what the game plays. You can open any map in it - a new
-one, POLIGON or a campaign mission (save a campaign map under a name of its own before changing it).
+one, POLIGON or a campaign mission (save a campaign map under a name of its own before changing it;
+POLIGON and the template too - every update of the game writes them again, so the editor always saves
+them under a new name, proposing e.g. `poligon1`).
 
 **Starting it:** **MAP EDITOR** on the custom maps page - the game starts again in the editor, on a
 new empty map of 2048 x 1536 grass that has no name yet (NEW MAP). The desktop shortcut **Locoland -
@@ -225,7 +227,7 @@ grass, forest floor, sand, desert, snow, ice, rock, dark rock, lava, swamp, lake
 campaign's maps; `[` and `]` pick them too), **SIZE** (8 - 200 px; the mouse wheel too), **STRENGTH**
 (how much a pass covers: lower it to blend textures) and **EDGE** soft or hard. Paint by dragging
 with the left button; the right button (or Shift+drag) puts the original picture back; Alt+click
-takes a texture painted earlier in the session. Paint a sand path where the track will run and some
+takes the texture under the cursor (also one of a picture painted and saved before). Paint a sand path where the track will run and some
 patches of other textures. The painted picture is saved with the map.
 
 ### 3. Water, swamp, lava
@@ -275,6 +277,15 @@ the line through a Y, a straight piece ending in a **dead end**.
 swamp. `PgUp` / `PgDn` make the next rail climb or descend (a ramp onto higher ground: each ramp
 11 levels). For a line on a hill, lay it up its ramps first, then raise the ground around the top and
 flatten it starting on the track. `B` picks the gravel bed under new rails. Del or the **Delete a section of track** tool removes rails.
+
+**The gravel bed.** Once the track is laid, **Paint the ground** -> **GRAVEL BED** lays the bed
+under the rails the brush goes over: **KIND** (meadow, ice, volcanic, desert - the bed `B` lays
+under new rails is the same one), **WIDTH** (28 px, as the missions have it), **SIZE**,
+**STRENGTH**, **EDGE**. On a map with a ground of its own the band is painted into the picture,
+centred on the rails and following curves, switches and ramps, and those rails' bed decals go (the
+band is their bed now); on a campaign map's terrain the bed decals are laid instead. The right
+button puts the original picture back, Alt+click takes the kind, **UNDER THE WHOLE TRACK** beds
+every rail of the map at once. A stroke is one undo.
 
 ### 5. Train arrivals
 
@@ -483,7 +494,8 @@ EDITOR**. Unsaved changes are asked about first.
 ### 12. Save
 
 `Ctrl+S` saves the map into its file; a map that has none yet (a campaign map, a new map) asks for
-the name. Menu → **SAVE MAP** (Alt+F2) always asks - to save under another name. A map saved as
+the name - and so do POLIGON and the template, which an update would overwrite (the dialog proposes
+`poligon1`, `map1` ... and its title says why). Menu → **SAVE MAP** (Alt+F2) always asks - to save under another name. A map saved as
 `maps\<name>\<name>.map` is written with its script and texts and appears on the **custom maps** page
 under its title. Open it again with **LOAD MAP** (Alt+F3). Every save shows a large **SAVED** with the
 map's file in the middle of the view for a moment, with the menus' click.

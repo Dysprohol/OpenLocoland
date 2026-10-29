@@ -135,7 +135,9 @@ nowa, a po niej menu wraca na stronę własnych map.
 
 Edytor to własny tryb edycji silnika, w którym autorzy robili swoje mapy i którego gra nigdy nie
 udostępniła: co postawisz, to gra zagra. Otworzysz w nim każdą mapę - nową, POLIGON albo misję
-kampanii (mapę kampanii zapisz pod własną nazwą, zanim zaczniesz ją zmieniać).
+kampanii (mapę kampanii zapisz pod własną nazwą, zanim zaczniesz ją zmieniać; POLIGON i szablon
+też - każda aktualizacja gry zapisuje je od nowa, więc edytor zawsze zapisuje je pod nową nazwą,
+proponując np. `poligon1`).
 
 **Uruchamianie:** **EDYTOR MAP** na stronie własnych map - gra uruchamia się od nowa w edytorze, na
 nowej pustej mapie: 2048 x 1536, trawa, jeszcze bez nazwy (NOWA MAPA). Skrót na pulpicie **Locoland -
@@ -222,7 +224,7 @@ nową krawędzią - tor może biec jeszcze 300 px dalej, poza zasięgiem wzroku.
 kampanii; `[` i `]` też je wybierają), **ROZMIAR** (8 - 200 px; także kółko myszy), **SILA** (ile
 pokrywa jedno pociągnięcie: mniejsza pozwala mieszać tekstury) i **KRAWEDZ** miękką albo twardą. Maluj
 przeciągając lewym przyciskiem; prawy (albo Shift+przeciąganie) przywraca oryginalny obraz; Alt+klik
-pobiera teksturę namalowaną wcześniej w tej sesji. Namaluj
+pobiera teksturę spod kursora (także z obrazu pomalowanego i zapisanego wcześniej). Namaluj
 piaszczystą drogę tam, gdzie pobiegną tory, i kilka plam innych tekstur. Pomalowany obraz zapisuje
 się razem z mapą.
 
@@ -272,6 +274,14 @@ od linii przez Y, prosty odcinek kończący się **ślepym końcem**.
 bagienne. `PgUp` / `PgDn` sprawiają, że następna szyna wznosi się albo opada (rampa na wyższy
 teren: każda rampa to 11 poziomów). Linię na wzgórze najpierw wprowadź po rampach, potem podnieś teren
 wokół jej końca i wyrównaj go, zaczynając na torze. `B` wybiera podsypkę pod nowe szyny. Del albo narzędzie **Usun odcinek toru** usuwa szyny.
+
+**Podsypka.** Gdy tory leżą, **Malowanie terenu** → **PODSYPKA** kładzie podsypkę pod szynami, po
+których przejdzie pędzel: **RODZAJ** (łąka, lód, wulkan, pustynia - ten sam, który `B` kładzie pod
+nowe szyny), **SZEROKOSC** (28 px, jak w misjach), **ROZMIAR**, **SILA**, **KRAWEDZ**. Na mapie z
+własnym terenem pas jest wmalowany w obraz, na środku szyn, wzdłuż łuków, rozjazdów i ramp, a
+naklejki podsypki tych szyn znikają (pas jest teraz ich podsypką); na terenie mapy kampanii kładzie
+zamiast tego naklejki podsypki. Prawy przycisk przywraca oryginalny obraz, Alt+klik pobiera rodzaj,
+**POD CALA MAPA** kładzie podsypkę pod każdą szyną mapy naraz. Jedno pociągnięcie to jedno cofnięcie.
 
 ### 5. Przyjazdy pociągów
 
@@ -477,7 +487,8 @@ zmiany najpierw pyta.
 ### 12. Zapisz
 
 `Ctrl+S` zapisuje mapę do jej pliku; mapa, która go jeszcze nie ma (mapa kampanii, nowa mapa), pyta
-o nazwę. Menu → **ZAPISZ MAPE** (Alt+F2) pyta zawsze - żeby zapisać pod inną nazwą. Mapa zapisana jako
+o nazwę - tak samo POLIGON i szablon, które aktualizacja by nadpisała (okno proponuje `poligon1`,
+`map1` ..., a jego tytuł mówi dlaczego). Menu → **ZAPISZ MAPE** (Alt+F2) pyta zawsze - żeby zapisać pod inną nazwą. Mapa zapisana jako
 `maps\<nazwa>\<nazwa>.map` zapisuje się ze skryptem i tekstami i pojawia na stronie **WLASNE MAPY**
 pod swoim tytułem. Otworzysz ją znowu przez **WCZYTAJ MAPE** (Alt+F3). Każdy zapis pokazuje na chwilę
 duże **ZAPISANO** z plikiem mapy na środku widoku, z kliknięciem menu.
