@@ -26,7 +26,8 @@
 #           Q<file> types the file into the game's open file dialog (File > Load / Save, the
 #           editor's Menu panel) and presses OK, Q alone presses Cancel (a screenshot of the
 #           dialog comes first, <Shot>_<n>_dialog.png);
-#           V<x>:<y> puts the top-left of the view at that map point (editor test mode);
+#           V<x>:<y> puts the top-left of the view at that map point and the test cursor in the
+#           middle of the game area, so the edge scrolling leaves the view there (editor test mode);
 #           D<x>:<y> writes the rail points near that map point to LocoFix.log (editor test mode);
 #           F<x>:<y> opens the panel of the factory at that map point (editor test mode);
 #           M<file> sets the mission settings from a file (editor test mode, src/LocoFix/editor_mission.cpp);

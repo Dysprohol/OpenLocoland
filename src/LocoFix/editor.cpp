@@ -102,6 +102,7 @@ bool resize_map(const std::string& map, int w, int h, std::string& error);   // 
 void edit_map_size(int& w, int& h);              // editor_edit.cpp
 int edit_outside(int w, int h, bool remove);     // editor_edit.cpp
 void edit_log_rail_points(float x, float y);
+void test_cursor_to_middle(HWND window);   // test.cpp
 std::string editor_new_map_title();   // below: the new map's title until it is saved
 
 namespace {
@@ -1105,6 +1106,7 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
                 if (std::sscanf(path.c_str(), "%f %f", &x, &y) != 2 || !world() || !graphics()) return FALSE;
                 const float* screen = reinterpret_cast<const float*>(static_cast<uint8_t*>(graphics()) + 0x20c);
                 reinterpret_cast<SetPosition_t>(SET_POSITION)(world(), nullptr, x + screen[0] / 2, y + screen[1] / 2, 0);
+                test_cursor_to_middle(window);   // or the edge scrolling moves the view on
                 return TRUE;
             }
         }

@@ -3136,7 +3136,9 @@ mode above) are not tested in full screen.
   a click); `Q<file>` types a file into the game's open file dialog (File > Load / Save, the
   Menu panel: the name box, the Edit with id 1001) and presses OK, `Q` alone Cancel, after a
   screenshot of the dialog; `V<x>:<y>` puts the top-left of the view at a map point (test mode), so the
-  points of the next steps are known, `D<x>:<y>` writes the rail points near a map point with
+  points of the next steps are known, and the test cursor in the middle of the game area (the
+  cursor starts where the real one was, and at an edge the engine's edge scrolling moved the view
+  away again until an `m` step brought it in), `D<x>:<y>` writes the rail points near a map point with
   their links to `LocoFix.log` (test mode; `V` takes negative points too, the editor's camera
   goes past the map), `M<file>` sets the mission settings from a file instead of the dialog
   (test mode; the format is in `editor_mission.cpp`), `N<name>:<line>[:<w>:<h>]` makes a new map as File >

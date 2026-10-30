@@ -88,6 +88,19 @@ void replace_iat(uintptr_t entry, void* function) {
 
 }  // namespace
 
+// editor.cpp's view step (test_game.ps1 V<x>:<y>): the test cursor to the middle of the game area, so
+// the engine's scrolling at the screen's edge does not take the view away again towards a cursor
+// left at an edge (where the real cursor was at the start, or the last m step's point).
+void test_cursor_to_middle(HWND window) {
+    if (!g_game_wndproc) return;   // not test mode
+    RECT r;
+    GetClientRect(window, &r);
+    POINT p = {(r.left + r.right) / 2, (r.top + r.bottom) / 2};
+    ClientToScreen(window, &p);
+    g_cursor = p;
+    SendMessageA(window, WM_NCHITTEST, 0, MAKELPARAM(p.x, p.y));
+}
+
 void install_test_mode() {
     char value[8] = {};
     if (!GetEnvironmentVariableA("LOCOFIX_TEST", value, sizeof value) || value[0] != '1') return;
