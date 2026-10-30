@@ -14,34 +14,35 @@ and OpenLocoland is put together from it on your computer. Your Steam game stays
 
 ## What you get
 
-- **The game as it was, on current Windows.** A window or full screen, every resolution up to 4K,
-  more of the map on a wide screen, a steady 60 frames a second, the mouse right on any monitor.
-- **Some of the old bugs fixed.** Crashes in some missions and in the repair point, sounds that
-  were missing, a car the factory could never build - others are still open ([BUGS.md](BUGS.md)).
-- **Custom maps.** A second page on the strategic map, with **POLIGON** - a ready mission to try -
+- **The game on today's Windows.** It runs in a window or on full screen in any resolution up to
+  4K, shows more of the map on a wide screen and keeps a steady 60 frames a second.
+- **Old bugs fixed.** Some of the original's crashes, missing sounds and a car the factory could
+  never build are fixed; the ones still open are listed in [BUGS.md](BUGS.md).
+- **Languages with their gaps filled.** English, German, Hungarian, Polish and Russian get their
+  missing texts, a Czech fan translation (unofficial) works on any Steam copy, and Setup lists them
+  all.
+- **Custom maps.** A second page of the strategic map holds **POLIGON**, a ready mission to try,
   and every map you make or get from a friend.
-- **A map editor (work in progress).** The authors' own editor mode, left inside the game and never
-  shown to players, brought back and built out: ground, water and lava, track that snaps the way the game drives it,
-  factories, repair points, forts with their guns, armies and their flags, trains, enemy patrols,
-  the mission's texts. Press "Play the map" and you are in it. Maps go to friends as one file.
+- **A map editor inside the game (work in progress).** Make your own missions - lay the track,
+  shape the ground, put up buildings with their guns, give trains their orders, send in new trains
+  during the mission, plan what the enemy's factory builds, decide who fights whom - and play them
+  at once.
+- **Maps for friends.** A map goes to a friend as one file and turns up on their custom maps page.
+- **Updates.** The launcher tells you when there is a newer version and downloads it, and an update
+  keeps your maps, scores and progress.
 - **Two extras, off by default**: the developers' cheat keys and all missions open from the start
   (your real progress is not touched).
-- **Languages**: English, German, Hungarian, Polish and Russian, the game's own translations with
-  their gaps filled, and Czech from a fan translation (unofficial). The game and the installer follow your
-  Windows language and fall back to English.
 
 ## Pictures
 
 | | |
 |---|---|
-| ![The strategic map](docs/img/strategic-map.jpg) | ![A battle](docs/img/battle.jpg) |
-| The campaign: 20 missions on the strategic map | A battle over the lava at 1920 x 1080 |
-| ![The custom maps page](docs/img/custom-maps-en.jpg) | ![The map editor](docs/img/editor-factory-en.jpg) |
-| The custom maps page with the editor on top | The editor: a factory on its track |
-| ![The palette of all objects](docs/img/editor-palette-en.jpg) | ![A fort's guns](docs/img/editor-fort-panel-en.jpg) |
-| Every object of the game to place | A fort and the gun in each socket |
-| ![A new map](docs/img/new-map-en.jpg) | ![The editor's help](docs/img/editor-help-en.jpg) |
-| A new map of any size | Help pages inside the editor |
+| ![A battle](docs/img/battle.jpg) | ![The custom maps page](docs/img/custom-maps-en.jpg) |
+| A battle over the lava at 1920 x 1080 | Custom maps: POLIGON, your own maps and the editor |
+| ![The map editor](docs/img/editor-factory-en.jpg) | ![The train arrivals](docs/img/arrivals-en.jpg) |
+| The editor on POLIGON: the two factories | The trains that come during the mission |
+| ![The editor's help](docs/img/help-contents-en.jpg) | ![The launcher](docs/img/launcher-update-en.jpg) |
+| Help inside the editor | The launcher, checking for updates |
 
 ## Installing
 
@@ -52,7 +53,8 @@ and OpenLocoland is put together from it on your computer. Your Steam game stays
    two extras there.
 3. Start **Locoland** or **Locoland - map editor** from the desktop or the Start menu.
 
-Running a newer `Setup.exe` updates the game and keeps your maps, scores and progress. The
+Running a newer `Setup.exe` updates the game and keeps your maps, scores and progress; **Check for
+updates** in the launcher downloads a newer one for you. The
 player's guide tells the rest, the editor with a step-by-step first mission included:
 [GUIDE.md](docs/GUIDE.md) (English), [PRZEWODNIK.md](docs/PRZEWODNIK.md) (Polish).
 
@@ -83,7 +85,7 @@ rest around it: the bar, the tools and the help in the look of the game.
   big screens, the editor tried in full screen, and whatever turns up while playing.
 - **The engine in readable code.** The understood parts of the engine rewritten in C++ one by one,
   so the game can grow past the limits of the original program.
-- **A public release**, ideally with the blessing of the rights holders.
+- **Ideas for later**: a modding tool for new objects, music and sounds of our own.
 
 ## For developers
 
