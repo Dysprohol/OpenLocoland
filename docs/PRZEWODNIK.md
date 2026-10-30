@@ -1,6 +1,7 @@
 # OpenLocoland - przewodnik gracza
 
-Wersja 0.1 - wydanie testowe. [English version: GUIDE.md](GUIDE.md)
+Wersja 0.2 - pierwsze regularne wydanie; edytor map jest wciąż w budowie. [English version:
+GUIDE.md](GUIDE.md)
 
 **OpenLocoland** to nieoficjalna, fanowska nowa edycja gry **Locoland** (Gromada / ESDigital
 Games, 2003): oryginalna gra działa z poprawkami dla dzisiejszego Windowsa, kilkoma ulepszeniami,
@@ -40,6 +41,8 @@ je ze Steama (np. `download_depot 352130 352132` dla niemieckiego): wpisz go w k
 (`steam://open/console` w pasku adresu przeglądarki albo w Win+R), poczekaj, aż Steam go pobierze,
 i uruchom instalator ponownie - zostawi wybrany język i doda nowy.
 
+![Lista języków w instalatorze](img/setup-languages-pl.jpg)
+
 Folder gry jest samodzielny: są w nim twoje mapy, tabele wyników i logi. Profil gracza (imię,
 wygrane misje, wyniki, ustawienia dźwięku) jest zapisany w rejestrze twojego użytkownika Windows,
 tak jak w oryginale.
@@ -65,6 +68,8 @@ mapy, skopiuj je najpierw (każda to folder w `maps\`, zob. [udostępnianie mapy
 
 Gra startuje okienkiem startowym (z obrazkiem Locolandu):
 
+![Okienko startowe](img/launcher-update-pl.jpg)
+
 - **Rozdzielczość** - oprócz 640 x 480 ... 1024 x 768 lista ma tryby panoramiczne twojego monitora
   (od 1280 x 720 do 3840 x 2160) i rozdzielczość pulpitu.
 - **Pełny ekran** - pole pod obrazkiem. Gdy nie jest zaznaczone, gra działa w **oknie** (okno
@@ -72,8 +77,10 @@ Gra startuje okienkiem startowym (z obrazkiem Locolandu):
 - **Język** - lista obok: języki, które masz (polski, angielski, ...; fanowskie tłumaczenie jest
   oznaczone „(nieoficjalne)”). Napisy okienka zmieniają się razem z nim. Jeśli wybranego języka już
   nie ma, gra startuje po angielsku, a bez angielskiego w języku twojej kopii ze Steama.
-- **Limit FPS** i **Licznik FPS** - wiersz pod rozdzielczością: ile klatek na sekundę rysuje gra
-  (domyślnie 60; ∞ = bez limitu) i mały licznik u góry ekranu.
+- **Licznik FPS** i **Limit FPS** - wiersz pod rozdzielczością: mały licznik u góry ekranu i ile
+  klatek na sekundę rysuje gra (domyślnie 60; ∞ = bez limitu).
+- **Kody twórców** i **Wszystkie misje** - dwa dodatki, domyślnie wyłączone: klawisze twórców gry i
+  wszystkie misje otwarte od początku (prawdziwe postępy zostają nietknięte).
 - **Sprawdź aktualizacje** - wiersz nad OK: czy jest nowsza wersja OpenLocoland, zob.
   [aktualizacja](#1-instalacja-aktualizacja-odinstalowanie).
 
@@ -126,7 +133,8 @@ Mapa strategiczna ma **drugą stronę**: przycisk `►►►` w jej prawym dolny
 
 **POLIGON** to gotowa misja zrobiona tymi samymi narzędziami co w edytorze: wróg zbudował bastion
 na wschodzie - bramy strzegą dwa działa fortyfikacji, za nią stoi jego fabryka i punkt naprawczy, a
-z fabryki co jakiś czas wyjeżdżają nowe pociągi. Przebij się i zniszcz je.
+z fabryki co jakiś czas wyjeżdżają nowe pociągi. Przebij się i zniszcz je. Pociągi wroga patrolują
+jego linie, a pętla toru na wschód od dolnej linii daje miejsce na manewry.
 
 Własna mapa nie jest misją kampanii: jej wygranie nie odblokowuje misji, nie dodaje do wyniku
 kampanii, stopnia ani galerii chwały. Ma własną tabelę wyników, „ponów misję” w menu Esc gra ją od
@@ -159,15 +167,20 @@ Co widać:
 - **Wiersz stanu** u góry: narzędzie (albo to pod myszą), liczba kroków do cofnięcia i ponowienia,
   „nie zapisano” i ostatni komunikat - dlaczego czegoś nie da się zrobić, zawsze jest napisane tutaj.
 - **Przyciski ? i menu** na lewym końcu paska (tam, gdzie gra ma przycisk pauzy). **?** (albo F1)
-  otwiera pomoc: osiemnaście stron z tym, co jest w tym rozdziale, w skrócie. Zaczyna się od **spisu
+  otwiera pomoc: dwadzieścia stron z tym, co jest w tym rozdziale, w skrócie. Zaczyna się od **spisu
   treści**: kategorie (PODSTAWY, TORY I POCIĄGI, OBIEKTY, MISJA I ZAPIS, TEREN, PRZYJAZDY I FABRYKI)
   po lewej, strony tej pod myszą po prawej - kliknięcie otwiera stronę. Strona ma swoją kategorię za
-  tytuł i swój numer (5 / 17); strzałki, Page Up / Down i kółko zmieniają strony, a **SPIS TRESCI**,
-  `Esc` albo prawy przycisk wracają do spisu. **Przycisk menu**
-  otwiera menu edytora ze wszystkimi poleceniami - nowa mapa, wczytaj, zapisz, ustawienia misji,
-  rozmiar mapy, zagraj zapisaną mapę, cofnij, ponów, test bez zapisu, powrót do menu, wyjdź z gry.
+  tytuł i swój numer (13 / 20); strzałki, Page Up / Down i kółko zmieniają strony, a **SPIS TRESCI**,
+  `Esc` albo prawy przycisk wracają do spisu.
 
-  ![Pomoc](img/editor-help-pl.jpg)
+  ![Spis treści pomocy](img/help-contents-pl.jpg)
+
+  ![Strona pomocy](img/editor-help-pl.jpg)
+
+  **Przycisk menu** otwiera menu edytora ze wszystkimi poleceniami - **NOWA MAPA**, **WCZYTAJ MAPE**,
+  **ZAPISZ MAPE**, **EKSPORT MAPY**, **IMPORT MAPY**, **USTAWIENIA MISJI**, **ROZMIAR MAPY**, **ZAGRAJ
+  ZAPISANA MAPE**, **COFNIJ**, **PONOW**, **TEST BEZ ZAPISU**, **POWROT DO MENU**, **WYJDZ Z GRY**;
+  wiersz stanu mówi, co robi to pod myszą.
 
   ![Menu edytora](img/editor-menu-pl.jpg)
 
@@ -181,7 +194,7 @@ Co widać:
 | przesunięcie | przeciągnij go |
 | obrót | R / E albo kółko myszy |
 | wyżej / niżej | PgUp / PgDn o 4 (z Shift o 16) albo Shift+kółko; Home stawia z powrotem na ziemi - wiersz stanu pokazuje wysokość nad ziemią |
-| zmiana armii | A: nasi, wróg, neutralni, piraci - flagi zmieniają kolor |
+| zmiana armii | A: nasi, wróg, neutralni, piraci - flagi zmieniają kolor (przy stawianiu A ustala armię następnego obiektu) |
 | usunięcie | Del (Shift+Del: cały pociąg; Shift+klik narzędziem Usun: cały odcinek toru) |
 | cofnij / ponów | Ctrl+Z / Ctrl+Y - każdą zmianę; pamięta ostatnie 500 kroków |
 | panel obiektu | prawy przycisk myszy na nim |
@@ -274,7 +287,8 @@ od linii przez Y, prosty odcinek kończący się **ślepym końcem**.
 `V` zmienia rodzaj następnych szyn: zwykłe, bagienne (na nasypie), zniszczone albo zniszczone
 bagienne. `PgUp` / `PgDn` sprawiają, że następna szyna wznosi się albo opada (rampa na wyższy
 teren: każda rampa to 11 poziomów). Linię na wzgórze najpierw wprowadź po rampach, potem podnieś teren
-wokół jej końca i wyrównaj go, zaczynając na torze. `B` wybiera podsypkę pod nowe szyny. Del albo narzędzie **Usun odcinek toru** usuwa szyny.
+wokół jej końca i wyrównaj go, zaczynając na torze. `B` wybiera podsypkę pod nowe szyny. Kliknięcie
+kółkiem, Del albo narzędzie **Usun odcinek toru** usuwa szyny.
 
 **Podsypka.** Gdy tory leżą, **Malowanie terenu** → **PODSYPKA** kładzie podsypkę pod szynami, po
 których przejdzie pędzel: **RODZAJ** (łąka, lód, wulkan, pustynia - ten sam, który `B` kładzie pod
@@ -284,13 +298,18 @@ naklejki podsypki tych szyn znikają (pas jest teraz ich podsypką); na terenie 
 zamiast tego naklejki podsypki. Prawy przycisk przywraca oryginalny obraz, Alt+klik pobiera rodzaj,
 **POD CALA MAPA** kładzie podsypkę pod każdą szyną mapy naraz. Jedno pociągnięcie to jedno cofnięcie.
 
+![Podsypka pod rozjazdem](img/paint-bed-pl.jpg)
+
 ### 5. Przyjazdy pociągów
 
 **Przyjazdy pociagow** (klawisz 0) otwiera panel z pociągami, które w czasie misji wjeżdżają na mapę -
 pociąg gracza na start, posiłki, fale wroga. Najpierw jest ich lista, każdy przyjazd w dwóch wierszach
-zwykłych słów („1. NASI, WJAZD 1: LOKOMOTYWA + WAGONY: 2”, „NA POCZATKU, RAZ”); kliknięcie otwiera
-przyjazd, **+ NOWY** tworzy nowy, **KOPIUJ n** i **USUN n** dotyczą ostatnio otwartego. W przyjeździe
-każdy wiersz to jedna rzecz:
+zwykłych słów („1. NASI, WJAZD 1: Lokomotywa + WAGONY: 1”, „NA POCZATKU, RAZ”); kliknięcie otwiera
+przyjazd, **+ NOWY** tworzy nowy, **KOPIUJ n** i **USUN n** dotyczą ostatnio otwartego.
+
+![Lista przyjazdów](img/arrivals-pl.jpg)
+
+W przyjeździe każdy wiersz to jedna rzecz (nowy to pociąg naszych, który jedzie do punktu):
 
 - **KTO** - nasi, wróg, neutralni albo piraci;
 - **SKLAD** - w kolejności pociągu: **+ WAGON** dodaje na koniec z palety Pojazdy, **SZABLON...**
@@ -304,7 +323,7 @@ każdy wiersz to jedna rzecz:
 - **POTEM** - pociąg naszych, neutralnych i piratów **STOI**, **JEDZIE DO PUNKTU** albo **PATROLUJE**
   między dwoma punktami; wroga **ATAKUJE**, **PILNUJE PUNKTU** albo **PATROLUJE** (robi to AI gry).
   Punkty **WSKAZ** na torze, poza główną linią;
-- **KOMUNIKAT** („przybyły posiłki”, dla naszych i wroga).
+- **KOMUNIKAT** u góry po prawej, **TAK** albo **NIE** („przybyły posiłki”, dla naszych i wroga).
 
 Pasek nad tytułem podaje prawdziwy problem z przyciskiem, który go naprawia - brak wjazdu (**WSKAZ
 WJAZD**), brak świateł na wjeździe (**POSTAW SWIATLA**: para semaforów w pierwszym miejscu w mapie i ich
@@ -340,7 +359,8 @@ w którą biegnie, a mysz nad nią mówi, co robi; potem na zaznaczonej linii - 
 Zaznacz kliknięcie kreski lub strzałki linii ją zaznacza, a prawy przycisk otwiera jej panel - `T` włącza albo wyłącza
 pchanie, `R` ją odwraca, `S` stawia jej semafory, Del ją usuwa. Zrób dwie:
 
-- **wjazd na mapę**: od końca głównej linii za krawędzią na mapę, z pchaniem;
+- **wjazd na mapę**: od końca głównej linii za krawędzią na mapę, z pchaniem - jeśli zrobiło go
+  **POSTAW SWIATLA** przyjazdu (krok 5), już jest;
 - **wyjazd z mapy** na drugim końcu, krótki i skierowany w głąb mapy, bez pchania - żeby żaden
   pociąg nie wyjechał poza mapę.
 
@@ -376,6 +396,8 @@ wróg buduje po jednym, gdy atakuje mniej jego pociągów, niż pozwala **AI...*
 ustawienia wroga od autorów, każde z linijką opisu: czy stracony pociąg startowy jest budowany na nowo i
 po jakim czasie, wypady pociągów startowych, od kiedy są wypady i ile trwają, mądry atak. Wszystko poza
 pociągiem raz o czasie wymaga mapy z przyjazdami (starsze mapy: PRZESTAW w panelu przyjazdów).
+
+![Plan fabryki wroga](img/factory-plan-pl.jpg)
 
 **Rozkazy pociągu**: prawy przycisk na pociągu, **ROZKAZY**: twoje, neutralne i pirackie **JEDZ DO...**
 punktu albo **PATROL...** między miejscem, gdzie stoją, a punktem; wroga (z wagonem z działem - jego AI z
@@ -426,14 +448,15 @@ ona może wtedy strzelać do nich. W panelu uzbrojonego neutralnego obiektu **ST
 
 - **Pociągi**: **Pojazdy** z listwy otwierają wagony - lokomotywy, wagony bojowe, zaopatrzenie
   (wóz z amunicją, pojazd naprawczy, cysterny), wagony cywilne, przeszkody. Wagon staje na torze
-  pod kursorem; postawiony na końcu pociągu dołącza się do niego. Zrób pociąg wroga: lokomotywa i
-  działo, potem `A` na nim dla armii wroga. `U` odczepia wagon, `C` doczepia do innego pociągu, `R`
+  pod kursorem; postawiony na końcu pociągu dołącza się do niego. Zrób pociąg wroga: wybierz **WROG**
+  w wierszu **ARMIA** palety (albo `A` przy stawianiu, albo `A` na postawionym pociągu), potem
+  lokomotywa i działo. `U` odczepia wagon, `C` doczepia do innego pociągu, `R`
   odwraca pociąg, przeciąganie przesuwa go po torze. Pociąg bez **lokomotywy** nie pojedzie.
-- **Patrol**: panel pociągu → PATROL → do punktu..., potem kliknij drugi koniec na torze. Pociąg
-  jeździ tam i z powrotem.
-- Więcej pociągów wroga ustawisz w ustawieniach misji (krok 10): pociągi na początku i pociągi,
-  które jego fabryka wysyła później. Do tych drugich wróg potrzebuje fabryki: postaw ją (klawisz 4)
-  na własnym ślepym końcu i `A` na wroga.
+- **Patrol**: panel pociągu (prawy przycisk) → ROZKAZY: **PATROL...**, potem kliknij drugi koniec na
+  torze. Pociąg jeździ tam i z powrotem między miejscem, gdzie stoi, a tym punktem.
+- Więcej pociągów wroga: kolejne pociągi na mapie z rozkazami, przyjazdy wroga (krok 5) i pociągi,
+  które buduje jego fabryka - jej plan (krok 6). Do tych ostatnich wróg potrzebuje fabryki: postaw ją
+  (klawisz 4) na własnym ślepym końcu i `A` na wroga.
 - **Skrzynka z pieniedzmi** (listwa) leży na torze: jednostka gracza, która ją zbierze, dostaje 100.
 
 Pamiętaj o zasadzie gry: fabryka, punkt naprawczy i fortyfikacja stoją **na torze albo tuż przy
@@ -444,7 +467,14 @@ nim**.
 **Dekoracje** z listwy: trawa, krzaki, kwiaty, kamienie, wraki... `[` `]` (albo kliknięcie pozycji)
 wybiera jedną; kliknięcie stawia jedną, przeciąganie rozrzuca je w promieniu (kółko, `+` `-`), nigdy
 bliżej niż odstęp (`<` `>`). Shift+przeciąganie je zbiera. Drzewa, domy i reszta są we **Wszystkie
-obiekty**. **Region** (listwa): przeciągnij jego prostokąt; jego panel ustawia mgłę (mgła, pył,
+obiekty**.
+
+**Zestawy z misji** (Wszystkie obiekty): to, co autorzy zawsze stawiali razem, jest jednym obiektem, a
+jego panel wybiera część - słup graniczny ze świdrem (cały albo złamany), wyjście z poziomu z jego
+szczytem, maszt albo dworzec z flagą, kominy z dymem albo poświatą, szyb naftowy, basen. **Zgniatacz**
+(piraci) stoi w poprzek toru i co 25 sekund gryzie wszystko poza swoją armią; jego panel mówi, kiedy
+staje - gdy padną wieże jego armii, albo nigdy. **Scylla** (bagno) na ukośnym torze gryzie każdego co
+15 sekund. Gdy padną wieże piratów, świdry się łamią. **Region** (listwa): przeciągnij jego prostokąt; jego panel ustawia mgłę (mgła, pył,
 opar, poświata) i rozpryski.
 
 ### 9. Zobacz, jak działa
@@ -539,7 +569,7 @@ misji, Wysokosc terenu, Skrzynka z pieniedzmi, Pojazdy, Malowanie terenu, Woda i
 | Klawisz | |
 |---|---|
 | R / E, kółko | obrót: o krok kierunków obiektu (R w prawo, E w lewo); zawrócenie pociągu, wraku na torze, semafora przy torze, a w narzędziu Linia jednokierunkowa linii; fabrykę, punkt naprawczy i bloker obraca ich tor (strona pomocy 15) |
-| A | następna armia |
+| A | następna armia; przy stawianiu: armia następnego obiektu |
 | T | semafor czerwony / zielony; na linii: pchanie tak / nie |
 | L / Shift+L | linia przy zaznaczonym semaforze: wpuszcza / zatrzymuje |
 | Del / Shift+Del | usuń / cały pociąg albo odcinek |
@@ -557,9 +587,10 @@ misji, Wysokosc terenu, Skrzynka z pieniedzmi, Pojazdy, Malowanie terenu, Woda i
 | W | woda, bagno albo lawa |
 | S | semafory zaznaczonej linii (narzędzie Linia jednokierunkowa) |
 | Shift (z pędzlem) | usuwanie |
-| Esc, prawy przycisk | powrót do Zaznacz; koniec linii toru (w narzędziu Tor kliknięcie kółkiem usuwa szynę pod kursorem) |
-| Ctrl+R | uruchom / wstrzymaj poziom |
-| F1 | pomoc |
+| Esc, prawy przycisk | powrót do Zaznacz; koniec linii toru |
+| środkowy przycisk | przeciąganie mapy; w narzędziu Tory kliknięcie usuwa szynę pod kursorem (także na rozjeździe) |
+| Ctrl+R | TEST BEZ ZAPISU: uruchom mapę tutaj / wróć do edytora |
+| F1 | pomoc, od spisu treści |
 | Ctrl+S | zapisz mapę |
 | Alt+F2 / Alt+F3 | zapisz pod nazwą / wczytaj |
 
