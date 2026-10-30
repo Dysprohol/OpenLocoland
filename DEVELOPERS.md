@@ -1699,7 +1699,15 @@ name - and dropped `RAIN_TYPE`, so a map with snow got rain; its labels were cut
 packs. Now each setting has a row with its label in full words, the map's settings on the right of the trains'
 rows (which stay as they were). Checked in play: money 12345, night, snow all the time and a new
 objectives text set, saved and played - $12345 in the state bar, the night's gamma, the snow
-falling all the time, the objectives line at the start. A map saved as
+falling all the time, the objectives line at the start. The dialog as it is now, filled in on
+POLIGON saved under three names and each played (Polish, English, Polish): money 7777, night, rain
+all the time, lightning, a title and header, objectives, win, loss and a two-page briefing with
+Polish letters - $7777, the night, the rain, flashes about every 20 s, "CEL: ZNISZCZ WROGA ŻÓŁTY",
+the header (in ASCII capitals, as written) over the briefing's first page in the Esc menu, the
+win's text on the victory screen; money 4321, morning, snow now and then, no lightning - the
+morning's light, the snow, no flash in a minute, the second briefing page (the right arrow), the
+loss's text on the defeat screen; money 100, evening, meteorites all the time, lightning ticked -
+the meteorites, no flash (lightning comes only in a clear sky or the rain). A map saved as
 `maps\<name>\<name>.map` gets its line in `maps\custom.lst` (the folder and its title in ASCII
 capitals; not the template), so it shows on the WLASNE MAPY page; `build.py`
 keeps the lines the editor added when it writes the repository's list into the game. A new map
