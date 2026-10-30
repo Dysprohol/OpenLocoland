@@ -2814,7 +2814,10 @@ mode above) are not tested in full screen.
      language whatever pack was chosen; files the game creates (high scores, logs) are not
      redirected and no pack holds player data (`languages.NOT_LANGUAGE_FILES`); the launcher
      gets a language list next to the full screen box, which switches the launcher labels
-     (`[launcher]` in `language.ini`) and is saved in the registry (`Language` next to the
+     (`[launcher]` in `language.ini`; the game's own Full screen and Cancel are ANSI controls,
+     whose `SetWindowTextW` went through the system's code page - "??????" for Russian on a
+     Polish Windows -, so their text is set with `DefWindowProcW`, kept as it is; checked in
+     Russian and Czech) and is saved in the registry (`Language` next to the
      game's settings); without a saved choice the system language is used if there is a pack,
      and a saved language without a pack (a depot not downloaded) falls back to English, or
      without it to the root's language (`lang\root.txt`); the list is owner-drawn so that the

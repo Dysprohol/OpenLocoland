@@ -203,7 +203,17 @@ std::vector<void (*)(HWND)> g_relabels;                     // add_launcher_rela
 void set_label(HWND dialog, int id, const char* key) {
     const auto& labels = g_packs[g_current].launcher;
     const auto it = labels.find(key);
-    if (it != labels.end()) SetWindowTextW(GetDlgItem(dialog, id), it->second.c_str());
+    HWND control = GetDlgItem(dialog, id);
+    if (it == labels.end() || !control) return;
+    if (IsWindowUnicode(control)) {
+        SetWindowTextW(control, it->second.c_str());
+    } else {
+        // the game's own controls (Full screen, Cancel) are ANSI windows: SetWindowTextW went through
+        // the system's code page and a pack's letters outside it came out as "?" (Russian on a Polish
+        // Windows); DefWindowProcW keeps the text as it is, and the control draws it from there
+        DefWindowProcW(control, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(it->second.c_str()));
+        InvalidateRect(control, nullptr, TRUE);
+    }
 }
 
 // The mark after a fan translation's name, in the chosen pack's language.
