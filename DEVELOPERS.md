@@ -1940,7 +1940,10 @@ mends it: no entry (PICK THE ENTRY), no track at it, no entry line - the line an
 thing (the posts own a line that ends at them, `edit_post_line` of the signals' side): with a pair of
 posts within 400 px on the way in (`edit_posts_on_way`) LINE TO THE LIGHTS lays the line from the
 entry to them, else PUT LIGHTS puts the pair the first place 50 px inside the map with its line
-(`edit_place_entry_posts`); the entry row shows "LIGHTS x,y" once they are there -, no locomotive anywhere in the train (ADD ONE), no point or no other
+(`edit_place_entry_posts`); the entry row shows "LIGHTS x,y" once they are there (checked on a POLIGON
+copy without the top-left exit's two posts and line, an arrival entering there: "! NO LIGHTS AT THE
+ENTRY - PUT LIGHTS", one click, `entry line -195,149 -> 52,149 with its lights`, the pair at the map's
+edge and LIGHTS 52,149 in the row; played, the train came in at 11 s and stopped at them) -, no locomotive anywhere in the train (ADD ONE), no point or no other
 end (PICK IT), an endless enemy - the map is not won by destroying it - (10 TIMES), a train that stays
 where the next ones come (DRIVE ON). The list's last rows: a limit of the game's AI once reached, the
 authors' reinforcement to convert. The arrow at the bottom left, Esc and the right button go a screen
