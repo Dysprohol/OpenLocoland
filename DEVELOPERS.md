@@ -2079,7 +2079,12 @@ condition began to hold (no train 75 s, fewer than 3 units 25 s, no factory 105 
 25 s, the enemy fewer than 2 trains 90 s, fewer than 1 attacker 143 s, 500 money 50 s, no train and
 a neutral factory 75 s, no locomotive and a factory of its own 75 s, fewer than 2 trains 75 s after
 a time with 2), the two arrivals at 75 and 90 s, and the three entries whose condition had ended
-before their `first` never.
+before their `first` never. An enemy entry repeated without end over a long game: POLIGON with one
+entry (5,20 attacking, at 20 s, every 60 s, no end), its attackers destroyed by the test's script
+once a minute so `LIMIT_ATACKERS` did not hold it, the game sped up to x2 with + (the engine's key:
+x2 at most, x5 in the developer mode) - in 13.5 minutes of the game seven waves, each queued 60 s
+after the one before was built (20, 150, 281, 411, 541, 671, 801 s) and built about 70 s later as
+5,20, the queue's one place used again each time.
 
 **Ground, gravel bed, decals** (`editor_edit.cpp`, `ground.h`, `ground.cpp`). The strip's Ground height
 tool raises, lowers, flattens or smooths the GRID cells (8 x 8 px) in a circle around the cursor while
