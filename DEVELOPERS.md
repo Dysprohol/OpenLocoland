@@ -2392,7 +2392,8 @@ The forms the missions do not have, from the palette onto POLIGON: across the ho
 form 0 and across a vertical track form 2 (`CRUSHER 1 at 820,1375 form 0`, `CRUSHER 2 at 958,1232
 form 2`), both biting in the quick test (`CRUSHERS bite` at 25 s, the drums closed across each
 track); the status line's warning of a map without a tower of its army was seen whole after the
-placing in Polish and English.
+placing in Polish and English. Factory chimneys (880) from the palette on POLIGON, played in the
+quick test: the smoke (291) rose from them, a long plume drifting with the wind.
 The explosive mine (86) snaps to the
 rail point nearest within 40 px, is placed in the army of the palette's row and is marked with its
 army by the editor (`draw_mines`: a square in the army's colour and MINE: ENEMY; the engine hides a
