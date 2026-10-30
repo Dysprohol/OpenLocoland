@@ -21,7 +21,8 @@ DirectDraw wrapper such as dgVoodoo2, DDrawCompat or cnc-ddraw, DxWnd, config fi
 and listed, and such a file copied into the target by an older build is removed.
 
 Order:
-  1. game files from Steam (without Steam.exe, steam.cfg and the movies in video/); the
+  1. game files from Steam (without Steam.exe, steam.cfg and the movies in video/ - the
+     intros are off, game/maps/logo.lgc.patch); the
      language files (languages.LANGUAGE_FILES) are taken from the English capture
      (captured/en/) instead of the language Steam has installed, so the root of the game -
      the fallback of every pack - is English (with no English capture, Steam's, and a note),
@@ -138,11 +139,15 @@ MODIFIED_STEAM = ("Steam.exe in {path} is not the original file of the game (it 
                   "Restore the original in Steam: Locoland > Properties > Installed Files > Verify integrity "
                   "of game files, then build again.")
 DGVOODOO = ["DDraw.dll", "D3DImm.dll"]  # the game only uses DirectDraw/Direct3D 7
-# The clean-up after the build (clean_up; DEVELOPERS.md "Updating"). Files and folders earlier
-# versions put into the target that no build writes now: the Steam launcher's files (0.1 copied
-# them), the DLLs of older dgVoodoo set-ups, the intros.
-OBSOLETE = ["Steam.exe", "steam.cfg", "steam_appid.txt", "D3D8.dll", "D3D9.dll", "dgVoodooCpl.exe"]
-OBSOLETE_DIRS = ["video"]
+# The clean-up after the build (clean_up; DEVELOPERS.md "Updating"). Files earlier versions put
+# into the target that no build writes now: the Steam launcher's files (0.1 copied them), the DLLs
+# of older dgVoodoo set-ups, the Steam intros of video\ (0.1 copied the folder) and the logo clip
+# video\openlocoland.wmv of the test builds after v0.2.0 (the intro's logo is the title board now,
+# vid\481logo.vid); the folder itself goes when it is empty.
+OBSOLETE = ["Steam.exe", "steam.cfg", "steam_appid.txt", "D3D8.dll", "D3D9.dll", "dgVoodooCpl.exe",
+            os.path.join("video", "publisher1.wmv"), os.path.join("video", "publisher2.wmv"),
+            os.path.join("video", "developer.wmv"), os.path.join("video", "intro.wmv"),
+            os.path.join("video", "openlocoland.wmv")]
 # the developer helpers of game/: copied only by --dev, without it removed like OBSOLETE
 DEV_FILES = ["run_map.cmd", "edit_map.cmd"]
 LOGS = "logs"   # the folder of the logs in the target
@@ -165,6 +170,8 @@ OBJECTS_OVERRIDE = "objects.override"   # in game/: changed values of objects.re
 MAPS_OVERRIDE = "maps.override"         # in game/: changed objects of maps (map_tool.py)
 MAPS_NEW = "maps.new"                   # in game/: whole new maps (map_tool.py new)
 EDITOR_DATA = "editor"                  # in game/: the editor's palette (patch_data.make_editor_palette)
+LOGO_PNG = os.path.join(REPO, "tools", "icon", "openlocoland_logo.png")   # the project's logo (just_Martin): the
+                                        # intro's title board vid\481logo.vid (patch_data.make_logo_board) and Setup's header
 MAP_MODEL = {"map.json", "objects.tsv", "groups.txt", "grid.txt", "vids.tsv",
              "vid_animations.tsv"}      # an unpacked .map, packed as <name>.map
 
@@ -431,7 +438,7 @@ def unit(rel):
 def clean_up(target, steam, previous=(), dev=False, foreign=(), ours=()):
     """Removes from `target`, after the build, what earlier versions put there that this build did
     not write (DEVELOPERS.md "Updating"): the files of `previous` (the list of the last install's
-    OpenLocoland.json) in a pack or map this build wrote into, OBSOLETE, OBSOLETE_DIRS and,
+    OpenLocoland.json) in a pack or map this build wrote into, OBSOLETE and,
     without `dev`, DEV_FILES, the files of OWNED_DIRS and the help pages of maps\\ it did not
     write, the editor's scratch folders and unfinished saves, and the `foreign` files of the
     Steam folder an older build copied (the same size, not named in `ours`); the logs of the root
@@ -486,8 +493,11 @@ def clean_up(target, steam, previous=(), dev=False, foreign=(), ours=()):
             remove(rel, "no longer installed")
     for f in OBSOLETE + ([] if dev else DEV_FILES):
         remove(f, "obsolete")
-    for d in OBSOLETE_DIRS:
-        remove(d, "obsolete", folder=True)
+    video = os.path.join(target, "video")   # 0.1 and the test builds after v0.2.0 made it; nothing writes it now
+    if os.path.isdir(video) and not os.listdir(video) and allowed("video"):
+        os.rmdir(video)
+        removed.append("video")
+        print(f"removed video{os.sep} (empty)")
     names = {f.lower() for f in ours}
     for f in foreign:
         if (f.lower() not in names and os.path.isfile(os.path.join(target, f)) and os.path.isfile(os.path.join(steam, f))
@@ -705,6 +715,8 @@ def build(steam, target, locofix=None, captured=None, progress=None, version=Non
     if not generate(copied, lambda path: patch_data.make_custom_edit_icon(os.path.join(a.steam, "vid"), path),
                     os.path.join(vid, "945edit.vid")):
         print("vid: unknown images, no edit icon for the custom maps page")
+    if not generate(copied, lambda path: patch_data.make_logo_board(LOGO_PNG, path), os.path.join(vid, "481logo.vid")):
+        sys.exit(f"{LOGO_PNG} is missing - the title board of the intro (vid\\481logo.vid, VID 481) cannot be made")
 
     done(0.9)
     for rel, folder in maps.items():

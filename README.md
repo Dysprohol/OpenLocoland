@@ -28,6 +28,8 @@ and OpenLocoland is put together from it on your computer. Your Steam game stays
   during the mission, plan what the enemy's factory builds, decide who fights whom - and play them
   at once.
 - **Maps for friends.** A map goes to a friend as one file and turns up on their custom maps page.
+- **An OpenLocoland logo at the start.** The game opens with the project's logo for a few seconds in
+  place of the original intro movies; any key or a click skips it.
 - **Updates.** The launcher tells you when there is a newer version and downloads it, and an update
   keeps your maps, scores and progress.
 - **Two extras, off by default**: the developers' cheat keys and all missions open from the start

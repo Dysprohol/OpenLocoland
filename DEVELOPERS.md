@@ -2686,8 +2686,41 @@ mode above) are not tested in full screen.
   Dragon).
 - New languages use `lang/_template` as a starting point: copy to `lang/<code>/`, edit `language.ini`,
   translate the files of `game/`, add font mapping if needed. See `docs/TRANSLATING.md`.
-- Intros disabled (`game/maps/logo.lgc.patch`); the outro is a scene in `maps\outro` and
-  stays.
+- The intro: the OpenLocoland logo instead of the original's movies and title. The original starts
+  with a chain of movies that `maps\logo.lgc` plays with `PlayMovie` (script function 142,
+  `Movie_Play` 0x412ec0: a DirectShow filter graph - `RenderFile` - in a 640x480 child window over
+  the game, any key or click stops the one playing and the next starts): `video\publisher1.wmv`
+  (not shipped by Steam, so the original logs a `MOVIE ... RenderFile` error at every start and goes
+  on), `publisher2.wmv` (the publisher, 12 s), `developer.wmv` (the developer's logo, 10 s) and
+  `intro.wmv` (the story, 80 s; all Windows Media Video 8, 640x480, with a Windows Media Audio 2
+  track), then two still pictures - VID 500 (`vid\500menu.vid`, a 640x480 sprite of (8, 8, 8),
+  shown for the first half of a fade) and VID 481 (`vid\logo.bmp` of the language: LOCOLAND /
+  STEAMLAND on black, 640x480, 24-bit BMP converted to a sprite at load) for 6 s (`WAIT_TIME`) or
+  until a key or a click, both `MenuCreate`d at the screen's centre - then a fade and the menu.
+  `build.py` does not copy the Steam `video\` folder (`SKIPPED_DIRS`) and `game/maps/logo.lgc.patch`
+  comments the four `PlayMovie` lines out, so the start is the title board alone: `game/objects.override`
+  points VID 481 at `vid\481logo.vid`, which `build.py` makes at install time
+  (`patch_data.make_logo_board`, so nothing of it is in the repository or the payload): a sprite of
+  the board's kind and size (640x480, 16-bit, no palette, one frame) with only the logo's pixels
+  drawn - `tools/icon/openlocoland_logo.png` (drawn by just_Martin, used as it is) cut to its letters,
+  560 px wide, the soft edge laid onto black -, the rest undrawn, so the board is the logo over the
+  game's black and nothing else, with the script's own fade in, 6 s and fade out. The board sits at
+  the centre of the game area at every size: the logo map is 1024x768, so LocoFix's logical screen
+  (`screen_scaling.cpp`) stretches that 4:3 picture to the window's height and centres it. Measured
+  on screenshots (the bounding box of the non-black pixels against the centre of the game area): a
+  1024x768 window (512, 384), a 1920x1080 window (960, 540), full screen 2560x1440 (1280, 720);
+  every sampled point off the logo (0, 0, 0). The game's loading hourglass goes before the fade begins
+  (shots at 60 ms steps), during the board the Windows cursor is hidden (the script's `SetCursor(-1)`,
+  `Cursor_Hide`) and the menu shows the game's cursor again (sampled with `GetCursorInfo` through a
+  full-screen start). The Steam `vid\logo.bmp` of the root and the packs
+  stays in place, unused by the game (Setup's header still reads it as its fallback). A test build
+  after v0.2.0 played an 8-second WMV clip of the logo first (`video\openlocoland.wmv`,
+  `make_logo_video.py`); it went: the engine's 640x480 DirectShow window is not placed with the
+  logical screen (it sat at the top left of a big window), `Movie_Play` moves the cursor to the
+  window's corner and the game's loading hourglass (`vid\000load.vid`, drawn at the cursor while a
+  level loads) froze there, since no frame is presented while a movie plays, and the logo came twice.
+  An update removes that file and the empty `video\` folder (`OBSOLETE`, `clean_up`). The outro is a
+  scene in `maps\outro` and stays.
 - Mission 11 (`maps\l11\l11.map`): a rail at 745,2075 laid as a ramp the wrong way up
   is laid flat (`game/maps.override/l11/objects.tsv`, `BUGS.md` F21), so the line at x 745
   goes on south there instead of ending; trains no longer go round through the fort gate.
@@ -3354,8 +3387,9 @@ Setup and of `build.py`) skips it. The candidates:
   wrote or found up to date (Setup records the list from this version on, so the next update removes
   exactly what a version stopped writing - a help page, a pack file, a file of one of our maps),
 - for installs made before that record, the known leftovers: `OBSOLETE` (`Steam.exe`, `steam.cfg`,
-  `steam_appid.txt` - copied by 0.1 -, `D3D8.dll`, `D3D9.dll`, `dgVoodooCpl.exe`), `OBSOLETE_DIRS`
-  (`video\`, the intros), `DEV_FILES` (`run_map.cmd`, `edit_map.cmd`; not with `--dev`), the files
+  `steam_appid.txt` - copied by 0.1 -, `D3D8.dll`, `D3D9.dll`, `dgVoodooCpl.exe`), the movies of
+  `video\` (the Steam intros 0.1 copied and the logo clip `openlocoland.wmv` of the test builds after
+  v0.2.0), `DEV_FILES` (`run_map.cmd`, `edit_map.cmd`; not with `--dev`), the files
   of `lang\` and `editor\` the build did not write (an older pack layout, e.g.
   `lang\cs\maps\l08\brief2.txt` of v0.1.10), help pages `maps\edithelp*.txt` / `.lst` beyond the
   current ones, and files of the Steam folder's root an older build copied (the same size, not ours),

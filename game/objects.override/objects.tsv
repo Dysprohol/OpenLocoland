@@ -25,3 +25,8 @@ nvid	name	spriteType	spriteClass	flags	moveMask	sizeX	sizeY	sizeZ	maxHp	speed	sp
 # and the wrench of the state bar's atlas as the page's green glyph, its mouse tip MenuVid945AllDir
 # (patch_data.make_custom_edit_icon)
 945	Custom maps edit	0x400	FRAME	0x2800	0xf	22	22	0	0	0	0	999999	999999	2500	1	1	1	1	vid\945edit.vid
+# VID 481: the title board the intro shows after the logo clip (maps\logo.lgc, 6 s) - the game's
+# vid\logo.bmp (LOCOLAND / STEAMLAND on black, per language) replaced by the OpenLocoland logo on
+# nothing: vid\481logo.vid, a sprite with only the logo's pixels drawn, made by build.py from
+# tools/icon/openlocoland_logo.png (patch_data.make_logo_board)
+481																			vid\481logo.vid

@@ -27,6 +27,13 @@ the select arrow, track, a section to delete, the fort, the semaphores green and
 decal, a push line, the ground's height, a money crate, all objects - from the game's own sprites in the atlas' style, for VID 939
 (game/objects.override).
 
+vid\\481logo.vid, the title board of the intro: maps\\logo.lgc shows VID 481 (the game's
+vid\\logo.bmp, LOCOLAND / STEAMLAND on black, per language) for 6 s after the movies.
+make_logo_board writes a sprite of the same kind and size (640x480, 16-bit, one frame) with
+only the OpenLocoland logo's pixels drawn (tools/icon/openlocoland_logo.png cut to its letters,
+logo_letters), so the board is the logo on the game's black and nothing else;
+game/objects.override points VID 481 at it.
+
 objects.res layout: "RES " + size, "DATA", then chunks (4-character name + size).
 SFX is the last chunk: entry count, then entries [length u32][data], where data is a
 parameter byte, zero-terminated file names and parameter bytes.
@@ -766,6 +773,62 @@ def make_custom_edit_icon(vid_folder, output):
         lamp.update(frameCount=len(frames), width=size, height=size, textures=1)
         json.dump(lamp, open(os.path.join(folder, "vid.json"), "w", encoding="utf-8"), indent=2)
         map_tool.pack(folder, output)
+        return True
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+# The title board of the intro (vid\481logo.vid, VID 481): the OpenLocoland logo cut to its letters
+# and LOGO_WIDTH wide (logo_letters; the game's own board has its title about 460 px wide),
+# centred in a 640x480 sprite like the game's own board - 16-bit, no palette, one frame - with
+# only the logo's pixels drawn, so the board is the logo over whatever the game draws beneath
+# (its black). A sprite without a palette has no alpha, so the logo's soft edge is laid onto black
+# (premultiplied) and drawn wherever the logo has any coverage: over black that is the same picture.
+BOARD_SIZE = (640, 480)
+LOGO_WIDTH = 560
+
+
+def logo_letters(logo_png, width=LOGO_WIDTH):
+    """The logo (RGBA, a transparent PNG) cut to its letters and scaled to `width`."""
+    from PIL import Image
+    logo = Image.open(logo_png).convert("RGBA")
+    box = logo.split()[3].getbbox()
+    if box is None:
+        raise ValueError(f"{logo_png}: the picture is empty")
+    letters = logo.crop(box)
+    return letters.resize((width, max(1, round(letters.height * width / letters.width))), Image.LANCZOS)
+
+
+def make_logo_board(logo_png, output):
+    """Writes `output` (vid\\481logo.vid) from the logo `logo_png`. Returns False (and writes
+    nothing) when the picture is missing."""
+    import json
+    import shutil
+    import tempfile
+    from PIL import Image
+    import map_tool
+
+    if not os.path.isfile(logo_png):
+        return False
+    letters = logo_letters(logo_png)
+    w, h = BOARD_SIZE
+    frame = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    frame.alpha_composite(letters, ((w - letters.width) // 2, (h - letters.height) // 2))
+    px = frame.load()
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            px[x, y] = (r * a // 255, g * a // 255, b * a // 255, 255) if a else (0, 0, 0, 0)
+    work = tempfile.mkdtemp(prefix="logoboard_")
+    try:
+        frame.save(os.path.join(work, "frames.png"))
+        with open(os.path.join(work, "frames.tsv"), "w", encoding="utf-8", newline="\n") as f:
+            f.write("frame\treference\tshadow\traw\n0\t\t\t\n")
+        json.dump({"chunks": ["HEAD", "DATA"], "imageFlags": "0x1", "frameSpeed": 71, "frameCount": 1,
+                   "width": w, "height": h, "kind": "sprite",
+                   "sheet": {"columns": 1, "cellWidth": w, "cellHeight": h}},
+                  open(os.path.join(work, "vid.json"), "w", encoding="utf-8"), indent=2)
+        map_tool.pack(work, output)
         return True
     finally:
         shutil.rmtree(work, ignore_errors=True)
