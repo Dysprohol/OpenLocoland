@@ -3051,7 +3051,10 @@ mode above) are not tested in full screen.
       original code runs. 5 locks per frame became 3,
   33. "check for updates" in the launcher (`update_check.cpp`): a row under the options with the
       button "Sprawdź aktualizacje" / "Check for updates", the box "przy starcie" / "at start"
-      (`UpdateCheckAtStart`, off by default: the check runs as the launcher opens), a link "GitHub"
+      (`UpdateCheckAtStart`, off by default: the check runs as the launcher opens - left off on
+      purpose: the game asks a server on the internet only when the player says so, a launcher
+      opened offline shows no notice it did not ask for, and the line keeps the last check's date
+      and version, so a player sees how old it is), a link "GitHub"
       (the releases page, or the new release's; its right button opens it or copies the address)
       and a result line with a button beside it (labels `check_updates`, `check_at_start`,
       `update_*`, `open_link`, `copy_link` of `[launcher]`, filled in with %1 / %2). The check
