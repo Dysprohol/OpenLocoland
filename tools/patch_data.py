@@ -496,6 +496,10 @@ BUTTON_SIGNS = {
 # the atlas' dark cell with the object's own picture (frame 0, in colour) fitted into it.
 PALETTE_UNIT_CLASSES = {"UNIT", "BUILDING", "AVIA", "CIV_ROBOT", "ENGINE", "DEPO", "CREATURE", "BALLOON"}
 VEHICLE_GROUP = "GroupTrain"   # the groups of the vehicles palette (the cars, ENGINE)
+# cars whose state bar icon is another car's: the explosive tank (56, the oil tank's sprite) has the
+# passenger car's icon 31 in objects.res (its weapon 32), so the two showed the same picture - it gets
+# its own sprite, as a car without an icon does
+STATE_BAR_ICON_NOT_ITS_OWN = {"56"}
 
 
 def _image_frame(path, frame, work):
@@ -624,7 +628,7 @@ def make_editor_palette(game_folder, palette_tsv, output_tsv, output_vid):
         cells = []
         for r in rows:
             o = objects.get(r["nvid"])
-            if o and r["group"].startswith(VEHICLE_GROUP):   # a car: the state bar's own icon
+            if o and r["group"].startswith(VEHICLE_GROUP) and r["nvid"] not in STATE_BAR_ICON_NOT_ITS_OWN:   # a car: the state bar's own icon
                 icon = state_bar_icon(o)
                 if icon is not None:
                     cells.append(icon)

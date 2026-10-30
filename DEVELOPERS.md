@@ -2817,7 +2817,11 @@ mode above) are not tested in full screen.
   name, or none for a unit named by the game's `[Units]`) and writes it to the game folder with,
   for each object, its icon's frame and - for a unit - the behave and build list of the first one
   on the missions' maps; the icons, the object's first frame of its own sprite scaled into a 40 x
-  40 atlas cell, are VID 944 (`Editor palette`, `game/objects.override`, one direction per icon).
+  40 atlas cell, are VID 944 (`Editor palette`, `game/objects.override`, one direction per icon);
+  a car of the Vehicles palette has the state bar's icon of `vid\455icon.vid` instead (its turret's
+  weapon's `iconFrame`, else its own), but the explosive tank (56) - the oil tank's sprite - has the
+  passenger car's icon 31 (its weapon 32; the state bar in play shows that too), so it gets its own
+  sprite (`STATE_BAR_ICON_NOT_ITS_OWN`; the two had looked like one car twice).
   `build.py` leaves `game/editor/` out of the plain copy.
 - `Locoland.exe` = `Steam.exe` after the patches from `tools/patch_exe.py`:
   1. loads `LocoFix.dll` before WinMain (the call at 0x45952b goes through code at
