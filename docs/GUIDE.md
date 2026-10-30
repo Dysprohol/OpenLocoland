@@ -1,6 +1,7 @@
 # OpenLocoland - player's guide
 
-Version 0.1 - a test release. [Polish version: PRZEWODNIK.md](PRZEWODNIK.md)
+Version 0.2 - the first regular release; the map editor is still work in progress. [Polish version:
+PRZEWODNIK.md](PRZEWODNIK.md)
 
 **OpenLocoland** is an unofficial, fan-made new edition of **Locoland** (Gromada / ESDigital
 Games, 2003): the original game runs with fixes for today's Windows, a few improvements, a page
@@ -40,6 +41,8 @@ whatever language you have. The others are greyed, with the line that gets them 
 (`steam://open/console` in the browser's address bar or Win+R), wait until Steam has downloaded it
 and run Setup again - it keeps your chosen language and adds the new one.
 
+![Setup's list of languages](img/setup-languages-en.jpg)
+
 The game folder is self-contained: the maps you make, your high scores and the logs live there.
 Your profile (the player's name, the missions won, the scores, the sound settings) is kept in your
 Windows user's registry, as the original kept it.
@@ -64,7 +67,7 @@ if you want to keep them (each one is a folder in `maps\`, see [sharing a map](#
 
 The game starts with its launcher (the window with the Locoland picture):
 
-![The launcher](img/launcher.jpg)
+![The launcher](img/launcher-update-en.jpg)
 
 - **Resolution** - besides 640 x 480 ... 1024 x 768 the list has the widescreen modes of your
   monitor (1280 x 720 up to 3840 x 2160) and your desktop's own resolution.
@@ -73,8 +76,10 @@ The game starts with its launcher (the window with the Locoland picture):
 - **Language** - the list next to it: the languages you have (Polish, English, ...; a fan
   translation is marked "(unofficial)"). The launcher's labels change with it. If the language you
   chose is no longer there, the game starts in English, or without English in your Steam copy's.
-- **Limit FPS** and **FPS counter** - the row under the resolution: how many frames a second the game
-  draws (60 by default; ∞ = no limit) and a small counter at the top of the screen.
+- **FPS counter** and **Frame limit** - the row under the resolution: a small counter at the top of
+  the screen and how many frames a second the game draws (60 by default; ∞ = no limit).
+- **Cheat keys** and **All missions** - the two extras, off by default: the developers' keys and
+  every mission open from the start (your real progress is not touched).
 - **Check for updates** - the row above OK: whether there is a newer OpenLocoland, see
   [updating](#1-installing-updating-uninstalling).
 
@@ -125,8 +130,10 @@ The strategic map has a **second page**: the `►►►` button at its bottom ri
 
 **POLIGON** is a ready mission made with the same tools as the editor: the enemy has built a
 bastion in the east - a fort with two guns guards its gates, behind it stand its factory and repair
-point, and new trains come out of the factory. Break through and destroy them. (Its texts are in
-Polish only.)
+point, and new trains come out of the factory. Break through and destroy them. The enemy's trains
+patrol its lines, and a loop of track east of the bottom line gives you room to manoeuvre.
+
+![POLIGON in play](img/poligon-en.jpg)
 
 A custom map is not a campaign mission: winning it does not unlock missions or add to your
 campaign score, rank or the hall of fame. It keeps its own high score table, "restart the mission"
@@ -159,16 +166,20 @@ What you see:
 - **The status line** at the top: the tool (or the one under the mouse), the undo and redo counts,
   "not saved" and the last message - why something could not be done is always written there.
 - **The ? and menu buttons** at the left end of the bar (where the game has its pause button).
-  **?** (or F1) opens the help: eighteen pages with everything of this chapter in short. It starts on
-  its **contents**: the categories (BASICS, TRACK AND TRAINS, OBJECTS, MISSION, SAVING, GROUND,
-  ARRIVALS, FACTORIES) on the left, the pages of the one under the mouse on the right - a click opens
-  one. A page has its category for the title and its number (5 / 17); the arrows, Page Up / Down and
+  **?** (or F1) opens the help: twenty pages with everything of this chapter in short. It starts on
+  its **contents**: the categories - BASICS; TRACK AND TRAINS; OBJECTS; MISSION, SAVING; GROUND;
+  ARRIVALS, FACTORIES - on the left, the pages of the one under the mouse on the right - a click opens
+  one. A page has its category for the title and its number (13 / 20); the arrows, Page Up / Down and
   the wheel turn the pages, and **CONTENTS**, `Esc` or the right button go back to the contents.
 
-  ![The help](img/editor-help-en.jpg)
+  ![The help's contents](img/help-contents-en.jpg)
 
-  The **menu button** opens the editor's menu with every command - new, load, save, mission
-  settings, map size, play the saved map, undo, redo, quick test, back to the menu, exit.
+  ![A page of the help](img/editor-help-en.jpg)
+
+  The **menu button** opens the editor's menu with every command - **NEW MAP**, **LOAD MAP**, **SAVE
+  MAP**, **EXPORT MAP**, **IMPORT MAP**, **MISSION SETTINGS**, **MAP SIZE**, **PLAY THE SAVED MAP**,
+  **UNDO**, **REDO**, **QUICK TEST, NO SAVE**, **BACK TO THE MENU**, **EXIT THE GAME**; the status line
+  says what the one under the mouse does.
 
   ![The editor's menu](img/editor-menu-en.jpg)
 
@@ -182,7 +193,7 @@ What you see:
 | move | drag it |
 | turn | R / E or the mouse wheel |
 | raise / lower it | PgUp / PgDn by 4 (with Shift by 16), or Shift+wheel; Home puts it back on the ground - the status line shows its height above the ground |
-| change its army | A: ours, enemy, neutral, pirates - the flags change colour |
+| change its army | A: ours, enemy, neutral, pirates - the flags change colour (while placing, A sets the army of the next object) |
 | delete | Del (Shift+Del: a whole train; Shift+click with the Delete tool: a whole section of track) |
 | undo / redo | Ctrl+Z / Ctrl+Y - every change; the last 500 steps are kept |
 | its panel | the right mouse button on it |
@@ -277,7 +288,8 @@ the line through a Y, a straight piece ending in a **dead end**.
 `V` switches the kind of the next rails: plain, swamp (on its embankment), destroyed or destroyed
 swamp. `PgUp` / `PgDn` make the next rail climb or descend (a ramp onto higher ground: each ramp
 11 levels). For a line on a hill, lay it up its ramps first, then raise the ground around the top and
-flatten it starting on the track. `B` picks the gravel bed under new rails. Del or the **Delete a section of track** tool removes rails.
+flatten it starting on the track. `B` picks the gravel bed under new rails. The wheel's click, Del
+or the **Delete a section of track** tool removes rails.
 
 **The gravel bed.** Once the track is laid, **Paint the ground** -> **GRAVEL BED** lays the bed
 under the rails the brush goes over: **KIND** (meadow, ice, volcanic, desert - the bed `B` lays
@@ -288,13 +300,18 @@ band is their bed now); on a campaign map's terrain the bed decals are laid inst
 button puts the original picture back, Alt+click takes the kind, **UNDER THE WHOLE TRACK** beds
 every rail of the map at once. A stroke is one undo.
 
+![The gravel bed under a junction](img/paint-bed-en.jpg)
+
 ### 5. Train arrivals
 
 **Train arrivals** (key 0) opens a panel with the trains that come onto the map during the mission -
 the player's train at the start, reinforcements, enemy waves. It first lists them, one arrival in two
-lines of plain words ("1. OURS, ENTRY 1: LOCOMOTIVE + CARS: 2", "AT THE START, ONCE"); a click on one
-opens it, **+ NEW** makes one, **COPY n** and **DELETE n** act on the one opened last. An arrival has
-one thing a row:
+lines of plain words ("1. OURS, ENTRY 1: Engine + CARS: 1", "AT THE START, ONCE"); a click on one
+opens it, **+ NEW** makes one, **COPY n** and **DELETE n** act on the one opened last.
+
+![The Arrivals list](img/arrivals-en.jpg)
+
+An arrival has one thing a row (a new one comes as a train of ours that drives to a point):
 
 - **WHO** - ours, the enemy, the neutrals or the pirates;
 - **CARS** - in the train's order: **+ CAR** adds one at the end from the Vehicles palette,
@@ -308,7 +325,8 @@ one thing a row:
 - **THEN** - ours, the neutrals' and the pirates' train **STAYS**, **DRIVES TO A POINT** or **PATROLS**
   between two points; the enemy's **ATTACKS**, **GUARDS A POINT** or **PATROLS** (the game's AI does
   it). **PICK** the points on the track, off the main line;
-- **MESSAGE** ("reinforcements have arrived", for ours and the enemy's).
+- **MESSAGE** at the top right, **YES** or **NO** ("reinforcements have arrived", for ours and the
+  enemy's).
 
 The strip above the title names a real problem with the button that mends it - no entry yet (**PICK THE ENTRY**),
 no lights at the entry (**PUT LIGHTS**: a pair of posts the first place inside the map and their line,
@@ -345,7 +363,8 @@ and arrows the way it runs, and the mouse over it tells what it does; then, on a
 Select tool too a click on a line's bar or arrow selects it, and the right button opens its panel -, `T` switches
 pushing on or off, `R` turns it round, `S` puts its semaphores, Del deletes it. Make two:
 
-- the **map's entry**: from the main line's end past the edge onto the map, pushing on;
+- the **map's entry**: from the main line's end past the edge onto the map, pushing on - if the
+  arrival's **PUT LIGHTS** (step 5) made it, it is there already;
 - the **map's exit** at the other end, short and pointing into the map, pushing off - so no train
   drives off the map.
 
@@ -383,6 +402,8 @@ has the authors' other settings of the enemy, a line on each: whether a lost sta
 again and after how long, the start trains' raids, when raids begin and how long they last, the clever
 attack. Everything except a train at a time once needs a map that runs arrivals (older maps: CONVERT
 in the Arrivals panel).
+
+![The enemy factory's plan](img/factory-plan-en.jpg)
 
 **Orders of a train**: the right button on a train, **ORDERS**: yours, the neutrals' and the pirates'
 **DRIVE TO...** a point or **PATROL...** between where they stand and a point; the enemy's (with a gun car -
@@ -431,15 +452,16 @@ AGAINST ALL SIDES**). A map of the editor plays so; the campaign's missions keep
 
 - **Trains**: the strip's **Vehicles** opens the cars - locomotives, combat cars, supply cars
   (ammunition, repair car, tankers), civil cars, obstacles. A car goes on the track under the
-  cursor; placed at a train's end it is coupled to it. Make the enemy's train: a locomotive and a
-  gun car, then `A` on it for the enemy's army. `U` uncouples a car, `C` couples to another train,
+  cursor; placed at a train's end it is coupled to it. Make the enemy's train: choose **ENEMY** in the
+  palette's **ARMY** row (or `A` while placing, or `A` on the placed train), then a locomotive and a
+  gun car. `U` uncouples a car, `C` couples to another train,
   `R` turns the train round, a drag moves it along the track. A train needs a **locomotive** to
   move.
-- **A patrol**: the train's panel → PATROL → to a point..., then click the far end on the track.
-  The train drives there and back.
-- More enemy trains can be set in the mission settings (step 10): trains at the start and trains
-  the enemy's factory sends later. For those the enemy needs a factory: put one (key 4) at a dead
-  end of its own and `A` to the enemy.
+- **A patrol**: the train's panel (right button) → ORDERS: **PATROL...**, then click the far end on
+  the track. The train drives to and fro between where it stands and that point.
+- More enemy trains: more trains on the map with their orders, the enemy's arrivals (step 5) and the
+  trains the enemy's factory builds - its plan (step 6). For those the enemy needs a factory: put one
+  (key 4) at a dead end of its own and `A` to the enemy.
 - A **money crate** (strip) lies on the track: a unit of the player that takes it gets 100.
 
 Remember the rule of the game: the factory, the repair point and the fort stand **on the track or
@@ -450,6 +472,13 @@ right next to it**.
 The strip's **Decals**: grass, bushes, flowers, stones, wrecks... `[` `]` (or a click on the
 entry) picks one; a click puts one, a drag scatters them in the radius (wheel, `+` `-`), never nearer than
 the spacing (`<` `>`). Shift+drag takes them away. Trees, houses and the rest are in **All objects**.
+
+**Sets of the missions** (All objects): what the authors always put together is one object, its panel
+choosing the part - the border post with its corkscrew (whole or broken), the level exit with its top,
+a flagpole or a station with its flag, chimneys with their smoke or glow, an oil derrick, a pool. The
+**crusher** (pirates) stands across the track and bites all but its army every 25 seconds; its panel
+says when it stops - when its army's towers fall, or never. **Scylla** (swamp) bites everyone on a
+diagonal track every 15 seconds. When the pirates' towers fall, the corkscrews break.
 A **Region** (strip): drag its rectangle; its panel sets fog (mist, dust, haze, glow) and splashes.
 
 ### 9. Look at it working
@@ -545,7 +574,7 @@ Mission settings, Ground height, Money crate, Vehicles, Paint the ground, Water 
 | Key | |
 |---|---|
 | R / E, wheel | turn: a step of the object's directions (R right, E left); turn round a train, a wreck on the track, a semaphore beside the track and, in the Push line tool, the line; a factory, a repair point and a blocker follow their track (help page 15) |
-| A | next army |
+| A | next army; while placing: the army of the next object |
 | T | semaphore red / green; on a line: pushing on / off |
 | L / Shift+L | a line at the selected semaphore: lets in / keeps out |
 | Del / Shift+Del | delete / a whole train or section |
@@ -563,9 +592,10 @@ Mission settings, Ground height, Money crate, Vehicles, Paint the ground, Water 
 | W | water, swamp or lava |
 | S | the selected line's semaphores (Push line tool) |
 | Shift (with a brush) | take away |
-| Esc, right button | back to Select; end a line of track (in the Track tool a wheel click deletes the rail under the cursor) |
-| Ctrl+R | run / hold the level |
-| F1 | help |
+| Esc, right button | back to Select; end a line of track |
+| middle button | drag the map; in the Track tool a click deletes the rail under the cursor (at a junction too) |
+| Ctrl+R | QUICK TEST, NO SAVE: run the map here / back to the editor |
+| F1 | help, opening on its contents |
 | Ctrl+S | save the map |
 | Alt+F2 / Alt+F3 | save under a name / load |
 
