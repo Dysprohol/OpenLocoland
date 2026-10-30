@@ -2068,7 +2068,18 @@ attack with the weapons' range) and `STG_DESTROY_TIME` (read by no script but mi
 shown as such). The start trains' renew and raids are one value for all of them in the panel, "each
 its own" while they differ. Test mode: `F<x>:<y>` opens the panel of the factory at a map point.
 Checked in play: the table in `arrivals-tests` of the session notes (each army's entries, the cars
-planned and made).
+planned and made). The WHILE conditions, every one of the list: POLIGON with five neutral and eight
+pirate factories off the track, an entry of WHILE each condition at our factory, a neutral or a
+pirate one (14 entries, most with `first` inside a time the condition did not hold), an arrival of the
+neutrals while the enemy has fewer than 2 trains and one of the pirates while the player has no
+train, and a script that took the conditions' states away one by one (our train at 75 s, money 1000
+at 50 s, an enemy train at 90 s, our factory at 105 s, the neutral factories at 135 s, an attacker
+coming at 100 s) and logged `MissionIf` of each every second: each entry was ordered in the second its
+condition began to hold (no train 75 s, fewer than 3 units 25 s, no factory 105 s, a neutral factory
+25 s, the enemy fewer than 2 trains 90 s, fewer than 1 attacker 143 s, 500 money 50 s, no train and
+a neutral factory 75 s, no locomotive and a factory of its own 75 s, fewer than 2 trains 75 s after
+a time with 2), the two arrivals at 75 and 90 s, and the three entries whose condition had ended
+before their `first` never.
 
 **Ground, gravel bed, decals** (`editor_edit.cpp`, `ground.h`, `ground.cpp`). The strip's Ground height
 tool raises, lowers, flattens or smooths the GRID cells (8 x 8 px) in a circle around the cursor while
