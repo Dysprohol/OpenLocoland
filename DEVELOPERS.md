@@ -2388,6 +2388,11 @@ l18) were each selected and deleted as one; played: the crusher and Scylla destr
 of ours in their reach and spared one 40 px away, an enemy Scylla spared the enemy's two beside it
 (`ours 1 -> 0, enemy 2 -> 2` at its bite), and with the citadel's tower destroyed by a test line the
 corkscrews broke and the crusher of its army stopped (`CRUSHER 1 stops: no tower of its army left`).
+The forms the missions do not have, from the palette onto POLIGON: across the horizontal bottom line
+form 0 and across a vertical track form 2 (`CRUSHER 1 at 820,1375 form 0`, `CRUSHER 2 at 958,1232
+form 2`), both biting in the quick test (`CRUSHERS bite` at 25 s, the drums closed across each
+track); the status line's warning of a map without a tower of its army was seen whole after the
+placing in Polish and English.
 The explosive mine (86) snaps to the
 rail point nearest within 40 px, is placed in the army of the palette's row and is marked with its
 army by the editor (`draw_mines`: a square in the army's colour and MINE: ENEMY; the engine hides a
