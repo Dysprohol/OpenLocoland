@@ -12,6 +12,13 @@ It is a fan project, not affiliated with the makers of Locoland. It does not con
 need your own copy of [Locoland from Steam](https://store.steampowered.com/app/352130/Locoland/),
 and OpenLocoland is put together from it on your computer. Your Steam game stays untouched.
 
+## Trailer
+
+[![The OpenLocoland trailer on YouTube](https://img.youtube.com/vi/04BeRSnfL6o/hqdefault.jpg)](https://www.youtube.com/watch?v=04BeRSnfL6o)
+
+The [trailer](https://www.youtube.com/watch?v=04BeRSnfL6o) and more videos of the project are on the
+[OpenLocoland YouTube channel](https://www.youtube.com/@OpenLocoOffical).
+
 ## What you get
 
 - **The game on today's Windows.** It runs in a window or on full screen in any resolution up to
