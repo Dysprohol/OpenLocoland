@@ -3107,14 +3107,16 @@ void mission_save(const std::string& map) {
         g_map = map;
         return;
     }
-    // a map saved from the template or from the editor's new map keeps nothing of its name:
-    // "TEMPLATE" or the new map's "NEW MAP" as the title (the custom maps page) or the briefing's
-    // header (the Esc menu's first page) becomes the map's own name
-    if (lstrcmpiA(folder_name(map).c_str(), "template") != 0 && !editor_unsaved_map(map)) {
+    // a map saved from the template, POLIGON or the editor's new map keeps nothing of its name:
+    // "TEMPLATE", POLIGON's "POLIGON" or the new map's "NEW MAP" as the title (the custom maps page)
+    // or the briefing's header (the Esc menu's first page) becomes the map's own name
+    if (lstrcmpiA(folder_name(map).c_str(), "template") != 0 && lstrcmpiA(folder_name(map).c_str(), "sandbox") != 0 &&
+        !editor_unsaved_map(map)) {
         const std::string unnamed = editor_unsaved_map(g_map) ? editor_new_map_title() : "";
+        const bool sandbox = lstrcmpiA(folder_name(g_map).c_str(), "sandbox") == 0;
         auto placeholder = [&](const std::wstring& text, size_t length) {
             const std::string a = ascii_upper(text, length);
-            return a == "TEMPLATE" || (!unnamed.empty() && a == unnamed);
+            return a == "TEMPLATE" || (sandbox && a == "POLIGON") || (!unnamed.empty() && a == unnamed);
         };
         const bool title = placeholder(g_mission.title, 24);
         if (title) g_mission.title = from_pack(upper(folder_name(map)));

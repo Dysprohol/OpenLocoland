@@ -1478,7 +1478,9 @@ for the name in the save dialog, which opens in `maps\` with the first free `map
 typed straight into `maps\` becomes `maps\<name>\<name>.map` (a map already there is overwritten
 only after a question), the map's own folder with its ground image (`<name>.vid`), script and texts,
 and its line in `maps\custom.lst`; a title or briefing header NEW MAP becomes the folder's name in
-capitals, as TEMPLATE does. A map is not saved outside the game folder ("A map is saved in the maps
+capitals, as TEMPLATE does, and POLIGON's own "POLIGON" when POLIGON is saved under a name (checked:
+POLIGON and the template loaded and saved as `pp1` / `tt1` - PP1 and TT1 in the script's title,
+`BRIEF_HEADER` and `custom.lst`; POLIGON kept its title before). A map is not saved outside the game folder ("A map is saved in the maps
 folder of this game."): its script and texts are found by game paths, and not into a scratch
 folder (refused as Load refuses it). The file dialogs are `IFileOpenDialog` / `IFileSaveDialog`
 with `SetFolder`: the old `GetOpenFileNameW` opened in the folder it remembers for the program -
