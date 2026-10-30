@@ -654,11 +654,13 @@ bool on_palette_next(POINT m) {
 void draw_palette(POINT m) {
     load_palette();
     g_group = (std::max)(0, (std::min)(g_group, static_cast<int>(g_groups.size()) - 1));
+    // the group's name as the title and ALL OBJECTS / VEHICLES in the strip above it, as the help's
+    // pages have CONTENTS there: the two in one title ran past the frame (it holds about 20 letters)
     const std::string group = g_groups.empty() ? "" : g_groups[g_group];
-    const std::string title = std::string(g_vehicles ? ui_text("VehiclesHeader", "VEHICLES") : ui_text("PaletteHeader", "ALL OBJECTS")) +
-                              (group.empty() ? "" : std::string(": ") + ui_text(group.c_str(), group.c_str() + 5));
-    draw_frame(VID_MENU_PICTURE, title.c_str());
+    const char* header = g_vehicles ? ui_text("VehiclesHeader", "VEHICLES") : ui_text("PaletteHeader", "ALL OBJECTS");
+    draw_frame(VID_MENU_PICTURE, group.empty() ? header : ui_text(group.c_str(), group.c_str() + 5));
     const Place p = picture();
+    if (!group.empty()) edit_draw_text(FONT_TEXT, p.x + STRIP_X, p.y + STRIP_Y, header, STEP + 3);
     const int hover_group = group_at(m);
     for (int i = 0; i < static_cast<int>(g_groups.size()); ++i) {
         const Place g = group_place(i);

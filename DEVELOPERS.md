@@ -2290,7 +2290,9 @@ has one row - SOCKET 1, SOCKET 2, numbered on the wall while the panel is open, 
 and a click on EMPTY, CANNON or MISSILES puts that gun in at once, underlined. The bar's entry 7, All objects, opens the palette: a
 panel like Help with the groups down the left (meadow, forest, desert, ice, volcanic, swamp, park,
 pirates, city, industry, railway, flags and crates, wrecks, units and creatures: the 236 kinds of
-object of the missions, trains and cars aside), 12 icons a page on the right (VID 944, made from the
+object of the missions, trains and cars aside; the chosen group's name is the panel's title, ALL
+OBJECTS / VEHICLES in the strip above it - the title holds about 20 letters, and "WSZYSTKIE OBIEKTY:
+JEDNOSTKI, ISTOTY" in one ran past the frame), 12 icons a page on the right (VID 944, made from the
 objects' own sprites when the game is assembled), the arrows or the wheel for more and the name of the
 one under the mouse (a unit's from the game's `[Units]`, the others' from `[Editor]`); a click picks
 it and the map takes it in the army the missions give it, a unit with the behave and build list of
