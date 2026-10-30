@@ -2084,7 +2084,14 @@ entry (5,20 attacking, at 20 s, every 60 s, no end), its attackers destroyed by 
 once a minute so `LIMIT_ATACKERS` did not hold it, the game sped up to x2 with + (the engine's key:
 x2 at most, x5 in the developer mode) - in 13.5 minutes of the game seven waves, each queued 60 s
 after the one before was built (20, 150, 281, 411, 541, 671, 801 s) and built about 70 s later as
-5,20, the queue's one place used again each time.
+5,20, the queue's one place used again each time. The difficulty: every train a panel writes has a
+type of a template or the map's own, never one ending in 5, so easy and hard build what the panel
+shows - checked on POLIGON with an enemy entry LIGHT GUN, one of its own cars 5,25,20, one of our
+factory 5,20 and an enemy arrival 5,80, played on easy and on hard (a test copy of `GetDifficulty`
+reading another registry value): the same cars as planned on both, while the authors' `ATT_DIFF_GUN`
+made 5,20 on easy and 10,20,20,20 on hard. The variant that goes: a campaign script's entry of such
+a type (the authors' "BY DIFFICULTY" trains) is read as the normal difficulty's train and written
+so, the same on every difficulty.
 
 **Ground, gravel bed, decals** (`editor_edit.cpp`, `ground.h`, `ground.cpp`). The strip's Ground height
 tool raises, lowers, flattens or smooths the GRID cells (8 x 8 px) in a circle around the cursor while
