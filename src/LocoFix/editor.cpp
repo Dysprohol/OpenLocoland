@@ -153,6 +153,7 @@ constexpr UINT WM_SAVE_AFTER_RUN = WM_APP + 0x52;   // Run the level's copy held
 constexpr uintptr_t SET_POSITION = 0x41c680;   // SetPosition: the centre of the view, clamped
 constexpr uintptr_t G_SOUND = 0x5d3a54;        // g_sound: the sound object
 constexpr uintptr_t STOP_MUSIC = 0x444e50;     // StopMusic(g_sound)
+constexpr uintptr_t SOUND_MUSIC_FILE = 0x3d8;  // g_sound: the music file (a char* of the game's heap, or the empty String)
 
 using GdiMode_t = void(__fastcall*)(void* graphics, void* edx);
 using SetPosition_t = void(__fastcall*)(void* world, void* edx, float x, float y, int mode);
@@ -249,8 +250,19 @@ void hold_level(uint8_t* w, bool hold) {
 }
 
 // The game's music (the running level's script played it): StopMusic(g_sound), as script function 134.
+// StopMusic leaves the music's file name (g_sound +0x3d8, PlayMusicFile's), and the sound's update
+// (every frame) now and then finds the stream stopped and starts that file again: the victory's
+// music of a won run came back a few seconds after the level was held. The name goes with it - the
+// update then stops the music for good (its own StopMusic for an empty name).
 void stop_music() {
-    if (void* sound = *reinterpret_cast<void**>(G_SOUND)) reinterpret_cast<StopMusic_t>(STOP_MUSIC)(sound, nullptr);
+    auto* sound = *reinterpret_cast<uint8_t**>(G_SOUND);
+    if (!sound) return;
+    reinterpret_cast<StopMusic_t>(STOP_MUSIC)(sound, nullptr);
+    char*& file = *reinterpret_cast<char**>(sound + SOUND_MUSIC_FILE);
+    if (file && reinterpret_cast<uintptr_t>(file) != EMPTY_STRING) {
+        reinterpret_cast<Delete_t>(CRT_DELETE)(file);
+        file = reinterpret_cast<char*>(EMPTY_STRING);
+    }
 }
 
 // Run the level: the level runs from its saved file - the mission's script with what the panels set

@@ -1453,7 +1453,11 @@ panel the status line says what each of the two does (`TipRun`, `TipPlay`). The 
 THE EDITOR in the Esc menu, or any level change while it runs: ABORT GAME's menu, a won or lost
 level's next map (`editor_level_redirect` in the Level_Load wrapper of `frame_limit.cpp` turns the
 name into the map's, in a string of the game's heap, which the load frees) - stops the music
-(`StopMusic(g_sound)`, 0x444e50, as script function 134) and loads the saved map again, held: the
+(`StopMusic(g_sound)`, 0x444e50, as script function 134, and the music file's name at g_sound
++0x3d8 made empty: the sound's update, every frame, starts a stopped stream again from that name, and
+the victory's music, `music\mus00.ogg`, came back in the held editor a few seconds after a won run;
+checked by the stream's state - its playing slot, the name - for 30 s after a won and a lost run
+and after Play the map's way back, where the editor's new game has no music at all) and loads the saved map again, held: the
 state of the run does not stay, the editor's bar comes back as before (the state bar's icons, VID
 455, get back their untinted gammas: the level's `SetArmyGamma` lights them for army 0), the view and
 the chosen object (found again by VID and place) and the tool as they were, and the undo history: before
