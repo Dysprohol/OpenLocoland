@@ -353,8 +353,8 @@ shows where, and placing them elsewhere is refused with the reason:
   runs the other way and the semaphores change places.
 
 Dragging one of them moves it, with its line, to the nearest right place; deleting it deletes the
-line too. A **blocker** (the buffer stop, in the RAILWAY group of All objects) goes to the nearest
-end of a track, across it, as the missions have theirs.
+line too. A **blocker** (the buffer stop, in the RAILWAY group of All objects) is placed freely and
+turned with R / E like any object: set it at the end of a track yourself.
 
 **One-way lines** (the strip's **Push line**): a line on the track no train may enter against its
 direction, as the missions mark the entry onto the map, the exit, the factories and the repair
@@ -573,7 +573,7 @@ Mission settings, Ground height, Money crate, Vehicles, Paint the ground, Water 
 
 | Key | |
 |---|---|
-| R / E, wheel | turn: a step of the object's directions (R right, E left); turn round a train, a wreck on the track, a semaphore beside the track and, in the Push line tool, the line; a factory, a repair point and a blocker follow their track (help page 15) |
+| R / E, wheel | turn: a step of the object's directions (R right, E left); turn round a train, a wreck on the track, a semaphore beside the track and, in the Push line tool, the line; a factory and a repair point follow their track (help page 15) |
 | A | next army; while placing: the army of the next object |
 | T | semaphore red / green; on a line: pushing on / off |
 | L / Shift+L | a line at the selected semaphore: lets in / keeps out |

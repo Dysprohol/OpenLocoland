@@ -159,7 +159,7 @@ constexpr int ANI_STAND = 0, ANI_STAND_OPEN = 10;
 constexpr int CURSOR_ARROW = 0, CURSOR_MOVE = 2, CURSOR_SELECT = 7, CURSOR_DELETE = 14;
 // VIDs
 constexpr int VID_GROUND = 1024, VID_DEPOT = 102, VID_WORKSHOP = 104, VID_GUN = 115, VID_SEMAPHORE = 152,
-              VID_FORT = 162, VID_LOCOMOTIVE = 5, VID_CIRCLE = 460, VID_ICONS = 455, VID_CRATE = 169, VID_BLOCKER = 150,
+              VID_FORT = 162, VID_LOCOMOTIVE = 5, VID_CIRCLE = 460, VID_ICONS = 455, VID_CRATE = 169,
               VID_MINE = 86, VID_MINE_MARKER = 89;
 // the bar: the state bar's base, its side tiles (game/objects.override), the depot panel's strip,
 // the frame of the chosen slot, the editor's icons (patch_data.make_editor_icons) and two fonts:
@@ -803,7 +803,6 @@ void resnap_on_track(uint8_t* o, float x, float y, int direction, const UiText& 
 bool rail_line_spot(float x, float y, float reach, bool diagonal, float& sx, float& sy, int& along);
 bool post_on_track(uint8_t* o);
 int post_facing_for(float x, float y);
-bool blocker_at_end(uint8_t* o);
 void turn_post(uint8_t* o);
 const char* way_name(int direction);
 int own_line(uint8_t* o);
@@ -2150,9 +2149,8 @@ void push_change(int key);   // push lines, below
 //  - turned round, R and E alike: a train, a wreck on the track, a post beside a track (it goes
 //    across to the trains of the other way), a car or a post to place; in the Push line tool the
 //    selected line,
-//  - a factory, a repair point and a blocker at a dead end are turned by their track (dragged along
-//    it), and so is a factory, repair point, crate or blocker to place; rails are not turned (the
-//    Track tool lays them again).
+//  - a factory and a repair point are turned by their track (dragged along it), and so is a
+//    factory, repair point or crate to place; rails are not turned (the Track tool lays them again).
 void turn(int steps) {
     if (entry().tool == Tool::PushLine) {
         push_change('R');
@@ -2228,7 +2226,7 @@ void turn(int steps) {
         resnap_on_track(o, at<float>(o, O_X), at<float>(o, O_Y), (at<int>(o, O_DIRECTION) + 128) & 255, {"OpTurn", "turn"});
         return;
     }
-    if (nvid_of(o) == VID_DEPOT || nvid_of(o) == VID_CRUSHER || nvid_of(o) == VID_SCYLLA || blocker_at_end(o)) {
+    if (nvid_of(o) == VID_DEPOT || nvid_of(o) == VID_CRUSHER || nvid_of(o) == VID_SCYLLA) {
         MESSAGE("MsgTurnedByTrack", "VID %d is turned by its track (drag it to another place on the track)", nvid_of(o));
         return;
     }
@@ -4374,17 +4372,15 @@ void push_semaphores() {
             posts.size() > 1 ? ui_text("SemBoth", "red at its end, green at its begin") : ui_text("SemEnd", "red at its end"));
 }
 
-// ---- on the track: the factory, the repair point, posts, money crates, buffer stops ----
+// ---- on the track: the factory, the repair point, posts, money crates ----
 //
 // The authors put these on the track (measured over the 20 missions): every factory (VID 102) at the
 // dead end of a straight spur, turned the way out along it (the nearest rail 1-38 px away), every
 // repair point (104) on a straight leg, turned along it like a gate; a post (152) 15-58 px beside the
 // track (median 31), facing the trains it is for; a money crate (169, army 3) on the track (1-46 px
-// from a rail, median 17); a buffer stop (150, "Blocker") at a dead end of the track (all 99 of the
-// missions' within 16 px of a rail point with one link, median 5 px past it), turned by the track's
-// way: its 4 frames are the 4 ways of the lattice - 0 on a vertical track, 64 on one rising to the
-// right, 128 on a horizontal one, 192 on one falling to the right (32 and 160 of some missions are
-// the same frames). Placing them snaps there - elsewhere they are refused with the reason. A
+// from a rail, median 17). Placing them snaps there - elsewhere they are refused with the reason. (A
+// buffer stop, 150 "Blocker", stands at a dead end in the missions but is placed and turned freely: it
+// snapped there once, facing one way only and drawn over the rail - issue #3.) A
 // factory gets its exit push line as the missions have them - from inside the building along the
 // spur, 140 px (they are 100-175), push_flag 1: built cars appear in the factory and are pushed out -
 // and a repair point the line through its leg, 240 px (139-304), flag 1, one way in the direction it
@@ -4706,42 +4702,6 @@ Snap snap_scylla(float x, float y) {
     return s;
 }
 
-// A buffer stop at the dead end nearest to the cursor within 150 px - not a factory's -, 5 px past
-// it, across the track.
-constexpr float BLOCKER_PAST = 5;
-Snap snap_blocker(float x, float y) {
-    Snap s;
-    std::vector<uint8_t*> factories;
-    for_each_object([&](uint8_t* o) {
-        if (!removed(o) && nvid_of(o) == VID_DEPOT) factories.push_back(o);
-    });
-    uint8_t* end = nullptr;
-    float best = 150;
-    for (uint8_t* d : rail_dots()) {
-        if (dot_links(d) != 1) continue;
-        if (std::any_of(factories.begin(), factories.end(), [&](uint8_t* f) {
-                return std::hypot(at<float>(f, O_X) - dot_wx(d), at<float>(f, O_Y) - dot_wy(d)) < 40;
-            }))
-            continue;
-        const float dist = std::hypot(dot_wx(d) - x, dot_wy(d) - y);
-        if (dist < best) {
-            best = dist;
-            end = d;
-        }
-    }
-    if (!end) {
-        s.reason = {"SnapBlocker", "a blocker (buffer stop) stands at the end of a track - no end of track near"};
-        return s;
-    }
-    float vx, vy;   // into the track
-    link_vector(end, 0, vx, vy);
-    s.ok = true;
-    s.x = dot_wx(end) - vx * BLOCKER_PAST;
-    s.y = dot_wy(end) - vy * BLOCKER_PAST;
-    s.direction = ((direction_of(vx, vy) % 128) * 2) & 255;   // the way of the track: 0, 32, 64, 96 -> 0, 64, 128, 192
-    return s;
-}
-
 Snap snap_crate(float x, float y) {
     Snap s;
     uint8_t* d = point_near(x, y, 1, 80);
@@ -4755,15 +4715,8 @@ Snap snap_crate(float x, float y) {
     return s;
 }
 
-// A buffer stop standing at a dead end (where snap_blocker puts one, give or take the missions' 16 px).
-bool blocker_at_end(uint8_t* o) {
-    if (nvid_of(o) != VID_BLOCKER) return false;
-    const Snap s = snap_blocker(at<float>(o, O_X), at<float>(o, O_Y));
-    return s.ok && std::hypot(s.x - at<float>(o, O_X), s.y - at<float>(o, O_Y)) < 20;
-}
-
 bool on_track_vid(int nvid) {
-    return nvid == VID_DEPOT || nvid == VID_WORKSHOP || nvid == VID_SEMAPHORE || nvid == VID_CRATE || nvid == VID_BLOCKER ||
+    return nvid == VID_DEPOT || nvid == VID_WORKSHOP || nvid == VID_SEMAPHORE || nvid == VID_CRATE ||
            nvid == VID_MINE || nvid == VID_MINE_MARKER || nvid == VID_CHARYBDIS || nvid == VID_FORT || nvid == VID_CITADEL ||
            nvid == VID_CRUSHER || nvid == VID_SCYLLA;
 }
@@ -4775,7 +4728,6 @@ bool snap(int nvid, float& x, float& y, int& direction, UiText& reason) {
     else if (nvid == VID_WORKSHOP) s = snap_repair(x, y, direction);
     else if (nvid == VID_SEMAPHORE) s = snap_post(x, y, direction);
     else if (nvid == VID_CRATE) s = snap_crate(x, y);
-    else if (nvid == VID_BLOCKER) s = snap_blocker(x, y);
     else if (nvid == VID_MINE || nvid == VID_MINE_MARKER) s = snap_mine(x, y);
     else if (nvid == VID_CHARYBDIS) s = snap_charybdis(x, y);
     else if (nvid == VID_FORT) s = snap_fort(x, y, direction);
@@ -6789,7 +6741,7 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
                          {{WAY_CAPS_KEYS[other], WAY_CAPS[other]}, false, [o] { turn_post(o); }}}});
     } else if (nvid == VID_WORKSHOP) {   // turned round on its leg
         rows.push_back({{"CtxTurn", "TURN:"}, {{{"CtxTurnRound", "ROUND (R / E)"}, false, [] { turn(1); }}}});
-    } else if (nvid == VID_DEPOT || nvid == VID_CRUSHER || nvid == VID_SCYLLA || blocker_at_end(o)) {
+    } else if (nvid == VID_DEPOT || nvid == VID_CRUSHER || nvid == VID_SCYLLA) {
         rows.push_back({{"CtxTurn", "TURN:"}, {{{"CtxTurnByTrack", "BY ITS TRACK (DRAG IT)"}, true, [] {}}}});
     } else if (wreck_on_track(o)) {
         rows.push_back({{"CtxTurn", "TURN:"}, {{{"CtxTurnRound", "ROUND (R / E)"}, false, [] { turn(1); }}}});

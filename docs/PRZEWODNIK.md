@@ -349,8 +349,8 @@ podgląd pokazuje gdzie, a postawienie gdzie indziej jest odrzucane z podaniem p
   linia biegnie wtedy w drugą stronę, a semafory zamieniają się miejscami.
 
 Przeciągnięcie przenosi je razem z linią na najbliższe właściwe miejsce; usunięcie usuwa też linię.
-**Bloker** (kozioł oporowy, w grupie KOLEJ we Wszystkich obiektach) staje na najbliższym końcu toru,
-w poprzek niego, tak jak w misjach.
+**Bloker** (kozioł oporowy, w grupie KOLEJ we Wszystkich obiektach) stawia się swobodnie i obraca
+R / E jak każdy obiekt: ustaw go sam na końcu toru.
 
 **Linie jednokierunkowe** (**Linia jednokierunkowa** z listwy): linia na torze, na którą żaden
 pociąg nie wjedzie pod prąd - tak misje oznaczają wjazd na mapę, wyjazd, fabryki i punkty naprawcze.
@@ -568,7 +568,7 @@ misji, Wysokosc terenu, Skrzynka z pieniedzmi, Pojazdy, Malowanie terenu, Woda i
 
 | Klawisz | |
 |---|---|
-| R / E, kółko | obrót: o krok kierunków obiektu (R w prawo, E w lewo); zawrócenie pociągu, wraku na torze, semafora przy torze, a w narzędziu Linia jednokierunkowa linii; fabrykę, punkt naprawczy i bloker obraca ich tor (strona pomocy 15) |
+| R / E, kółko | obrót: o krok kierunków obiektu (R w prawo, E w lewo); zawrócenie pociągu, wraku na torze, semafora przy torze, a w narzędziu Linia jednokierunkowa linii; fabrykę i punkt naprawczy obraca ich tor (strona pomocy 15) |
 | A | następna armia; przy stawianiu: armia następnego obiektu |
 | T | semafor czerwony / zielony; na linii: pchanie tak / nie |
 | L / Shift+L | linia przy zaznaczonym semaforze: wpuszcza / zatrzymuje |

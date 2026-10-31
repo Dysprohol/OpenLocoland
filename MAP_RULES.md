@@ -249,8 +249,9 @@ rising to the right, 128 horizontal, 192 (or 160) falling to the right - four fr
 **[editor]** Enforced when placing: a factory snaps to the nearest dead end (22 px inside, turned the
 way out) and gets its exit line (140 px, push_flag 1) and post; a repair point snaps to a straight
 piece, turned along it, and gets its line (120 px each side, flag 1, one way the way it faces) and
-posts - R / E turn it round on its leg, its line and posts with it; a crate snaps onto the track; a
-blocker to the nearest dead end, 5 px past it, turned by the track's way; elsewhere they are refused.
+posts - R / E turn it round on its leg, its line and posts with it; a crate snaps onto the track;
+elsewhere they are refused. A blocker is placed and turned freely (it snapped to a dead end until
+v0.2.2, issue #3).
 Moving or deleting the building
 moves or deletes its line and posts.
 
