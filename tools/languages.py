@@ -26,12 +26,13 @@ the pack):
     game/editor/*.txt                maps\ (the editor's help pages)
     game/scripts/*.lgc.patch         maps\script\ (the developer mode scripts)
     game/scripts/shiftb.txt.patch    maps\ (the developer mode's help)
+    fonts/<font>.png                 fonts\<font>*.bmp (the pack's own letters, see font_cells.py)
 
 A file is copied, or applied to the captured one when it is a change (<file>.patch,
-<file>.override.ini). The four developer mode scripts (maps\script\*.lgc) are the same in every
-language version; their patches apply to the game's own files. lang/_template/ is the starting
-point of a new translation, not a pack (README.md files there and anywhere in a pack are not
-shipped). build.py assembles each pack into <game>\lang\<code>\ and LocoFix reads files from the
+<file>.override.ini; a font sheet has its cells pasted into the base's fonts). The four
+developer mode scripts (maps\script\*.lgc) are the same in every language version; their
+patches apply to the game's own files. lang/_template/ is the starting point of a new
+translation, not a pack (README.md files there and anywhere in a pack are not shipped). build.py assembles each pack into <game>\lang\<code>\ and LocoFix reads files from the
 chosen pack first (src/LocoFix/language.cpp).
 """
 import argparse
@@ -44,6 +45,7 @@ import sys
 REPO = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 sys.path.insert(0, os.path.join(REPO, "tools"))
+import font_cells  # noqa: E402
 import patch_text  # noqa: E402
 from safe_path import safe_relpath  # noqa: E402
 
@@ -110,6 +112,8 @@ def pack_path(rel):
         return None
     if parts == ["language.ini"]:
         return name
+    if parts[0] == "fonts" and len(parts) == 2 and name.lower().endswith(".png"):
+        return os.path.join("fonts", name)   # a font sheet: pasted into fonts\<name>*.bmp (install)
     if parts[0] != "game":
         return None
     if parts[1:] == ["strings.override.ini"]:
@@ -300,11 +304,14 @@ def install(code, game_folder, target, copy, read_original=None, write=None):
     or applied when they are changes). The originals of changed files come from the capture, or
     from `game_folder` for files that are the same in every language (scripts). `copy(src, dst)` copies one file incrementally;
     `read_original(path)` reads an original (patch_text.read when not given), `write(path, data)`
-    writes a changed one (patch_text.write_if_changed when not given). Returns the number of files
-    written by the changes."""
+    writes a changed one (patch_text.write_if_changed when not given). The pack's font sheets
+    (lang/<code>/fonts/*.png) are pasted into the base's fonts they apply to (font_files).
+    Returns the number of files written by the changes."""
     pack, source = os.path.join(target, "lang", code), os.path.join(CAPTURED, build_base(code))
-    ours = pack_files(code)
+    ours = [(rel, path) for rel, path in pack_files(code) if not is_font_sheet(path)]
+    fonts = font_files(code, source)
     changed_names = {os.path.normcase(patch_text.target_name(path) or path) for _, path in ours}
+    changed_names |= {os.path.normcase(rel) for rel in fonts}
 
     for directory, _, files in os.walk(source):
         for f in files:
@@ -324,7 +331,32 @@ def install(code, game_folder, target, copy, read_original=None, write=None):
             original = os.path.join(game_folder, name)
         written += (write or patch_text.write_if_changed)(
             os.path.join(pack, name), patch_text.changed_file(src, original, (read_original or patch_text.read)(original)))
+    codepage = int(pack_value(code, "codepage", "1252"))
+    for rel, sheet in fonts.items():
+        written += (write or patch_text.write_if_changed)(
+            os.path.join(pack, rel), font_cells.apply(patch_text.read(os.path.join(source, rel)), sheet, codepage))
     return written
+
+
+def is_font_sheet(path):
+    """A pack path of a font sheet (pack_path of lang/<code>/fonts/<font>.png)."""
+    parts = path.replace("/", "\\").split("\\")
+    return len(parts) == 2 and parts[0] == "fonts" and parts[1].lower().endswith(".png")
+
+
+def font_files(code, source):
+    """{path of a font in the capture `source` (fonts\\<name>.bmp): the sheet of lang/<code>/fonts/
+    pasted into it} - every font whose name starts with a sheet's name (font_cells.sheet_for)."""
+    sheets = font_cells.sheets(os.path.join(LANG, code))
+    folder = os.path.join(source, "fonts")
+    if not sheets or not os.path.isdir(folder):
+        return {}
+    out = {}
+    for name in sorted(os.listdir(folder)):
+        sheet = font_cells.sheet_for(name, sheets) if name.lower().endswith(".bmp") else None
+        if sheet:
+            out[os.path.join("fonts", name)] = sheet
+    return out
 
 
 def main():
