@@ -8,6 +8,8 @@ with the frame of that number in a font picture: fonts\*.bmp, a 16 x 16 grid of 
 0x00 in the top-left cell, the cells of the bytes without a letter empty. The fonts differ by
 pack - the English ones hold Cyrillic in 0xC0-0xFF, the Polish ones Polish letters in place of
 some of it - so a letter may be in the code page and still have no picture in the pack's fonts.
+A pack with its own letters (lang/<code>/fonts/*.png, Czech) is checked against the fonts as they
+are assembled: its base's with its cells pasted in (font_cells.py).
 
 For every pack this checks what we ship in lang/<code>/ (game/strings.override.ini, the texts of
 game/briefings, game/menus and game/editor)
@@ -17,8 +19,9 @@ a picture in the fonts that draw such texts -
 
     strings.override.ini   font8x13 (VID 2), font8x13light (7), font-Mousetips (6); the
                            headers also font-MainMenuTitles (3): the menu's and the
-                           missions' (MenuHeader*, MapHeader*) and the editor's panels'
-                           (the titles, the palette's Group*)
+                           missions' (MenuHeader*, MapHeader*), the pages after a mission
+                           (MenuEndWin, MenuEndLoose, MenuEndSecond, MenuEndThird) and the
+                           editor's panels' (the titles, the palette's Group*)
     maps\*.txt             font8x13 (2) and font8x13light (7), objectives.txt font8x13
                            and the messages' font-Objectives (14)
 
@@ -35,6 +38,7 @@ import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "tools"))
+import font_cells  # noqa: E402
 import languages  # noqa: E402
 from safe_path import safe_relpath  # noqa: E402
 
@@ -44,7 +48,8 @@ STRINGS_FONTS = (2, 6, 7)
 MAP_TEXT_FONTS = (2, 7)
 OBJECTIVES_FONTS = (2, 14)
 TITLE_FONT = 3
-EDITOR_TITLES = {"HelpHeader", "PanelMenuHeader", "PaletteHeader", "VehiclesHeader", "SavedNotice"}   # editor_panel.cpp (and HelpCat...)
+END_TITLES = {"MenuEndWin", "MenuEndLoose", "MenuEndSecond", "MenuEndThird"}   # the pages after a mission
+EDITOR_TITLES ={"HelpHeader", "PanelMenuHeader", "PaletteHeader", "VehiclesHeader", "SavedNotice"}   # editor_panel.cpp (and HelpCat...)
 ESC = 0x1b
 
 
@@ -62,10 +67,12 @@ def find_file(folder, name):
     return None
 
 
-def glyphs(path):
-    """The bytes that have a picture in a font: the cells that differ from the cell of 0x00."""
+def glyphs(path, data=None):
+    """The bytes that have a picture in a font: the cells that differ from the cell of 0x00 (of the
+    file at `path`, or of its content `data`)."""
+    import io
     from PIL import Image
-    image = Image.open(path).convert("RGB")
+    image = Image.open(io.BytesIO(data) if data is not None else path).convert("RGB")
     width, height = image.size
     cw, ch = width // 16, height // 16
     pixels = image.load()
@@ -96,7 +103,7 @@ def ini_texts(path):
         if len(value) >= 2 and value[:1] == b'"' and value[-1:] == b'"':
             value = value[1:-1]
         key = key.decode("ascii", "replace")
-        header = (section == "strings" and key.startswith(("MenuHeader", "MapHeader"))) or \
+        header = (section == "strings" and (key.startswith(("MenuHeader", "MapHeader")) or key in END_TITLES)) or \
             (section == "Editor" and (key in EDITOR_TITLES or key.startswith(("Group", "HelpCat"))))
         fonts = STRINGS_FONTS + ((TITLE_FONT,) if header else ())
         # \n and \t of the editor's texts are escapes, not letters
@@ -190,11 +197,13 @@ def check_fonts(code, captured, font_code=None, depot_note=True):
     problems = []
     items = texts(code)
     fonts_folder = os.path.join(captured, font_code or languages.pack_base(code), "fonts")   # a translation: its base's
+    sheets = font_cells.sheets(os.path.join(REPO, "lang", code))   # the pack's own letters, pasted in
     fonts, cyrillic = {}, {}
     for vid, name in FONT_FILES.items():
         path = find_file(fonts_folder, name)
         if path:
-            fonts[vid] = glyphs(path)
+            sheet = font_cells.sheet_for(name, sheets)
+            fonts[vid] = glyphs(path, font_cells.apply(open(path, "rb").read(), sheet, cp) if sheet else None)
         # the English fonts keep the game's original Cyrillic in 0xC0-0xFF: in a pack of another
         # code page a letter drawn with the very same picture comes out as the Cyrillic one
         path = find_file(os.path.join(captured, "en", "fonts"), name)
@@ -228,6 +237,8 @@ def check_fonts(code, captured, font_code=None, depot_note=True):
         status = "code page only - not captured"
     else:
         status = f"checked with the fonts of {font_code}" if font_code else "fonts checked"
+        if sheets:
+            status += " with its own letters"
     print(f"{code}: code page {cp}, {len(items)} texts, {status}")
     if depot_note and (len(fonts) != len(FONT_FILES) or font_code):
         depot = {v: k for k, v in languages.DEPOT_LANGUAGES.items()}.get(languages.pack_base(code))

@@ -154,7 +154,7 @@ For working on the engine, generate the local reverse-engineering output (not in
 |---|---|
 | `game/` | Our files for the game folder (`Locoland.cfg`, `dgVoodoo.conf`, `maps/custom.lst` - the custom maps of the menu) and changes to original files as `<file>.patch` (`maps/logo.lgc.patch`, `maps/menu.lgc.patch`) - same structure as the game folder; `maps/script/cheats.lgc`, `unlock.lgc` and their `_on` variants are the launcher's options (LocoFix fix 30); `update.txt` is the launcher's notice when the update check cannot reach GitHub (fix 33). `objects.override/` would hold changed values of `objects.res` (see "Editing objects.res"), `maps.override/<map>/` changed objects of a map (`l11`: a rail of mission 11, `BUGS.md` F21) and `maps.new/<map>/` whole new maps (see "Editing maps and images"); `maps.new/template` (the empty template) and `maps.new/sandbox` (the one to play) at the moment, and `run_map.cmd` - a double-click at the game starts the sample map, `run_map <map>` any map; `edit_map.cmd` the same in editor mode (see "Editor mode"); these two are developer helpers, copied only by `build.py --dev`. |
 | `docs/` | The player's guide for the release, in Polish and English only (the German, Hungarian and Russian players get the English one): `PRZEWODNIK.md` (Polish) and `GUIDE.md` (English) - installing, what is new in the game, the custom maps page, the map editor with a tutorial and its keys - and a few screenshots of the game in `docs/img/`. Version 0.2; keep the guides in step with the in-game help pages (`maps/edithelp*.txt`) and "Editor mode" below. |
-| `lang/<code>/` | Our translation work for each language pack (`cs`, `de`, `en`, `hu`, `pl`, `ru`): `language.ini` (the launcher's name and labels, `codepage`, `base` for a translation Steam does not ship) and in `game/` the texts by kind, each assembled into its place in `<game>\lang\<code>\` (`languages.pack_path`): `game/strings.override.ini` -> `strings.ini` (changes to the captured file), `game/briefings/<map>/` -> `maps\<map>\` (the missions', POLIGON's and the template's texts), `game/menus/menu*.txt` -> `maps\` (the menu's pages), `game/editor/edithelp*.txt` -> `maps\` (the editor's help pages), `game/scripts/*.lgc.patch` -> `maps\script\` and `game/scripts/shiftb.txt.patch` -> `maps\` (the developer mode). A pack ships only what it changes; the rest comes from its capture. `lang/_template/` is the starting point of a new translation (a placeholder for every file and `README.md` notes per folder) and not a pack: `languages.packs()` leaves out folders starting with `_`, and no `README.md` is shipped. Each pack's texts are in its code page (CP1250/1251/1252); format details in `docs/TRANSLATING.md` and `tools/patch_text.py`. |
+| `lang/<code>/` | Our translation work for each language pack (`cs`, `de`, `en`, `hu`, `pl`, `ru`): `language.ini` (the launcher's name and labels, `codepage`, `base` for a translation Steam does not ship) and in `game/` the texts by kind, each assembled into its place in `<game>\lang\<code>\` (`languages.pack_path`): `game/strings.override.ini` -> `strings.ini` (changes to the captured file), `game/briefings/<map>/` -> `maps\<map>\` (the missions', POLIGON's and the template's texts), `game/menus/menu*.txt` -> `maps\` (the menu's pages), `game/editor/edithelp*.txt` -> `maps\` (the editor's help pages), `game/scripts/*.lgc.patch` -> `maps\script\` and `game/scripts/shiftb.txt.patch` -> `maps\` (the developer mode); and in `fonts/` a pack's own letters, `<font>.png` pasted into the captured `fonts\<font>*.bmp` (`tools/font_cells.py`, Czech - see "Languages"). A pack ships only what it changes; the rest comes from its capture. `lang/_template/` is the starting point of a new translation (a placeholder for every file and `README.md` notes per folder) and not a pack: `languages.packs()` leaves out folders starting with `_`, and no `README.md` is shipped. Each pack's texts are in its code page (CP1250/1251/1252); format details in `docs/TRANSLATING.md` and `tools/patch_text.py`. |
 | `external/dgVoodoo2/` | dgVoodoo2 2.87.5 (`DDraw.dll`, `D3DImm.dll`, unmodified; credit in `NOTICE.md`). |
 | `src/LocoFix/` | Game fixes in C++ - a library loaded by the exe before WinMain. |
 | `tools/` | Game assembly, language capture, text/exe/data patches, LocoFix build, decompilation, data unpacking, editing of objects.res, maps and images, tests; the installer (`installer.py`) and the release (`release.py`, see "Release"). |
@@ -226,7 +226,10 @@ Briefing and help texts (`maps\*.txt`) are in CP1250 in the Polish version. The 
 `fonts\*.bmp` (a 16x16 grid of characters, byte 0x00 top left) partly have Polish letters in
 place of Cyrillic; `shiftb.bmp` (the Shift+B menu) does not. The English fonts hold the
 original Cyrillic in 0xC0-0xFF and no letters with marks; `font-MainMenuTitles.bmp` (VID 3,
-the menu's headers) has capitals only.
+the menu's headers) and `font-Objectives.bmp` (VID 14, the messages) have capitals only. Each
+cell has a one-pixel grid line on its right and bottom; the fonts are 24-bit, the objectives' and
+the tips' 16-bit (5-5-5) in the English, Hungarian and Russian versions. The Czech pack pastes
+its own letters into them ("Languages" below).
 
 **Developer mode.** `#define KEYS_ENABLE 1` (in `maps\script\constants.lgc`, off in the
 original game) enables the keys from `dokeys.lgc`: h - repair, W - victory, B - create units (menu `maps\shiftb.txt`),
@@ -252,8 +255,9 @@ texts). The exe, `objects.res` and the scripts are the same. The English version
 (`tools\languages.py`, run by `build.py`). The
 repository keeps only our translation work in `lang/<code>/` (see "Repository layout"): the
 completed `strings.ini` as `game/strings.override.ini`, our texts in `game/briefings/`,
-`game/menus/` and `game/editor/`, and the developer mode texts as patches of `maps\shiftb.txt`
-and four scripts in `game/scripts/`. `build.py` assembles each captured pack with those changes
+`game/menus/` and `game/editor/`, the developer mode texts as patches of `maps\shiftb.txt`
+and four scripts in `game/scripts/`, and a pack's own letters in `fonts/` (Czech, below).
+`build.py` assembles each captured pack with those changes
 into `<game>\lang\<code>\`, every file at its place there (`languages.pack_path`).
 English is the fallback, in three ways. The root of the assembled game gets the English
 capture's (`captured/en`) original language files, unchanged, whatever language Steam has
@@ -280,8 +284,9 @@ or, when the base is not captured (a player with the Polish Steam copy only), fr
 captured language (`languages.build_base`: en, pt, de, pl, hu, ru, the first there is), with a
 line in the build's log; `needs_base=1` in `[language]` would keep a pack to its own base, and
 Setup would then list it greyed with that base's `download_depot` line. On another base the
-fonts and the logo are that language's (ASCII draws the same with all of them; `check_lang.py`
-checks a fan pack with every captured font set) and so are the files the pack does not have:
+logo and the fonts are that language's, with the pack's Czech letters pasted in (ASCII and those
+letters draw the same with all of them; `check_lang.py` checks a fan pack with every captured
+font set, the letters pasted in) and so are the files the pack does not have:
 `maps\menu2.txt` and `menu3.txt` (empty in every version), `shiftb.txt` (the developer keys'
 help, English in every version) and `l08\brief2.txt` / `l15\brief2.txt` (empty, only the Polish
 version has them) - none shows anything of the base's language. What differs is `strings.ini`:
@@ -291,26 +296,64 @@ the Polish one leaves 80 keys empty that the English one fills with references
 Russian a few too, so `strings.override.ini` sets all of these to the English values (84 keys)
 and the pack reads the same on any base; `check_lang.py` reports such keys a fan pack leaves to
 its base. `lang/cs/game/` holds the fan translation's texts converted
-to what the game reads (ASCII, CRLF; it was UTF-8 with two files in CP1250, and its few Czech
-letters, dashes and a Cyrillic O are written without marks: the English fonts it is drawn with
-have Cyrillic in 0xC0-0xFF and no Czech letters, so `check_lang.py` would flag them), and
+to what the game reads: the briefings, menu pages and the editor's help pages in ASCII with CRLF
+(it was UTF-8 with two files in CP1250, and its few Czech letters, dashes and a Cyrillic O were
+written without marks while the fonts had no Czech letters; their diacritics are to come), and
 `strings.override.ini` its `strings.ini` on the English keys - its two renamed keys (`Penize`,
 `Rychlost casu`) and the empty or English values completed in Czech -, our keys and the editor's,
-in the fan translation's words (Tovarna, Opravne depo, Dul for VID 165, Mina for VID 86). The game
+in CP1250 with every diacritic: the revision by the translator Danetry (merged from his fork with
+his commits), in his words (Továrna for VID 102, Opravovací depo for 104, Důl for
+165, Mina for 86). The game
 does not wrap a text, so the fan translation's long lines - it wrote paragraphs on one line - are
 broken at the English files' widths (briefings, menu pages, win and loss 44 characters, objectives
 40, the tutorial's scripts 54), the key columns of the controls pages (`menu41.txt`, which had lost
 its ESC 7 / ESC 2, and `menu42.txt`) are aligned again, and mission 1's briefing, too long for one
-page then, has a third page (`l01rief3.txt`, listed by the pack's own `l01rief.lst`); the
+page then, has a third page (`l01\brief3.txt`, listed by the pack's own `l01\brief.lst`); the
 menu's and the missions' headers (`MenuHeader*`, `MapHeader*`, drawn with the capitals-only VID 3)
 and the objectives (the messages' font VID 14, capitals only too) are in capitals.
+
+**The Czech letters** are the pack's own (`tools/font_cells.py`): none of the captured fonts has
+them, and the repository holds no copy of the game's fonts. `lang/cs/fonts/<font>.png` is a
+picture the size of the font with only our marks in it, each in the cell of its CP1250 byte (Á C1
+á E1, Č C8 č E8, Ď CF ď EF, É C9 é E9, Ě CC ě EC, Í CD í ED, Ň D2 ň F2, Ó D3 ó F3, Ř D8 ř F8, Š 8A
+š 9A, Ť 8D ť 9D, Ú DA ú FA, Ů D9 ů F9, Ý DD ý FD, Ž 8E ž 9E), in four colours: white the font's
+ink, grey 128 its shadow (the second letter colour, font-Objectives' dark edge), black its paper
+(erases a pixel of the letter), transparent the base's pixel. `languages.install` makes every cell
+of a sheet from the base font's own Latin letter - the code page's letter without its mark
+(`unicodedata` NFD: Č -> C) - and paints the sheet's pixels over it in that font file's own colours
+(the paper of the space's cell, the ink and shadow the two commonest other colours of A-Z, the
+grid line's colour left out), writing the BMP back in its own format (16-bit 5-5-5 or 24-bit,
+Steam's header) with only those cells changed. A sheet applies to every font whose name starts
+with its own: `font8x13.png` (VID 2, the texts) also to `font8x13light.bmp` (7, the lit text),
+`font-Objectives.png` (14) to its `-green`, `-red` and `-yellow` copies, each in its own colours;
+`font-Mousetips.png` (6) and `font-MainMenuTitles.png` (3) to theirs. font8x13, font8x13light and
+font-Mousetips get the 30 letters, font-Objectives and font-MainMenuTitles the 15 capitals (their
+lower case is empty in every version); font5x5, font-unitnumbersonscreen and shiftb.bmp are left
+alone. On the Russian base the cells replace Cyrillic letters, on the Polish one its Ś Ź ś ź (8C
+8F 9C 9F; the Czech pack's Š Ť Ž are 8A 8D 8E) and Ó ó in the same bytes. The marks follow the
+Polish fonts' and the Czech edition's (a Czech edition of the game had all its fonts with
+diacritics; two screenshots of it were the reference): in font8x13 the capitals' acute and caron
+two pixels high with a free row above the letter as the Polish Ś, the small letters' above the
+x-height with one free row, ů's ring three pixels, ď and ť an apostrophe right of the stem (the d
+moved a pixel to the left for it); in font-Mousetips the capitals' marks sit on the letter (no
+row is free); in font-Objectives the marks are drawn two pixels wide with the font's shadow, the
+caron three rows; in font-MainMenuTitles, whose letters fill the cell, the acute and the caron are
+cut into the letter's top bar with black slits and hang one or two pixels into the opening below
+(Í, Ť, Ž have none under the bar; Ú, Ý, Ů get the mark in their open top), Ň's caron over the
+bar's left part. `python tools\font_cells.py preview cs [--base <code>]` writes the assembled
+fonts and a picture of every changed cell, enlarged, under its base letter, into
+`build\fonts-cs-on-<base>\`; the sheets were made with a draft script (letter + mark) and then
+corrected by eye at 4-8x, and are edited with any picture editor that keeps the four colours.
+LocoFix needs nothing for them: the fonts are opened with CreateFileA, which takes the chosen
+pack's copy (`language.cpp`), as the Polish pack's own fonts are.
 
 Each pack's texts are bytes in its own code page, the one its fonts are drawn for:
 `codepage=` in `[language]` of `language.ini` - 1250 Polish and Hungarian, 1251 Russian, 1252
 English and German. LocoFix converts with it wherever text crosses into Windows (the editor's
 menus, dialogs and message boxes are the W functions: `editor_text.cpp`, `language_codepage()`
 of `language.cpp`), and the map editor writes a map's texts in it. `tools\check_lang.py` checks
-our texts of every pack against its code page and against the captured fonts: that each
+our texts of every pack against its code page and against the captured fonts (with the pack's own
+letters pasted in, as they are assembled): that each
 character has a picture in the fonts that draw it, and - in a pack that is not Russian - that
 the picture is not still the original Cyrillic letter of the English fonts (an Ö of the German
 pack drawn as Ц). A pack without a capture is checked against its code page only;
@@ -3160,8 +3203,9 @@ mode above) are not tested in full screen.
   against the Steam file). `strings.ini` changes go straight into `strings.override.ini`.
   A new language: copy `lang/_template` to `lang/<code>/`, edit `language.ini` (name, code page,
   base), translate the files under `game/` (and delete the ones it does not translate: a pack's
-  file replaces the captured one), add font mapping if needed (`fonts/mapping/<code>.json`),
-  run `python tools/fonts/generate.py --lang <code> --all`, then `python tools\check_lang.py <code>`,
+  file replaces the captured one), draw the letters its base's fonts do not have in
+  `lang/<code>/fonts/<font>.png` if it needs any (see "Languages", the Czech letters; `python
+  tools\font_cells.py preview <code>`), then `python tools\check_lang.py <code>`,
   build it (`python tools\build.py --target <test folder>`) and look at it in the game
   (`tools\test_game.ps1 -Language <code>`). See `docs/TRANSLATING.md`.
 - `tools\test_game.ps1` - starts the game (`-Language <code>` sets the language), clicks OK in

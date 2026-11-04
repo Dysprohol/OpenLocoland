@@ -19,6 +19,7 @@ The installer's own window texts are not part of a pack: they are in `TEXTS` of
 ```
 lang/<code>/
 ├── language.ini                 name, code page, base; the launcher's labels
+├── fonts/<font>.png             -> fonts\<font>*.bmp  the pack's own letters (see "Fonts")
 └── game/
     ├── strings.override.ini     -> strings.ini        changes to the captured file
     ├── briefings/<map>/*.txt    -> maps\<map>\        l01-l20, sandbox (POLIGON), template
@@ -31,8 +32,9 @@ lang/<code>/
 
 The arrow is where `build.py` puts the file in the pack (`languages.pack_path`). A file
 ending in `.patch` or `.override.ini` is a change applied to the captured file (the scripts:
-to the Steam file); any other file replaces the captured one as a whole. So a pack holds
-only the files it changes - a file that is missing comes from the capture.
+to the Steam file), and so is a font sheet (its cells pasted into the captured fonts); any
+other file replaces the captured one as a whole. So a pack holds only the files it changes - a
+file that is missing comes from the capture.
 
 `lang/_template/` is the starting point of a new translation: a placeholder for every file,
 with a `README.md` per folder. It is not a pack (`languages.packs()` leaves out folders
@@ -89,6 +91,11 @@ MenuLoad=&Nahrat...\tAlt+F3
 (`[Editor]`, the map editor's texts) is added at its end. A bare `key` line only names a place
 to insert the next keys after. Syntax in `tools/patch_text.py`.
 
+In the editor's `Menu*` entries `&` marks the letter that opens the item with Alt (exactly one
+per entry, and no two items of one menu on the same letter), `\t` separates the keyboard
+shortcut shown at the right (`\tAlt+F3`; keep the shortcut as it is), and `&&` writes an
+ampersand itself.
+
 **briefings/**, **menus/**, **editor/** - plain text files in the format of the game's own
 (at most 44 characters a line in briefings and menu pages; ESC 7 / ESC 2 switch to the lit
 font and back). A map's briefing pages are listed by its `brief.lst`.
@@ -102,12 +109,34 @@ texts and comments; leave the code as it is.
 
 ## Fonts
 
-The game draws texts with bitmap fonts (`fonts\*.bmp`, a 16 x 16 grid, one cell per byte). A
-pack uses the fonts of its base's capture, so a letter can be in the code page and still have
-no picture. `tools/fonts/generate.py --lang <code> --all` makes font pictures from
-`fonts/mapping/<code>.json` into `fonts/generated/` (see `fonts/README.md`); the build does not
-use them yet, so a pack's texts must stay within the letters its base's fonts have (the Czech
-pack is written without diacritics for that reason).
+The game draws texts with bitmap fonts (`fonts\*.bmp`, a 16 x 16 grid, one cell per byte of the
+code page). A pack uses the fonts of its base's capture, so a letter can be in the code page and
+still have no picture: the English fonts hold Cyrillic in 0xC0-0xFF, the Polish ones the Polish
+letters, the German and Hungarian ones theirs.
+
+A pack whose letters its base's fonts do not have draws them itself, in `fonts/<font>.png`: a
+picture the size of the font with only its marks, each in the cell of its byte - white the
+letters' colour, grey 128 the shadow of font-Objectives, black the background (erases a pixel),
+transparent the base's pixel. When the pack is assembled each such cell is made from the base
+font's own Latin letter (for 0xC8, Č in CP1250: the C) with these pixels painted over it in that
+font's colours (`tools/font_cells.py`). A sheet applies to every font whose name starts with its
+own - `font8x13.png` also to `font8x13light.bmp`, `font-Objectives.png` to its `-green`, `-red`
+and `-yellow` copies. Draw the marks with any editor that keeps the four colours exact, and look
+at the result with
+
+```bash
+python tools\font_cells.py preview <code>
+```
+
+(the assembled fonts and every changed cell enlarged, in `build\fonts-<code>-on-<base>\`).
+
+The Czech pack has its own: the letters of Czech in their CP1250 bytes (Á C1 á E1, Č C8 č E8,
+Ď CF ď EF, É C9 é E9, Ě CC ě EC, Í CD í ED, Ň D2 ň F2, Ó D3 ó F3, Ř D8 ř F8, Š 8A š 9A, Ť 8D ť 9D,
+Ú DA ú FA, Ů D9 ů F9, Ý DD ý FD, Ž 8E ž 9E) in font8x13 and font8x13light (the texts), font-Mousetips
+(the tips) and, capitals only as those fonts are, font-Objectives (the messages) and
+font-MainMenuTitles (the headers). So its texts are written with diacritics, in CP1250; any
+other letter beyond ASCII still has no picture. font5x5, font-unitnumbersonscreen and
+shiftb.bmp (the developer menu) are left as they are.
 
 
 ## A fan translation on another base
@@ -118,8 +147,9 @@ A pack with `base=` another language is a fan translation: the launcher and Setu
 ru, the first there is) - the Czech pack on the Polish files for a player with the Polish Steam
 copy. Then:
 
-- the fonts and the logo are that language's: keep the texts ASCII, which every font set draws
-  (`check_lang.py` checks a fan pack with each captured font set);
+- the fonts and the logo are that language's: keep the texts to ASCII, which every font set
+  draws, and the letters of the pack's own font sheets, which are pasted into whichever fonts it
+  is built on (`check_lang.py` checks a fan pack with each captured font set, its cells pasted in);
 - the files the pack does not have come from that language: for Czech these are `menu2.txt` and
   `menu3.txt` (empty in every version), `shiftb.txt` (English in every version) and the Polish
   version's empty `l08\brief2.txt` and `l15\brief2.txt` - nothing of the base's language shows;
@@ -137,9 +167,9 @@ A pack that really needs its base's files (letters only those fonts have) says `
 ```bash
 python tools\check_lang.py <code>
 ```
-checks every text of the pack against its code page and the captured fonts (each character
-must have a picture, and outside Russian not the original Cyrillic one). Then build into a test
-folder and look at it in the game:
+checks every text of the pack against its code page and the captured fonts, with the pack's
+own letters pasted in (each character must have a picture, and outside Russian not the original
+Cyrillic one). Then build into a test folder and look at it in the game:
 
 ```bash
 python tools\build.py --target <test folder>
