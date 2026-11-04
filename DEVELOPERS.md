@@ -336,7 +336,8 @@ diacritics; two screenshots of it were the reference): in font8x13 the capitals'
 two pixels high with a free row above the letter as the Polish Ś, the small letters' above the
 x-height with one free row, ů's ring three pixels, ď and ť an apostrophe right of the stem (the d
 moved a pixel to the left for it); in font-Mousetips the capitals' marks sit on the letter (no
-row is free); in font-Objectives the marks are drawn two pixels wide with the font's shadow, the
+row is free) - Ť's caron a pixel right of the stem, so it does not read as a cross, and Ů's ring
+in the mouth of the U; in font-Objectives the marks are drawn two pixels wide with the font's shadow, the
 caron three rows; in font-MainMenuTitles, whose letters fill the cell, the acute and the caron are
 cut into the letter's top bar with black slits and hang one or two pixels into the opening below
 (Í, Ť, Ž have none under the bar; Ú, Ý, Ů get the mark in their open top), Ň's caron over the
