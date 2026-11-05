@@ -169,6 +169,13 @@ What you see:
   tools in the **strip** above it. The chosen one is framed.
 - **The status line** at the top: the tool (or the one under the mouse), the undo and redo counts,
   "not saved" and the last message - why something could not be done is always written there.
+- **Hints**: when the cursor rests a moment, a few words beside it give the keys of the tool (or of the
+  bar's entry under it), e.g. for Track "click: start / end, wheel: ramp, V: kind"; the next move
+  takes them away. **HINTS UNDER THE CURSOR** at the top of the Menu panel turns them off and on.
+- **Music** in the top right corner: the file's name, `|<` the one before, `>` plays it while you edit
+  (`||` stops it), `>|` the next - to listen through the game's music and pick the map's in Mission
+  settings. Off at first; the editor remembers whether it played and which file. Quick test and Play
+  the map play the map's own music.
 - **The ? and menu buttons** at the left end of the bar (where the game has its pause button).
   **?** (or F1) opens the help: twenty pages with everything of this chapter in short. It starts on
   its **contents**: the categories - BASICS; TRACK AND TRAINS; OBJECTS; MISSION, SAVING; GROUND;
@@ -304,14 +311,15 @@ Lay the main line the way the missions do: from **past the west edge** (scroll o
 along the map, so the trains come and go out of sight. Then a spur for the factory: a branch off
 the line through a Y, a straight piece ending in a **dead end**.
 
-`V` switches the kind of the next rails: plain, swamp (on its embankment), destroyed or destroyed
-swamp. `PgUp` / `PgDn` or the mouse wheel make the next rail climb or descend (a ramp onto higher
+The row above the bar picks the kind of the next rails - plain, swamp (on its embankment), destroyed or
+destroyed swamp, each shown as its rail - and whether the rails go up, flat or down; `V` cycles the kinds too. `PgUp` / `PgDn` or the mouse wheel make every rail laid climb or descend a step after the one before, until you change it (ramps onto higher
 ground: each ramp 11 levels; the status line shows the level). For a line on a hill, lay it up its ramps first, then raise the ground around the top and
 flatten it starting on the track. `B` picks the gravel bed under new rails. The wheel's click, Del
 or the **Delete a section of track** tool removes rails.
 
-**The gravel bed.** Once the track is laid, **Paint the ground** -> **GRAVEL BED** lays the bed
-under the rails the brush goes over: **KIND** (meadow, ice, volcanic, desert - the bed `B` lays
+**The gravel bed.** Once the track is laid, **Paint the ground** -> **MODE: GRAVEL BED** (the other
+mode, **TEXTURE**, paints the textures anywhere) lays the bed under the rails the brush goes over -
+dots along them show where the band goes before you drag: **KIND** (meadow, ice, volcanic, desert - the bed `B` lays
 under new rails is the same one), **WIDTH** (28 px, as the missions have it), **SIZE**,
 **STRENGTH**, **EDGE**. On a map with a ground of its own the band is painted into the picture,
 centred on the rails and following curves, switches and ramps, and those rails' bed decals go (the
@@ -490,8 +498,9 @@ right next to it**.
 
 ### 8. Decorate
 
-The strip's **Decals**: grass, bushes, flowers, stones, wrecks... `[` `]` (or a click on the
-entry) picks one; a click puts one, a drag scatters them in the radius (wheel, `+` `-`), never nearer than
+The strip's **Decals**: grass, bushes, flowers, stones, wrecks... The row above the bar shows each
+of them (its arrows turn the pages); a click there picks one, and so do `[` `]` and a click on the
+entry. A click on the map puts one, a drag scatters them in the radius (wheel, `+` `-`), never nearer than
 the spacing (`<` `>`). Shift+drag takes them away. Trees, houses and the rest are in **All objects**.
 
 **Sets of the missions** (All objects): what the authors always put together is one object, its panel
@@ -522,6 +531,8 @@ Menu → **MISSION SETTINGS** (or the gear in the strip):
   then (it comes and goes, about half a minute each) or all the time;
 - **Lightning** - flashes in a clear sky; with rain only while it rains, none with snow, clouds or
   meteorites;
+- **Music at the start** and **then by turns with** - two files of the game's `music` folder: the level
+  plays the first when it starts, then the two take turns (`mus00` is the victory's music);
 - **Enemy attackers at once** - how many enemy trains attack together;
 - **Train arrivals** - their count and the button to their panel (step 5); a map made with an older
   version has the **player's reinforcement waves** and **their train** (VIDs, e.g. `5,20`) here

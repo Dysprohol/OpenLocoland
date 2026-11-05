@@ -46,6 +46,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -73,6 +74,8 @@ bool edit_arrival_picking();   // editor_edit.cpp: a point for the Arrivals pane
 void edit_fill(float l, float t, float r, float b, uint32_t argb);
 bool edit_escape();            // editor_edit.cpp: Esc ends what is under way there (true when it did)
 bool editor_level_held();      // editor.cpp
+bool edit_hints_on();           // editor_edit.cpp: the hints under the cursor (the Menu panel turns them off and on)
+void edit_set_hints(bool on);
 
 namespace {
 
@@ -274,6 +277,8 @@ int g_palette_army[2] = {-1, 0};
 const char* const ARMY_KEYS[] = {"CtxOurs", "CtxEnemy", "CtxNeutral", "CtxPirates"};
 const char* const ARMY_WORDS[] = {"OURS", "ENEMY", "NEUTRAL", "PIRATES"};
 
+std::map<int, int> g_icon_only;   // nvid -> icon frame of the objects the palette does not show
+
 void load_palette() {
     if (!g_palette.empty()) return;
     bool header = true;
@@ -297,6 +302,10 @@ void load_palette() {
             o.items = f.size() > 7 ? f[7] : "";
             o.has_state = true;
         }
+        if (o.group == "-") {   // only an icon (a decal the palette leaves out, for the Decals tool's row)
+            g_icon_only[o.nvid] = o.frame;
+            continue;
+        }
         if (std::find(g_all_groups.begin(), g_all_groups.end(), o.group) == g_all_groups.end())
             g_all_groups.push_back(o.group);
         g_palette.push_back(o);
@@ -307,6 +316,7 @@ void load_palette() {
 
 extern "C" void reset_palette_cache() {
     g_palette.clear();
+    g_icon_only.clear();
     g_all_groups.clear();
     g_groups.clear();
     load_palette();
@@ -442,6 +452,20 @@ float text_width(int font, const char* text) {
     return n * w;
 }
 
+// the Menu panel's line in the strip above the title: the hints under the cursor on or off
+const char* hints_text() {
+    return edit_hints_on() ? ui_text("PanelHintsOn", "HINTS UNDER THE CURSOR: ON") : ui_text("PanelHintsOff", "HINTS UNDER THE CURSOR: OFF");
+}
+
+bool on_hints(POINT m) {
+    const Place p = picture();
+    float w, h;
+    edit_font_size(FONT_TEXT, w, h);
+    const float x = p.x + STRIP_X, y = p.y + STRIP_Y + h / 2;
+    return g_panel == Panel::Menu && m.x >= x - 12 && m.x < x + LAMP_TEXT + text_width(FONT_TEXT, hints_text()) + 4 &&
+           std::fabs(m.y - y) < 10;
+}
+
 // a page's CONTENTS in the strip above the title
 bool on_contents(POINT m) {
     const Place p = picture();
@@ -564,6 +588,9 @@ void draw_menu(POINT m) {
     const int hover = row_at(m);
     float w, h;
     edit_font_size(FONT_TEXT, w, h);
+    const Place p = picture();   // the hints' line in the strip above the title, lit while they are on
+    draw_lamp(p.x + STRIP_X, p.y + STRIP_Y + h / 2, on_hints(m) || edit_hints_on());
+    edit_draw_text(on_hints(m) ? FONT_LIT : FONT_TEXT, p.x + STRIP_X + LAMP_TEXT, p.y + STRIP_Y, hints_text(), STEP + 3);
     for (int i = 0; i < COMMAND_COUNT; ++i) {
         const Place r = row_place(i);
         draw_lamp(r.x, r.y, i == hover);
@@ -781,6 +808,8 @@ const char* panel_tip(POINT m) {
                                      "back to the edits");
         if (row >= 0 && COMMANDS[row].id == ID_FILES)
             return ui_text("TipFiles", "Rename the map (its folder and files) or delete it");
+        if (on_hints(m))
+            return ui_text("TipHints", "A few words beside the cursor when it rests: the keys of the tool; a click turns them off or on");
         if (row >= 0 && COMMANDS[row].id == ID_PLAY)
             return ui_text("TipPlay", "Play the saved map: starts the game anew on the saved map (asks to save first) and comes back "
                                       "to the editor");
@@ -814,6 +843,10 @@ bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse) {
         else if (on_previous(mouse) && g_panel == Panel::Factory) factory_back();
         else if (on_previous(mouse)) turn_page(-1);
         else if (on_next(mouse)) turn_page(1);
+        else if (g_panel == Panel::Menu && on_hints(mouse)) {
+            edit_set_hints(!edit_hints_on());
+            patch::log("panel: hints under the cursor %s", edit_hints_on() ? "on" : "off");
+        }
         else if (g_panel == Panel::Menu && row_at(mouse) >= 0) run(window, row_at(mouse));
         else if (g_panel == Panel::Help) help_click(mouse);
         else if (g_panel == Panel::Arrivals) arrivals_click(mouse);
@@ -1006,7 +1039,8 @@ int palette_icon(int nvid) {
     load_palette();
     for (const PaletteObject& o : g_palette)
         if (o.nvid == nvid) return o.frame;
-    return -1;
+    const auto only = g_icon_only.find(nvid);
+    return only == g_icon_only.end() ? -1 : only->second;
 }
 
 // The army the palette gives an object (the missions'), -1 when it is not in the palette.

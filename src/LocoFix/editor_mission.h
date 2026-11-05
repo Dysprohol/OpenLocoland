@@ -244,3 +244,6 @@ std::string mission_author_train_name(const AuthorTrain& t);
 // ATA_STAND0-9), and the enemy trains at the start and from its factory. The patrols and posts
 // past ten are written as attacks (ATA_FIGHT); the panels warn of them.
 void mission_ai_use(int& patrols, int& posts, int& start_trains, int& queue_trains);
+// The level's music the editor can choose (Mission settings, the editor's player): the files of the
+// game's music\ folder but the menu's (musicmenu.ogg), by name - mus00.ogg ... mus11.ogg.
+std::vector<std::string> mission_music_files();

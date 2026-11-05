@@ -74,6 +74,9 @@ void ground_bed(const std::vector<BedRail>& rails, size_t paint, int kind, float
                 bool restore);
 // The distance of a screen point of the map (x, y - z) from a rail's line.
 float ground_bed_distance(const BedRail& rail, float x, float y);
+// A rail's line as ground_bed lays the band along it: up to `max` screen points of the map (x, y - z), the
+// count written.
+int ground_bed_path(const BedRail& rail, float* x, float* y, int max);
 // The bed kind whose colour the picture has around a screen point (a band saved before), -1 when none.
 int ground_bed_at(float x, float y);
 // Lowers the picture in a circle to `bed` (a GRID level) with a sloping shore, painting the bed

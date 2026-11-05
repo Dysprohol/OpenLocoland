@@ -1352,6 +1352,9 @@ ATOM WINAPI RegisterClassA_editor(const WNDCLASSA* cls) {
 
 }  // namespace
 
+// editor_edit.cpp: the editor's music player stops (stop_music above).
+void editor_stop_music() { stop_music(); }
+
 // restart.cpp: script StartEditorMode in editor mode loads the map.
 bool editor_mode_on() { return g_enabled; }
 void editor_load_map(const std::string& map) { load_map(map); }

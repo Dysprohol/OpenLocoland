@@ -572,6 +572,13 @@ const BedKind* ground_bed_kinds() {
     return g_bed_kinds;
 }
 
+int ground_bed_path(const BedRail& rail, float* x, float* y, int max) {
+    const BedLine l = bed_line(rail, 0, 0);
+    const int n = (std::min)(max, BED_SEGMENTS + 1);
+    for (int i = 0; i < n; ++i) x[i] = l.x[i], y[i] = l.y[i];
+    return n;
+}
+
 float ground_bed_distance(const BedRail& rail, float x, float y) {
     const BedLine l = bed_line(rail, 0, 0);
     float best = 1e9f;

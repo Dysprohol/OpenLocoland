@@ -1567,13 +1567,44 @@ the victory's music, `music\mus00.ogg`, came back in the held editor a few secon
 checked by the stream's state - its playing slot, the name - for 30 s after a won and a lost run
 and after Play the map's way back, where the editor's new game has no music at all) and loads the saved map again, held: the
 state of the run does not stay, the editor's bar comes back as before (the state bar's icons, VID
-455, get back their untinted gammas: the level's `SetArmyGamma` lights them for army 0), the view and
+455, and the editor's, 939, get the menu gammas the editor gives them again), the view and
 the chosen object (found again by VID and place) and the tool as they were, and the undo history: before
 the run the editor keeps it with every object of the level in the world's order and the rail points
 its cars stand on (their places and their links' other points); after the load held again
 (`edit_restore_history`) the new objects are matched by that order, VID and place (the save keeps the
 order), a deleted one the history can bring back is made again and hidden, and the history's objects,
 the cars' couplings and rail positions and the later units' factories point at the new ones. RESTART of the same map keeps it running.
+
+**Hints under the cursor** (`editor_edit.cpp`, "the hint under the cursor"). The status line explains
+the tool; a hint is a few words beside the cursor - the keys of the tool on the map, or of the bar's
+entry under the cursor (`hint_of`: `HintSelect` ... `HintRegion`, the Paint tool's gravel bed mode
+`HintBed`) - in the mouse tips' font, 14 px right of and 22 below the cursor (above it over the bar,
+kept inside the view), shown when the cursor has rested 700 ms and gone with its next move; never
+while a button is held, a stroke or a drag is under way, a panel is open or the cursor is on the
+rows or the music player. The Menu panel's line in the strip above its title, HINTS UNDER THE
+CURSOR: ON / OFF (`PanelHintsOn` / `Off`, its tip `TipHints`), turns them off and on; `EditorHints`
+(DWORD, next to `FrameLimit`, on when missing) keeps it. Checked in Polish and English: the Track
+tool's hint after a rest, the Decals entry's above the bar, the Paint tool's at the view's right edge
+pulled inside it, the Menu line turning them off - no hint after a rest then.
+
+**Music while editing** (`editor_edit.cpp`, "the editor's music"). A held level plays nothing (its script
+does not run, and the way back from a run stops the music, above), so the editor has a small player in the
+top right corner of the view, in the status line's font: the file's name, `|<`, `>` (`||` while it plays)
+and `>|` - the files of the game's `music\` folder but the menu's (`mission_music_files`, the list of
+Mission settings' drop-downs), the one under the mouse underlined and said in the status line; it stands
+on the first line of the top whose status text does not reach it (`g_status_ends`), and its box is part of
+`on_options`, so nothing under it is painted, picked or placed, also with a panel open. The engine's
+`PlayMusicFile(g_sound, file, loop)` (0x445090, script function 136) only names the file (+0x3d8) and the
+sound's update plays it and starts it again when it ends, so a file plays on until another is chosen;
+`||` is `stop_music` (StopMusic and the name taken away), and the file starts from its beginning when
+played again. Off by default; `EditorMusic` (DWORD) and `EditorMusicFile` (the name) next to `FrameLimit`
+keep the choice, so the editor comes back silent unless it was playing. Only the held level ticks it
+(`music_tick` from the overlay): Run the level loads the map running and its script's
+`PlayMusicFile(music0)` names the level's file, Play the map is a game of its own, and the way back
+stops the run's music as before - then the player names its file again. Checked (Polish, English, the
+files opened in `LocoFix.log` of test mode): `>` played mus01, `>|` mus02; Ctrl+R opened POLIGON's own
+mus08, Ctrl+R back the player's mus02 again; `||` stopped it; turned on and the game closed, the next
+start of the editor played mus02 at once.
 
 **The map the editor starts on** (`editor.cpp`, "the map the editor starts on"; `editor_newmap.cpp`
 `make_start_map`). Started on the template - `StartEditorMode("maps\\template\\template.map")` from
@@ -1649,12 +1680,17 @@ The bar looks like the game's state bar and is drawn with its pictures over the 
 the middle of the bottom edge with its side tiles (VID 938, as LocoFix fix 23 lines them up) out
 to the edges of the view, the first ten entries in the base's ten slots (where the unit bar shows
 its units, 41 px apart) and the others in the factory panel's strip (VID 497) a slot higher, the
-chosen one in the slot frame (VID 456), each with its key in the factory panel's small font (VID 8,
-right-aligned at the icon's lower edge as the panel's F-keys). The icons come from the state
-bar's atlas where it has one (VID 455: the cross 3, the factory 10, the wrench 2, the cannon 36,
-the locomotive 11) and otherwise from the editor's own atlas (VID 939, `vid\939edit.vid`, made
+chosen one in the slot frame (VID 456) and a gold frame on its icon's edge, the one under the mouse
+a thin light one (the lit icons hide the slot frame; a lit icon draws its brightening as specular light,
+which the bar turns off after its icons - left on, every `Graphics_FillRect` after them came out
+white), each with its key in the factory panel's small
+font (VID 8, right-aligned at the icon's lower edge as the panel's F-keys). The icons come from the
+state bar's atlas where it has one (VID 455: the cross 3, the factory 10, the wrench 2, the cannon
+36, the locomotive 11) and otherwise from the editor's own atlas (VID 939, `vid\939edit.vid`, made
 when the game is assembled, below): the arrow, the track, a section to delete, the fort, the
-semaphores green and red, a decal. The status line at the top is in the mouse tips' font (VID 6,
+semaphores green and red, a decal, the gear of Mission settings (it had the state bar's frame 0,
+which the game shows for no option); both lit green as the game's state bar (the menu gamma, "The
+armies' colours"). The status line at the top is in the mouse tips' font (VID 6,
 each character in its orange box - the look of the game's tips): the tool or the entry under the
 cursor with its key, the undo and redo counts, "not saved" and the last message. A text is drawn
 the way `Text_Draw` writes one: a frame of the font VID per character (its code), the VID's
@@ -1663,8 +1699,9 @@ width apart. A click on the bar's plates does nothing on the map under them. Its
 1), All objects (7: the palette, below), a green (8) and a red (9) semaphore 152, Train arrivals (0: a
 panel, "Train arrivals" below), and in the strip Delete a section of track (a click on a rail deletes its section,
 as Shift+click with Delete), Decals (below; [ and ] pick which of the 61 decals of `objects.res` -
-read from the file: the editor mode loads them as class 0 -, its slot shows the chosen one's
-palette icon), the Push line tool, Mission
+read from the file: the editor mode loads them as class 0 -; its slot has the atlas' bush, lit as
+the other icons - the chosen decal's palette icon kept its colours and stood out unlit among them -,
+and the tool's row shows the chosen decal), the Push line tool, Mission
 settings (the dialog of the File menu; both below), Ground height, a money crate (VID 169, army 3)
 and Vehicles (the cars' palette, below), Paint the ground, Water and lava and Region (below).
 The camera of a held level goes 300 px past
@@ -1843,7 +1880,14 @@ storm clouds, meteorites - `environmenttact.lgc` makes the last three) and how o
 never, 1 now and then - it comes and goes, about half a minute each -, 2 all the time;
 `daynight.lgc`'s own comment has 1 and 2 the other way round, its code does this), lightning
 (`NUKE`: a flash and its sound at random in a clear sky, with rain only while it rains, never with
-the other weathers), the reinforcement waves and their train (VIDs), the enemy trains attacking at once,
+the other weathers), the level's music (`music0` and `music1`: `initdefault.lgc` plays `music0` when the
+level starts and `gametact.lgc` the other one each time one ends, so the two take turns - the missions
+pair them, l05 `mus07` / `mus08`; two drop-downs of the files of the game's `music\` folder but the
+menu's `musicmenu.ogg`, `mission_music_files`; `mus00` is the victory's, `menuend.lgc`; written into
+the settings block as the script spells them, `"music\\mus05.ogg"`; the test file's keys `music0` and
+`music1`; checked: POLIGON set to mus05 / mus03, saved as `poligonm`, loaded again - the dialog shows
+them - and played: the game opened `music\mus05.ogg`, `LocoFix.log` of test mode), the reinforcement
+waves and their train (VIDs), the enemy trains attacking at once,
 the enemy's trains at the start (a line each: its type - `light_gun`, `medium_mortair`, ... the
 `ATT_` names of `TrainsTactDeclares.lgc` - and the point it starts at, or two rail points it
 patrols between, screen coordinates), the trains its factory builds later (the time, the type and
@@ -2270,12 +2314,17 @@ object drawn 18 px under its rail: an embankment whose slope the ground's pictur
 missions' grounds do, so it shows as the band of gravel under the rails wherever the rails show
 (where the ground's picture stands higher than the track, a lawn of the template, both are hidden);
 in play it is painted into the ground. The
-Decals tool places the chosen decal - its name (the palette's) in the status line, its icon in the
-bar's slot, its sprite at the cursor: a click puts one at the cursor, dragging scatters 1 + radius of
+Decals tool places the chosen decal - its name (the palette's) in the status line, its icon framed in
+the tool's row, its sprite at the cursor: a click puts one at the cursor, dragging scatters 1 + radius of
 them a step in the circle (+ and -; radius 0 one a step along the drag), each turned at random (a
 decal's directions are its variants), none nearer than the spacing (< and >, 4-64 px, 16 by default)
 to a decal already there (beds aside), so they do not stack; Shift takes the decals in the circle
-away. [ and ] pick the decal, and a click on the chosen Decals entry opens the palette, where a click
+away. The tool's row above the bar holds every decal, each its palette icon (VID 944 - the decals the
+palette leaves out, the beds and four more, get icon-only rows, group `-` of the game's
+`editor\palette.tsv`, which the palette does not show), the chosen one framed, a click picks it and
+the status line names the one under the mouse; as many as the view's width takes are a page, the
+others behind its < and > (the last page padded, so the arrows stay put), and the page follows [ and
+], which still pick the decal; a click on the chosen Decals entry opens the palette, where a click
 on a decal makes it the brush's. A map's first decal is the ground cover it has most of (the beds,
 wrecks, buildings and track pieces aside), else the round bush 936. A placed factory, repair point or fort gets its footprint flattened as map_tool.py place
 does, and script function 81 `ReCalcGridZ(int unit)` - declared in export.lgc, missing in the exe -
@@ -2422,7 +2471,9 @@ them when the level starts (`SetArmyGamma()` of `maps\script\setarmygamma.lgc`, 
 `InitDefault`: `SetVid(nvid, VID_GAMMA + army, ...)` for the units, the buildings' flags - VID 175 and
 770-774 - and the state bar's icons). A held level runs no script, so every army looked the same;
 the editor sets the same gammas when it holds a level (`SetVidData` 18-21: `Gamma_FromScriptInt`,
-then the VID's `SetGamma`, vtable slot 7; not the icons of VID 455, which its bar draws untinted). The
+then the VID's `SetGamma`, vtable slot 7; the state bar's icons, VID 455, and the editor's own, 939, get
+the script's `menu_gamma` - 0x1FF351 for the first, the one `Graphics_DrawVid`'s army-0 objects draw
+with, lights them green as the game's state bar shows them; they were drawn untinted, white and grey). The
 buildings' flags are their linked objects (`Object_CreateLinked` at construction: the fort and the
 mine link VID 175, the factory and the repair point a light that links it), so they follow the army:
 green for ours, red for the enemy, yellow for the neutrals, black for the pirates (checked with the
@@ -2445,7 +2496,7 @@ turned and stood over the rail, so since v0.2.2 it is placed, dragged and turned
 | factory | the dead end (a rail point with one link) nearest to the cursor within 150 px, 22 px inside along the spur (the sandbox and l05), turned the way out (multiples of 32) | its exit push line as the missions have them: from the dead end along the spur, 140 px (they are 100-175), push_flag 1 - built cars appear in the factory and are pushed clear - with its post |
 | repair point | the point of a straight piece (two links going opposite ways) nearest within 100 px, turned along it the way nearest to the direction chosen (at first the way of its link with the smaller direction: north on a vertical leg, as l05's); R / E turn it round | the push line through its leg, 120 px each side (they are 139-304), push_flag 1, one way in the direction it faces, with its posts |
 | post | 24 px beside the track point nearest to the cursor, on the cursor's side of the track (R / E or the wheel put the preview on the other side), facing along the track the way that has that side on the right of its trains - its side follows from its way (184 of the missions' 188 posts stand so, 12-40 px from the track, median 23); the status line names its trains ("for the trains going left"); R / E, the wheel or the panel's FOR TRAINS turn a post beside a track round and put it across the track, as far from it as it stood (the track a post is beside is the one its trains pass on their right: the rail point nearest to 24 px on the post's other side - at a junction other track is as near), a post with no track within 70 px turns a step of its 8 directions | its own line at once, as the missions' posts have theirs (measured: each of the 188 posts against the nearest end of its script's lines): a line ending at the post's rail point - a red post's coming from behind it (107 of the 124 red posts; 85 with push_flag 1), so the trains it faces would enter it at its end against it and stop at the post; a green post's coming from the trains it faces (29 of the 61 green ones; 26 more at the begin of a line going on), so they run along it, pushed, and leave it at the post. The editor's are 70 px long with push_flag 1 (the red post's then pushes the trains of the other way toward it, as the missions' do). A pair at an entry - green facing the edge for the trains coming in, red facing in for those going out - owns one line from past the edge to the pair: the missions' entry (l02: `SetPushLine(-107,1203,54,1465,1)` with its pair at 54,1465). A line is a post's own by that shape alone, of any length (`owns`), so a loaded map's posts keep theirs, a pair shares one and the line of S or the Arrivals panel's entry belongs to its posts; never a factory's or repair point's line. None for a post that owns one already or stands within 40 px of an end of a line no post owns (a building's, the script's). Turning the post round, T or moving it makes its line again (a line another post owns too stays, the post gets one beside it); deleting the post deletes its line unless another post owns it (one step of the history each); L / Shift+L give a selected post its line green / red, the panel's LINE row says what the line does - STOPS THEM (red) or LETS THEM IN (green), the trains of its FOR TRAINS row - or NONE; the preview draws the line it will get. A post's line is drawn where it acts: a green post's line green (the way its trains are let in); a red post's not where the engine's line lies (behind it) but in front of it, where its trains come from and stop - red, from 35 px toward them to the post, the arrowhead and a red stop bar at the post; a pair's line green (the way in) with the red post's red mark in front of the pair (none goes back out); the status line says it in words ("the red semaphore's at 443,1399: the trains going right stop there (514,1299 -> 443,1299)"). A factory's or repair point's line keeps its flag's colour. Checked in play (`SANDBOX_DRIVE_TEST` on a copy of the sandbox): a red post on the main line for the trains going right, `SetPushLine(443,1299,301,1299,1)` - the reinforcement coming east onto that piece stopped at 387,1366 and stayed; the same post green, `SetPushLine(159,1299,301,1299,1)` - it went on east and reached its points; a pair at 194 (green south for the trains going right, red north for those going left) made one line, `SetPushLine(52,1299,194,1299,1)` - the reinforcement from past the west edge passed it east, and sent back west it stopped at 216,1375 and stayed |
-| money crate | the rail point nearest within 80 px | - |
+| money crate | the rail point nearest within 80 px, 5 px above the point's height (`CRATE_ABOVE_POINT`): 23 of the missions' 42 crates on track stand 5 above their rail point (the others 4, 7 or 9; l05's at 80 over points at 76 and ground at 65-66; l04's four off the track 3-4 below it) - at the ground's height, as before, it sank into the rails, which stand 6-10 above the ground under them. A drag puts it onto the next point the same way; undo and redo keep its height; the status line's height above the ground is its z less the ground (11 on POLIGON's main line). Checked in play on a copy of POLIGON with `SANDBOX_DRIVE_TEST` and a crate placed at 123,1375,81 on the reinforcement's way: money 375 at 6 s against 275 without the crate - the train took it | - |
 | fort | the line of the straight rail nearest within 60 px (`rail_line_spot`: its two ends' segment), where the cursor falls on it, turned along it the way nearest to the direction chosen - all 20 forts of the missions stand 0-6 px from such a line (R / E turn it round there) | its guns |
 | mining plant (165) | as the fort: 29 of the missions' 30 stand 0-6 px from a straight rail's line, turned along it the same way (rails of shape 0: 0 / 128, 1: 64, 2: 160, 3: 96 / 224; l14's sixteen in rows on their tracks, l18's on the line through them); `F165_0` takes it as `F162_0` a fort - a train of another army within 75 px. Placed anywhere before | its gun |
 | Charybdis | the line of the straight rail nearest within 100 px through its middle - l06's diagonal passes 1 px from it, so what it pulls in comes within the 40 px it eats in | its pieces |
@@ -2623,12 +2674,15 @@ track as the missions' (it went anywhere), the flagpole's and station's slots ta
 their default armies are the missions' (the enemy's, the neutrals'), a mine is placed unarmed.
 
 **The rows of the ground's tools** (`editor_edit.cpp`, the section of the same name). While the
-Ground height or the Paint tool is chosen, a row of buttons stands above the bar's strip: the depot
+Decals tool is chosen, its row holds DECAL n / 61: and the decals (above). While the
+Track tool is chosen, its row holds RAIL: the four kinds (`RAIL_KINDS`, each drawn as its own straight
+rail across, the chosen one framed; a click picks it as V does) and RAILS GO: UP / FLAT / DOWN (the
+ramp of the wheel and PgUp / PgDn). While the Ground height or the Paint tool is chosen, a row of buttons stands above the bar's strip: the depot
 panel's strip (VID 497) laid as long as the row, centred on the view, the menu font (VID 2; VID 7 lit
 for what is set and what is under the mouse, the set choice underlined). Ground height: the modes
 RAISE/LOWER, FLATTEN, SMOOTH, RAMP, ROUGH, SIZE - n +, STRENGTH - n +, EDGE SOFT / HARD; Paint: a
-swatch of each texture (its mean colour, the chosen one framed), GRAVEL BED (below: then KIND and WIDTH
-too, and UNDER THE WHOLE TRACK), SIZE, STRENGTH (a fifth to all of the texture a pass: `ground_paint`'s
+MODE: TEXTURE / GRAVEL BED, then a swatch of each texture (its mean colour, the chosen one framed)
+or KIND and WIDTH (GRAVEL BED, below; and UNDER THE WHOLE TRACK), SIZE, STRENGTH (a fifth to all of the texture a pass: `ground_paint`'s
 strength), EDGE (`weight` full to the edge). A group that does not fit
 beside the others goes into a row above (the window's or the screen's width). A click on a button
 sets it; nothing under the rows is painted, raised or picked (`on_options`, as `on_bar`). The right
@@ -2652,8 +2706,15 @@ l12 and l18 put a decal under every rail and have nothing under the track in the
 ~28 px across, l16's ~20, centred on the rails seen); l13 has neither. In play l02's decal beds show
 as a band ~28 px across, darker than the sprite (~110, 100, 60 where the sprite's top is ~140, 115,
 60). No campaign ground has a patch of gravel to sample, and a patch mirrored out of the decal's
-60 x 36 px top repeats like a kaleidoscope, so the band is laid along the rail instead: GRAVEL BED in
-the Paint tool's row (then KIND - meadow 612, ice 615, volcanic 616, desert 617, the same variable as
+60 x 36 px top repeats like a kaleidoscope, so the band is laid along the rail instead: MODE: GRAVEL BED in
+the Paint tool's row - the Paint tool has two modes, TEXTURE (painting anywhere: the swatches) and
+GRAVEL BED, the first group of its row, the one on lit and underlined and only its own options
+after it; the status line starts with it ("Paint - TEXTURE: ...", "Paint - GRAVEL BED (dotted: where
+it goes): ..."; before, the swatches and GRAVEL BED stood side by side and the bed's status line was
+an older key of the same name, `StatusBed` defined twice in every pack, so it showed "gravel bed (B):
+meadow" only), and the brush's preview dots the band's two edges along each rail whose line it
+reaches (`ground_bed_path`, the line `ground_bed` lays it along, `BED_RISE` up), red with Shift
+(then KIND - meadow 612, ice 615, volcanic 616, desert 617, the same variable as
 the Track tool's B -, WIDTH 8-64 px, 28 by default, SIZE, STRENGTH, EDGE and UNDER THE WHOLE TRACK)
 beds the plain and destroyed rails whose line comes within the brush, each once a stroke. A rail's
 line is the quadratic curve from its end 0 through its middle to its end 1 (ENDS of `rail_rules.h`,
@@ -2749,8 +2810,13 @@ left as it is; its points stand 7 above it (the VID's altitude) where a plain ra
 track rules take that into account. The destroyed rails are the death VIDs of the others:
 `Rail_Action` marks their points `broken`, trains slow down there (`Options.brokenRailSpeed`) and the
 repair car mends them as it passes (`Rail_RepairAt`); deleting one clears the mark of the points the
-other rails keep. PgUp or the wheel up makes the next rail climb, PgDn or the wheel down descend (the
-wheel turns nothing in the Track tool; the status line shows the level the next rail stands at): the same shape in a ramp frame -
+other rails keep. The ramp is a mode: UP (PgUp, the wheel up or the row's RAILS GO: UP) makes every rail
+laid climb a step after the one before, DOWN (PgDn, the wheel down) every one descend, FLAT every one keep
+the height reached, until it is changed (before, it was the next rail only and fell back to flat; a run
+toward a far cursor was cut to one rail while a ramp was set) - a run of one click climbs rail by rail,
+the preview draws each at its own height, the ground under each slopes with it, and a section started
+at a ramp's raised end is found where that end is drawn (`line_start`: the end's point height, not the
+rail's) and goes on at its height (the status line shows the level and the mode): each rail the same shape in a ramp frame -
 frames 12-23 raise the point of end 0, 24-35 that of end 1, by sizeZ 11 (direction (shape + 12 or
 24) * 256 / 37: 83, 89 ... 159 and 166 ... 242, the directions of the missions' 98 ramps of l11, l12
 and l15) - with its far end raised (climbing) or its near end (descending, the rail then 11 lower);
@@ -2759,7 +2825,11 @@ and its bed is the bed VID in the rail's direction (the missions' ramp beds are,
 Checked: a new map on mission 6's swamp terrain with a swamp line on its embankment and a plain line
 climbing a ramp onto a plateau raised with the Ground height tool, a train on each with a patrol,
 `check-track` clean; played: both trains drove to and fro, over the swamp line and up and down the
-ramp.
+ramp. The mode, checked in Polish on POLIGON: UP, one click laying 5 rails (z 66 ... 110, their last point
+131 = 76 + 55), FLAT from its raised end 2 rails at 131 linked to it, DOWN 5 rails back to 76; Ctrl+Z took
+the last run out whole (10 rail points), Ctrl+Y put it back, `check-track` of the saved map clean; on a
+copy of POLIGON with `SANDBOX_DRIVE_TEST`, two rails of the reinforcement's way laid again UP and DOWN
+(points at 87 between 76s): the train drove over the hill to its first point.
 
 **The ground's picture, water, regions** (`src/LocoFix/editor_ground.cpp`, `editor_edit.cpp`;
 MAP_RULES.md 2). The editor reads the held level's ground image into memory (its colours and its
@@ -3025,7 +3095,7 @@ mode above) are not tested in full screen.
   (`Editor icons`, like VID 455, one direction per icon) for it; besides those, the ground
   height brush, the money crate and the palette (a fort, a bush, a semaphore and a crate in
   four quarters), the ground's paint (a brush stroke), water (a pool of the light water's own
-  picture) and a region (a dashed rectangle).
+  picture), a region (a dashed rectangle) and Mission settings (a gear: eight teeth round a ring).
 - `editor\palette.tsv` and `vid\944pal.vid`, the editor's palette ("All objects"):
   `patch_data.make_editor_palette` reads `game/editor/palette.tsv` (the 236 kinds of object the
   missions use, by group, with the army the missions give them and the `[Editor]` key of the

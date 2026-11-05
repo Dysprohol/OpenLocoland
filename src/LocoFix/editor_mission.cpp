@@ -284,6 +284,24 @@ std::string quoted_path(const std::string& path) {
     return out + "\"";
 }
 
+// The music of a level (music0 and music1 of the script: initdefault.lgc plays music0 when the level
+// starts, gametact.lgc the other each time one ends, so the two take turns): a file of music\, its
+// name in a setting written as the script has it ("music\\mus08.ogg").
+std::string music_name(const std::string& setting) {
+    const std::string path = unquote(setting);
+    const size_t slash = path.find_last_of("\\/");
+    return slash == std::string::npos ? path : path.substr(slash + 1);
+}
+
+std::string music_setting(const std::string& name) { return quoted_path("music\\" + name); }
+
+bool music_name_ok(const std::string& name) {
+    if (name.size() < 5 || name.size() > 40 || name.compare(name.size() - 4, 4, ".ogg") != 0) return false;
+    for (char c : name)
+        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_' && c != '-' && c != '.') return false;
+    return true;
+}
+
 int to_int(const std::string& s, int fallback = 0) {
     const std::string t = trim(s);
     if (t.empty()) return fallback;
@@ -2408,7 +2426,7 @@ bool parse_patrol(const std::string& raw, TrainPatrol& out) {
 
 enum : int {
     IDC_TITLE = 100, IDC_HEADER, IDC_MONEY, IDC_TIME, IDC_RAIN, IDC_NUKE, IDC_LIMIT, IDC_WAVES, IDC_TRAIN, IDC_START,
-    IDC_QUEUE, IDC_OBJECTIVES, IDC_WIN, IDC_LOSE, IDC_BRIEF, IDC_ARRIVALS, IDC_WEATHER, IDC_PLAN
+    IDC_QUEUE, IDC_OBJECTIVES, IDC_WIN, IDC_LOSE, IDC_BRIEF, IDC_ARRIVALS, IDC_WEATHER, IDC_PLAN, IDC_MUSIC0, IDC_MUSIC1
 };
 bool g_open_arrivals = false;   // the dialog ended with its Arrivals... button
 bool g_open_plan = false;       // ... or its Plan... button (the enemy factory's panel)
@@ -2621,6 +2639,13 @@ std::string apply_fields(const Fields& f, Mission& n) {
     if (number(IDC_RAIN, rain)) n.rain = (std::max)(0, (std::min)(2, rain));
     if (f.count(IDC_WEATHER) && number(IDC_WEATHER, weather)) n.weather = (std::max)(0, (std::min)(4, weather));
     n.nuke = get(IDC_NUKE) == L"1";
+    const int slots[2] = {IDC_MUSIC0, IDC_MUSIC1};
+    for (int k = 0; k < 2; ++k)
+        if (f.count(slots[k])) {
+            const std::string name = trim(to_pack(get(slots[k])));
+            if (music_name_ok(name)) n.settings[k ? "music1" : "music0"] = music_setting(name);
+            else if (error.empty()) error = ui_text("ErrMusic", "Music: a file of the music folder (.ogg)");
+        }
     if (!number(IDC_LIMIT, n.factories.ai.limit) && error.empty()) error = ui_text("ErrAttackers", "Enemy attackers at once: a number");
     if (f.count(IDC_WAVES)) {   // a map whose arrivals the editor runs has the Arrivals panel instead
         if (!number(IDC_WAVES, n.reinforcements) && error.empty()) error = ui_text("ErrWaves", "Reinforcement waves: a number");
@@ -2671,6 +2696,16 @@ INT_PTR CALLBACK mission_proc(HWND dialog, UINT m, WPARAM w, LPARAM) {
             SendDlgItemMessageW(dialog, IDC_RAIN, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(t.c_str()));
         SendDlgItemMessageW(dialog, IDC_RAIN, CB_SETCURSEL, s.rain, 0);
         CheckDlgButton(dialog, IDC_NUKE, s.nuke ? BST_CHECKED : BST_UNCHECKED);
+        for (int k = 0; k < 2; ++k) {   // the files of music\ (the menu's left out), the map's own chosen
+            const int id = k ? IDC_MUSIC1 : IDC_MUSIC0;
+            const std::string now = music_name(s.settings.count(k ? "music1" : "music0") ? s.settings.at(k ? "music1" : "music0") : "");
+            std::vector<std::string> files = mission_music_files();
+            if (!now.empty() && std::find(files.begin(), files.end(), now) == files.end()) files.push_back(now);
+            for (size_t i = 0; i < files.size(); ++i) {
+                SendDlgItemMessageW(dialog, id, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(widen(files[i]).c_str()));
+                if (files[i] == now) SendDlgItemMessageW(dialog, id, CB_SETCURSEL, i, 0);
+            }
+        }
         SetDlgItemInt(dialog, IDC_LIMIT, s.factories.ai.limit, TRUE);
         SetDlgItemInt(dialog, IDC_WAVES, s.reinforcements, TRUE);
         SetDlgItemTextW(dialog, IDC_TRAIN, widen(s.train).c_str());
@@ -2694,6 +2729,13 @@ INT_PTR CALLBACK mission_proc(HWND dialog, UINT m, WPARAM w, LPARAM) {
     fields[IDC_RAIN] = std::to_wstring(SendDlgItemMessageW(dialog, IDC_RAIN, CB_GETCURSEL, 0, 0));
     fields[IDC_WEATHER] = std::to_wstring(SendDlgItemMessageW(dialog, IDC_WEATHER, CB_GETCURSEL, 0, 0));
     fields[IDC_NUKE] = IsDlgButtonChecked(dialog, IDC_NUKE) == BST_CHECKED ? L"1" : L"0";
+    for (int id : {IDC_MUSIC0, IDC_MUSIC1}) {
+        const LRESULT i = SendDlgItemMessageW(dialog, id, CB_GETCURSEL, 0, 0);
+        wchar_t name[64] = L"";
+        if (i >= 0 && SendDlgItemMessageW(dialog, id, CB_GETLBTEXTLEN, i, 0) < 64)
+            SendDlgItemMessageW(dialog, id, CB_GETLBTEXT, i, reinterpret_cast<LPARAM>(name));
+        if (*name) fields[id] = name;
+    }
     Mission n = s;
     const std::string error = apply_fields(fields, n);
     if (!error.empty()) {
@@ -2716,6 +2758,8 @@ Fields current_fields() {
             {IDC_RAIN, std::to_wstring(s.rain)},
             {IDC_WEATHER, std::to_wstring(s.weather)},
             {IDC_NUKE, s.nuke ? L"1" : L"0"},
+            {IDC_MUSIC0, widen(music_name(s.settings.count("music0") ? s.settings.at("music0") : ""))},
+            {IDC_MUSIC1, widen(music_name(s.settings.count("music1") ? s.settings.at("music1") : ""))},
             {IDC_LIMIT, std::to_wstring(s.factories.ai.limit)},
             {IDC_WAVES, std::to_wstring(s.reinforcements)},
             {IDC_TRAIN, widen(s.train)},
@@ -2988,6 +3032,14 @@ bool mission_dialog(HWND owner, bool* open_arrivals, bool* open_plan) {
            -1, label, cx, 138, cw, 24);
     t.item(STATIC, ui_wtext("MissionAttackers", "Enemy attackers at once:").c_str(), -1, label, cx, 170, 150, 8);
     t.item(EDIT, L"", IDC_LIMIT, LINE | ES_NUMBER, cx + 156, 168, cw - 156, 12);
+    // the level's music: music0 at the start, then music1 and music0 by turns
+    t.item(STATIC, ui_wtext("MissionMusic0", "Music at the start:").c_str(), -1, label, cx, 192, 100, 8);
+    t.item(COMBOBOX, L"", IDC_MUSIC0, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, cx + 104, 190, cw - 104, 120);
+    t.item(STATIC, ui_wtext("MissionMusic1", "Then by turns with:").c_str(), -1, label, cx, 210, 100, 8);
+    t.item(COMBOBOX, L"", IDC_MUSIC1, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, cx + 104, 208, cw - 104, 120);
+    t.item(STATIC, ui_wtext("MissionMusicNote", "The level plays the first when it starts, then the two take turns. "
+                                                "mus00 is the victory's.").c_str(),
+           -1, label, cx, 224, cw, 24);
     if (g_arrivals.on) {   // the trains that arrive: the Arrivals panel
         t.item(STATIC,
                ui_wide(ui_printf(ui_format("MissionArrivals", "Train arrivals: %u - set in the Arrivals panel (key 0 of the bar)"),
@@ -3289,7 +3341,8 @@ static bool plan_of_line(const std::string& text, FactoryTrain& t) {
 }
 
 // Test mode (editor.cpp's WM_COPYDATA 40042): the settings of a file instead of the dialog - UTF-8
-// lines "key: value" with the keys title, header, money, time (1-4), rain (0-2), weather (0-4), nuke (0/1), limit,
+// lines "key: value" with the keys title, header, money, time (1-4), rain (0-2), weather (0-4), nuke (0/1),
+// music0 and music1 (a file of music\, e.g. mus05.ogg), limit,
 // waves, train, start and queue (a line per train), objectives, win, lose and brief ("\n" in a
 // value is a line end, "---" between briefing pages); the keys not given stay as they are. The
 // lines "arrival: ..." (arrival_of_line) replace the map's arrivals and make the map run them
@@ -3302,7 +3355,7 @@ bool mission_settings_from_file(const std::string& path) {
         {"title", IDC_TITLE}, {"header", IDC_HEADER}, {"money", IDC_MONEY}, {"time", IDC_TIME},
         {"rain", IDC_RAIN}, {"weather", IDC_WEATHER}, {"nuke", IDC_NUKE}, {"limit", IDC_LIMIT}, {"waves", IDC_WAVES},
         {"train", IDC_TRAIN}, {"start", IDC_START}, {"queue", IDC_QUEUE}, {"objectives", IDC_OBJECTIVES},
-        {"win", IDC_WIN}, {"lose", IDC_LOSE}, {"brief", IDC_BRIEF}};
+        {"win", IDC_WIN}, {"lose", IDC_LOSE}, {"brief", IDC_BRIEF}, {"music0", IDC_MUSIC0}, {"music1", IDC_MUSIC1}};
     Fields fields = current_fields();
     std::map<int, bool> cleared;
     ArrivalsState arrivals = g_arrivals;
@@ -3407,4 +3460,17 @@ bool mission_settings_from_file(const std::string& path) {
                static_cast<unsigned>(n.start.size()), static_cast<unsigned>(n.factories.queue.size()),
                static_cast<unsigned>(g_arrivals.list.size()));
     return true;
+}
+std::vector<std::string> mission_music_files() {
+    std::vector<std::string> out;
+    WIN32_FIND_DATAA f;
+    HANDLE h = FindFirstFileA("music\\*.ogg", &f);
+    if (h == INVALID_HANDLE_VALUE) return out;
+    do {
+        const std::string name = f.cFileName;
+        if (!(f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && _stricmp(name.c_str(), "musicmenu.ogg") != 0) out.push_back(name);
+    } while (FindNextFileA(h, &f));
+    FindClose(h);
+    std::sort(out.begin(), out.end(), [](const std::string& a, const std::string& b) { return _stricmp(a.c_str(), b.c_str()) < 0; });
+    return out;
 }

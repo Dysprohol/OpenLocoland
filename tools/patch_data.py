@@ -237,7 +237,7 @@ def make_status_bar_sides(bar_vid, output):
 EDITOR_ICON = 40
 EDITOR_ICON_ART = 34                    # the picture fits in this square of the cell
 EDITOR_ICONS = ["select", "track", "section", "fort", "semaphore_green", "semaphore_red", "decal",
-                "push_line", "height", "crate", "palette", "paint", "water", "region"]
+                "push_line", "height", "crate", "palette", "paint", "water", "region", "settings"]
 # the flat straight rails of vid\610.vid
 RAIL_DIAGONAL, RAIL_HORIZONTAL = 2, 1         # the flat frames of shapes 2 and 1
 ATLAS_BACKGROUND = 5                    # frame of 455icon.vid whose left columns are plain ground
@@ -417,7 +417,21 @@ def make_editor_icons(vid_folder, output):
         for y in range(0, 24, 6):
             d.line([(0, y), (0, min(23, y + 3))], fill=(215, 215, 215, 255), width=2)
             d.line([(31, y), (31, min(23, y + 3))], fill=(215, 215, 215, 255), width=2)
+        # the mission's settings: a gear in the atlas' light grey - eight teeth round a ring with a hole
+        import math
+        gear = Image.new("RGBA", (32, 32))
+        d = ImageDraw.Draw(gear)
+        cx = cy = 15.5
+        teeth = []
+        for k in range(8):
+            a = k * math.pi / 4
+            for da, r in ((-0.22, 9.5), (-0.17, 14.5), (0.17, 14.5), (0.22, 9.5)):
+                teeth.append((cx + r * math.cos(a + da), cy + r * math.sin(a + da)))
+            d.polygon(teeth[-4:], fill=(215, 215, 215, 255))
+        d.ellipse((cx - 11, cy - 11, cx + 11, cy + 11), fill=(215, 215, 215, 255))
+        d.ellipse((cx - 4.5, cy - 4.5, cx + 4.5, cy + 4.5), fill=(0, 0, 0, 0))
         icons = {
+            "settings": icon(gear),
             "paint": icon(stroke),
             "water": icon(pool),
             "region": icon(frame),
@@ -496,6 +510,7 @@ BUTTON_SIGNS = {
 # the atlas' dark cell with the object's own picture (frame 0, in colour) fitted into it.
 PALETTE_UNIT_CLASSES = {"UNIT", "BUILDING", "AVIA", "CIV_ROBOT", "ENGINE", "DEPO", "CREATURE", "BALLOON"}
 VEHICLE_GROUP = "GroupTrain"   # the groups of the vehicles palette (the cars, ENGINE)
+ICON_ONLY = "-"                # a row with only an icon (a decal the palette leaves out), not in the palette
 # cars whose state bar icon is another car's: the explosive tank (56, the oil tank's sprite) has the
 # passenger car's icon 31 in objects.res (its weapon 32), so the two showed the same picture - it gets
 # its own sprite, as a car without an icon does
@@ -625,8 +640,13 @@ def make_editor_palette(game_folder, palette_tsv, output_tsv, output_vid):
             inner = icon.convert("L").crop((4, 4, size - 4, size - 4))   # a flat cell (the stone's 29) is no icon
             return icon.convert("RGB") if ImageStat.Stat(inner).stddev[0] > 12 else None
 
+        # the decals the palette leaves out (the gravel beds, a few others) get an icon too, for the
+        # Decals tool's row: rows of the group ICON_ONLY, which the palette does not show
+        listed = {r["nvid"] for r in rows}
+        icon_only = [{"group": ICON_ONLY, "nvid": o["nvid"], "army": "0", "key": "", "english": ""}
+                     for o in tables["objects"] if str(o["spriteClass"]) == "8" and o["nvid"] not in listed]
         cells = []
-        for r in rows:
+        for r in rows + icon_only:
             o = objects.get(r["nvid"])
             if o and r["group"].startswith(VEHICLE_GROUP) and r["nvid"] not in STATE_BAR_ICON_NOT_ITS_OWN:   # a car: the state bar's own icon
                 icon = state_bar_icon(o)
@@ -665,7 +685,7 @@ def make_editor_palette(game_folder, palette_tsv, output_tsv, output_vid):
         os.makedirs(os.path.dirname(output_tsv), exist_ok=True)
         with open(output_tsv, "w", encoding="utf-8", newline="\n") as f:
             f.write("group\tnvid\tarmy\tkey\tenglish\tframe\tbehave\titems\n")
-            for k, r in enumerate(rows):
+            for k, r in enumerate(rows + icon_only):
                 behave, items = state.get(r["nvid"], ("", ""))
                 f.write("\t".join([r["group"], r["nvid"], r["army"], r["key"], r["english"], str(k), behave,
                                    items]) + "\n")

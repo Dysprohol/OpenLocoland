@@ -73,6 +73,7 @@ void window_to_logical(POINT& p);   // screen_scaling.cpp
 const char* object_name(int nvid);  // editor_panel.cpp: the palette's names of the objects
 bool palette_state(int nvid, int& behave, std::vector<short>& items);   // editor_panel.cpp
 int palette_icon(int nvid);                                             // editor_panel.cpp
+void editor_stop_music();                                              // editor.cpp: StopMusic and the name taken away
 void panel_open_palette(bool vehicles);   // editor_panel.cpp: All objects, or the vehicles
 int panel_palette_army(int which);   // editor_panel.cpp: the palette's army row, -1 the missions'
 void panel_set_palette_army(int which, int army);
@@ -273,8 +274,10 @@ void set_red(uint8_t* o, bool on) {
 // The colours of the armies are not in objects.res: the mission script sets them when the level
 // starts - SetArmyGamma() of maps\script\setarmygamma.lgc, called by InitDefault - with
 // SetVid(nvid, VID_GAMMA + army, value) for the units, the buildings' flags (VID 175, 770-774) and
-// the state bar's icons (VID 455: the editor's bar draws them untinted, so the gammas a level run
-// from the editor gave them - lit for army 0 - are taken back). A held level runs no
+// the state bar's icons (VID 455, menu_gamma: 0x1FF351 lights them green - the state bar draws its
+// icons with the first, Graphics_DrawVid's objects are army 0 - and the other three are the factory
+// queue's, the dimmed and the build choice's looks). The editor's bar takes the same for the state
+// bar's atlas and its own (VID 939), so its icons are lit as the game shows them. A held level runs no
 // script, so every army looked the same; the editor sets the same gammas (SetVidData 18-21: Gamma_FromScriptInt, then the VID's SetGamma, vtable
 // slot 7). The buildings' flags are their linked objects (Object_CreateLinked: the fort and the
 // mine link VID 175, the factory and the repair point a light that links it), coloured by army.
@@ -286,6 +289,7 @@ const char* const ARMY_CHOICES[] = {"OURS", "ENEMY", "NEUTRAL", "PIRATES"};
 const char* const ARMY_CHOICE_KEYS[] = {"CtxOurs", "CtxEnemy", "CtxNeutral", "CtxPirates"};
 const uint32_t ARMY_GAMMA[4] = {0, 0xe83917, 0xf40059, 0x2e451f};
 const uint32_t FLAG_GAMMA[4] = {0x7e007e, 0x007e7e, 0x00007e, 0x686868};
+const uint32_t MENU_GAMMA[4] = {0x1FF351, 0xF4FA4E, 0x000000, 0xD40539};   // setarmygamma.lgc's menu_gamma
 
 const int ARMY_GAMMA_VIDS[] = {5,  10, 15, 20, 21, 25, 26, 27, 28, 30, 31, 35, 40, 41, 42,  43,  45,  50, 55,
                                56, 60, 62, 63, 70, 71, 75, 76, 80, 81, 82, 83, 84, 85, 90, 91, 97, 110, 112, 115, 116, 117};
@@ -322,7 +326,8 @@ void set_army_gammas() {
         for (int nvid : ARMY_GAMMA_VIDS) set_vid_gamma(nvid, army, ARMY_GAMMA[army]);
         set_vid_gamma(95, army, ARMY_GAMMA[army == 3 ? 2 : army]);   // as the script has it
         for (int nvid : FLAG_VIDS) set_vid_gamma(nvid, army, FLAG_GAMMA[army]);
-        set_vid_gamma(VID_ICONS, army, 0);
+        set_vid_gamma(VID_ICONS, army, MENU_GAMMA[army]);          // lit, as the game's state bar
+        set_vid_gamma(VID_EDITOR_ICONS, army, MENU_GAMMA[army]);   // the editor's own icons the same
     }
 }
 
@@ -807,6 +812,7 @@ void end_line();
 // on the track (below)
 bool on_track_vid(int nvid);
 bool snap(int nvid, float& x, float& y, int& direction, UiText& reason);
+float crate_height(float x, float y, float ground);   // a money crate on a rail point, below
 // A mine and the authors' marker of one go onto a rail point or nowhere: in play F086_0 closes the
 // rail point nearest to the mine for its army (SetSemaphore takes the nearest one however far it is),
 // and TrainsTact makes a marker such a mine.
@@ -1357,7 +1363,7 @@ const Entry ENTRIES[] = {
     {"ToolSection", "Delete a section of track", "", Tool::Section, -1, VID_EDITOR_ICONS, 2, 0, false},
     {"ToolDecals", "Decals", "[ ]", Tool::Decals, 0, VID_EDITOR_ICONS, 6, 0, false},
     {"ToolPushLine", "Push line", "", Tool::PushLine, -1, VID_EDITOR_ICONS, 7, 0, false},
-    {"ToolMission", "Mission settings", "", Tool::Settings, -1, VID_ICONS, 0, 0, false},
+    {"ToolMission", "Mission settings", "", Tool::Settings, -1, VID_EDITOR_ICONS, 14, 0, false},   // the gear
     {"ToolHeight", "Ground height", "", Tool::Height, -1, VID_EDITOR_ICONS, 8, 0, false},
     {"ToolCrate", "Money crate", "", Tool::Place, VID_CRATE, VID_EDITOR_ICONS, 9, 3, false},
     {"ToolVehicles", "Vehicles", "", Tool::Place, VEHICLES_NVID, VID_ICONS, 12, 0, false},
@@ -1502,6 +1508,15 @@ void choose_entry(int i) {
     } else {
         MESSAGE("MsgTool", "tool: %s", label_of(entry()));
     }
+}
+
+// The decal of the Decals tool (the row, [ and ]): the tool chosen with it.
+void choose_decal(int k) {
+    if (g_decals.empty()) return;
+    g_decal = (std::max)(0, (std::min)(static_cast<int>(g_decals.size()) - 1, k));
+    if (g_entry != DECAL_ENTRY) choose_entry(DECAL_ENTRY);
+    const char* name = object_name(decal_nvid());
+    MESSAGE("MsgDecal", "decal: %s (VID %d)", name ? name : "?", decal_nvid());
 }
 
 // ---- the mouse ----
@@ -2169,7 +2184,9 @@ void resnap_on_track(uint8_t* o, float x, float y, int direction, const UiText& 
         gone.present = false;
         apply(objects[i], gone);
     }
-    reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, x, y, ground_z(vid_of(o), x, y));
+    float z = ground_z(vid_of(o), x, y);
+    if (snapped && nvid_of(o) == VID_CRATE) z = crate_height(x, y, z);   // above the rails, as the missions' crates
+    reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, x, y, z);
     set_direction(o, direction);
     remake_own_line(o, own);
     commit(what, objects, before);
@@ -2701,6 +2718,7 @@ PlacePlan plan_place(POINT p, int nvid, uint8_t* v) {
             pl.y = y;
             pl.direction = direction;
             pl.z = ground_z(v, x, y);
+            if (nvid == VID_CRATE) pl.z = crate_height(x, y, pl.z);   // above the rails, as the missions' crates
         } else if (on_its_point(nvid)) {   // nowhere else
             pl.why = pl.missing;
             return pl;
@@ -2857,7 +2875,7 @@ constexpr int VID_EMBANKMENT = 602;
 constexpr float EMBANKMENT_DEPTH = 28;
 constexpr int SWAMP_LIFT = 29;   // a new swamp line: its level above the ground (the rails 28 above it)
 int g_rail_kind = 0;
-int g_ramp = 0;                  // the next rail climbs (1) or descends (-1)
+int g_ramp = 0;                  // the rails laid climb (1), descend (-1) or stay flat (0) - a mode, until changed
 
 bool swamp_rail(int nvid) { return nvid == 600 || nvid == 601; }
 bool destroyed_rail(int nvid) { return nvid == 611 || nvid == 601; }
@@ -2954,7 +2972,11 @@ rail::Point line_start(const std::vector<RailObject>& rails) {
     for (const RailObject& r : rails)
         for (int i = 0; i < 2; ++i) {
             const rail::Point e = rail::end_of(r.rail, i);
-            const double d = std::hypot(e.x - x, e.y - at<float>(r.object, O_Z) - screen_y);
+            // the end where it is drawn: a ramp's raised end 11 higher than the rail (its point's height)
+            const rail::Rail q = rail::rail_of(at<float>(r.object, O_X), at<float>(r.object, O_Y), at<float>(r.object, O_Z),
+                                               at<int>(r.object, O_DIRECTION));
+            const float lift = static_cast<float>(rail::height_of(q, i) - static_cast<int>(at<float>(r.object, O_Z)) - rail::ALTITUDE);
+            const double d = std::hypot(e.x - x, e.y - at<float>(r.object, O_Z) - lift - screen_y);
             if (d < best_distance) {
                 best_distance = d;
                 best = {rail::round3(e.x), rail::round3(e.y)};
@@ -3004,7 +3026,7 @@ std::vector<rail::Point> run_to_cursor(const std::vector<rail::Rail>& rails, rai
         }
         return best_to;
     };
-    if (distance(from, mouse) <= std::hypot(2 * rail::HALF_X, 2 * rail::HALF_Y) || g_ramp != 0) {
+    if (distance(from, mouse) <= std::hypot(2 * rail::HALF_X, 2 * rail::HALF_Y)) {
         points.push_back(nearest_step(from));
         return points;
     }
@@ -3081,10 +3103,11 @@ void end_line() {
     g_line_original.clear();
 }
 
-// The ramp of the next rail (the wheel, PgUp / PgDn): 1 climbs, -1 falls, 0 flat.
+// The ramp mode (the row, the wheel, PgUp / PgDn): 1 every rail laid climbs a step (11) after the one
+// before, -1 every one descends, 0 every one keeps the height reached - until it is changed.
 void set_ramp(int ramp) {
     g_ramp = ramp;
-    MESSAGE("MsgRamp", "track: the next rail %s", g_ramp > 0 ? ui_text("WordClimbs", "climbs")
+    MESSAGE("MsgRamp", "track: every rail %s", g_ramp > 0 ? ui_text("WordClimbs", "climbs")
                                                   : g_ramp < 0 ? ui_text("WordDescends", "descends")
                                                                : ui_text("WordFlat", "flat"));
 }
@@ -3199,8 +3222,7 @@ void lay_step() {
         const rail::Rail laid = {seg.x, seg.y, seg.shape};
         g_line_ends.push_back(rail::close(rail::end_of(laid, 0).x, to.x) && rail::close(rail::end_of(laid, 0).y, to.y)
                                   ? rail::ENDS[seg.shape][0] : rail::ENDS[seg.shape][1]);
-        g_line_level += ramp * rail::RAMP;
-        g_ramp = 0;
+        g_line_level += ramp * rail::RAMP;   // the next rail of the run goes on from there (the mode stays)
         MESSAGE("MsgTrackRail", "track: rail of shape %d at %.1f,%.1f z %d (%u cells of ground)", seg.shape, seg.x, seg.y,
                 static_cast<int>(z), static_cast<unsigned>(here.size()));
     }
@@ -3265,7 +3287,6 @@ void delete_rail_at_cursor() {
         g_line.pop_back();
         if (!g_line_ends.empty()) g_line_ends.pop_back();
         g_line_level = level;
-        g_ramp = 0;
     }
     MESSAGE("MsgTrackRailDeleted", "track: the rail at %.0f,%.0f deleted (Ctrl+Z puts it back)", at<float>(r, O_X), at<float>(r, O_Y));
 }
@@ -4702,7 +4723,10 @@ void push_semaphores() {
 // dead end of a straight spur, turned the way out along it (the nearest rail 1-38 px away), every
 // repair point (104) on a straight leg, turned along it like a gate; a post (152) 15-58 px beside the
 // track (median 31), facing the trains it is for; a money crate (169, army 3) on the track (1-46 px
-// from a rail, median 17). Placing them snaps there - elsewhere they are refused with the reason. (A
+// from a rail, median 17), standing above the rails: 23 of the 42 crates on track are 5 px above their
+// rail point's height (the others 4, 7 or 9; l04's four off the track lie 3-4 below it), so a crate
+// snapped to a rail point goes 5 above it (CRATE_ABOVE_POINT) - at the ground's height it sank into the
+// rails, which stand 6-10 above the ground under them. Placing them snaps there - elsewhere they are refused with the reason. (A
 // buffer stop, 150 "Blocker", stands at a dead end in the missions but is placed and turned freely: it
 // snapped there once, facing one way only and drawn over the rail - issue #3.) A
 // factory gets its exit push line as the missions have them - from inside the building along the
@@ -5029,6 +5053,14 @@ Snap snap_scylla(float x, float y) {
     s.ok = true;
     s.direction = along % 128 == 32 ? 0 : 128;
     return s;
+}
+
+constexpr float CRATE_ABOVE_POINT = 5;   // a money crate on a rail point: this much above it (the missions)
+
+// The height of a crate snapped to the rail point at (x, y), or `ground` when there is none.
+float crate_height(float x, float y, float ground) {
+    uint8_t* d = point_near(x, y, 1, 1);
+    return d ? static_cast<float>(at<int>(d, DOT_Z)) + CRATE_ABOVE_POINT : ground;
 }
 
 Snap snap_crate(float x, float y) {
@@ -5612,13 +5644,16 @@ void draw_track() {
     // green, red only for a rail the engine's limit of links keeps out
     const TrackStep s = next_step(rails);
     const int nvid = RAIL_KINDS[g_rail_kind];
-    const float z = line_rail_z(nvid) - (g_ramp < 0 ? rail::RAMP : 0);
+    // every rail of the run a step higher or lower than the one before (the ramp mode), as lay_step lays them
+    const float z = line_rail_z(nvid);
+    const float step = static_cast<float>(g_ramp * rail::RAMP);
     if (uint8_t* v = vid_by_number(nvid))
         for (size_t k = 0; k < s.segments.size() && k + 1 < s.points.size(); ++k)
-            draw_vid(v, frame_for(v, step_direction(s.segments[k], s.points[k], k ? 0 : g_ramp)),
-                     static_cast<float>(s.segments[k].x) - cam_x, static_cast<float>(s.segments[k].y) - cam_y, k ? line_rail_z(nvid) : z);
+            draw_vid(v, frame_for(v, step_direction(s.segments[k], s.points[k], g_ramp)), static_cast<float>(s.segments[k].x) - cam_x,
+                     static_cast<float>(s.segments[k].y) - cam_y, z + step * k - (g_ramp < 0 ? rail::RAMP : 0));
     const uint32_t colour = s.valid ? 0xc000ff00 : 0xc0ff2020;
-    for (const rail::Point& q : s.points) mark(static_cast<float>(q.x), static_cast<float>(q.y), z, colour);
+    for (size_t k = 0; k < s.points.size(); ++k)
+        mark(static_cast<float>(s.points[k].x), static_cast<float>(s.points[k].y), z + step * k, colour);
     std::snprintf(text, sizeof text, ui_format("StatusTrackSection", "Track: %.1f,%.1f -> %.1f,%.1f %s"),
                   g_line.back().x, g_line.back().y, s.to.x, s.to.y, s.valid ? ui_text("WordOk", "ok") : s.reason.get());
     g_track_status = std::string(text) +
@@ -6046,12 +6081,36 @@ void draw_paint_tool() {
     }
     char text[300];
     if (entry().tool == Tool::Paint && g_paint_bed) {
+        // where the stroke lands: the band's two edges along each rail whose line the brush reaches
+        // (bed_dab beds those), BED_RISE up the screen as ground_bed lays it
+        uint8_t* w = world();
+        const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y), sx = mx + cam_x, sy = my + cam_y;
+        const float half = g_bed_width / 2.0f;
+        for_each_object([&](uint8_t* o) {
+            if (!plain_rail(o) || std::fabs(at<float>(o, O_X) - sx) > r + 60 || std::fabs(at<float>(o, O_Y) - at<float>(o, O_Z) - sy) > r + 60)
+                return;
+            const BedRail rail = bed_rail(o);
+            if (ground_bed_distance(rail, sx, sy) > r) return;
+            float px[24], py[24];
+            const int n = ground_bed_path(rail, px, py, 24);
+            for (int i = 0; i + 1 < n; ++i) {
+                const float ux = px[i + 1] - px[i], uy = py[i + 1] - py[i], len = std::hypot(ux, uy);
+                if (len < 0.5f) continue;
+                const float nx = -uy / len, ny = ux / len;
+                for (float t = 0; t < len; t += 5) {
+                    const float x = px[i] + ux * t / len - cam_x, y = py[i] + uy * t / len - cam_y;
+                    for (int side = -1; side <= 1; side += 2)
+                        fill(graphics(), nullptr, x + side * nx * half - 1, y + side * ny * half - 1, x + side * nx * half + 1,
+                             y + side * ny * half + 1, erase ? 0xe0ff4040 : 0xe0ffd040);
+                }
+            }
+        });
         const uint16_t c = ground_bed_kinds()[g_bed_kind].mean;
         const uint32_t rgb = ((c >> 11) << 19) | (((c >> 5) & 63) << 10) | ((c & 31) << 3);
         fill(graphics(), nullptr, mx + r + 4, my - 8, mx + r + 20, my + 8, 0xff000000);
         fill(graphics(), nullptr, mx + r + 5, my - 7, mx + r + 19, my + 7, 0xff000000 | rgb);
         std::snprintf(text, sizeof text,
-                      ui_format("StatusBed", "Gravel bed: %s ([ ]), width %d px, brush %d px (wheel), strength %d, edge %s - %s; the right button puts the original back"),
+                      ui_format("StatusBed", "Paint - GRAVEL BED (dotted: where it goes): %s ([ ]), width %d px, brush %d px (wheel), strength %d, edge %s - %s; the right button puts the original back"),
                       bed_kind_name(g_bed_kind), g_bed_width, g_paint_radius, g_paint_strength,
                       g_paint_hard ? ui_text("WordHard", "hard") : ui_text("WordSoft", "soft"),
                       bed_painted() ? ui_text("WordBedPainted", "painted into the picture") : ui_text("WordBedDecals", "decals (a campaign terrain)"));
@@ -6064,7 +6123,7 @@ void draw_paint_tool() {
             fill(graphics(), nullptr, mx + r + 5, my - 7, mx + r + 19, my + 7, 0xff000000 | rgb);
         }
         std::snprintf(text, sizeof text,
-                      ui_format("StatusPaint", "Paint: %s ([ ]), brush %d px (wheel), strength %d, edge %s - the right button puts the original back"),
+                      ui_format("StatusPaint", "Paint - TEXTURE: %s ([ ]), brush %d px (wheel), strength %d, edge %s - the right button puts the original back"),
                       ground_texture_name(g_texture), g_paint_radius, g_paint_strength,
                       g_paint_hard ? ui_text("WordHard", "hard") : ui_text("WordSoft", "soft"));
     } else {
@@ -6119,7 +6178,12 @@ constexpr float LINE_HEIGHT = 14;
 
 // A line of the status in the mouse tips' font, which has its own box behind every
 // character - the look of the game's tips.
+std::vector<std::pair<float, float>> g_status_ends;   // this frame's status lines: their top, how far right they reach
+
 void status_line(float x, float y, const char* text) {
+    float cw = 6;
+    if (uint8_t* v = vid_by_number(FONT_TIPS)) cw = at<float>(v, V_SIZE_X);
+    g_status_ends.push_back({y, x + 2 + cw * (std::strlen(text) + 2)});
     if (vid_by_number(FONT_TIPS)) draw_text(FONT_TIPS, x + 2, y + 1, (std::string(" ") + text + " ").c_str());
     else reinterpret_cast<Printf_t>(PRINTF)(graphics(), x + 6, y + 2, "%s", text);
 }
@@ -6183,6 +6247,17 @@ struct SoftwareLock {
     ~SoftwareLock() { unlock(); }
 };
 
+// The lit icons (a texture VID drawn with a gamma that brightens, set_army_gammas): Texture_DrawZ adds
+// the brightening as specular light and turns SPECULARENABLE (29) on for it, and Graphics_FillRect - an
+// untextured quad whose vertices' specular it leaves unset - drawn after them with it still on came
+// out white (the rows' swatches, the frames). The bar turns it off again after its icons, through the
+// engine's Graphics_SetRenderState, which caches that state (flag 0x2000).
+constexpr uintptr_t GRAPHICS_SET_RENDER_STATE = 0x40f050;
+using SetRenderState_t = void(__fastcall*)(void* graphics, void* edx, int state, unsigned value);
+void specular_off() {
+    if (void* g = graphics()) reinterpret_cast<SetRenderState_t>(GRAPHICS_SET_RENDER_STATE)(g, nullptr, 29, 0);
+}
+
 void draw_bar() {
     const Box v = view(), b = bar();
     const float y = (b.t + b.b) / 2;
@@ -6219,10 +6294,9 @@ void draw_bar() {
         const Entry& e = ENTRIES[i];
         float x, ey;
         entry_cell(i, x, ey);
-        const int decal_icon = i == DECAL_ENTRY ? palette_icon(decal_nvid()) : -1;   // the chosen decal's picture
-        if (decal_icon >= 0 && vid_by_number(VID_PALETTE_ICONS)) {
-            draw_screen(VID_PALETTE_ICONS, decal_icon, x, ey, 2);
-        } else if (vid_by_number(e.atlas)) {
+        // the Decals entry has the atlas' own bush, lit as the others (the chosen decal's colour picture
+        // stood out unlit among them; the tool's row shows the chosen decal)
+        if (vid_by_number(e.atlas)) {
             draw_screen(e.atlas, e.icon, x, ey, 2);
         } else {   // objects.res without the editor's icons: the name
             char label[5];
@@ -6230,6 +6304,275 @@ void draw_bar() {
             draw_text(FONT_TIPS, x - 18, ey - 6, label, false, 3);
         }
     }
+    specular_off();   // the lit icons' specular light goes with them (above)
+    // the icons are lit green as the game's (set_army_gammas), which the slot frame does not stand out
+    // against: the chosen entry gets a gold frame over its icon's edge, the one under the mouse a thin light one
+    const auto frame = [](int i, float t, uint32_t color) {
+        float hx, hy;
+        entry_cell(i, hx, hy);
+        const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
+        const float h = 20;   // on the icon's edge (40 px)
+        fill(graphics(), nullptr, hx - h, hy - h, hx + h, hy - h + t, color);
+        fill(graphics(), nullptr, hx - h, hy + h - t, hx + h, hy + h, color);
+        fill(graphics(), nullptr, hx - h, hy - h, hx - h + t, hy + h, color);
+        fill(graphics(), nullptr, hx + h - t, hy - h, hx + h, hy + h, color);
+    };
+    frame(g_entry, 3, 0xffffd040);
+    const int hover = panel_open() ? -1 : bar_entry_at(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y));
+    if (hover >= 0 && hover != g_entry) frame(hover, 2, 0xd0f0f0e0);
+}
+
+// ---- the editor's music ----
+//
+// A held level plays nothing (its script does not run, and the way back from Run the level stops the
+// music). A small player in the top right corner of the view plays the files of music\ while the map is
+// made (mission_music_files: mus00 ... mus11, not the menu's): the file's name, |< the one before, > to
+// play it or || to stop it, >| the next - in the status line's font, the one under the mouse underlined
+// and said in the status line. The engine's PlayMusicFile(g_sound, file, loop) (script function 136)
+// only names the file (g_sound +0x3d8) and the sound's update starts it, and starts it again when it
+// ends, so a file plays on until another is chosen; a stopped one starts from its beginning again
+// (StopMusic and the name taken away, editor.cpp's stop_music). Off by default; on or off and the file
+// are kept in the registry (EditorMusic, EditorMusicFile, next to FrameLimit), so the editor comes back
+// silent unless it was playing. Only the held level has it: a level that runs (Run the level) starts its
+// own music (initdefault.lgc's PlayMusicFile(music0) names its file), Play the map is a game of its own,
+// and the way back stops the run's music as before; the player then starts its file again. It stands
+// on the first line of the top whose status text does not reach it, so it never covers that text.
+
+constexpr uintptr_t G_SOUND_OBJECT = 0x5d3a54, PLAY_MUSIC_FILE = 0x445090;
+constexpr size_t SOUND_MUSIC_NAME = 0x3d8;   // g_sound: the music file's name (a String)
+using PlayMusicFile_t = int(__fastcall*)(void* sound, void* edx, char** file, int loop);
+constexpr char MUSIC_KEY[] = "SOFTWARE\\Gromada\\Locoland";   // LocoFix's settings (RegPath of Locoland.cfg)
+
+struct MusicPlayer {
+    bool loaded = false, on = false;
+    std::string file;   // mus08.ogg
+};
+MusicPlayer g_music;
+struct MusicHit {
+    float l, t, r, b;
+    int what;   // 0 the name, -1 before, 1 next, 2 play / stop
+};
+std::vector<MusicHit> g_music_hits;
+Box g_music_box{0, 0, 0, 0};
+
+void music_save() {
+    HKEY key;
+    if (RegCreateKeyExA(HKEY_CURRENT_USER, MUSIC_KEY, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &key, nullptr) != ERROR_SUCCESS) return;
+    const DWORD on = g_music.on;
+    RegSetValueExA(key, "EditorMusic", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&on), sizeof on);
+    RegSetValueExA(key, "EditorMusicFile", 0, REG_SZ, reinterpret_cast<const BYTE*>(g_music.file.c_str()),
+                   static_cast<DWORD>(g_music.file.size() + 1));
+    RegCloseKey(key);
+}
+
+void music_load() {
+    if (g_music.loaded) return;
+    g_music.loaded = true;
+    HKEY key;
+    if (RegOpenKeyExA(HKEY_CURRENT_USER, MUSIC_KEY, 0, KEY_QUERY_VALUE, &key) == ERROR_SUCCESS) {
+        DWORD on = 0, size = sizeof on, type = 0;
+        if (RegQueryValueExA(key, "EditorMusic", nullptr, &type, reinterpret_cast<BYTE*>(&on), &size) == ERROR_SUCCESS && type == REG_DWORD)
+            g_music.on = on != 0;
+        char name[64] = "";
+        size = sizeof name - 1;
+        if (RegQueryValueExA(key, "EditorMusicFile", nullptr, &type, reinterpret_cast<BYTE*>(name), &size) == ERROR_SUCCESS && type == REG_SZ)
+            g_music.file = name;
+        RegCloseKey(key);
+    }
+    const std::vector<std::string> files = mission_music_files();
+    if (std::find(files.begin(), files.end(), g_music.file) == files.end())   // the first level music (mus00 is the victory's)
+        g_music.file = files.empty() ? "" : files.size() > 1 && _stricmp(files[0].c_str(), "mus00.ogg") == 0 ? files[1] : files[0];
+    if (g_music.file.empty()) g_music.on = false;
+    patch::log("editor music: %s, %s", g_music.file.c_str(), g_music.on ? "on" : "off");
+}
+
+const char* music_playing() {   // the file the sound plays now ("" none)
+    auto* sound = *reinterpret_cast<uint8_t**>(G_SOUND_OBJECT);
+    const char* name = sound ? *reinterpret_cast<const char**>(sound + SOUND_MUSIC_NAME) : nullptr;
+    return name ? name : "";
+}
+
+// Every frame of the held level: the chosen file playing while the player is on.
+void music_tick() {
+    music_load();
+    auto* sound = *reinterpret_cast<uint8_t**>(G_SOUND_OBJECT);
+    if (!sound || !g_music.on || g_music.file.empty()) return;
+    std::string want = "music\\" + g_music.file;
+    if (_stricmp(music_playing(), want.c_str()) == 0) return;
+    char* name = &want[0];
+    reinterpret_cast<PlayMusicFile_t>(PLAY_MUSIC_FILE)(sound, nullptr, &name, 1);
+    patch::log("editor music: playing %s (the sound's file now %s)", want.c_str(), music_playing());
+}
+
+void music_choose(int step) {
+    const std::vector<std::string> files = mission_music_files();
+    if (files.empty()) return;
+    auto it = std::find(files.begin(), files.end(), g_music.file);
+    int i = it == files.end() ? 0 : static_cast<int>(it - files.begin());
+    i = (i + step + static_cast<int>(files.size())) % static_cast<int>(files.size());
+    g_music.file = files[i];
+    music_save();
+    MESSAGE("MsgMusicFile", "music: %s%s", g_music.file.c_str(), g_music.on ? "" : ui_text("WordMusicStopped", " (stopped)"));
+}
+
+void music_toggle() {
+    if (g_music.file.empty()) return;
+    g_music.on = !g_music.on;
+    music_save();
+    if (!g_music.on) editor_stop_music();
+    patch::log("editor music: %s %s", g_music.file.c_str(), g_music.on ? "on" : "stopped");
+    MESSAGE("MsgMusicOn", "music: %s %s", g_music.file.c_str(), g_music.on ? ui_text("WordMusicPlays", "plays") : ui_text("WordMusicStops", "stopped"));
+}
+
+// The player, right-aligned at the top, on the first line its status text leaves free.
+void music_draw() {
+    g_music_hits.clear();
+    g_music_box = {0, 0, 0, 0};
+    music_load();
+    uint8_t* font = vid_by_number(FONT_TIPS);
+    if (!font || g_music.file.empty()) return;
+    const float cw = at<float>(font, V_SIZE_X), ch = at<float>(font, V_SIZE_Y);
+    std::string name = g_music.file;
+    if (name.size() > 4 && _stricmp(name.c_str() + name.size() - 4, ".ogg") == 0) name.resize(name.size() - 4);
+    const struct {
+        std::string text;
+        int what;
+    } parts[] = {{" " + name + " ", 0}, {" |< ", -1}, {g_music.on ? " || " : " > ", 2}, {" >| ", 1}};
+    float width = 0;
+    for (const auto& p : parts) width += cw * p.text.size();
+    const Box v = view();
+    const float right = v.r - 4, left = right - width;
+    float top = v.t;
+    for (int row = 0; row < 8; ++row, top += LINE_HEIGHT) {
+        bool free = true;
+        for (const auto& e : g_status_ends)
+            if (std::fabs(e.first - top) < 1 && e.second + 8 > left) free = false;
+        if (free) break;
+    }
+    g_music_box = {left - 2, top, right + 2, top + LINE_HEIGHT};
+    const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
+    float x = left;
+    for (const auto& p : parts) {
+        const float w = cw * p.text.size();
+        const bool hover = p.what && g_mouse.x >= x && g_mouse.x < x + w && g_mouse.y >= top && g_mouse.y < top + LINE_HEIGHT;
+        draw_text(FONT_TIPS, x, top + 1, p.text.c_str());
+        if (hover) fill(graphics(), nullptr, x + cw, top + ch + 1, x + w - cw, top + ch + 3, 0xfff0e080);
+        if (p.what) g_music_hits.push_back({x, top, x + w, top + LINE_HEIGHT, p.what});
+        x += w;
+    }
+}
+
+bool on_music(float x, float y) { return x >= g_music_box.l && x < g_music_box.r && y >= g_music_box.t && y < g_music_box.b; }
+
+// What the button under the mouse does, for the status line, or nullptr.
+const char* music_tip(POINT m) {
+    static std::string tip;
+    for (const MusicHit& h : g_music_hits)
+        if (m.x >= h.l && m.x < h.r && m.y >= h.t && m.y < h.b) {
+            if (h.what == 2)
+                tip = ui_printf(g_music.on ? ui_format("TipMusicStop", "Music: %s plays - a click stops it")
+                                           : ui_format("TipMusicPlay", "Music: %s - a click plays it while you edit (the map's own music: Mission settings)"),
+                                g_music.file.c_str());
+            else
+                tip = ui_text(h.what < 0 ? "TipMusicPrevious" : "TipMusicNext", h.what < 0 ? "Music: the file before" : "Music: the next file");
+            return tip.c_str();
+        }
+    return on_music(static_cast<float>(m.x), static_cast<float>(m.y)) ? ui_text("TipMusic", "Music while you edit") : nullptr;
+}
+
+// A click on the player: true when it was its.
+bool music_click(POINT m) {
+    if (!on_music(static_cast<float>(m.x), static_cast<float>(m.y))) return false;
+    for (const MusicHit& h : g_music_hits)
+        if (m.x >= h.l && m.x < h.r && m.y >= h.t && m.y < h.b) {
+            if (h.what == 2) music_toggle();
+            else music_choose(h.what);
+            break;
+        }
+    return true;
+}
+
+// ---- the hint under the cursor ----
+//
+// The status line explains the tool; a hint is a few words beside the cursor - the keys of the tool
+// on the map (or of the bar's entry under the cursor) - in the mouse tips' font as the game's tips,
+// shown when the cursor has rested for HINT_DELAY and gone with its next move, never while a button
+// is held, a stroke or a drag is under way or a panel is open. The Menu panel's top line turns them
+// off and on (EditorHints in the registry next to FrameLimit; on by default).
+
+bool on_options(float x, float y);   // the rows, below
+constexpr DWORD HINT_DELAY = 700;   // ms the cursor rests before the hint
+bool g_hints_loaded = false, g_hints = true;
+POINT g_hint_mouse = {-1, -1};
+DWORD g_hint_rest = 0;   // when the cursor came to rest
+
+bool hints_on() {
+    if (!g_hints_loaded) {
+        g_hints_loaded = true;
+        HKEY key;
+        if (RegOpenKeyExA(HKEY_CURRENT_USER, MUSIC_KEY, 0, KEY_QUERY_VALUE, &key) == ERROR_SUCCESS) {
+            DWORD on = 1, size = sizeof on, type = 0;
+            if (RegQueryValueExA(key, "EditorHints", nullptr, &type, reinterpret_cast<BYTE*>(&on), &size) == ERROR_SUCCESS && type == REG_DWORD)
+                g_hints = on != 0;
+            RegCloseKey(key);
+        }
+    }
+    return g_hints;
+}
+
+void set_hints(bool on) {
+    g_hints = on;
+    g_hints_loaded = true;
+    HKEY key;
+    if (RegCreateKeyExA(HKEY_CURRENT_USER, MUSIC_KEY, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &key, nullptr) != ERROR_SUCCESS) return;
+    const DWORD value = on;
+    RegSetValueExA(key, "EditorHints", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&value), sizeof value);
+    RegCloseKey(key);
+}
+
+// The few words of a tool (its key tips).
+const char* hint_of(Tool t) {
+    switch (t) {
+    case Tool::Select: return ui_text("HintSelect", "click: select, drag: move, right: its panel, R / E: turn");
+    case Tool::Delete: return ui_text("HintDelete", "click: delete, Shift+click on a rail: its section");
+    case Tool::Track: return ui_text("HintTrack", "click: start / end, wheel: ramp, V: kind, middle: delete a rail");
+    case Tool::Place: return ui_text("HintPlace", "click: place, R / E: turn, Shift: where the cursor is");
+    case Tool::Section: return ui_text("HintSection", "click on a rail: delete its section");
+    case Tool::Decals: return ui_text("HintDecals", "click / drag: scatter, [ ]: decal, Shift: take away");
+    case Tool::PushLine: return ui_text("HintPushLine", "click: begin, click: end; on a line: Del, T, R");
+    case Tool::Height: return ui_text("HintHeight", "drag: the mode, right: lower, M: mode, Alt+click: level");
+    case Tool::Paint:
+        return g_paint_bed ? ui_text("HintBed", "drag along the rails: gravel bed, right: original back")
+                           : ui_text("HintPaint", "drag: paint, right: original back, Alt+click: pipette");
+    case Tool::Water: return ui_text("HintWater", "drag: water, Shift: take away, W: kind");
+    case Tool::Region: return ui_text("HintRegion", "drag: its rectangle, right on its frame: its panel");
+    default: return nullptr;
+    }
+}
+
+void draw_hint() {
+    const DWORD now = GetTickCount();
+    if (g_mouse.x != g_hint_mouse.x || g_mouse.y != g_hint_mouse.y) {   // it moved: gone, the rest starts anew
+        g_hint_mouse = g_mouse;
+        g_hint_rest = now;
+        return;
+    }
+    if (!hints_on() || now - g_hint_rest < HINT_DELAY || g_mouse.x < 0 || panel_open() || g_drag.active || g_stroke.active ||
+        g_gstroke.active || GetKeyState(VK_LBUTTON) < 0 || GetKeyState(VK_RBUTTON) < 0)
+        return;
+    const float mx = static_cast<float>(g_mouse.x), my = static_cast<float>(g_mouse.y);
+    const int entry_under = bar_entry_at(mx, my);
+    if (entry_under < 0 && (on_bar(mx, my) || on_options(mx, my))) return;   // the plates, the rows, the music
+    const char* text = hint_of(entry_under >= 0 ? ENTRIES[entry_under].tool : entry().tool);
+    uint8_t* font = vid_by_number(FONT_TIPS);
+    if (!text || !*text || !font) return;
+    const std::string shown = std::string(" ") + text + " ";
+    const float cw = at<float>(font, V_SIZE_X), w = cw * shown.size();
+    const Box v = view();
+    float x = mx + 14, y = my + 22;   // below right of the arrow, as the game's tips
+    if (x + w > v.r - 2) x = (std::max)(v.l + 2, v.r - 2 - w);
+    if (y + LINE_HEIGHT > v.b - 2 || entry_under >= 0) y = my - 22 - LINE_HEIGHT;   // above the bar
+    draw_text(FONT_TIPS, x, y, shown.c_str());
 }
 
 // ---- the rows of the ground's tools ----
@@ -6239,12 +6582,17 @@ void draw_bar() {
 // one VID 7 for what is set and what is under the mouse): the Ground height tool's modes, size,
 // strength and edge, the Paint tool's textures (their colours; the chosen one framed), size, strength
 // and edge. A group that does not fit beside the others goes into a row above. A click on a button
-// sets it; the rows are not the map (nothing under them is painted or picked).
+// sets it; the rows are not the map (nothing under them is painted or picked). The Decals tool's row
+// holds the decals, each its palette icon (VID 944: its own picture fitted into a 40 px cell; the
+// chosen one framed), as many as the view's width takes, the rest on pages behind < and > (the page
+// follows [ and ], which still cycle them).
 
 struct OptionItem {
     UiText text;            // a button or a label
     std::string value;      // or a number shown as it is
     int swatch = -1;        // or the colour of a texture (Paint)
+    int rail = 0;           // or a kind of rail, its own straight (the Track tool)
+    int decal = 0;          // or a decal, its palette icon (the Decals tool; -1 an empty cell)
     bool lit = false, button = false;
     std::function<void()> act;
 };
@@ -6253,13 +6601,20 @@ using OptionGroup = std::vector<OptionItem>;
 struct OptionHit {
     float l, t, r, b;
     std::function<void()> act;
+    int decal = 0;   // the decal of a Decals row's icon
 };
 std::vector<OptionHit> g_option_hits;    // the buttons where the last frame drew them
 std::vector<Box> g_option_rows;          // the rows' boxes
 constexpr int OPTION_STEP = 3, CONTEXT_FONT_VID = 2, CONTEXT_FONT_LIT = 7;   // the menu font and its lit one
 constexpr float SWATCH = 15;
 
-bool options_tool() { return entry().tool == Tool::Height || entry().tool == Tool::Paint; }
+bool options_tool() {
+    return entry().tool == Tool::Height || entry().tool == Tool::Paint || entry().tool == Tool::Track || entry().tool == Tool::Decals;
+}
+constexpr float RAIL_ICON = 71;   // a straight rail across (VID 610 ... 71 x 50)
+constexpr float DECAL_ICON = 40;  // a palette icon (VID 944)
+int g_decal_page = 0;             // the page of the Decals row
+int g_decal_shown = -1;           // the decal the page was last set for
 
 OptionItem option_button(UiText text, bool lit, std::function<void()> act) {
     OptionItem i;
@@ -6311,8 +6666,74 @@ OptionGroup option_edge(bool& hard) {
             })};
 }
 
+void choose_decal(int k);   // the Decals tool's decal, below
+
+// The Decals row: DECAL n / 61:, < the icons of a page >.
+OptionGroup decal_group() {
+    OptionGroup g;
+    const int n = static_cast<int>(g_decals.size());
+    if (!n) return g;
+    float cw = 8;
+    if (uint8_t* font = vid_by_number(CONTEXT_FONT_VID)) cw = at<float>(font, V_SIZE_X);
+    const Box v = view();
+    const float room = (v.r - v.l) - 40 - 24 - 2 * (2 * cw) - 16 * cw;   // the strip's ends, the arrows, the label
+    const int per = (std::max)(1, (std::min)(n, static_cast<int>(room / (DECAL_ICON + 4))));
+    const int pages = (n + per - 1) / per;
+    if (g_decal != g_decal_shown) {   // [ ], ] or the palette chose another: its page
+        g_decal_page = g_decal / per;
+        g_decal_shown = g_decal;
+    }
+    g_decal_page = (std::max)(0, (std::min)(pages - 1, g_decal_page));
+    OptionItem label;
+    label.value = ui_printf(ui_format("OptDecal", "DECAL %d / %d:"), g_decal + 1, n);
+    g.push_back(label);
+    auto page = [pages](int step) {
+        return [pages, step] { g_decal_page = (g_decal_page + step + pages) % pages; };
+    };
+    if (pages > 1) g.push_back(option_button({nullptr, "<"}, false, page(-1)));
+    for (int k = g_decal_page * per; k < (std::min)(n, (g_decal_page + 1) * per); ++k) {
+        OptionItem i;
+        i.decal = g_decals[k];
+        i.lit = k == g_decal;
+        i.button = true;
+        i.act = [k] { choose_decal(k); };
+        g.push_back(i);
+    }
+    if (pages > 1)   // the last page as wide as the others, so the arrows stay where they are
+        for (int k = n; k < pages * per && g_decal_page == pages - 1; ++k) {
+            OptionItem empty;
+            empty.decal = -1;
+            g.push_back(empty);
+        }
+    if (pages > 1) g.push_back(option_button({nullptr, ">"}, false, page(1)));
+    return g;
+}
+
 std::vector<OptionGroup> option_groups() {
     std::vector<OptionGroup> groups;
+    if (entry().tool == Tool::Decals) {
+        groups.push_back(decal_group());
+        return groups;
+    }
+    if (entry().tool == Tool::Track) {   // the kinds of rail (V cycles them) and the next rail's ramp (the wheel, PgUp / PgDn)
+        OptionGroup kinds{option_label({"OptRailKind", "RAIL:"})};
+        for (int k = 0; k < 4; ++k) {
+            OptionItem i;
+            i.rail = RAIL_KINDS[k];
+            i.lit = g_rail_kind == k;
+            i.button = true;
+            i.act = [k] {
+                g_rail_kind = k;
+                MESSAGE("MsgRailKind", "track: %s rails (VID %d)", rail_kind_name(RAIL_KINDS[g_rail_kind]), RAIL_KINDS[g_rail_kind]);
+            };
+            kinds.push_back(i);
+        }
+        groups.push_back(kinds);
+        groups.push_back({option_label({"OptNextRail", "RAILS GO:"}), option_button({"OptRailUp", "UP"}, g_ramp > 0, [] { set_ramp(1); }),
+                          option_button({"OptRailFlat", "FLAT"}, g_ramp == 0, [] { set_ramp(0); }),
+                          option_button({"OptRailDown", "DOWN"}, g_ramp < 0, [] { set_ramp(-1); })});
+        return groups;
+    }
     if (entry().tool == Tool::Height) {
         OptionGroup modes;
         const struct {
@@ -6336,26 +6757,33 @@ std::vector<OptionGroup> option_groups() {
         groups.push_back(option_number({"OptStrength", "STRENGTH:"}, g_strength, MIN_STRENGTH, MAX_STRENGTH, 1, "MsgStrength", "strength %d"));
         groups.push_back(option_edge(g_hard_edge));
     } else {
-        OptionGroup textures;
-        const std::vector<GroundTexture>& t = ground_textures();
-        for (int k = 0; k < static_cast<int>(t.size()); ++k) {
-            if (!t[k].available) continue;
-            OptionItem i;
-            i.swatch = k;
-            i.lit = !g_paint_bed && g_texture == k;
-            i.button = true;
-            i.act = [k] {
-                g_texture = k;
-                g_paint_bed = false;
-                MESSAGE("MsgTexture", "texture: %s", ground_texture_name(g_texture));
-            };
-            textures.push_back(i);
+        // two things: painting a texture anywhere, or laying the gravel bed along the rails - the mode
+        // first, then only that mode's options (the textures, or the bed's kind and width)
+        groups.push_back({option_label({"OptPaintMode", "MODE:"}), option_button({"OptPaintTexture", "TEXTURE"}, !g_paint_bed, [] {
+                              g_paint_bed = false;
+                              MESSAGE("MsgTexture", "texture: %s", ground_texture_name(g_texture));
+                          }),
+                          option_button({"OptBed", "GRAVEL BED"}, g_paint_bed, [] {
+                              g_paint_bed = true;
+                              MESSAGE("MsgBedMode", "paint: the gravel bed (%s) under the rails the brush goes over", bed_kind_name(g_bed_kind));
+                          })});
+        if (!g_paint_bed) {
+            OptionGroup textures;
+            const std::vector<GroundTexture>& t = ground_textures();
+            for (int k = 0; k < static_cast<int>(t.size()); ++k) {
+                if (!t[k].available) continue;
+                OptionItem i;
+                i.swatch = k;
+                i.lit = g_texture == k;
+                i.button = true;
+                i.act = [k] {
+                    g_texture = k;
+                    MESSAGE("MsgTexture", "texture: %s", ground_texture_name(g_texture));
+                };
+                textures.push_back(i);
+            }
+            groups.push_back(textures);
         }
-        groups.push_back(textures);
-        groups.push_back({option_button({"OptBed", "GRAVEL BED"}, g_paint_bed, [] {
-            g_paint_bed = true;
-            MESSAGE("MsgBedMode", "paint: the gravel bed (%s) under the rails the brush goes over", bed_kind_name(g_bed_kind));
-        })});
         if (g_paint_bed) {
             OptionGroup kinds{option_label({"OptBedKind", "KIND:"})};
             const UiText NAMES[BED_KINDS] = {{"OptBedMeadow", "MEADOW"}, {"OptBedIce", "ICE"}, {"OptBedVolcanic", "VOLCANIC"},
@@ -6383,6 +6811,8 @@ std::vector<OptionGroup> option_groups() {
 
 float option_width(const OptionItem& i, float cw) {
     if (i.swatch >= 0) return SWATCH + 5;
+    if (i.rail) return RAIL_ICON + 8;
+    if (i.decal) return DECAL_ICON + 4;
     const char* text = i.value.empty() ? i.text.get() : i.value.c_str();
     return std::strlen(text) * cw + cw;
 }
@@ -6438,6 +6868,7 @@ template <typename F> void layout_options(F f) {
 }
 
 bool on_options(float x, float y) {
+    if (on_music(x, y)) return true;   // the music player too (above)
     for (const Box& b : g_option_rows)
         if (b.contains(x, y)) return true;
     return false;
@@ -6452,7 +6883,33 @@ void draw_options() {
             drawn.push_back(box);
         }
         const bool hover = i.button && g_mouse.x >= x && g_mouse.x < x + iw && g_mouse.y >= cy - SLOT / 2 && g_mouse.y < cy + SLOT / 2;
-        if (i.swatch >= 0) {
+        if (i.rail) {   // the rail's own straight across; the chosen one framed
+            const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
+            const float l = x + 2, r = x + iw - 4, t0 = cy - SLOT / 2 + 4, b0 = cy + SLOT / 2 - 4;
+            if (i.lit || hover) {
+                const uint32_t c = i.lit ? 0xfff0e080 : 0xc0f0e080;
+                fill(graphics(), nullptr, l, t0, r, t0 + 2, c);
+                fill(graphics(), nullptr, l, b0 - 2, r, b0, c);
+                fill(graphics(), nullptr, l, t0, l + 2, b0, c);
+                fill(graphics(), nullptr, r - 2, t0, r, b0, c);
+            }
+            const float mx = (l + r) / 2;
+            if (uint8_t* rv = vid_by_number(i.rail)) draw_screen(i.rail, frame_for(rv, rail::DIRECTION[1]), mx, cy, OPTION_STEP + 1);
+        } else if (i.decal < 0) {   // an empty cell of the last page
+        } else if (i.decal) {   // its palette icon (its own picture fitted into the cell); the chosen one framed
+            const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
+            const float mx = x + iw / 2, h = DECAL_ICON / 2 + 2;
+            if (i.lit || hover) {
+                const uint32_t c = i.lit ? 0xfff0e080 : 0xc0f0e080;
+                fill(graphics(), nullptr, mx - h, cy - h, mx + h, cy - h + 2, c);
+                fill(graphics(), nullptr, mx - h, cy + h - 2, mx + h, cy + h, c);
+                fill(graphics(), nullptr, mx - h, cy - h, mx - h + 2, cy + h, c);
+                fill(graphics(), nullptr, mx + h - 2, cy - h, mx + h, cy + h, c);
+            }
+            const int icon = palette_icon(i.decal);
+            if (icon >= 0 && vid_by_number(VID_PALETTE_ICONS)) draw_screen(VID_PALETTE_ICONS, icon, mx, cy, OPTION_STEP + 1);
+            else if (uint8_t* dv = vid_by_number(i.decal)) draw_screen(i.decal, frame_for(dv, 0), mx, cy + DECAL_ICON / 4, OPTION_STEP + 1);
+        } else if (i.swatch >= 0) {
             const std::vector<GroundTexture>& t = ground_textures();
             const uint16_t c = t[i.swatch].mean;
             const uint32_t rgb = ((c >> 11) << 19) | (((c >> 5) & 63) << 10) | ((c & 31) << 3);
@@ -6465,8 +6922,15 @@ void draw_options() {
             draw_text(i.lit || hover ? CONTEXT_FONT_LIT : CONTEXT_FONT_VID, x + (i.button ? 0 : 0), cy - ch / 2, text, false, OPTION_STEP);
             if (i.lit) reinterpret_cast<FillRect_t>(FILL_RECT)(graphics(), nullptr, x, cy + ch / 2 + 1, x + iw - 8, cy + ch / 2 + 3, 0xe0f0e080);
         }
-        if (i.button) g_option_hits.push_back({x - 2, cy - SLOT / 2, x + iw, cy + SLOT / 2, i.act});
+        if (i.button) g_option_hits.push_back({x - 2, cy - SLOT / 2, x + iw, cy + SLOT / 2, i.act, i.decal});
     });
+}
+
+// The decal of the Decals row under the mouse, 0 when none.
+int decal_under_mouse() {
+    for (const OptionHit& h : g_option_hits)
+        if (h.decal && g_mouse.x >= h.l && g_mouse.x < h.r && g_mouse.y >= h.t && g_mouse.y < h.b) return h.decal;
+    return 0;
 }
 
 // A click on the rows: true when it was theirs (a button set, or nothing under the click).
@@ -7507,6 +7971,8 @@ void draw_overlay() {
     // the status line, in the mouse tips' font on a dark band: the tool (or the entry under
     // the cursor), the undo and redo counts, "not saved" and the last message
     const Box v = view();
+    g_status_ends.clear();
+    music_tick();
     char status[400];
     char tool[160];
     const int hover = bar_entry_at(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y));
@@ -7526,6 +7992,7 @@ void draw_overlay() {
     }
     if (hover >= 0 && *shown.key) std::snprintf(tool + std::strlen(tool), sizeof tool - std::strlen(tool), " (%s)", shown.key);
     if (const char* tip = panel_tip(g_mouse)) std::snprintf(tool, sizeof tool, "%s", tip);   // the Help or Menu button
+    if (const char* tip = music_tip(g_mouse)) std::snprintf(tool, sizeof tool, "%s", tip);   // the music player
     std::snprintf(status, sizeof status, ui_format("StatusLine", "EDITOR - %s - undo %u, redo %u%s   %s"), tool,
                   static_cast<unsigned>(g_undo.size()), static_cast<unsigned>(g_redo.size()),
                   g_dirty ? ui_text("StatusNotSaved", " - not saved") : "",
@@ -7534,8 +8001,13 @@ void draw_overlay() {
     if (entry().tool == Tool::Track) status_line(v.l, v.t + LINE_HEIGHT, g_track_status.c_str());
     if (entry().tool == Tool::PushLine) status_line(v.l, v.t + LINE_HEIGHT, g_push_status.c_str());
     if (g_arrival_pick != ArrivalPick::None) status_line(v.l, v.t + LINE_HEIGHT, g_arrival_status.c_str());
-    if (entry().tool == Tool::Height || entry().tool == Tool::Decals || entry().tool == Tool::Paint || entry().tool == Tool::Water)
+    if (const int d = entry().tool == Tool::Decals ? decal_under_mouse() : 0) {   // a decal of the row under the mouse
+        const char* name = object_name(d);
+        status_line(v.l, v.t + LINE_HEIGHT,
+                    ui_printf(ui_format("StatusDecalHover", "Decals: %s, VID %d - a click picks it"), name ? name : "?", d).c_str());
+    } else if (entry().tool == Tool::Height || entry().tool == Tool::Decals || entry().tool == Tool::Paint || entry().tool == Tool::Water) {
         status_line(v.l, v.t + LINE_HEIGHT, g_ground_status.c_str());
+    }
     if (entry().tool == Tool::Region)
         status_line(v.l, v.t + LINE_HEIGHT,
                     ui_text("StatusRegion", "Region: drag its rectangle on the map; the right button on its frame opens its panel"));
@@ -7547,7 +8019,7 @@ void draw_overlay() {
                               static_cast<int>(std::lround(lift_of(g_selection[0])))).c_str());
     if (entry().tool == Tool::Track) {
         char bed[200];
-        std::snprintf(bed, sizeof bed, ui_format("StatusRailLevel", "rail (V): %s, level %d, next %s (wheel, PgUp / PgDn), gravel bed (B): %s"),
+        std::snprintf(bed, sizeof bed, ui_format("StatusRailLevel", "rail (V): %s, level %d, every rail %s (wheel, PgUp / PgDn), gravel bed (B): %s"),
                       rail_kind_name(RAIL_KINDS[g_rail_kind]), track_level(),
                       g_ramp > 0 ? ui_text("WordClimbs", "climbs") : g_ramp < 0 ? ui_text("WordDescends", "descends")
                                                                      : ui_text("WordFlat", "flat"),
@@ -7557,8 +8029,10 @@ void draw_overlay() {
     int below = entry().tool == Tool::Track ? 3 : 2;   // below the tool's lines (the Track tool has two)
     if (!g_line_status.empty()) status_line(v.l, v.t + below++ * LINE_HEIGHT, g_line_status.c_str());   // the push line under the cursor
     if (!g_enemy_status.empty()) status_line(v.l, v.t + below * LINE_HEIGHT, g_enemy_status.c_str());
+    music_draw();
     draw_sockets();
     draw_context();
+    draw_hint();
     panel_draw(g_mouse);   // the Help and Menu buttons, an open panel in front of everything
 }
 
@@ -7618,6 +8092,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
     // under the panel and after it, with no button held, until the next click
     if ((m == WM_LBUTTONUP || m == WM_RBUTTONUP) && (g_stroke.active || g_gstroke.active || g_drag.active) && panel_open())
         end_strokes();
+    if (m == WM_LBUTTONDOWN && music_click(logical(l))) return true;   // the music player, also over an open panel
     if (panel_message(window, m, w, g_mouse)) return true;   // the Help and Menu buttons, an open panel
     switch (m) {
     case WM_MOUSEMOVE:
@@ -7913,13 +8388,8 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
                 select(nullptr);
             }
         } else if (w == VK_OEM_4 || w == VK_OEM_6) {
-            if (!g_decals.empty()) {
-                g_decal = (g_decal + (w == VK_OEM_6 ? 1 : static_cast<int>(g_decals.size()) - 1)) %
-                          static_cast<int>(g_decals.size());
-                g_entry = DECAL_ENTRY;
-                const char* name = object_name(decal_nvid());
-                MESSAGE("MsgDecal", "decal: %s (VID %d)", name ? name : "?", decal_nvid());
-            }
+            if (!g_decals.empty())
+                choose_decal((g_decal + (w == VK_OEM_6 ? 1 : static_cast<int>(g_decals.size()) - 1)) % static_cast<int>(g_decals.size()));
         } else if (w >= '0' && w <= '9') {
             choose_entry((static_cast<int>(w - '0') + 9) % 10);
         } else {
@@ -8058,6 +8528,9 @@ bool edit_dirty() { return g_dirty; }
 
 // editor_panel.cpp's drawing: pictures and texts in front of the scene as the bar's, the view and the bar.
 void edit_draw_picture(int nvid, int frame, float x, float y, int step) { draw_screen(nvid, frame, x, y, step); }
+// editor_panel.cpp's Menu panel: the hints under the cursor on or off (kept in the registry).
+bool edit_hints_on() { return hints_on(); }
+void edit_set_hints(bool on) { set_hints(on); }
 float edit_draw_text(int font, float x, float y, const char* text, int step) { return draw_text(font, x, y, text, false, step); }
 bool edit_font_size(int font, float& w, float& h) {
     uint8_t* v = vid_by_number(font);

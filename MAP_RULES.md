@@ -255,14 +255,15 @@ stands, every corkscrew breaks.
 Measured over the 20 missions: all 37 factories and repair points stand on the track (the nearest
 rail 1-38 px, one at 68); a factory's exit line runs 100-175 px from inside it along its spur, a
 repair point's line 139-304 px through its leg; money crates (VID 169, army 3; `F169_8` gives the
-player 100 when a unit of theirs takes it) lie on the track, 1-46 px from a rail (median 17); the
+player 100 when a unit of theirs takes it) lie on the track, 1-46 px from a rail (median 17), above
+the rails: 23 of the 42 on track 5 px above their rail point's height (the others 4, 7 or 9); the
 blockers (VID 150, the buffer stop, nDir 4) stand at dead ends - all 99 within 16 px of a rail point
 with one link, median 5 px past it -, turned by the track's way: 0 on a vertical track, 64 (or 32)
 rising to the right, 128 horizontal, 192 (or 160) falling to the right - four frames.
 **[editor]** Enforced when placing: a factory snaps to the nearest dead end (22 px inside, turned the
 way out) and gets its exit line (140 px, push_flag 1) and post; a repair point snaps to a straight
 piece, turned along it, and gets its line (120 px each side, flag 1, one way the way it faces) and
-posts - R / E turn it round on its leg, its line and posts with it; a crate snaps onto the track;
+posts - R / E turn it round on its leg, its line and posts with it; a crate snaps onto a rail point, 5 px above it;
 elsewhere they are refused. A blocker is placed and turned freely (it snapped to a dead end until
 v0.2.2, issue #3).
 Moving or deleting the building

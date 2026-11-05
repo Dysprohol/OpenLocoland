@@ -170,6 +170,13 @@ Co widać:
   **listwie** nad nim. Wybrane jest w ramce.
 - **Wiersz stanu** u góry: narzędzie (albo to pod myszą), liczba kroków do cofnięcia i ponowienia,
   „nie zapisano” i ostatni komunikat - dlaczego czegoś nie da się zrobić, zawsze jest napisane tutaj.
+- **Podpowiedzi**: gdy kursor chwilę stoi, kilka słów obok niego podaje klawisze narzędzia (albo
+  pozycji paska pod nim), np. dla Torów „klik: początek / koniec, kółko: rampa, V: rodzaj”; następny
+  ruch je zabiera. **PODPOWIEDZI POD KURSOREM** na górze panelu Menu je wyłącza i włącza.
+- **Muzyka** w prawym górnym rogu: nazwa pliku, `|<` poprzedni, `>` gra go podczas edycji (`||`
+  zatrzymuje), `>|` następny - żeby przesłuchać muzykę gry i wybrać muzykę mapy w Ustawieniach misji. Na
+  początku wyłączona; edytor pamięta, czy grała i który plik. Szybki test i Zagraj w mapę grają własną
+  muzykę mapy.
 - **Przyciski ? i menu** na lewym końcu paska (tam, gdzie gra ma przycisk pauzy). **?** (albo F1)
   otwiera pomoc: dwadzieścia stron z tym, co jest w tym rozdziale, w skrócie. Zaczyna się od **spisu
   treści**: kategorie (PODSTAWY, TORY I POCIĄGI, OBIEKTY, MISJA I ZAPIS, TEREN, PRZYJAZDY I FABRYKI)
@@ -304,14 +311,16 @@ Główną linię połóż tak, jak robią to misje: **zza zachodniej krawędzi**
 mapę, żeby pociągi przyjeżdżały i odjeżdżały poza widokiem. Potem bocznica na fabrykę: odgałęzienie
 od linii przez Y, prosty odcinek kończący się **ślepym końcem**.
 
-`V` zmienia rodzaj następnych szyn: zwykłe, bagienne (na nasypie), zniszczone albo zniszczone
-bagienne. `PgUp` / `PgDn` albo kółko myszy sprawiają, że następna szyna wznosi się albo opada (rampa na
+Rząd nad paskiem wybiera rodzaj następnych szyn - zwykłe, bagienne (na nasypie), zniszczone albo
+zniszczone bagienne, każdy pokazany swoją szyną - i czy szyny idą w górę, płasko albo w dół; `V`
+też przełącza rodzaje. `PgUp` / `PgDn` albo kółko myszy sprawiają, że każda kładziona szyna wznosi się albo opada o stopień po poprzedniej, dopóki tego nie zmienisz (rampy na
 wyższy teren: każda rampa to 11 poziomów; wiersz stanu pokazuje poziom). Linię na wzgórze najpierw wprowadź po rampach, potem podnieś teren
 wokół jej końca i wyrównaj go, zaczynając na torze. `B` wybiera podsypkę pod nowe szyny. Kliknięcie
 kółkiem, Del albo narzędzie **Usun odcinek toru** usuwa szyny.
 
-**Podsypka.** Gdy tory leżą, **Malowanie terenu** → **PODSYPKA** kładzie podsypkę pod szynami, po
-których przejdzie pędzel: **RODZAJ** (łąka, lód, wulkan, pustynia - ten sam, który `B` kładzie pod
+**Podsypka.** Gdy tory leżą, **Malowanie terenu** → **TRYB: PODSYPKA** (drugi tryb, **TEKSTURA**,
+maluje tekstury gdziekolwiek) kładzie podsypkę pod szynami, po których przejdzie pędzel - kropki
+wzdłuż nich pokazują, gdzie legnie pas, zanim przeciągniesz: **RODZAJ** (łąka, lód, wulkan, pustynia - ten sam, który `B` kładzie pod
 nowe szyny), **SZEROKOSC** (28 px, jak w misjach), **ROZMIAR**, **SILA**, **KRAWEDZ**. Na mapie z
 własnym terenem pas jest wmalowany w obraz, na środku szyn, wzdłuż łuków, rozjazdów i ramp, a
 naklejki podsypki tych szyn znikają (pas jest teraz ich podsypką); na terenie mapy kampanii kładzie
@@ -485,8 +494,9 @@ nim**.
 
 ### 8. Ozdoby
 
-**Dekoracje** z listwy: trawa, krzaki, kwiaty, kamienie, wraki... `[` `]` (albo kliknięcie pozycji)
-wybiera jedną; kliknięcie stawia jedną, przeciąganie rozrzuca je w promieniu (kółko, `+` `-`), nigdy
+**Dekoracje** z listwy: trawa, krzaki, kwiaty, kamienie, wraki... Rząd nad paskiem pokazuje każdą
+z nich (jego strzałki zmieniają strony); kliknięcie tam wybiera jedną, tak samo `[` `]` i kliknięcie
+pozycji. Kliknięcie na mapie stawia jedną, przeciąganie rozrzuca je w promieniu (kółko, `+` `-`), nigdy
 bliżej niż odstęp (`<` `>`). Shift+przeciąganie je zbiera. Drzewa, domy i reszta są we **Wszystkie
 obiekty**.
 
@@ -518,6 +528,8 @@ Menu → **USTAWIENIA MISJI** (albo zębatka na listwie):
   do czasu (przychodzi i odchodzi, mniej więcej co pół minuty) albo cały czas;
 - **błyskawice** - błyska przy czystym niebie; z deszczem tylko, gdy pada; przy śniegu, chmurach i
   meteorytach nie ma ich;
+- **muzyka na początku** i **potem na zmianę z** - dwa pliki z folderu `music` gry: poziom gra pierwszy
+  na starcie, potem oba na zmianę (`mus00` to muzyka zwycięstwa);
 - **atakujących naraz** - ile pociągów wroga atakuje jednocześnie;
 - **przyjazdy pociągów** - ich liczba i przycisk do ich panelu (krok 5); mapa ze starszej wersji ma tu
   **fale posiłków gracza** i **ich pociąg** (numery, np. `5,20`), dopóki nie zostanie przestawiona;
