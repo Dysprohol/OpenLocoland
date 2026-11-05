@@ -2873,6 +2873,10 @@ def check_track(path, objects_res=None, nvid=RAIL_NVID):
     return track_problems(map_rails(model, nvid))
 
 
+# A grid cell more than this below the track height has the rail above it: the track leaves it.
+FLAT_SLACK = 4
+
+
 def track_objects(folder, points, nvid=610, z=None, clear=False, shapes=None,
                   objects_res=None):
     """Lays a rail (VID 610 by default) along a path of rail-network points on an unpacked
@@ -2889,9 +2893,13 @@ def track_objects(folder, points, nvid=610, z=None, clear=False, shapes=None,
     more than six others (the engine's "Too many links" limit). The shape of each step is
     the one that joins; `shapes` picks it by hand. The height is the ground of the rail
     minus 4, where the game's own maps put their rails, unless `z` is given. `clear`
-    removes the old rails of the same VID first. The track flattens the terrain: every
-    8x8 grid cell crossed by a rail takes the track height, and the one-cell buffer around
-    the track is ramped gently toward it, so there are no vertical cliffs under the track.
+    removes the old rails of the same VID first. The track flattens the terrain where it
+    lies on it or under it: an 8x8 grid cell crossed by a rail whose ground is at most
+    FLAT_SLACK below the track height, or above it (a cutting), takes the track height, and
+    such cells of the one-cell buffer around the track are ramped half way toward it, so
+    there are no vertical cliffs under the track. A rail above the ground (a raised track,
+    `--z` over the terrain) leaves the ground under it as it is - the gravel bed gives the
+    embankment's look; the editor's Track tool does the same (editor_edit.cpp FLAT_SLACK).
     Returns the number of rails added."""
     model = load_map(folder)
     if "objects" not in model:
@@ -2927,15 +2935,18 @@ def track_objects(folder, points, nvid=610, z=None, clear=False, shapes=None,
             track_level = grid[int(first[3]) // 8][int(first[2]) // 8]
     segments = plan_track(rails, points, shapes, track_level - 4 + RAIL_ALTITUDE)
 
-    # flatten: every grid cell crossed by a rail takes the track height, and the
-    # one-cell buffer around the track is ramped gently toward it
+    # flatten where the track lies on the ground or under it: a crossed cell takes the
+    # track height, a cell of the one-cell buffer is ramped half way toward it; a cell more
+    # than FLAT_SLACK below the track (the rail above the ground) is left as it is
     track_cells_, buffer = track_cells(segments, width, height)
     new_grid = [row[:] for row in grid]
     for cx, cy in track_cells_:
-        new_grid[cy][cx] = track_level
+        if grid[cy][cx] >= track_level - FLAT_SLACK:
+            new_grid[cy][cx] = track_level
     for cx, cy in buffer:
         original = grid[cy][cx]
-        new_grid[cy][cx] = original + (track_level - original) // 2
+        if original >= track_level - FLAT_SLACK:
+            new_grid[cy][cx] = original + (track_level - original) // 2
     model["grid"] = new_grid
 
     added = 0

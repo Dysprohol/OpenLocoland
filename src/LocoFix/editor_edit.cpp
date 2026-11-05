@@ -384,10 +384,10 @@ struct State {
 // y - z. What it does, as Region_Draw, Region_InitFog and Vid_GetTerrainVariant show:
 //  - fog: between two heights (low, high) of the ground's picture, in its colour (ARGB), over the
 //    rectangle or - flag 8 - over the whole view, pulsing with flag 1 (Graphics_DrawFog);
-//  - an image tiled over it (its VID's own: 750 is the light water's picture) - in play, and in the
-//    held level once the region was saved and loaded; fresh from the palette it shows only its frame
-//    (the created and the loaded object differ in nothing but their times and the high bits of
-//    GameObject.flags; the cause is not found);
+//  - an image tiled over it (its VID's own: 750 is the light water's picture), drawn with the depth
+//    test: it shows only where the ground's picture is lower than the region's z, as the missions'
+//    lakes lie over a lowered bed - on flat ground at the region's own level only its frame shows
+//    (lowering the ground under it with the Ground height tool shows the water there at once);
 //  - six pairs of VIDs: an object of the first VID created in it, less than 25 above it, is made of
 //    the second instead - the missions turn the big and the small explosion (308, 309) into the
 //    explosion on water (338) or on lava (528) there (World_CreateObject); with flag 8 anywhere on
@@ -1306,7 +1306,7 @@ bool pickable(uint8_t* o) {
            c != B_FRAME && c != B_TEXT && c != B_LINKER;
 }
 
-// A point at a region's frame (inside it the objects under the region are picked).
+// A point at a region's frame (inside it the objects under the region are picked first, pick).
 bool on_region_frame(uint8_t* o, float x, float y) {
     const Box b = box_of(o);
     return b.contains(x, y) && !(x > b.l + 2 * REGION_BORDER && x < b.r - 2 * REGION_BORDER && y > b.t + 2 * REGION_BORDER &&
@@ -1318,14 +1318,28 @@ uint8_t* host_of(uint8_t* gun);
 // The object at a point of the map (screen coordinates plus the camera): the smallest box that
 // holds the point, the rails only when nothing else is there; a gun in a socket is its host's part
 // (its panel sets the gun).
+// A region is picked on its frame as any object, and inside its rectangle only when nothing else is
+// there - the last fallback, after the rails (the smallest region holding the point): so a click or the
+// Delete tool takes it anywhere inside, while a region over the whole map or a big marker region does
+// not swallow the objects in it (before 2026-11-05 only its thin frame took a click).
 uint8_t* pick(float x, float y) {
     uint8_t* best = nullptr;
     float best_area = 0;
     bool best_rail = true;
+    uint8_t* inside = nullptr;   // the smallest region whose inside holds the point
+    float inside_area = 0;
     for_each_object([&](uint8_t* o) {
         if (!pickable(o)) return;
         const Box b = box_of(o);
-        if (!b.contains(x, y) || (is_region(o) && !on_region_frame(o, x, y))) return;
+        if (!b.contains(x, y)) return;
+        if (is_region(o) && !on_region_frame(o, x, y)) {
+            const float area = (b.r - b.l) * (b.b - b.t);
+            if (!inside || area < inside_area) {
+                inside = o;
+                inside_area = area;
+            }
+            return;
+        }
         const bool rail = class_of(o) == B_RAIL;
         const float area = (b.r - b.l) * (b.b - b.t);
         if (!best || (best_rail && !rail) || (rail == best_rail && area < best_area)) {
@@ -1334,6 +1348,7 @@ uint8_t* pick(float x, float y) {
             best_rail = rail;
         }
     });
+    if (!best) return inside;
     if (uint8_t* host = host_of(best)) return host;
     return best;
 }
@@ -1430,6 +1445,12 @@ Tool tool() {
 int place_nvid() {
     return is_palette(entry()) ? g_picked_nvid[palette_of(entry())] : entry().nvid != 0 ? entry().nvid : decal_nvid();
 }
+// A palette's entry (All objects, Vehicles) with nothing picked in it - the palette closed without a pick
+// (Esc, BACK TO THE MAP, the entry's tile again). Its nvid is 0 then, and VID 0 is the engine's hourglass
+// (the loading animation), which must not show as the object to place: no preview, no Place hint; the
+// status line says nothing is picked and a click opens the palette again (place).
+bool nothing_picked(const Entry& e) { return e.tool == Tool::Place && is_palette(e) && g_picked_nvid[palette_of(e)] <= 0; }
+bool nothing_picked() { return nothing_picked(entry()); }
 // The army of what is placed: the palette's row (or the one the missions give the object picked), the
 // bar's entries their own.
 int place_army() {
@@ -2281,6 +2302,10 @@ void turn(int steps) {
         MESSAGE("MsgDirection", "direction %d", g_place_direction);
         return;
     }
+    if (tool() == Tool::Place && nothing_picked()) {
+        MESSAGE("MsgNothingPicked", "nothing picked - a click opens the palette");
+        return;
+    }
     if (tool() == Tool::Place) {
         float sx, sy, wx, wy, wz;
         int wd;
@@ -2925,6 +2950,10 @@ constexpr float EMBANKMENT_DEPTH = 28;
 constexpr int SWAMP_LIFT = 29;   // a new swamp line: its level above the ground (the rails 28 above it)
 int g_rail_kind = 0;
 int g_ramp = 0;                  // the rails laid climb (1), descend (-1) or stay flat (0) - a mode, until changed
+// A cell whose ground is more than this below a new rail's level has the rail above it (raised): the
+// Track tool leaves it. Within it the rail lies on the ground (its level the ground's, the rails 4
+// below the surface - l11: the GRID 6 above its rails), and the cell goes to the level.
+constexpr int FLAT_SLACK = 4;
 
 bool swamp_rail(int nvid) { return nvid == 600 || nvid == 601; }
 bool destroyed_rail(int nvid) { return nvid == 611 || nvid == 601; }
@@ -3216,9 +3245,14 @@ void lay_step() {
         const rail::Segment& seg = s.segments[k];
         const rail::Point from = s.points[k], to = s.points[k + 1];
         const int ramp = g_ramp;
-        // the ground (not under a swamp rail: its embankment stands on the swamp): the cells the rail
-        // crosses to the level - along a ramp sloping to the level 11 higher or lower -, those around
-        // half way to it
+        // the ground (not under a swamp rail: its embankment stands on the swamp): only where the rail
+        // lies on it or under it - the cells it crosses whose ground was at most FLAT_SLACK below its
+        // level, or above it (a cutting), go to the level (along a ramp sloping with it), the cells
+        // around them half way. A rail above the ground (a ramp's climb, a raised line, a dip under a
+        // line) leaves the ground as it was: the authors' pictures have the embankment painted in, and
+        // here the bed (its decal, or the Paint tool's GRAVEL BED band, which follows the rail's height)
+        // gives it - raising the GRID made a ridge in the picture's relief with ragged edges (the
+        // user's rule of 2026-11-05).
         auto level_at = [&](const rail::Cell& c) {
             const double ux = to.x - from.x, uy = to.y - from.y, len2 = ux * ux + uy * uy;
             double t = len2 > 0 ? ((c.first * 8 + 4 - from.x) * ux + (c.second * 8 + 4 - from.y) * uy) / len2 : 0;
@@ -3232,16 +3266,19 @@ void lay_step() {
             if (it == g_line_original.end()) it = g_line_original.emplace(c, ground_cell(c.first, c.second)).first;
             return it->second;
         };
+        auto on_ground = [&](const rail::Cell& c) { return original(c) >= level_at(c) - FLAT_SLACK; };
         std::vector<GridChange> here;
         if (!swamp) {
             for (const rail::Cell& c : cells) {
                 original(c);
                 g_line_cells.insert(c);
+                if (!on_ground(c)) continue;   // the rail above the ground: it stays
                 const short before = ground_cell(c.first, c.second);
                 if (before != level_at(c)) here.push_back({c.first, c.second, before, level_at(c)});
             }
             for (const rail::Cell& c : buffer) {
                 if (g_line_cells.count(c)) continue;   // a cell of the track stays at its level
+                if (!on_ground(c)) continue;
                 const short before = ground_cell(c.first, c.second);
                 const short after = static_cast<short>(rail::ramp(original(c), level_at(c)));
                 if (before != after) here.push_back({c.first, c.second, before, after});
@@ -3504,6 +3541,12 @@ rail::Cell cursor_cell(float& x, float& y) {
     return {static_cast<int>(std::floor(x / 8)), static_cast<int>(std::floor(y / 8))};
 }
 
+// The Ground height tool and the track (its row's TRACK: NOT COVERED / COVERED): by default the cells
+// under the rails and their ring keep their height (the rails stay in sight in a cutting, a raised
+// line keeps the ground under it), COVERED lets the brush change them too - the terrain goes over
+// the track freely (the rails may sink under it; the Track tool's own flattening is not undone).
+bool g_track_covered = false;
+
 std::set<rail::Cell> track_cells() {
     std::vector<rail::Segment> segments;
     for (const RailObject& r : map_rails()) {
@@ -3530,7 +3573,7 @@ void start_height_stroke(bool right) {
     g_stroke.brush = right ? Brush::Lower : g_brush;
     if (shift_down()) g_stroke.brush = Brush::Flatten;   // for the stroke, the mode stays
     else if (g_ctrl || GetKeyState(VK_CONTROL) < 0) g_stroke.brush = Brush::Smooth;
-    g_stroke.track = track_cells();
+    if (!g_track_covered) g_stroke.track = track_cells();   // the track's cells and their ring stay as they are
     float x, y;
     const rail::Cell c = cursor_cell(x, y);
     const int here = in_grid(c) ? ground_cell(c.first, c.second) : 0;
@@ -5611,9 +5654,121 @@ void give_building_line(uint8_t* o) {
 // each is one step of the history as it stands; the brush's repeat timer stops.
 HWND g_window = nullptr;   // the window of the timer
 
+// ---- the Delete tool's sweep ----
+//
+// While the left button is held in the Delete tool every object the cursor passes over goes, as the
+// click takes one: the object under the cursor (pick: the smallest, rails only when nothing else is
+// there), with its group (a fort's guns), Shift on a rail its section, a car alone. The path between
+// two mouse messages is walked in steps of a few px, so a quick move leaves nothing out; under the bar,
+// a panel or the rows nothing goes, and the sweep goes on where the cursor comes out. Each deletion is a
+// step of delete_objects (the beds, the cars and crates on the track, the push lines, the arrivals with
+// it); when the button is let go the steps of the sweep become one step of the history (merge_steps).
+
+struct Sweep {
+    bool active = false;
+    POINT last = {};     // the cursor's last point (logical px)
+    bool gap = false;    // over the bar or the rows: the next point starts anew
+    unsigned steps = 0;  // the steps of the history it made
+    unsigned objects = 0;
+};
+Sweep g_sweep;
+
+// The last `n` steps of the history as one (`what`): each object its first state before and its last
+// after, the push lines, arrivals, factories and start trains from the first step that changed them to
+// the last.
+void merge_steps(unsigned n, const UiText& what) {
+    if (n < 2 || g_undo.size() < n) return;
+    Operation merged{what, {}, {}, false, {}, {}};
+    std::map<uint8_t*, size_t> index;
+    for (size_t k = g_undo.size() - n; k < g_undo.size(); ++k) {
+        const Operation& op = g_undo[k];
+        for (const Change& c : op.changes) {
+            const auto it = index.find(c.object);
+            if (it == index.end()) {
+                index[c.object] = merged.changes.size();
+                merged.changes.push_back(c);
+            } else {
+                merged.changes[it->second].after = c.after;
+            }
+        }
+        for (const GridChange& g : op.grid) merged.grid.push_back(g);
+        if (op.lines) {
+            if (!merged.lines) merged.lines_before = op.lines_before;
+            merged.lines = true;
+            merged.lines_after = op.lines_after;
+        }
+        if (op.arrivals) {
+            if (!merged.arrivals) merged.arrivals_before = op.arrivals_before;
+            merged.arrivals = true;
+            merged.arrivals_after = op.arrivals_after;
+        }
+        if (op.factories) {
+            if (!merged.factories) merged.factories_before = op.factories_before;
+            merged.factories = true;
+            merged.factories_after = op.factories_after;
+        }
+        if (op.start) {
+            if (!merged.start) merged.start_before = op.start_before;
+            merged.start = true;
+            merged.start_after = op.start_after;
+        }
+    }
+    g_undo.resize(g_undo.size() - n);
+    g_undo.push_back(merged);
+}
+
+// What a click of the Delete tool at the map point takes, and its deletion (one step of the history).
+bool delete_at(float x, float y) {
+    uint8_t* o = pick(x, y);
+    if (!o) return false;
+    const std::vector<uint8_t*> chosen = shift_down() && class_of(o) == B_RAIL ? section_of(o)
+                                         : is_car(o) && !shift_down()          ? std::vector<uint8_t*>{o}
+                                                                               : group_of(o);
+    delete_objects(chosen);
+    if (g_sweep.active) {
+        ++g_sweep.steps;
+        g_sweep.objects += static_cast<unsigned>(chosen.size());
+    }
+    return true;
+}
+
+void start_sweep(POINT p) {
+    g_sweep = Sweep();
+    g_sweep.active = true;
+    g_sweep.last = p;
+    uint8_t* w0 = world();
+    delete_at(at<float>(w0, W_CAMERA_X) + p.x, at<float>(w0, W_CAMERA_Y) + p.y);
+}
+
+// The cursor moved with the button held: what lies along the way from the last point goes.
+void sweep_to(POINT p) {
+    if (!g_sweep.active) return;
+    if (g_sweep.gap) {
+        g_sweep.gap = false;
+        g_sweep.last = p;
+    }
+    uint8_t* w0 = world();
+    const float cx = at<float>(w0, W_CAMERA_X), cy = at<float>(w0, W_CAMERA_Y);
+    const float dx = static_cast<float>(p.x - g_sweep.last.x), dy = static_cast<float>(p.y - g_sweep.last.y);
+    const int n = (std::max)(1, static_cast<int>(std::ceil(std::sqrt(dx * dx + dy * dy) / 4)));
+    for (int i = 1; i <= n; ++i)
+        delete_at(cx + g_sweep.last.x + dx * i / n, cy + g_sweep.last.y + dy * i / n);
+    g_sweep.last = p;
+}
+
+void end_sweep() {
+    if (!g_sweep.active) return;
+    const Sweep s = g_sweep;
+    g_sweep = Sweep();
+    if (s.steps < 2) return;   // a click: its own step and message
+    merge_steps(s.steps, {"OpDeleteSweep", "delete (a sweep)"});
+    MESSAGE("MsgDeletedSweep", "deleted %u objects in one sweep (one step of the history)", s.objects);
+}
+
 void end_strokes() {
     if (g_window) KillTimer(g_window, HEIGHT_TIMER);
     end_drag();
+    end_sweep();
     if (g_stroke.active && tool() == Tool::Height) {
         if (g_stroke.brush == Brush::Ramp) ramp_apply();
         end_height_stroke();
@@ -6062,7 +6217,7 @@ void draw_ground_tool(bool heights) {
     const rail::Cell c = cursor_cell(x, y);
     char text[160];
     if (heights) {
-        const std::set<rail::Cell> track = g_stroke.active ? g_stroke.track : track_cells();
+        const std::set<rail::Cell> track = g_stroke.active ? g_stroke.track : g_track_covered ? std::set<rail::Cell>() : track_cells();
         const int reach = g_radius;   // the brush's cells (the contours show the rest)
         for (int dy = -reach; dy <= reach; ++dy)
             for (int dx = -reach; dx <= reach; ++dx) {
@@ -6591,7 +6746,7 @@ void set_hints(bool on) {
 const char* hint_of(Tool t) {
     switch (t) {
     case Tool::Select: return ui_text("HintSelect", "click: select, drag: move, right: its panel, R / E: turn");
-    case Tool::Delete: return ui_text("HintDelete", "click: delete, Shift+click on a rail: its section");
+    case Tool::Delete: return ui_text("HintDelete", "click / drag: delete, Shift+click on a rail: its section");
     case Tool::Track: return ui_text("HintTrack", "click: start / end, wheel: ramp, V: kind, middle: delete a rail");
     case Tool::Place: return ui_text("HintPlace", "click: place, R / E: turn, Shift: where the cursor is");
     case Tool::Decals: return ui_text("HintDecals", "click / drag: scatter, R / E: turn, [ ]: decal, Shift: take away");
@@ -6601,7 +6756,7 @@ const char* hint_of(Tool t) {
         return g_paint_bed ? ui_text("HintBed", "drag along the rails: gravel bed, right: original back")
                            : ui_text("HintPaint", "drag: paint, right: original back, Alt+click: pipette");
     case Tool::Water: return ui_text("HintWater", "drag: water, Shift: take away, W: kind");
-    case Tool::Region: return ui_text("HintRegion", "drag: its rectangle, right on its frame: its panel");
+    case Tool::Region: return ui_text("HintRegion", "drag: its rectangle, right on it: its panel");
     default: return nullptr;
     }
 }
@@ -6614,12 +6769,15 @@ void draw_hint() {
         return;
     }
     if (!hints_on() || now - g_hint_rest < HINT_DELAY || g_mouse.x < 0 || panel_open() || g_drag.active || g_stroke.active ||
-        g_gstroke.active || GetKeyState(VK_LBUTTON) < 0 || GetKeyState(VK_RBUTTON) < 0)
+        g_gstroke.active || g_sweep.active || GetKeyState(VK_LBUTTON) < 0 || GetKeyState(VK_RBUTTON) < 0)
         return;
     const float mx = static_cast<float>(g_mouse.x), my = static_cast<float>(g_mouse.y);
     const int entry_under = bar_entry_at(mx, my);
     if (entry_under < 0 && (on_bar(mx, my) || on_options(mx, my))) return;   // the plates, the rows, the music
-    const char* text = hint_of(entry_under >= 0 ? ENTRIES[entry_under].tool : tool());
+    const Entry& hinted = entry_under >= 0 ? ENTRIES[entry_under] : entry();
+    const char* text = nothing_picked(hinted) && (entry_under >= 0 || tool() == Tool::Place)
+                           ? ui_text("HintChoose", "click: choose an object in the palette")
+                           : hint_of(entry_under >= 0 ? ENTRIES[entry_under].tool : tool());
     uint8_t* font = vid_by_number(FONT_TIPS);
     if (!text || !*text || !font) return;
     const std::string shown = std::string(" ") + text + " ";
@@ -6842,6 +7000,15 @@ std::vector<OptionGroup> option_groups() {
         groups.push_back(option_number({"OptSize", "SIZE:"}, g_radius, 0, MAX_RADIUS, 1, "MsgRadius", "radius %d"));
         groups.push_back(option_number({"OptStrength", "STRENGTH:"}, g_strength, MIN_STRENGTH, MAX_STRENGTH, 1, "MsgStrength", "strength %d"));
         groups.push_back(option_edge(g_hard_edge));
+        groups.push_back({option_label({"OptTrackCover", "TRACK:"}),
+                          option_button({"OptTrackKept", "NOT COVERED"}, !g_track_covered, [] {
+                              g_track_covered = false;
+                              MESSAGE("MsgTrackKept", "ground: the track's cells keep their height (the rails stay in sight)");
+                          }),
+                          option_button({"OptTrackCovered", "COVERED"}, g_track_covered, [] {
+                              g_track_covered = true;
+                              MESSAGE("MsgTrackCovered", "ground: the brush changes the track's cells too (the terrain may cover the rails)");
+                          })});
     } else {
         // two things: painting a texture anywhere, or laying the gravel bed along the rails - the mode
         // first, then only that mode's options (the textures, or the bed's kind and width)
@@ -7590,7 +7757,11 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
         // the rectangle with it) - so OVER, not FOG OVER
         rows.push_back({{"CtxFogOver", "OVER:"},
                         {{{"CtxFogRegion", "THE REGION"}, !(flags & 8), [o] { region_change(o, [o] { at<uint32_t>(o, RG_FLAGS) &= ~8u; }); }},
-                         {{"CtxFogView", "THE WHOLE MAP"}, (flags & 8) != 0, [o] { region_change(o, [o] { at<uint32_t>(o, RG_FLAGS) |= 8u; }); }},
+                         {{"CtxFogView", "THE WHOLE MAP"}, (flags & 8) != 0, [o] {
+                              region_change(o, [o] { at<uint32_t>(o, RG_FLAGS) |= 8u; });
+                              if (region_splash(o))   // flag 8 widens the pairs too (Vid_GetTerrainVariant)
+                                  MESSAGE("MsgFogWholePairs", "region: over the whole map its explosions become splashes everywhere too");
+                          }},
                          {{"CtxPulse", "PULSING"}, (flags & 1) != 0, [o] { region_change(o, [o] { at<uint32_t>(o, RG_FLAGS) ^= 1u; }); }}}});
         rows.push_back({{"CtxDelete", "DELETE (DEL):"},
                         {{{"CtxDeleteIt", "DELETE"}, false, [o] {
@@ -7987,6 +8158,8 @@ void draw_overlay() {
                     circle(d, 0);
             }
             cursor = CURSOR_DELETE;
+        } else if (tool() == Tool::Place && nothing_picked()) {   // a palette's entry, nothing picked: no preview
+            g_place_status = ui_text("StatusNothingPicked", "nothing picked - a click opens the palette to choose an object");
         } else if (tool() == Tool::Place && vid_by_number(place_nvid()) &&
                    at<int>(vid_by_number(place_nvid()), V_CLASS) == B_ENGINE) {   // a car: on the track
             uint8_t* v = vid_by_number(place_nvid());
@@ -8098,6 +8271,8 @@ void draw_overlay() {
                       palette && object_name(shown_nvid) ? object_name(shown_nvid) : label_of(shown), shown_nvid,
                       vid_by_number(shown_nvid) ? to_step(g_place_direction, at<int>(vid_by_number(shown_nvid), V_ND_DIR))
                                                 : g_place_direction);
+    else if (nothing_picked(shown))
+        std::snprintf(tool_text, sizeof tool_text, ui_format("StatusToolNothing", "%s: nothing picked"), label_of(shown));
     else
         std::snprintf(tool_text, sizeof tool_text, "%s", label_of(shown));
     if (shown.tool == Tool::Place && shown_nvid > 0 && palette && &shown == &entry()) {   // the palette's army
@@ -8125,10 +8300,10 @@ void draw_overlay() {
     }
     if (tool() == Tool::Region)
         status_line(v.l, v.t + LINE_HEIGHT,
-                    ui_text("StatusRegion", "Region: drag its rectangle on the map; the right button on its frame opens its panel"));
+                    ui_text("StatusRegion", "Region: drag its rectangle on the map; the right button on a region opens its panel (Select and Delete take one by a click inside)"));
     if (tool() == Tool::Delete)
         status_line(v.l, v.t + LINE_HEIGHT,
-                    ui_text("StatusDelete", "Delete: a click deletes the object under the cursor; Shift+click on a rail deletes its section, up to a junction or an end"));
+                    ui_text("StatusDelete", "Delete: a click or a drag deletes the objects under the cursor; Shift+click on a rail deletes its section, up to a junction or an end"));
     if (tool() == Tool::Place && !g_place_status.empty() && !under)
         status_line(v.l, v.t + LINE_HEIGHT, g_place_status.c_str());
     if (tool() == Tool::Select && !g_selection.empty() && liftable(g_selection[0]))   // the selected object's height
@@ -8209,7 +8384,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
     // the button let go ends a stroke or a drag whoever takes the message: a panel opened during a
     // stroke (F1) took it, and a Paint stroke - which has no repeat timer to notice - went on painting
     // under the panel and after it, with no button held, until the next click
-    if ((m == WM_LBUTTONUP || m == WM_RBUTTONUP) && (g_stroke.active || g_gstroke.active || g_drag.active) && panel_open())
+    if ((m == WM_LBUTTONUP || m == WM_RBUTTONUP) && (g_stroke.active || g_gstroke.active || g_drag.active || g_sweep.active) && panel_open())
         end_strokes();
     if (m == WM_LBUTTONDOWN && music_click(logical(l))) return true;   // the music player, also over an open panel
     if (panel_message(window, m, w, g_mouse)) return true;   // the Help and Menu buttons, an open panel
@@ -8221,9 +8396,10 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             on_options(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
             // nothing is painted or raised unseen under a panel, the bar or the rows; the stroke goes on
             // where the cursor comes out (not along the way under them)
-            g_stroke.gap = g_gstroke.gap = true;
+            g_stroke.gap = g_gstroke.gap = g_sweep.gap = true;
             return false;
         }
+        if (g_sweep.active) sweep_to(g_mouse);
         if (g_stroke.active && tool() == Tool::Height) height_step();
         if (g_stroke.active && tool() == Tool::Decals) decal_step(false);
         if (g_gstroke.active) ground_step(false);
@@ -8301,11 +8477,9 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             float px, py;
             mouse_on_map(px, py);
             push_click(static_cast<int>(px), static_cast<int>(py));
-        } else if (tool() == Tool::Delete) {
-            if (uint8_t* o = pick(x, y))
-                delete_objects(shift_down() && class_of(o) == B_RAIL ? section_of(o)
-                               : is_car(o) && !shift_down()                                         ? std::vector<uint8_t*>{o}
-                                                                                                    : group_of(o));
+        } else if (tool() == Tool::Delete) {   // a click, and a sweep while the button is held
+            start_sweep(g_mouse);
+            if (!g_test) SetCapture(window);
         } else if (g_patrol_train && !removed(g_patrol_train)) {   // the patrol's point
             uint8_t* c = g_patrol_train;
             g_patrol_train = nullptr;
@@ -8375,6 +8549,16 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
                 if (!g_test) SetCapture(window);
             }
             return true;
+        }
+        if (tool() == Tool::Region && !on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)) &&
+            !on_options(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {   // a region's panel: the right button on it
+            uint8_t* w0 = world();
+            uint8_t* o = pick(at<float>(w0, W_CAMERA_X) + g_mouse.x, at<float>(w0, W_CAMERA_Y) + g_mouse.y);
+            if (o && is_region(o)) {
+                select(o);
+                open_context(o);
+                return true;
+            }
         }
         if (tool() == Tool::Select && !on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
             if (arrival_marker_click(g_mouse) || start_mark_click()) {

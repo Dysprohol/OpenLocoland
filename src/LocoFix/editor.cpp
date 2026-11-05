@@ -301,8 +301,13 @@ float g_run_view_x = 0, g_run_view_y = 0;   // the view's top-left before the ru
 
 void load_map(const std::string& path);
 
+bool music_stream_playing();
+
 void stop_running() {
     g_running = false;
+    // what the run played last (a level's music list, editor_mission.cpp: none - nothing plays)
+    patch::log("editor: the run ends - its music %s, %s", *music_file_name() ? music_file_name() : "none",
+               music_stream_playing() ? "playing" : "not playing");
     stop_music();
     patch::log("editor: the level is held again - %s loaded", g_run_map.c_str());
     load_map(g_run_map);

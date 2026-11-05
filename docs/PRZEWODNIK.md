@@ -208,7 +208,7 @@ Co widać:
 | obrót | R / E albo kółko myszy |
 | wyżej / niżej | PgUp / PgDn o 4 (z Shift o 16) albo Shift+kółko; Home stawia z powrotem na ziemi - wiersz stanu pokazuje wysokość nad ziemią |
 | zmiana armii | A: nasi, wróg, neutralni, piraci - flagi zmieniają kolor (przy stawianiu A ustala armię następnego obiektu) |
-| usunięcie | Del (Shift+Del: cały pociąg; Shift+klik narzędziem Usun: cały odcinek toru) |
+| usunięcie | Del (Shift+Del: cały pociąg); narzędzie Usun: kliknięcie, albo przeciągnięcie z wciśniętym przyciskiem usuwa wszystko, nad czym przejdzie kursor (jeden krok cofania); Shift+klik: cały odcinek toru |
 | cofnij / ponów | Ctrl+Z / Ctrl+Y - każdą zmianę; pamięta ostatnie 500 kroków |
 | panel obiektu | prawy przycisk myszy na nim |
 
@@ -283,7 +283,9 @@ wysokościami: wzgórze widać jako wzgórze z cieniem i zasłania to, co stoi z
 (obraz zapisuje się z mapą; na terenie misji kampanii staje się własnym obrazem mapy). Poziomice co
 4 poziomy pokazują wysokości, gdy narzędzie jest wybrane; `H` pokazuje je przy każdym narzędziu.
 **Wyrównywanie** bierze poziom miejsca, w którym zaczynasz - zacznij na torze, żeby zrobić płaskowyż
-na wysokości toru - albo poziom pobrany przez Alt+klik. Obiekty zostają na ziemi; torów i terenu tuż przy nich narzędzie nie rusza.
+na wysokości toru - albo poziom pobrany przez Alt+klik. Obiekty zostają na ziemi; torów i terenu tuż przy nich narzędzie nie rusza - **TORY: NIE ZASLANIANE**
+w jego wierszu -, więc szyny zostają widoczne w wykopie; **ZASLANIANE** pozwala pędzlowi zmieniać i je,
+a teren może przykryć szyny.
 
 Obiekt może też stać wyżej albo niżej sam: zaznacz go i naciśnij `PgUp` / `PgDn` (albo Shift+kółko,
 albo WYSOKOSC w jego panelu); `Home` stawia go z powrotem na ziemi. Wagony i szyny zostają na torach.
@@ -316,7 +318,9 @@ od linii przez Y, prosty odcinek kończący się **ślepym końcem**.
 Rząd nad paskiem wybiera rodzaj następnych szyn - zwykłe, bagienne (na nasypie), zniszczone albo
 zniszczone bagienne, każdy pokazany swoją szyną - i czy szyny idą w górę, płasko albo w dół; `V`
 też przełącza rodzaje. `PgUp` / `PgDn` albo kółko myszy sprawiają, że każda kładziona szyna wznosi się albo opada o stopień po poprzedniej, dopóki tego nie zmienisz (rampy na
-wyższy teren: każda rampa to 11 poziomów; wiersz stanu pokazuje poziom). Linię na wzgórze najpierw wprowadź po rampach, potem podnieś teren
+wyższy teren: każda rampa to 11 poziomów; wiersz stanu pokazuje poziom). Szyny na ziemi mają teren
+tuż nad sobą (wzgórze na ich drodze zostaje ścięte do nich); rampa albo podniesiona linia zostawia teren
+pod sobą taki, jaki był, i stoi na podsypce, która wygląda jak nasyp. Linię na wzgórze najpierw wprowadź po rampach, potem podnieś teren
 wokół jej końca i wyrównaj go, zaczynając na torze. `B` wybiera podsypkę pod nowe szyny. Kliknięcie
 kółkiem, Del albo narzędzie Usun usuwa szynę; Shift+klik narzędziem Usun usuwa cały odcinek.
 
@@ -512,9 +516,13 @@ szczytem, maszt albo dworzec z flagą, kominy z dymem albo poświatą, szyb naft
 (piraci) stoi w poprzek toru i co 25 sekund gryzie wszystko poza swoją armią; jego panel mówi, kiedy
 staje - gdy padną wieże jego armii, albo nigdy. **Scylla** (bagno) na ukośnym torze gryzie każdego co
 15 sekund. Gdy padną wieże piratów, świdry się łamią. **Region** (listwa): przeciągnij jego prostokąt; jego panel ustawia mgłę (mgła, pył,
-opar, poświata) i rozpryski, nad nim albo nad całą mapą; stworzenie postawione w środku trzyma się go.
-Temat **Efekty** we Wszystkich obiektach ma region jasnej wody (wygląd jeziora) i region z kręgami w
-deszczu.
+opar, poświata) i rozpryski, nad nim albo nad całą mapą; stworzenie postawione w środku trzyma się go. Klik w środku regionu, gdzie nic innego nie stoi, zaznacza go (narzędzie Usun i `Del` go usuwają, prawy przycisk otwiera jego panel).
+Mgła (wiersz **NAD** osobno) jest najgęstsza nisko, obiekty z niej wystają: nad regionem przybiera
+kształt zagłębienia (dna jeziora), na płaskim terenie to zabarwiony prostokąt; **NAD: CAŁĄ MAPĄ** robi z
+niej mgiełkę nad całym widokiem, jak w misjach 7, 13 i 18 (zamienia też wybuchy regionu w pluski na całej
+mapie). Temat **Efekty** we Wszystkich obiektach ma region
+jasnej wody (wygląd jeziora) i region z kręgami w deszczu; woda widać tylko tam, gdzie teren pod nią
+jest niżej niż region (obniż go wysokością terenu albo połóż jezioro narzędziem wody).
 
 ### 9. Zobacz, jak działa
 
@@ -536,8 +544,10 @@ Menu → **USTAWIENIA MISJI** (albo zębatka na listwie):
   do czasu (przychodzi i odchodzi, mniej więcej co pół minuty) albo cały czas;
 - **błyskawice** - błyska przy czystym niebie; z deszczem tylko, gdy pada; przy śniegu, chmurach i
   meteorytach nie ma ich;
-- **muzyka na początku** i **potem na zmianę z** - dwa pliki z folderu `music` gry: poziom gra pierwszy
-  na starcie, potem oba na zmianę (`mus00` to muzyka zwycięstwa);
+- **muzyka, grana po kolei** - lista plików z folderu `music` gry: wybierz plik z listy rozwijanej i
+  **dodaj** go (za plikiem wybranym na liście albo na końcu), **usuń**, **w górę** i **w dół** zmieniają
+  listę; poziom gra je od pierwszego, w kółko, jeden plik gra bez końca, a pusta lista to brak muzyki
+  (`mus00` to muzyka zwycięstwa);
 - **atakujących naraz** - ile pociągów wroga atakuje jednocześnie;
 - **przyjazdy pociągów** - ich liczba i przycisk do ich panelu (krok 5); mapa ze starszej wersji ma tu
   **fale posiłków gracza** i **ich pociąg** (numery, np. `5,20`), dopóki nie zostanie przestawiona;
@@ -593,7 +603,7 @@ gry (`l01`-`l20`, `sandbox`, `template`, `script`, `outro`).
 | Klawisz | Narzędzie | |
 |---|---|---|
 | 1 | Zaznacz | zaznaczanie, przeciąganie, obrót, armia, panel |
-| 2 | Usun | kliknięcie usuwa; Shift+klik na szynie: jej odcinek |
+| 2 | Usun | kliknięcie usuwa; przeciągnięcie z wciśniętym przyciskiem usuwa wszystko po drodze (jeden krok cofania); Shift+klik na szynie: jej odcinek |
 | 3 | Tory | kładzie szyny (V rodzaj, PgUp/PgDn albo kółko rampa, B podsypka) |
 | 4 | Linia jednokierunkowa | linia na torze w jedną stronę |
 | 5 | Fabryka | na ślepym końcu, z linią wyjazdu |

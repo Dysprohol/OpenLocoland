@@ -699,9 +699,13 @@ links: every point of the 20 missions): a rail laid twice, a rail point with mor
 links, and a joint where several rails end but a rail end has no rail ending the opposite way at
 its height (a dead end of two rails, or rails at different heights) - the sandbox and the
 editor's tracks pass it; the missions have a few (BUGS.md, Quirks). Every grid cell crossed by a rail
-is flattened to the track height and the one-cell buffer around it is ramped toward it,
-so there are no cliffs under the track -- the rail sits 4 px below the ground surface,
-as in the game's own maps. Objects go in with
+whose ground is at most `FLAT_SLACK` 4 below the track height, or above it (a cutting), is
+flattened to the track height and such cells of the one-cell buffer around it are ramped half way
+toward it, so there are no cliffs under the track -- the rail sits 4 px below the ground surface,
+as in the game's own maps; a rail above the ground (`--z` over the terrain, a track continuing a
+raised rail) leaves the ground under it as it is, as the editor's Track tool does (since 2026-11-05;
+checked on a copy of POLIGON: a track on its flat ground and one at `--z 88` changed no cell, one
+through a hill of 80 cut it to 70 with a ring of 75). Objects go in with
 `place <folder> <nvid> <x> <y> --from <a mission map> --objects <game>\objects.res` -- it
 copies the object's state (army, behave, items) from the reference map so the level starts.
 
@@ -1701,14 +1705,14 @@ with the engine's own pieces (scripts and object updates are off, so nothing els
 
 | Action | Keys and mouse | How |
 |---|---|---|
-| select | a click on an object (the smallest one under the cursor; rails only when nothing else is there) | the selection circle VID 460 ("Select Unit Circle", its outline frame) is drawn under it and the guns in its sockets |
+| select | a click on an object (the smallest one under the cursor; rails only when nothing else is there, a region inside its rectangle only when not even a rail is - on its frame as any object; since 2026-11-05, before only the frame took it, so a region was hard to pick or delete; the Delete tool's click and sweep and the Region tool's right button, which opens its panel, the same) | the selection circle VID 460 ("Select Unit Circle", its outline frame) is drawn under it and the guns in its sockets |
 | its panel | the right button on an object (Select tool) | the object's panel (below): army, turn, delete, a semaphore's colour and line, the gun in each socket |
 | move | drag a selected object | `Object_MoveTo` (what `ACT_CHANGE_COOR` 63 calls); the height follows the ground (`World_GetGroundZForVid`), keeping the object's own height above it |
 | height | PgUp / PgDn by 4 (Shift: 16) or Shift+wheel, Home back on the ground; HEIGHT: LOWER / RAISE / ON THE GROUND in its panel | the object and its guns `Object_MoveTo` by the change of its height above the ground (z less `World_GetGroundZForVid` under it), -32 to 400; shown in the status line ("height above the ground: N") and after "selected"; saved as its SPR z ("The relief and the heights of objects" below) |
 | turn | R / E, the mouse wheel, Edit > Turn right / left or the panel's TURN | by what is turned (`turn` in `editor_edit.cpp`, help page 15): `Object_SetDirection` by one of the VID's `nDir` directions, R right and E left - the guns in its sockets go to their new places, a semaphore's lamp halo (VID 154) is turned with it so the light spot it links (155) moves with it, a decal's directions are its looks, an object of one direction (the citadel, a crate, a region) says so; turned round, R and E alike - a train (`Train_Reverse`), a wreck on the track, a post beside a track (across the track, below), in the Push line tool the selected line; turned by its track - a factory, a repair point (drag it along the track; the panel's TURN row says BY ITS TRACK); a rail is not turned (laid again), and the Track tool turns nothing. Before placing, R / E turn the preview: a step of the VID's directions (the direction placed is one of its frames: a direction left from an object of more directions is rounded to them), round for a car or a post, and an object the track turns says so |
 | army | A (0 -> 1 -> 2 -> 3: ours, enemy, neutral, pirates) | `ACT_SET_ARMY` 97; the armies' colours as in play (below) |
 | semaphore red / green | T | red is the command `10,0,0,0` (MAP_RULES.md 7), shown with that animation - also the red posts of a loaded map, whose first command never runs on a held level (the command stays as it is); a post's own line changes with it ("On the track") |
-| delete | Del, or the Delete tool of the bar (the filled circle marks what a click takes, the cursor is the game's delete cursor; its status line says so); Shift+Del or Shift+click on a rail: its section, as far as one rail continues it at each end (up to a junction or an end) - the strip's "Delete a section of track" tool, which did only that, is gone | `ACT_UNDO_REMOVE` 132 - made for the authors' MapEdit: the object leaves the layer lists (not drawn, not updated, not saved; a train car leaves its rail points and couplings); a rail also leaves the rail network (below) |
+| delete | Del, or the Delete tool of the bar (the filled circle marks what a click takes, the cursor is the game's delete cursor; its status line says so) - a click, or a sweep: with the button held every object the cursor passes over goes as a click would take it (the way between two mouse messages walked in 4 px steps, nothing under the bar, a panel or the rows; `start_sweep` / `sweep_to`, captured like the ground tools' strokes), and the sweep's deletions become one step of the history when the button is let go (`merge_steps`: each object its first state before and its last after, the push lines and arrivals from the first step to the last); Shift+Del or Shift+click on a rail: its section, as far as one rail continues it at each end (up to a junction or an end) - the strip's "Delete a section of track" tool, which did only that, is gone | `ACT_UNDO_REMOVE` 132 - made for the authors' MapEdit: the object leaves the layer lists (not drawn, not updated, not saved; a train car leaves its rail points and couplings); a rail also leaves the rail network (below) |
 | undo / redo | Ctrl+Z / Ctrl+Y | every change keeps the state of the objects it touched before and after (position, direction, army, present, red); undo puts the "before" back - a deleted object returns with `ACT_UNDO_INSERT` 133 - and redo the "after"; the last 500 steps are kept, at most 256 MB of them (below) |
 | place | the bar at the bottom: 1-0 or a click picks an entry, a click on the map places it, Esc or the right button go back to selecting | World `CreateObject` at the point under the cursor on the ground - over other objects too ("Placing over objects, the track as a help" below); a preview of the object (its own sprite in the chosen direction, `Graphics_DrawVid`) follows the cursor, the status line says where it goes |
 
@@ -1855,10 +1859,20 @@ heights (`rail::rail_of`), so a line starts at a ramp's end as well, and the rul
 rails whose points are at the line's height. A line continuing a rail takes the height of its
 rail point there (and its VID); a new one
 the ground under its first rail - the rails stand 4 below the ground - and the ground is flattened
-the way `map_tool.py track` does: the cells a rail crosses get the track's level, the cells around
-them half the way, from their height before the line (so a line laid in one go gives exactly
-map_tool's grid; checked on the template map), written with `World_SetGroundZ` and undone with
-the rail. Extern 81 `ReCalcGridZ(int unit)`, which `export.lgc` describes as recalculating the
+only where the rail lies on it or under it: a cell the rail crosses whose ground was at most
+`FLAT_SLACK` 4 below the track's level, or above it (a cutting), gets the level, the cells around such
+cells half the way, from their height before the line (the same rule as `map_tool.py track`'s, so a
+flat line laid in one go gives its grid); written with `World_SetGroundZ` and undone with the rail. A rail above the
+ground - a ramp's climb, a raised line, a dip under a line - leaves the GRID as it was (2026-11-05, the
+user's rule): raising it to the track's level made a ridge in the picture's relief (`relief_for`), its
+bed's edges ragged, while the embankment's look is the bed's - the decal, baked into the picture in
+play, or the Paint tool's GRAVEL BED band, which follows the rail's height and a ramp's climb. (The
+authors' l11 does have the GRID 6 above its raised rails too - z 105 and 116, a band of 3 cells over
+ground 101-105 - and 10-15 above its ramps' z; their picture was painted beforehand and is never made
+from the GRID, so it shows no ridge.) Checked on POLIGON (flat, GRID 70): two ramps up, four rails at
+z 88 and two down - 20 cells changed, 1-4 up at the two ramps' feet, none under the raised part; the
+older build's line beside it for comparison (`build\shots\_ba.png`: the ridge's ragged lower edge
+gone); a locomotive of ours patrolling over it in Run the level, up, along and down and back. Extern 81 `ReCalcGridZ(int unit)`, which `export.lgc` describes as recalculating the
 grid with a unit's size, is not used: it is not implemented in the exe and is about one object's
 footprint, not the cells along a track.
 
@@ -1921,13 +1935,29 @@ storm clouds, meteorites - `environmenttact.lgc` makes the last three) and how o
 never, 1 now and then - it comes and goes, about half a minute each -, 2 all the time;
 `daynight.lgc`'s own comment has 1 and 2 the other way round, its code does this), lightning
 (`NUKE`: a flash and its sound at random in a clear sky, with rain only while it rains, never with
-the other weathers), the level's music (`music0` and `music1`: `initdefault.lgc` plays `music0` when the
-level starts and `gametact.lgc` the other one each time one ends, so the two take turns - the missions
-pair them, l05 `mus07` / `mus08`; two drop-downs of the files of the game's `music\` folder but the
-menu's `musicmenu.ogg`, `mission_music_files`; `mus00` is the victory's, `menuend.lgc`; written into
-the settings block as the script spells them, `"music\\mus05.ogg"`; the test file's keys `music0` and
-`music1`; checked: POLIGON set to mus05 / mus03, saved as `poligonm`, loaded again - the dialog shows
-them - and played: the game opened `music\mus05.ogg`, `LocoFix.log` of test mode), the reinforcement
+the other weathers), the level's music - none, one file or a list of
+up to 30 played in turn (MUSIC, PLAYED IN TURN: the list, a drop-down of the files of the game's
+`music\` folder but the menu's `musicmenu.ogg` - `mission_music_files` -, Add (after the file chosen in
+the list, or at its end), Remove, Up, Down; `mus00` is the victory's, `menuend.lgc`). The standard scripts
+play `music0` when the level starts (`initdefault.lgc`) and, each time one ends (`IsPlayMusic` 0,
+`gametact.lgc`), `music1` and `music0` by turns - the missions pair two files, l05 `mus07` / `mus08`. The
+editor's block keeps them as they are and makes both the next file of the list: `#define MUSIC_FILES n`,
+`MUSIC_FILE0` ... (`"music\\mus05.ogg"`), `#define music0 MissionMusic()` and the same `music1`, and a
+function `MissionMusic()` in the block that steps `music_turn` round the list and returns its file, or
+`""` with none (`music_of` reads it back, `settings_block` writes it). With none `PlayMusicFile("", 0)`
+fades out what plays and loads nothing - the engine's sound update (0x444950) loads a file only for a
+name that is not empty -, so the level is silent; one file starts again each time it ends (with loop 0
+`Sound_LoadWave` keeps no name, so the engine does not restart it by itself; the same name again reuses
+the open stream, without a new "open" line in the log). A script without `MUSIC_FILES` - every map made
+before 2026-11-05, the campaign's, the template's - is read as the list of its `music0` and `music1`
+(the template's mus08 / mus07 when it has neither), and its next save writes the list. The test file's
+key is `music` (the files separated by commas; empty: none). Checked in the game (test mode's
+`LocoFix.log`, which names every file opened, and the music's state logged when a run ends - "the run ends
+- its music ..."): POLIGON's dialog showing mus08, mus07; three files (two 3 s test files and mus00)
+saved and run: opened in turn twice round in 20 s; none: nothing opened, the editor's own music faded out
+and the run ended with "none, not playing"; one 3 s file: "playing" again at 15 s; the list's buttons
+driven in the open dialog (mus00 up, mus05 added after it, the first removed, Down greyed on the last),
+OK, saved - `MUSIC_FILE0` mus00, mus05, the test file -, the dialog read back the same), the reinforcement
 waves and their train (VIDs), the enemy trains attacking at once,
 the enemy's trains at the start (a line each: its type - `light_gun`, `medium_mortair`, ... the
 `ATT_` names of `TrainsTactDeclares.lgc` - and the point it starts at, or two rail points it
@@ -2347,7 +2377,9 @@ object's height in the Select tool; checked: three notches up, one down -> radiu
 ends - one step of the history - also when the window or the mouse's capture is lost or the tool
 changes, and the brush's repeat timer stops when the button is found let go; the brush and the picture: "The relief and the
 heights of objects" below), shows the brush's cells at their height coloured by it, leaves the track's
-cells and their ramp as they are, puts the objects back on the new ground and makes the stroke one
+cells and their ring as they are (the row's TRACK: NOT COVERED, the default; COVERED, `g_track_covered`,
+lets the brush change them too - the terrain may go over the rails; checked: a Raise stroke across a
+raised line left its 3 rows of cells at 70 with NOT COVERED and raised them with COVERED), puts the objects back on the new ground and makes the stroke one
 undo step (World_SetGroundZ). New track gets the gravel bed decal the missions use
 (VID 612, 615 ice, 616 volcanic, 617 desert: the rail's place and direction, 18 below it; B cycles it,
 the map's most common one by default), deleted and undone with its rail. In the editor a bed is an
@@ -2606,7 +2638,13 @@ one under the mouse (a unit's from the game's `[Units]`, the others' from `[Edit
 it and the map takes it in the army the missions give it, a unit with the behave and build list of
 one of its kind on the map or, with none there, of the first on the missions' maps; a decal picked
 anywhere in the palette makes the All objects entry the Decals tool with it (`tool()`: the scatter
-brush, not a single placing - one way to place a decal wherever it was picked). Under the icons
+brush, not a single placing - one way to place a decal wherever it was picked). The palette closed
+without a pick (Esc, BACK TO THE MAP, the entry's tile again) leaves the entry with nothing picked
+(`nothing_picked`: its object number 0 - and VID 0 is the engine's hourglass, the loading animation,
+which the preview drew at the cursor with the Place hint until 2026-11-05): no preview, the status line
+says "nothing chosen - a click opens the list", the hint "click: choose an object", R / E turn nothing,
+and a click on the map opens the palette again (the entry stays chosen, so the strip's category is at
+hand). Under the icons
 an army row (ARMY: AS IN THE MISSIONS - All objects only, its first choice -, OURS, ENEMY, NEUTRAL,
 PIRATES; the Vehicles palette starts on OURS) sets the army of what is placed next, the chosen one
 underlined (`panel_palette_army`); A in the Place tool steps through the armies the same way, the
@@ -2877,7 +2915,8 @@ rail's) and goes on at its height (the status line shows the level and the mode)
 frames 12-23 raise the point of end 0, 24-35 that of end 1, by sizeZ 11 (direction (shape + 12 or
 24) * 256 / 37: 83, 89 ... 159 and 166 ... 242, the directions of the missions' 98 ramps of l11, l12
 and l15) - with its far end raised (climbing) or its near end (descending, the rail then 11 lower);
-the line goes on 11 higher or lower, the ground under the ramp slopes from one level to the other
+the line goes on 11 higher or lower, the ground under the ramp stays as it was where the ramp is above it (it slopes
+with the ramp only at the foot that lies on the ground, "Laying track" above)
 and its bed is the bed VID in the rail's direction (the missions' ramp beds are, all but 7 of 98).
 Checked: a new map on mission 6's swamp terrain with a swamp line on its embankment and a plain line
 climbing a ramp onto a plateau raised with the Ground height tool, a train on each with a patrol,
@@ -2922,14 +2961,20 @@ splashes, a fire from the palette - saved, loaded (the painted picture came back
 `map_tool.py check` round-tripping the map and its ground image, played: the water rippling, the lava
 erupting, the fog over the region, the fire burning.
 
-**Regions, reviewed** (2026-11-04, the Region tool against the engine). A region (`B_REGION`, `struct
+**Regions, reviewed** (2026-11-04 and 11-05, the Region tool against the engine). A region (`B_REGION`, `struct
 Region` 0xd0 bytes; `Region_Action` saves 80 bytes of it: flags, the fog's high and low levels, its
 colour, width, height, an unused word, its image VID, six VID pairs) is a rectangle on layer 7 around
 its place, at its z. No script refers to one (`GETSPRITE_REGION` of `export.lgc` is declared and never
 used; `daynight.lgc` only gives VIDs 750 and 752 rain circles as their child while it rains). The engine
 does four things with it: `Region_Draw` tiles its own VID's picture over it (750: the light water's
 tiles - a lake's look without the Water tool's bed) and draws the fog between its low and high levels
-in its colour (`Graphics_DrawFog`; flag 1 pulses it, flag 8 lays it over the whole view);
+in its colour (`Graphics_DrawFog`; flag 1 pulses it, flag 8 lays it over the whole view): per pixel
+of a quarter-resolution mask the depth buffer less 0x400 - the ground's picture is 1026 + 8 a GRID level,
+so 2 + 8 a level, an object's pixels higher - against the levels times 8 (`Region_Draw` passes them,
+`Graphics_DrawFog` multiplies: its pulse + (low - high) * 8): full fog below low, fading out up to high,
+none above, clipped to the rectangle unless flag 8 (l05's mist 5-35 lies on its river bed, picture
+depth 58-182 under the region; l18's 70-120 on ground at 563-579; l13's 7-20 on the lava at 1; l07's
+30-45, flags 10, over the whole view);
 `Vid_GetTerrainVariant` (from `World_CreateObject`) makes an object of a pair's first VID created inside
 it, less than 25 above it, of the second - the missions' explosions 308 / 309 become the splashes 338
 (water) or 528 (lava) -, and with flag 8 anywhere on the map; a creature (`Creature_Construct`,
@@ -2941,20 +2986,26 @@ values read back from the loaded level: the file holds them in `Region_Action`'s
 `Region_InitFog` turns into high and low), 752 in l06, l09 and l15 (l15's flood raises its 752 with
 `ChangeZUnit`). The tool has every kind: the rectangle (16 px at least) at the ground's level, its
 panel's size, EXPLOSIONS (as they are / on water / on lava: the pairs), FOG (none, or the missions'
-mist, dust, haze, glow around its level), OVER: THE REGION / THE WHOLE MAP (flag 8 - the fog and the
-pairs both; the row said FOG OVER: THE VIEW, which hid half of it) and PULSING (flag 1); the palette's
-Effects group places 750, 751 and 752 as rectangles sized in the panel; the image VID is the region's
-own and not set anywhere. Found, not fixed: a region of light water (750) fresh from the palette shows
-only its frame in the held editor, while in play, and in the editor once the map was saved and loaded
-(Run the level and back does it), it draws its water; the created and the loaded object were compared
-byte for byte (the log line of a selected region) and differ in nothing but their times and the high
-bits of `GameObject.flags`, and `Region_Draw` tiles through the Vid's own `DrawObject`, which
-`draw_vid` from the overlay did not make draw either - the cause is still to be found. Nothing else was
-wrong. Checked in the game: a mist region made with the tool on POLIGON, seen
-in the held editor and the same after Run the level, its values the same after the way back (low 50,
-high 80, colour ff006478); l05's and l01's regions read in the editor (the log line of a selected
-region: size, flags, fog, image, pairs); a 750 region from the palette tiled with water in play and in
-the editor after the way back, not before; a golem inside a marker region and one outside stood where they were placed through 20 s
+mist, dust, haze, glow around its level, in GRID levels: MIST 50-80 at level 70), OVER: THE REGION /
+THE WHOLE MAP (flag 8 - the fog and the pairs both; the row said FOG OVER: THE VIEW, which hid half of
+it) and PULSING (flag 1); the palette's Effects group places 750, 751 and 752 as rectangles sized in the
+panel; the image VID is the region's own and not set anywhere. FOG and OVER are rows of their own: a
+fog chosen stays over the region until OVER: THE WHOLE MAP is set (which says so when the region has
+pairs - they go over the whole map with it). A fog over the region alone on flat ground is a rectangle
+of one tint with hard edges, while the missions' fogs lie over the whole map (l07, l13, l18) or in a
+hollow, a lake or river bed under a big region (l01, l05), where the fog takes the terrain's shape
+(`build\shots\_o_l*.png`: each mission held and run). The maintainer saw no fog after Run the level on
+d43e850; in this build it shows in the run - the rectangle at 4 s and on through 40 s (`i2_fog`,
+`i2_long`), and with THE WHOLE MAP the tint over the whole view (`i2_w`: the ground's colour outside
+the rectangle 112,149,61 against 112,134,27 without the fog). A region of light water (750)
+shows only its frame where the ground's picture is not lower than its z: its water tiles are drawn with
+the depth test, so a 750 at the ground's own level (as the palette places it) is hidden under the
+ground, held or running, and the missions' lie over a lowered bed; lowered with the Ground height tool
+under it, its water shows at once in the held editor (`i2_lower`) - the "cause still to be found" of
+the review before this. The regions' frames (`draw_regions` of the overlay, and the engine's
+`Region_DrawDebug`, vtable slot 6, only with World flag 0x8000 - the debug key O) were not seen in a
+run or in Play the map (`i2_w_12`, `_18`, `_19`). Checked in the game besides: l05's and l01's regions
+read in the editor (the log line of a selected region: size, flags, fog, image, pairs); a golem inside a marker region and one outside stood where they were placed through 20 s
 of a run (golems do not walk by themselves - l13's stand at its script's places), so the creature area
 rests on the engine's code and the missions' dragons, not on a run; the pairs on the code path only
 (an explosion inside a splash region was not provoked).

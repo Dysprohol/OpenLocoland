@@ -207,7 +207,7 @@ What you see:
 | turn | R / E or the mouse wheel |
 | raise / lower it | PgUp / PgDn by 4 (with Shift by 16), or Shift+wheel; Home puts it back on the ground - the status line shows its height above the ground |
 | change its army | A: ours, enemy, neutral, pirates - the flags change colour (while placing, A sets the army of the next object) |
-| delete | Del (Shift+Del: a whole train; Shift+click with the Delete tool: a whole section of track) |
+| delete | Del (Shift+Del: a whole train); the Delete tool: a click, or a drag with the button held deletes everything the cursor passes over (one undo step); Shift+click: a whole section of track |
 | undo / redo | Ctrl+Z / Ctrl+Y - every change; the last 500 steps are kept |
 | its panel | the right mouse button on it |
 
@@ -284,7 +284,9 @@ with the map; on a campaign terrain it becomes the map's own). Contour lines eve
 the heights while the tool is chosen; `H` shows them with any tool. **Flatten** takes the level
 where the stroke begins - begin it on the track to make a plateau at the track's level - or the level
 you take with Alt+click. Objects
-stay on the ground; the tool leaves the track and the ground beside it alone.
+stay on the ground; the tool leaves the track and the ground beside it alone - the row's **TRACK: NOT
+COVERED** -, so rails stay in sight in a cutting; **COVERED** lets the brush change them too, and the
+terrain may go over the rails.
 
 An object can stand higher or lower on its own: select it and press `PgUp` / `PgDn` (or Shift+wheel,
 or HEIGHT in its panel); `Home` puts it back on the ground. Train cars and rails stay on the track.
@@ -315,7 +317,9 @@ the line through a Y, a straight piece ending in a **dead end**.
 
 The row above the bar picks the kind of the next rails - plain, swamp (on its embankment), destroyed or
 destroyed swamp, each shown as its rail - and whether the rails go up, flat or down; `V` cycles the kinds too. `PgUp` / `PgDn` or the mouse wheel make every rail laid climb or descend a step after the one before, until you change it (ramps onto higher
-ground: each ramp 11 levels; the status line shows the level). For a line on a hill, lay it up its ramps first, then raise the ground around the top and
+ground: each ramp 11 levels; the status line shows the level). Rails on the ground keep the ground
+just above them (a hill in their way is cut down to them); a ramp or a raised line leaves the ground under
+it as it was and stands on its gravel bed, which looks like an embankment. For a line on a hill, lay it up its ramps first, then raise the ground around the top and
 flatten it starting on the track. `B` picks the gravel bed under new rails. The wheel's click, Del
 or the Delete tool removes a rail; Shift+click with the Delete tool removes a whole section.
 
@@ -516,8 +520,12 @@ a flagpole or a station with its flag, chimneys with their smoke or glow, an oil
 says when it stops - when its army's towers fall, or never. **Scylla** (swamp) bites everyone on a
 diagonal track every 15 seconds. When the pirates' towers fall, the corkscrews break.
 A **Region** (strip): drag its rectangle; its panel sets fog (mist, dust, haze, glow) and splashes, over
-it or the whole map; a creature placed inside keeps to it. The **Effects** theme of All objects has the
-region of light water (a lake's look) and the one with rain circles.
+it or the whole map (**OVER**, a row of its own); a creature placed inside keeps to it. A click inside a region where nothing else stands selects it (the Delete tool and `Del` delete it, the right button opens its panel). A fog is
+thickest low down, objects rise out of it: over the region it takes the shape of a hollow (a lake bed),
+on flat ground it is a tinted rectangle; **OVER: THE WHOLE MAP** makes it a haze over the whole view, as
+in missions 7, 13 and 18 (it also turns a region's explosions into splashes everywhere). The **Effects** theme of All objects has the region of light water (a lake's look) and the
+one with rain circles; the water shows only where the ground under it is lower than the region (lower it
+with Ground height, or lay a lake with the Water tool).
 
 ### 9. Look at it working
 
@@ -539,8 +547,10 @@ Menu → **MISSION SETTINGS** (or the gear in the strip):
   then (it comes and goes, about half a minute each) or all the time;
 - **Lightning** - flashes in a clear sky; with rain only while it rains, none with snow, clouds or
   meteorites;
-- **Music at the start** and **then by turns with** - two files of the game's `music` folder: the level
-  plays the first when it starts, then the two take turns (`mus00` is the victory's music);
+- **Music, played in turn** - a list of files of the game's `music` folder: choose a file in the
+  drop-down and **Add** it (after the one chosen in the list, or at the end), **Remove**, **Up** and
+  **Down** change the list; the level plays them from the first, again and again, one file plays on, and
+  an empty list means no music (`mus00` is the victory's music);
 - **Enemy attackers at once** - how many enemy trains attack together;
 - **Train arrivals** - their count and the button to their panel (step 5); a map made with an older
   version has the **player's reinforcement waves** and **their train** (VIDs, e.g. `5,20`) here
@@ -597,7 +607,7 @@ and must not be a folder of the game (`l01`-`l20`, `sandbox`, `template`, `scrip
 | Key | Tool | |
 |---|---|---|
 | 1 | Select | select, drag, turn, army, panel |
-| 2 | Delete | a click deletes; Shift+click on a rail: its section |
+| 2 | Delete | a click deletes; a drag with the button held deletes all it passes over (one undo step); Shift+click on a rail: its section |
 | 3 | Track | lays rails (V kind, PgUp/PgDn or the wheel ramp, B bed) |
 | 4 | Push line | a one-way line on the track |
 | 5 | Factory | at a dead end, with its exit line |
