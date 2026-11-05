@@ -194,7 +194,7 @@ GroupIndustry	627	0	Obj627	Pipeline
 GroupIndustry	177	0	Obj177	Ore heap
 GroupIndustry	937	0	Obj937	Mine cart
 GroupIndustry	888	0	Obj888	Barrels
-GroupRailway	170	0		
+GroupRailway	170	2		
 GroupRailway	150	0		
 GroupRailway	153	0		
 GroupRailway	151	0		
@@ -210,7 +210,7 @@ GroupRailway	871	0	Obj871	Road posts
 GroupRailway	869	0	Obj869	Small road posts
 GroupRailway	411	0	Obj411	Stone on rails
 GroupRailway	100	0	Obj100	Level exit
-GroupFlags	769	0	Obj769	Flagpole
+GroupFlags	769	1	Obj769	Flagpole
 GroupFlags	770	1	Obj770	Flag 1
 GroupFlags	771	1	Obj771	Flag 2
 GroupFlags	772	1	Obj772	Flag 3

@@ -182,22 +182,36 @@ struct Segment {
     double x, y;   // the rail's centre
     int shape;
     Point end0, end1;
+    int z0 = 0, z1 = 0;   // the heights of its points (end 0, end 1)
 };
 
 struct Plan {
     Error error = Error::None;
     int step = -1;   // the step it failed at (-1: links, or none)
     double turn = 0; // degrees, for Sharp
+    bool crossing = false;   // `through`: the track's last point is a joint of other track it crosses
     std::vector<Segment> segments;
 };
 
 // The rails of a track along `points` next to `rails` (map_tool.py plan_track). `shapes` (one
 // per step, or empty) picks the shape by hand; `z` is the height of the track's rail points (its
 // rails' z + ALTITUDE): it joins only the rails whose points are at that height, ANY_Z all.
+// `through`: the track goes on past its last point (the editor lays a line a rail a click), so a
+// joint of other track there whose rails it neither joins nor shares a point with is crossed - as
+// plan() lets a track cross such a joint between its first and last point - instead of refused.
+// `lay` (the editor's Track tool, which lays what is clicked): only what the engine cannot take is
+// refused - a point with more than MAX_LINKS links ("Too many links"), and a step off the lattice,
+// which the tool never makes; a rail that joins nothing before it (trains stop there), a turn over 45
+// degrees (they reverse), the end on a joint it does not join and a rail that is already there (the
+// points are shared, no link is added) are laid. The rules still choose the shape a step means: one
+// joining the rail before it when there is one. `ramp` (-1, 0, 1): each step's far point 11 lower or
+// higher than its near one (the Track tool's PgDn / PgUp), the level going on from there.
 inline Plan plan(const std::vector<Rail>& rails, const std::vector<Point>& points,
-                 const std::vector<int>& shapes = {}, int z = ANY_Z) {
+                 const std::vector<int>& shapes = {}, int z = ANY_Z, bool through = false, bool lay = false,
+                 int ramp = 0) {
     Plan p;
     if (points.size() < 2) return p;
+    if (z == ANY_Z) ramp = 0;
     std::vector<Vec> entry;
     for (const Vec& e : ends_at(rails, points[0], z)) {
         const Vec o = e.opposite();
@@ -207,9 +221,11 @@ inline Plan plan(const std::vector<Rail>& rails, const std::vector<Point>& point
     bool have_previous = false;
     double previous = 0;
     Vec second = {0, 0};
+    int level = z;   // the height of the step's near point
     for (size_t n = 0; n + 1 < points.size(); ++n) {
         const Point a = points[n], b = points[n + 1];
         std::vector<Candidate> cs = candidates(a, b);
+        const std::vector<Candidate> every = cs;   // `lay`: a shape given is laid joining or not
         if (cs.empty()) {
             p.error = Error::Step;
             p.step = static_cast<int>(n);
@@ -219,12 +235,12 @@ inline Plan plan(const std::vector<Rail>& rails, const std::vector<Point>& point
             std::vector<Candidate> joined;
             for (const Candidate& c : cs)
                 if (contains(entry, c.first)) joined.push_back(c);
-            if (joined.empty()) {
+            if (joined.empty() && !lay) {
                 p.error = Error::Join;
                 p.step = static_cast<int>(n);
                 return p;
             }
-            cs = joined;
+            if (!joined.empty()) cs = joined;
         }
         Candidate c = cs[0];
         if (!shapes.empty()) {
@@ -234,6 +250,11 @@ inline Plan plan(const std::vector<Rail>& rails, const std::vector<Point>& point
                     c = k;
                     found = true;
                     break;
+                }
+            for (const Candidate& k : every)
+                if (!found && lay && k.shape == shapes[n]) {
+                    c = k;
+                    found = true;
                 }
             if (!found) {
                 p.error = Error::Step;
@@ -247,7 +268,7 @@ inline Plan plan(const std::vector<Rail>& rails, const std::vector<Point>& point
         const double h = std::atan2(b.y - a.y, b.x - a.x) * 180.0 / 3.14159265358979323846;
         if (have_previous) {
             const double turn = std::fmod(std::fmod(h - previous + 180.0, 360.0) + 360.0, 360.0) - 180.0;
-            if (std::fabs(turn) > 45.0) {
+            if (std::fabs(turn) > 45.0 && !lay) {
                 p.error = Error::Sharp;
                 p.step = static_cast<int>(n);
                 p.turn = turn;
@@ -256,9 +277,12 @@ inline Plan plan(const std::vector<Rail>& rails, const std::vector<Point>& point
         }
         previous = h;
         have_previous = true;
+        // its points' heights: the near one at the level, the far one a ramp higher or lower
+        const int far_z = level == ANY_Z ? ANY_Z : level + ramp * RAMP;
+        const bool a_is_0 = c.first == ENDS[c.shape][0] && c.second == ENDS[c.shape][1];
+        const int z0 = a_is_0 ? level : far_z, z1 = a_is_0 ? far_z : level;
         for (const Rail& r : rails)
-            if (close(r.x, c.x) && close(r.y, c.y) && r.shape == c.shape &&
-                (z == ANY_Z || (r.z0 == z && r.z1 == z))) {
+            if (!lay && close(r.x, c.x) && close(r.y, c.y) && r.shape == c.shape && (z == ANY_Z || (r.z0 == z0 && r.z1 == z1))) {
                 p.error = Error::Duplicate;
                 p.step = static_cast<int>(n);
                 return p;
@@ -267,31 +291,39 @@ inline Plan plan(const std::vector<Rail>& rails, const std::vector<Point>& point
         Point e0 = end_of(made, 0), e1 = end_of(made, 1);
         e0 = {round3(e0.x), round3(e0.y)};
         e1 = {round3(e1.x), round3(e1.y)};
-        p.segments.push_back({a, b, c.x, c.y, c.shape, e0, e1});
+        p.segments.push_back({a, b, c.x, c.y, c.shape, e0, e1, z0, z1});
+        level = far_z;
     }
-    const std::vector<Vec> meeting = ends_at(rails, points.back(), z);
+    const std::vector<Vec> meeting = ends_at(rails, points.back(), level);
     if (!meeting.empty() && !contains(meeting, second.opposite())) {
-        p.error = Error::Last;
-        p.step = static_cast<int>(points.size()) - 2;
-        p.segments.clear();
-        return p;
+        const bool cross = through && !contains(meeting, second);   // its point stays apart from theirs
+        if (cross) {
+            p.crossing = true;
+        } else if (!lay) {
+            p.error = Error::Last;
+            p.step = static_cast<int>(points.size()) - 2;
+            p.segments.clear();
+            return p;
+        }
     }
     // no rail point may get more links than the engine allows: at every joint of the track, with
-    // the rails already there (ANY_Z: the rails at any height as if at one)
-    const int level = z == ANY_Z ? 0 : z;
+    // the rails already there (ANY_Z: the rails at any height as if at one), each point at its height
+    const bool any = z == ANY_Z;
     std::vector<Rail> laid;
-    for (const Rail& r : rails)
-        laid.push_back({r.x, r.y, r.shape, z == ANY_Z ? level : r.z0, z == ANY_Z ? level : r.z1});
-    for (const Segment& s : p.segments) laid.push_back({s.x, s.y, s.shape, level, level});
+    for (const Rail& r : rails) laid.push_back({r.x, r.y, r.shape, any ? 0 : r.z0, any ? 0 : r.z1});
+    for (const Segment& s : p.segments) laid.push_back({s.x, s.y, s.shape, any ? 0 : s.z0, any ? 0 : s.z1});
     for (const Segment& s : p.segments)
-        for (const Point q : {s.end0, s.end1})
+        for (int i = 0; i < 2; ++i) {
+            const Point q = i ? s.end1 : s.end0;
+            const int height = any ? 0 : i ? s.z1 : s.z0;
             for (const JointPoint& j : point_links(laid, q))
-                if (j.z == level && j.links > MAX_LINKS) {
+                if (j.z == height && j.links > MAX_LINKS) {
                     p.error = Error::Links;
                     p.step = -1;
                     p.segments.clear();
                     return p;
                 }
+        }
     return p;
 }
 

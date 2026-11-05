@@ -95,6 +95,7 @@ void edit_commit_mission(const ArrivalsState& arrivals_before, const FactoryStat
 void panel_open_arrivals();   // editor_panel.cpp
 void edit_open_enemy_factory();   // editor_edit.cpp: the panel of the map's first enemy factory
 bool edit_open_factory_at(float x, float y);   // editor_edit.cpp: the panel of the factory at a map point
+bool edit_test_pick(int nvid, int army);   // editor_edit.cpp: test mode - the palette object to place
 void new_map_dialog(HWND owner);                // editor_newmap.cpp
 bool new_map_for_test(const std::string& text);  // editor_newmap.cpp
 std::string make_start_map();                    // editor_newmap.cpp: maps\_new\, empty grass
@@ -155,6 +156,7 @@ constexpr int TEST_IMPORT = 40046;    // test mode: WM_COPYDATA "<zip>|overwrite
 constexpr int TEST_RENAME = 40048;    // test mode: WM_COPYDATA <name> - the map renamed (Rename or delete)
 constexpr int TEST_DELETE = 40049;    // test mode: WM_COPYDATA - the map deleted (Rename or delete)
 constexpr int TEST_FACTORY = 40047;   // test mode: WM_COPYDATA "x y" - the panel of the factory there
+constexpr int TEST_PICK = 40050;      // test mode: WM_COPYDATA "nvid army" - that object of the palette to place
 constexpr UINT WM_SAVE_AFTER_RUN = WM_APP + 0x52;   // Run the level's copy held again: save it (wParam 1: then end the game)
 constexpr uintptr_t SET_POSITION = 0x41c680;   // SetPosition: the centre of the view, clamped
 constexpr uintptr_t G_SOUND = 0x5d3a54;        // g_sound: the sound object
@@ -1309,6 +1311,10 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
             if (data->dwData == TEST_FACTORY) {   // "x y": the panel of the factory there
                 float x = 0, y = 0;
                 return std::sscanf(path.c_str(), "%f %f", &x, &y) == 2 && edit_open_factory_at(x, y) ? TRUE : FALSE;
+            }
+            if (data->dwData == TEST_PICK) {   // "nvid army": the palette's object to place
+                int nvid = 0, army = -1;
+                return std::sscanf(path.c_str(), "%d %d", &nvid, &army) >= 1 && edit_test_pick(nvid, army) ? TRUE : FALSE;
             }
             if (data->dwData == TEST_RAIL_POINTS) {   // "x y": the rail points there into the log
                 float x = 0, y = 0;

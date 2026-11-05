@@ -203,6 +203,15 @@ Co widać:
 | cofnij / ponów | Ctrl+Z / Ctrl+Y - każdą zmianę; pamięta ostatnie 500 kroków |
 | panel obiektu | prawy przycisk myszy na nim |
 
+**Stawianie.** Obiekt staje tam, gdzie go postawisz, także na innych obiektach. Przy szynie fabryka,
+punkt naprawczy, fortyfikacja, kopalnia, semafor, skrzynka z pieniędzmi, wrak i pirackie urządzenia
+toru przyciągają się do toru tak, jak stoją w misjach - podgląd pokazuje gdzie, a wiersz stanu mówi
+"na tor"; z wciśniętym **Shiftem** albo z dala od toru obiekt zostaje tam, gdzie kursor, obrócony tak,
+jak wybrałeś (fabryka ani punkt naprawczy nie dostają tam linii, semafor też nie). **Mina** staje tylko na
+punkcie toru. Nic nie staje we **wrotach fabryki** (w jej środku): fabryka usuwa to, co tam stoi, gdy
+buduje wagon. **Flaga** powiewa na własnym maszcie, z wiatrem jak wszystkie flagi w misjach; nad
+masztem albo dworcem trafia na niego w miejsce jego flagi; z Shiftem sama flaga staje tam, gdzie kursor.
+
 **Panel obiektu** (prawy przycisk) ma jego armię, obrót, wysokość (niżej, wyżej, na ziemi) i usuwanie, kolor semafora i linię przy
 nim, a dla fortyfikacji, kopalni i cytadeli - działo w każdym gnieździe (puste, działo albo
 rakiety; gdy panel jest otwarty, gniazda są ponumerowane na murze, a kliknięcie działa otwiera panel
@@ -273,16 +282,21 @@ Kilka jednostek i dział gra zawsze sama stawia na ziemi; wiersz stanu to mówi.
 ### 4. Główna linia
 
 **Tory** (klawisz 3). Kliknij, żeby zacząć linię - na końcu szyny mapy albo gdziekolwiek - a każde
-następne kliknięcie kładzie **jedną szynę** w stronę kursora; prawy przycisk (albo Esc) kończy linię,
-a kliknięcie kółkiem myszy usuwa szynę pod kursorem (Ctrl+Z ją przywraca). Podgląd
-pokazuje następną szynę: **zielone** końce - pasuje, **czerwone** - wiersz stanu mówi, którą
-zasadę łamie:
+następne kliknięcie kładzie szyny w stronę kursora - **jedną szynę**, gdy kursor jest blisko końca
+linii, a cały **ciąg** prostych i łuków w jego stronę, gdy jest dalej, jednym kliknięciem; prawy
+przycisk (albo Esc) kończy linię, a kliknięcie kółkiem myszy usuwa szynę pod kursorem (Ctrl+Z ją
+przywraca). Podgląd zawsze pokazuje szyny, które kliknięcie położy; narzędzie kładzie to, co
+klikniesz - na innym torze, przez jego styki, ślepy koniec, ostry skręt, tę samą szynę jeszcze raz.
+Nie zostanie położona tylko 7. szyna w jednym punkcie (gra pozwala na 6): jej końce są **czerwone**,
+a wiersz stanu to mówi. Dobrze wiedzieć:
 
 - krok to 71 x 50 px albo jego połowa (siatka torów);
-- skręt zawsze przez **łuk**, najwyżej o 45° (prosta szyna nie łączy się wprost ze skośną);
-- w jednym punkcie spotyka się najwyżej 6 szyn;
+- skręt zawsze przez **łuk** (prosta szyna nie łączy się wprost ze skośną); ostrzejszy skręt zostanie
+  położony, ale pociągi zawracają w tym miejscu;
 - **rozjazd**: zacznij nową linię w punkcie istniejącej - odgałęzienie to prosta szyna i łuk o tym
-  samym środku, **rozjazd Y** jak w misjach.
+  samym środku, **rozjazd Y** jak w misjach;
+- **skrzyżowanie**: połóż linię w poprzek dowolnego toru, także przez punkt, w którym stykają się jego
+  szyny; pociągi je przejeżdżają, ale nie skręcą tam na drugi tor. Strona 23 pomocy opisuje siatkę.
 
 Główną linię połóż tak, jak robią to misje: **zza zachodniej krawędzi** (przewiń nad siatkę) przez
 mapę, żeby pociągi przyjeżdżały i odjeżdżały poza widokiem. Potem bocznica na fabrykę: odgałęzienie
@@ -342,7 +356,7 @@ jako znaczniki na torze; kliknięcie znacznika otwiera ten panel), dopóki w pan
 ### 6. Fabryka, punkt naprawczy, linie jednokierunkowe i semafory
 
 **Fabryka** (klawisz 4) i **Punkt naprawczy** (klawisz 5) stają tam, gdzie stawiali je autorzy -
-podgląd pokazuje gdzie, a postawienie gdzie indziej jest odrzucane z podaniem powodu:
+podgląd pokazuje gdzie; z dala od toru albo z Shiftem zostają tam, gdzie kursor, bez linii:
 
 - **fabryka** na **ślepym końcu bocznicy**, obrócona wyjazdem na zewnątrz. Dostaje swoją **linię
   wyjazdu**: linię jednokierunkową wzdłuż bocznicy (zbudowane wagony pojawiają się w fabryce i są
@@ -352,7 +366,8 @@ podgląd pokazuje gdzie, a postawienie gdzie indziej jest odrzucane z podaniem p
   swoje semafory. `R` albo `E` (albo **OBROT: ZAWROC** w jego panelu) obraca go na torze:
   linia biegnie wtedy w drugą stronę, a semafory zamieniają się miejscami.
 
-Przeciągnięcie przenosi je razem z linią na najbliższe właściwe miejsce; usunięcie usuwa też linię.
+Przeciągnięcie przenosi je razem z linią na najbliższe właściwe miejsce (upuszczone z dala od toru
+albo z Shiftem: tam, gdzie upuszczone); usunięcie usuwa też linię.
 **Bloker** (kozioł oporowy, w grupie KOLEJ we Wszystkich obiektach) stawia się swobodnie i obraca
 R / E jak każdy obiekt: ustaw go sam na końcu toru.
 
@@ -428,7 +443,7 @@ ona może wtedy strzelać do nich. W panelu uzbrojonego neutralnego obiektu **ST
   wraki, jednostki i stworzenia, efekty): kliknij jeden, potem postaw go na mapie. Wiersz **ARMIA**
   pod ikonami ustala, czyj będzie - JAK W MISJACH, NASI, WROG, NEUTRALNI albo PIRACI (paleta Pojazdy
   zaczyna od naszych); `A` przy stawianiu robi to samo. Są tu **kopalnia** (jedno gniazdo na
-  działo), cytadela, mury, budynki, roboty. **Wrak** (spalony wóz
+  działo; staje na torze jak fortyfikacja, tak jak 29 z 30 kopalń w misjach), cytadela, mury, budynki, roboty. **Wrak** (spalony wóz
   albo wagon) postawiony albo przeciągnięty przy szynie staje na torze, wzdłuż niego (`R` go
   odwraca), tak jak w misjach; gdzie indziej zostaje tam, gdzie go postawisz. W grze pociąg najeżdża
   na niego i go miażdży - wrak pociągu nie zatrzymuje.
@@ -446,9 +461,9 @@ ona może wtedy strzelać do nich. W panelu uzbrojonego neutralnego obiektu **ST
 - **Gniazdo much** (jednostki i stworzenia): jego panel wybiera **ZIELONE, FALAMI** (fale zielonych
   much) albo **SZARE, NA STRAZY** (szare muchy, gdy twoje pociągi podjadą blisko, rój, gdy je
   zniszczysz).
-- **Mina** (jednostki i stworzenia): staje na torze, w armii z wiersza palety. Edytor oznacza każdą
-  minę jej armią (MINA: WROG); w grze widzi ją tylko jej armia - pociąg innej armii ją odpala, jej
-  własne pociągi zatrzymują się przed nią.
+- **Mina** (jednostki i stworzenia): staje na punkcie toru, w armii z wiersza palety. Edytor oznacza
+  każdą minę jej armią (MINA: WROG); w grze widzi ją tylko jej armia - pociąg innej armii ją odpala,
+  jej własne pociągi zatrzymują się przed nią (gdy poziom ruszy, mina zamyka im swój punkt toru).
 
 - **Pociągi**: **Pojazdy** z listwy otwierają wagony - lokomotywy, wagony bojowe, zaopatrzenie
   (wóz z amunicją, pojazd naprawczy, cysterny), wagony cywilne, przeszkody. Wagon staje na torze

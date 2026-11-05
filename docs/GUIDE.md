@@ -202,6 +202,16 @@ What you see:
 | undo / redo | Ctrl+Z / Ctrl+Y - every change; the last 500 steps are kept |
 | its panel | the right mouse button on it |
 
+**Placing.** An object goes where you put it, over other objects too. Near a rail a factory, a repair
+point, a fort, a mining plant, a semaphore, a money crate, a wreck and the track's pirate pieces snap
+onto the track the way the missions have them - the preview shows where and the status line says
+"onto the track"; with **Shift** held, or with no track near, it stays where the cursor is, turned as
+you chose (a factory or repair point there gets no line, a semaphore none either). A **mine** goes onto
+a rail point only. Nothing is placed in a **factory's door** (its middle): the factory deletes what
+stands there when it builds a car. A **flag** flies on a flagpole of its own, facing the wind like all
+the missions' flags; over a flagpole or a station it goes onto it, replacing the flag there; with Shift
+the flag alone goes where the cursor is.
+
 The **object's panel** (right button) has its army, turning, its height (lower, raise, on the ground) and delete, a semaphore's colour and
 its line, and - for a fort, a mining plant or a citadel - the gun in each of its sockets (empty, a
 cannon or missiles; while the panel is open the sockets are numbered on the wall, and a click on a
@@ -274,16 +284,20 @@ A few units and guns are always put on the ground by the game itself; the status
 ### 4. The main line
 
 **Track** (key 3). Click to start a line - at the end of a rail of the map or anywhere - and every
-next click lays **one rail** toward the cursor; the right button (or Esc) ends the line, and a click
-of the mouse wheel deletes the rail under the cursor (Ctrl+Z puts it back). The preview shows
-the next rail: **green** ends - it fits, **red** - the status line says which rule it breaks:
+next click lays rails toward the cursor - **one rail** when the cursor is near the line's end, a whole
+**run** of straight rails and curves toward it when it is farther, in one click; the right button
+(or Esc) ends the line, and a click of the mouse wheel deletes the rail under the cursor (Ctrl+Z puts
+it back). The preview always shows the rails the click lays; the tool lays what you click - over other
+track, across its joints, a dead end, a sharp turn, the same rail again. Only a 7th rail at one point
+is not laid (the game allows 6): its ends are **red** and the status line says so. Good track to know:
 
 - one step is 71 x 50 px or its half (the rails' lattice);
-- a turn goes through a **curve** and turns at most 45° (a straight rail does not join a diagonal
-  directly);
-- at most 6 rails meet at a point;
+- a turn goes through a **curve** (a straight rail does not join a diagonal directly); a sharper turn
+  is laid, but the trains reverse there;
 - a **junction**: start a new line at a point of an existing line - a branch is a straight rail and
-  a curve with the same middle, a **Y junction** like in the missions.
+  a curve with the same middle, a **Y junction** like in the missions;
+- a **crossing**: lay a line on across any track, also across the point where two of its rails meet;
+  trains cross it but cannot turn onto the other track there. Help page 23 describes the lattice.
 
 Lay the main line the way the missions do: from **past the west edge** (scroll out over the grid)
 along the map, so the trains come and go out of sight. Then a spur for the factory: a branch off
@@ -346,7 +360,7 @@ attack), editable like any train.
 ### 6. The factory, the repair point, one-way lines and semaphores
 
 **Factory** (key 4) and **Repair point** (key 5) go where the authors put them - the preview
-shows where, and placing them elsewhere is refused with the reason:
+shows where; away from the track, or with Shift, they stay where the cursor is, without a line:
 
 - a **factory** at the **dead end of a spur**, turned the way out. It comes with its **exit line**:
   a one-way line along the spur (built cars appear in the factory and are pushed out) and a red
@@ -356,8 +370,8 @@ shows where, and placing them elsewhere is refused with the reason:
   `R` or `E` (or **TURN: ROUND** in its panel) turns it round on its leg: the line then
   runs the other way and the semaphores change places.
 
-Dragging one of them moves it, with its line, to the nearest right place; deleting it deletes the
-line too. A **blocker** (the buffer stop, in the RAILWAY group of All objects) is placed freely and
+Dragging one of them moves it, with its line, to the nearest right place (dropped away from the
+track or with Shift: where it is dropped); deleting it deletes the line too. A **blocker** (the buffer stop, in the RAILWAY group of All objects) is placed freely and
 turned with R / E like any object: set it at the end of a track yourself.
 
 **One-way lines** (the strip's **Push line**): a line on the track no train may enter against its
@@ -433,7 +447,8 @@ AGAINST ALL SIDES**). A map of the editor plays so; the campaign's missions keep
   forest, desert, ice, volcanic, swamp, park, pirates, city, industry, railway, flags and crates,
   wrecks, units and creatures, effects): click one, then place it. Under the icons the **ARMY** row
   sets whose it will be - AS IN THE MISSIONS, OURS, ENEMY, NEUTRAL or PIRATES (the Vehicles palette
-  starts on ours); `A` while placing does the same. Here are the **mining plant** (one gun socket),
+  starts on ours); `A` while placing does the same. Here are the **mining plant** (one gun socket; it
+  goes onto the track like the fort, as 29 of the missions' 30 do),
   the citadel, walls, buildings, robots. A **wreck** (a burnt
   cart or car) put or dragged near a rail goes onto the track, along it (`R` turns it round), as the
   missions have them; elsewhere it stays where you put it. In the game a train runs it over and
@@ -450,9 +465,10 @@ AGAINST ALL SIDES**). A map of the editor plays so; the campaign's missions keep
   its eye to destroy it.
 - **Fly nest** (units and creatures): its panel chooses **GREEN, IN WAVES** (waves of green flies)
   or **GREY, ON GUARD** (grey flies when your trains come near, a swarm when it is destroyed).
-- **Mine** (units and creatures): it goes on the track, in the army of the palette's row. The editor
-  marks every mine with its army (MINE: ENEMY); in the game only its own army sees it - a train of
-  another army sets it off, its own trains stop in front of it.
+- **Mine** (units and creatures): it goes onto a rail point, in the army of the palette's row. The
+  editor marks every mine with its army (MINE: ENEMY); in the game only its own army sees it - a train
+  of another army sets it off, its own trains stop in front of it (the mine closes its rail point to
+  them once the level runs).
 
 - **Trains**: the strip's **Vehicles** opens the cars - locomotives, combat cars, supply cars
   (ammunition, repair car, tankers), civil cars, obstacles. A car goes on the track under the

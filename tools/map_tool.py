@@ -2704,78 +2704,95 @@ def rail_point_links(rails, point):
             for (end, height), far in far_points.items()}
 
 
-def plan_track(rails, points, shapes=None, z=None):
+def plan_track(rails, points, shapes=None, z=None, through=False, lay=False, ramp=0):
     """The rails that lay a track along `points` (rail-network points, see track_objects)
     next to the existing `rails` (x, y, shape, z0, z1, see rail_of):
-    [(a, b, x, y, shape, end0, end1), ...], or TrackError. `z` is the height of the track's
-    rail points (its rails' z + RAIL_ALTITUDE): it joins only the rails whose points are at
-    that height; None takes the rails at any height. The rules of the engine's linking
-    (Rail_Action) - the same in the in-game editor (src/LocoFix/rail_rules.h)."""
+    [(a, b, x, y, shape, end0, end1, z0, z1), ...], or TrackError. `z` is the height of the
+    track's rail points (its rails' z + RAIL_ALTITUDE): it joins only the rails whose points are
+    at that height; None takes the rails at any height. `through`: the track goes on past its
+    last point (the in-game editor lays a line a rail a click), so a joint of other track there
+    whose rails it neither joins nor shares a point with is crossed - as a track crosses such a
+    joint between its first and last point - instead of refused ("last"). `lay` (the editor's
+    Track tool, which lays what is clicked): only what the engine cannot take is refused - a point
+    with more than 6 links, and a step off the lattice; a rail joining nothing before it, a turn
+    over 45 degrees, an end on a joint it does not join and a rail already there are laid (the
+    rules still choose the shape a step means: one joining the rail before it when there is one).
+    `ramp` (-1, 0, 1): each step's far point 11 lower or higher than its near one. The rules of
+    the engine's linking (Rail_Action) - the same in the in-game editor (src/LocoFix/rail_rules.h)."""
     hx, hy = RAIL_HALF
 
     def heading(a, b):
         return math.degrees(math.atan2(b[1] - a[1], b[0] - a[0]))
 
+    if z is None:
+        ramp = 0
     segments = []
     previous = None
     second = None
+    level = z
     # end vectors a rail may have at its first point: opposite to the rails ending there
     entry = {(-e[0], -e[1]) for e in rail_ends_at(rails, points[0], z)} or None
     for n, (a, b) in enumerate(zip(points, points[1:])):
-        candidates = rail_candidates(a, b)
+        candidates = every = rail_candidates(a, b)
         if not candidates:
             raise TrackError("step", n, f"step {n} ({a} -> {b}): a step must be 71 in x and 50 "
                                         f"in y (or halves of them)")
         if entry is not None:
             joined = [c for c in candidates if c[3] in entry]
-            if not joined:
+            if not joined and not lay:
                 raise TrackError("join", n, f"step {n} ({a} -> {b}): no rail here joins the rail "
                                             f"before it - the engine links two rails only where "
                                             f"their ends point opposite ways, so a turn needs a "
                                             f"curve (a step of 71, 25 or 35.5, 50)")
-            candidates = joined
+            if joined:
+                candidates = joined
         if shapes is not None:
-            pick = [c for c in candidates if c[2] == shapes[n]]
+            pick = [c for c in candidates if c[2] == shapes[n]] or                 [c for c in every if lay and c[2] == shapes[n]]   # lay: a shape given, joining or not
             if not pick:
                 raise TrackError("step", n, f"step {n} ({a} -> {b}): no rail of shape {shapes[n]}, "
                                             f"the shapes here are {sorted({c[2] for c in candidates})}")
-            x, y, shape, _first, second = pick[0]
+            x, y, shape, first, second = pick[0]
         else:
-            x, y, shape, _first, second = candidates[0]
+            x, y, shape, first, second = candidates[0]
         entry = {(-second[0], -second[1])}
         h = heading(a, b)
         if previous is not None:
             turn = (h - previous + 180) % 360 - 180
-            if abs(turn) > 45.0:
+            if abs(turn) > 45.0 and not lay:
                 raise TrackError("sharp", n, f"step {n} ({a} -> {b}): the track turns "
                                              f"{turn:.1f} deg, sharper than 45 deg (0x20 of 256) "
                                              f"- trains would reverse")
         previous = h
-        if any(abs(rx - x) < 0.01 and abs(ry - y) < 0.01 and rs == shape and
-               (z is None or (r0, r1) == (z, z)) for rx, ry, rs, r0, r1 in rails):
+        far = None if level is None else level + ramp * RAIL_RAMP
+        a_is_0 = (first, second) == tuple(RAIL_ENDS[shape])
+        z0, z1 = (level, far) if a_is_0 else (far, level)
+        if not lay and any(abs(rx - x) < 0.01 and abs(ry - y) < 0.01 and rs == shape and
+                           (z is None or (r0, r1) == (z0, z1)) for rx, ry, rs, r0, r1 in rails):
             raise TrackError("duplicate", n, f"step {n} ({a} -> {b}): this rail is already there")
         end0 = (round(x + RAIL_ENDS[shape][0][0] * hx, 3),
                 round(y + RAIL_ENDS[shape][0][1] * hy, 3))
         end1 = (round(x + RAIL_ENDS[shape][1][0] * hx, 3),
                 round(y + RAIL_ENDS[shape][1][1] * hy, 3))
-        segments.append((a, b, x, y, shape, end0, end1))
-    meeting = rail_ends_at(rails, points[-1], z)
+        segments.append((a, b, x, y, shape, end0, end1, z0, z1))
+        level = far
+    meeting = rail_ends_at(rails, points[-1], level)
     if meeting and (-second[0], -second[1]) not in meeting:
-        raise TrackError("last", len(points) - 2,
-                         f"the last rail ({points[-2]} -> {points[-1]}) does not join the rails "
-                         f"ending at {points[-1]} - their ends must point opposite ways")
+        crossing = through and second not in meeting   # its point stays apart from theirs
+        if not crossing and not lay:
+            raise TrackError("last", len(points) - 2,
+                             f"the last rail ({points[-2]} -> {points[-1]}) does not join the rails "
+                             f"ending at {points[-1]} - their ends must point opposite ways")
 
     # no rail point may get more links than the engine allows: at every joint of the track,
-    # with the rails already there (rail_point_links)
-    level = 0 if z is None else z     # None: the rails at any height as if at one
-    laid = [(x, y, shape, z0 if z is not None else level, z1 if z is not None else level)
-            for x, y, shape, z0, z1 in rails]
-    laid += [(x, y, shape, level, level) for _a, _b, x, y, shape, *_e in segments]
+    # with the rails already there (rail_point_links), each point at its height
+    anyz = z is None     # None: the rails at any height as if at one
+    laid = [(x, y, shape, 0 if anyz else z0, 0 if anyz else z1) for x, y, shape, z0, z1 in rails]
+    laid += [(x, y, shape, 0 if anyz else z0, 0 if anyz else z1) for _a, _b, x, y, shape, _e0, _e1, z0, z1 in segments]
     over = {}
     for segment in segments:
-        for point in segment[5:7]:
-            for (end, height), links in rail_point_links(laid, point).items():
-                if height == level and links > MAX_RAIL_LINKS:
+        for point, height in ((segment[5], segment[7]), (segment[6], segment[8])):
+            for (end, joint_z), links in rail_point_links(laid, point).items():
+                if joint_z == (0 if anyz else height) and links > MAX_RAIL_LINKS:
                     over[(point, end)] = links
     if over:
         raise TrackError("links", -1, "rail points with more than 6 links (engine limit): " +

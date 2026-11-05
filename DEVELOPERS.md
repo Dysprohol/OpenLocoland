@@ -1642,7 +1642,7 @@ with the engine's own pieces (scripts and object updates are off, so nothing els
 | semaphore red / green | T | red is the command `10,0,0,0` (MAP_RULES.md 7), shown with that animation - also the red posts of a loaded map, whose first command never runs on a held level (the command stays as it is); a post's own line changes with it ("On the track") |
 | delete | Del, or the Delete tool of the bar (the filled circle marks what a click takes, the cursor is the game's delete cursor); Shift+Del or Shift+click on a rail: its section, as far as one rail continues it at each end (up to a junction or an end) | `ACT_UNDO_REMOVE` 132 - made for the authors' MapEdit: the object leaves the layer lists (not drawn, not updated, not saved; a train car leaves its rail points and couplings); a rail also leaves the rail network (below) |
 | undo / redo | Ctrl+Z / Ctrl+Y | every change keeps the state of the objects it touched before and after (position, direction, army, present, red); undo puts the "before" back - a deleted object returns with `ACT_UNDO_INSERT` 133 - and redo the "after"; the last 500 steps are kept, at most 256 MB of them (below) |
-| place | the bar at the bottom: 1-0 or a click picks an entry, a click on the map places it, Esc or the right button go back to selecting | World `CreateObject` at the point under the cursor on the ground, after `AskPlace` (161) - a place another object with a common `moveMask` takes is refused; a preview of the object (its own sprite in the chosen direction, `Graphics_DrawVid`) follows the cursor |
+| place | the bar at the bottom: 1-0 or a click picks an entry, a click on the map places it, Esc or the right button go back to selecting | World `CreateObject` at the point under the cursor on the ground - over other objects too ("Placing over objects, the track as a help" below); a preview of the object (its own sprite in the chosen direction, `Graphics_DrawVid`) follows the cursor, the status line says where it goes |
 
 The bar looks like the game's state bar and is drawn with its pictures over the scene, after
 `Graphics_DrawScene` (`Graphics_DrawVid`, in front of everything): the bar's base (VID 450) in
@@ -1677,8 +1677,8 @@ list; with none on the map, the state of one on a mission's map, from the palett
 player's factory without such an object the game's 14 factory units; a fort, a mining plant or a
 citadel comes with the missions' most common guns in its sockets (MAP_RULES.md 6), which move, turn,
 change army and are deleted with it; a reinforcement point is put on the nearest track by
-`Engine_Construct` itself; a factory, repair point, fort or citadel snaps onto the track ("On the
-track" below). Rails are not moved or turned (a rail is laid again instead); train cars move with their train along the track (below) - a car
+`Engine_Construct` itself; a factory, repair point, fort, mining plant or citadel near a rail snaps
+onto the track ("On the track" below), elsewhere or with Shift it stays where it is put. Rails are not moved or turned (a rail is laid again instead); train cars move with their train along the track (below) - a car
 stands on its rail points).
 
 Checked on the sandbox (`test_game.ps1 -Editor` with the steps of "Working with the code"):
@@ -1690,6 +1690,28 @@ with the factory moved and turned, the repair point gone and the six new ones - 
 record unchanged, the semaphores' commands as set, the new factory with the 14 units; then File >
 Play the map: the edited map plays with its interface, and `error.log` has no `LOGIC`, `R_MAP`
 or `RAIL` line.
+
+**Placing over objects, the track as a help** (`editor_edit.cpp` "where the object to place goes":
+`plan_place`, which the preview and the click share). Placing asked the engine's `AskPlace` (161) and
+refused a place that another object with a common `moveMask` bit took - a tree against a wall, a flag
+on a roof, a fort over the bushes beside the track were refused, while the missions are full of such
+overlaps and the engine minds none of them on a map. Now an object goes where it is put, and a drag
+was never asked. The track is a help, not a rule: an object of the track ("On the track" below) near
+a rail snaps onto it within its reach, as before; farther away, or with **Shift** held while placing or
+at the drop of a drag, it stays where the cursor is, turned as chosen (R / E turn the preview of such
+an object too), and the status line says which - "onto the track (Shift: where the cursor is)",
+"where the cursor is (Shift)" or "where the cursor is - <the rule's reason>"; a factory or repair
+point placed so gets no push line, a post a line only if a track is near. Two refusals stay, the
+places the game itself would undo: a car off the rails (`place_car`) and an object in a **factory's
+door** - `Depo_ReleaseUnit` (0x405290) deletes every object that `AskPlace` finds in the way of a unit
+it has just built at the factory's middle, so an object whose box overlaps that of the factory's units
+there and shares a `moveMask` bit with them (`factory_door`: the cars' 0x8) is refused, placed or
+dropped, with "the factory's door - the factory deletes what stands there when it builds a unit" (a
+locomotive placed at the dead end inside the sandbox's factory; a bush there, without the bit, goes).
+A mine keeps its rule too: onto a rail point or nowhere (below). Checked in the game on POLIGON: a
+factory placed 200 px off the track (where the cursor is, no line), a fort snapped across the main
+line, another with Shift beside it at its own direction, a tree placed into the fort, the locomotive
+refused in the factory's door and the bush put there.
 
 **The history's limits** (`editor_edit.cpp`, "object state and the undo history"). Undoing and
 redoing far crashed the editor: a train car's state kept the pointers to the rail points its two ends
@@ -1710,17 +1732,38 @@ locomotive stands on its points again; 510 turns of a fort left 500 steps.
 
 **Laying track** (the Track tool, key 3; `src/LocoFix/rail_rules.h`). The first click starts a
 line - at the end of a rail of the map near the cursor, or at the point of the rail lattice of
-the nearest rail end - and every next click lays one rail toward the cursor: the step of the
-lattice (one of the 12 shapes of VID 610, 71 x 50 px or their halves) whose end is nearest to
-it. The preview draws that rail and marks its ends green, or marks them red and names the rule
-in the status line ("does not join the rail before it - a turn needs a curve", "turns more than
-45 degrees", "this rail is already there"...). The right button or Esc ends the line (a second one the
+the nearest rail end - and every next click lays rails toward the cursor (`run_to_cursor`): within a
+step of the line's end (71 x 50) the step of the lattice (one of the 12 shapes of VID 610, 71 x 50 px
+or their halves) whose end is nearest to it, any of them; farther off a run toward the lattice point
+nearest to the cursor - each rail the one of the three that go on from the last (straight, a curve to
+either side) whose end comes nearest, while that brings it nearer, at most 40 - laid with one click as
+one step of the history, so a long straight or a curve round is one click. **The tool lays what is
+clicked** (the user's choice): over other rails, across their joints, as a dead end, turning sharply,
+at another height, where the same rail lies already - the engine takes all of them (a rail laid twice
+shares its points, adds no link; rails at two heights do not link; a dead end stops the trains, a sharp
+turn reverses them; the missions have each of these). The rules only choose which shape a step means -
+one joining the line's last rail when there is one (`rail::plan` / `plan_track` with `lay`). The one
+rail not laid is one that would give a point a 7th link, which the engine cannot take ("Too many
+links"); the status line says only that ("this point already has 6 rails"), its ends red - the run
+stops before it. The preview draws the rails of the click always (the 6-link one too), wherever the
+cursor is, also over the bar - before, a step that broke a rule was not drawn at all and the
+preview seemed to vanish with the cursor far off. The right button or Esc ends the line (a second one the
 tool). A click of the middle button (a drag of it pans the map, `mouse_pan.cpp`) deletes the rail under
 the cursor (of the rails whose box holds it, the one whose middle is nearest), with its bed and what
 stands on it (below), as one step of the history; when it was the last rail of the line being laid,
 the line goes on from the point before at that point's height. (For a while the right button deleted
 the rail instead: a right click meant to end a line took its last curve away and the next clicks of a
-star junction - several curves from one point - were laid from the wrong point and refused.) The rules
+star junction - several curves from one point - were laid from the wrong point and refused.) Before
+this, every click was checked by all the rules of a whole line: a line across POLIGON's main line at a
+joint was refused there ("does not join the rails at its end") though `map_tool.py track` laid the
+same line in one go, and so were the authors' own dead ends, duplicates and joints at two heights.
+Checked in the game on POLIGON at the joint 993.5,1375: four curve branches, a vertical across the
+joint in one click (a run of 4), three ramps from it (PgUp) until its point (1011,1375) had 6 links
+(the test command `D`), the 7th refused with its ends red, a curve laid again (shared points); a run
+of 8 rails in one click, then 3 with a curve; saved, `check-track` listing the dead ends, the
+duplicate and the joints at two heights; run with a locomotive of ours patrolling east through the
+cluster, `error.log` without `R_DOT`, `R_MAP` or `RAIL` lines (only the four `ENGINE ...: 0 rail 1`
+lines the untouched POLIGON has too). The rules
 are those of `map_tool.py track` (MAP_RULES.md 3) in C++: `rail_rules.h` mirrors `plan_track`,
 `rail_candidates`, `rail_ends_at` and `track_cells` of map_tool.py, and `tools\test_rail_rules.py`
 compares the two on generated cases (see "Working with the code"). A rail is created with World
@@ -2280,7 +2323,17 @@ and the tester's "how do I change an object's height" had no answer either. Now:
   flattens and Ctrl smooths for a stroke (`Stroke.brush`); Alt+click takes the level under the
   cursor for Flatten (`g_flatten_level`; the Alt keys are kept, `WM_SYSKEYDOWN`/`UP` of VK_MENU are
   taken so Alt alone does not open the window's system menu). Held still the brush goes on every 150 ms (a window timer, `HEIGHT_TIMER`) - before,
-  it worked only when the cursor entered a new cell. Flatten's level is the cell where the stroke
+  it worked only when the cursor entered a new cell. A stroke now steps every cell between two mouse moves (`height_step`): the moves
+  come a frame or more apart, and a quick drag took the brush only to the cells they fell in - an 800
+  px drag of a brush of radius 0 raised 11 cells 80 px apart, a ring drawn quickly did not close (the
+  Paint and Water brushes already laid their dabs along the way). Over the bar, the tools' rows or an
+  open panel nothing is raised or painted - the stroke goes on where the cursor comes out, not along
+  the way under them -, and the button let go ends the stroke even when a panel takes the message: a
+  panel opened during a stroke (F1) took the button-up, and a Paint stroke, which has no repeat timer
+  to notice, went on painting under the panel and after it with no button held. Checked in the game
+  (POLIGON, radius 0): the drag raised 101 cells in a band; a Paint stroke with Help opened and the
+  button let go over it ended there ("231x81 px"), and one dragged down over the rows and back painted
+  nothing under them (test steps `j` / `J`: the left button only pressed / let go). Flatten's level is the cell where the stroke
   begins, now named in the status line ("flatten to level 92"): begun on the track it gives a plateau
   at the track's level - the way to put a line and its factory on a hill: lay the line up its ramps
   (Track tool PgUp, 11 levels each), raise the ground around the top, flatten it starting on the track.
@@ -2378,7 +2431,8 @@ turned the way out along it (the nearest rail 1-38 px away), every repair point 
 leg, turned along it like a gate, a post (152) 15-58 px beside the track (median 31), facing the
 trains it is for, a money crate (169, army 3; `F169_8` gives the player 100 when a unit of
 theirs takes it) on the track (1-46 px from a rail, median 17). Placing them snaps there - the
-preview shows where -, elsewhere they are refused with the reason in the status line. (The missions'
+preview shows where -; farther than their reach, or with Shift, they stay where the cursor is (above:
+"Placing over objects, the track as a help") - only a mine needs its rail point. (The missions'
 blockers - the buffer stop, 150, "Blocker" of the palette's Railway group - stand at dead ends, all 99
 within 16 px of a rail point with one link; the editor snapped one there too, but it could not be
 turned and stood over the rail, so since v0.2.2 it is placed, dragged and turned freely, issue #3.)
@@ -2390,6 +2444,7 @@ turned and stood over the rail, so since v0.2.2 it is placed, dragged and turned
 | post | 24 px beside the track point nearest to the cursor, on the cursor's side of the track (R / E or the wheel put the preview on the other side), facing along the track the way that has that side on the right of its trains - its side follows from its way (184 of the missions' 188 posts stand so, 12-40 px from the track, median 23); the status line names its trains ("for the trains going left"); R / E, the wheel or the panel's FOR TRAINS turn a post beside a track round and put it across the track, as far from it as it stood (the track a post is beside is the one its trains pass on their right: the rail point nearest to 24 px on the post's other side - at a junction other track is as near), a post with no track within 70 px turns a step of its 8 directions | its own line at once, as the missions' posts have theirs (measured: each of the 188 posts against the nearest end of its script's lines): a line ending at the post's rail point - a red post's coming from behind it (107 of the 124 red posts; 85 with push_flag 1), so the trains it faces would enter it at its end against it and stop at the post; a green post's coming from the trains it faces (29 of the 61 green ones; 26 more at the begin of a line going on), so they run along it, pushed, and leave it at the post. The editor's are 70 px long with push_flag 1 (the red post's then pushes the trains of the other way toward it, as the missions' do). A pair at an entry - green facing the edge for the trains coming in, red facing in for those going out - owns one line from past the edge to the pair: the missions' entry (l02: `SetPushLine(-107,1203,54,1465,1)` with its pair at 54,1465). A line is a post's own by that shape alone, of any length (`owns`), so a loaded map's posts keep theirs, a pair shares one and the line of S or the Arrivals panel's entry belongs to its posts; never a factory's or repair point's line. None for a post that owns one already or stands within 40 px of an end of a line no post owns (a building's, the script's). Turning the post round, T or moving it makes its line again (a line another post owns too stays, the post gets one beside it); deleting the post deletes its line unless another post owns it (one step of the history each); L / Shift+L give a selected post its line green / red, the panel's LINE row says what the line does - STOPS THEM (red) or LETS THEM IN (green), the trains of its FOR TRAINS row - or NONE; the preview draws the line it will get. A post's line is drawn where it acts: a green post's line green (the way its trains are let in); a red post's not where the engine's line lies (behind it) but in front of it, where its trains come from and stop - red, from 35 px toward them to the post, the arrowhead and a red stop bar at the post; a pair's line green (the way in) with the red post's red mark in front of the pair (none goes back out); the status line says it in words ("the red semaphore's at 443,1399: the trains going right stop there (514,1299 -> 443,1299)"). A factory's or repair point's line keeps its flag's colour. Checked in play (`SANDBOX_DRIVE_TEST` on a copy of the sandbox): a red post on the main line for the trains going right, `SetPushLine(443,1299,301,1299,1)` - the reinforcement coming east onto that piece stopped at 387,1366 and stayed; the same post green, `SetPushLine(159,1299,301,1299,1)` - it went on east and reached its points; a pair at 194 (green south for the trains going right, red north for those going left) made one line, `SetPushLine(52,1299,194,1299,1)` - the reinforcement from past the west edge passed it east, and sent back west it stopped at 216,1375 and stayed |
 | money crate | the rail point nearest within 80 px | - |
 | fort | the line of the straight rail nearest within 60 px (`rail_line_spot`: its two ends' segment), where the cursor falls on it, turned along it the way nearest to the direction chosen - all 20 forts of the missions stand 0-6 px from such a line (R / E turn it round there) | its guns |
+| mining plant (165) | as the fort: 29 of the missions' 30 stand 0-6 px from a straight rail's line, turned along it the same way (rails of shape 0: 0 / 128, 1: 64, 2: 160, 3: 96 / 224; l14's sixteen in rows on their tracks, l18's on the line through them); `F165_0` takes it as `F162_0` a fort - a train of another army within 75 px. Placed anywhere before | its gun |
 | Charybdis | the line of the straight rail nearest within 100 px through its middle - l06's diagonal passes 1 px from it, so what it pulls in comes within the 40 px it eats in | its pieces |
 | citadel | over the diagonal rail nearest within 80 px, the rail's line 8 px north of its middle - the three citadels of l04 and l18 stand over the crossing of two diagonal tracks, which cross there, a grate on each southern arm | its pieces and tower |
 | crusher | across the straight rail nearest within 60 px, its middle on the rail's line, the drums on both sides - its form (the stands' direction) by the track's way, as `Pirate_Crasher` puts the ten of l04 and l18 | its second stand and drums |
@@ -2397,7 +2452,8 @@ turned and stood over the rail, so since v0.2.2 it is placed, dragged and turned
 
 Dragging one of them puts it at the place on the track nearest to where it is dropped (with a new
 line and posts for a factory or repair point; a fort, a citadel or Charybdis with all that goes with
-it); deleting a factory or a repair point takes its line and posts with it - each one step of the
+it); dropped farther than its reach, or with Shift held, it stays where it is dropped (its old line
+goes, it gets none) - before, it went back where it was; deleting a factory or a repair point takes its line and posts with it - each one step of the
 history. A factory is not turned by hand (its spur turns it); a repair
 point turns round on its leg - R / E, or TURN: ROUND in its panel, also while it is being placed -,
 and its line is made anew the other way with its posts (a green one at the new way in, a red one at
@@ -2505,8 +2561,33 @@ form 2`), both biting in the quick test (`CRUSHERS bite` at 25 s, the drums clos
 track); the status line's warning of a map without a tower of its army was seen whole after the
 placing in Polish and English. Factory chimneys (880) from the palette on POLIGON, played in the
 quick test: the smoke (291) rose from them, a long plume drifting with the wind.
+**Flags** (MAP_RULES.md 6c; `plan_place`, "where the object to place goes"). The palette's FLAGS,
+CRATES group had the flagpole (769, with its flag 770) and the five flags as loose objects: a flag
+picked went onto the ground at the direction last used - 0, its cloth seen edge on like a stick -,
+the pole's flag was ours (green) and the loose ones the enemy's, the station's flag ours, while every
+flag of the missions flies on a host facing 32 (the wind) and the pole flags are mostly the enemy's,
+the station flags the neutrals'. Now a flag picked faces 32 (R / E still turn it), goes onto the
+flagpole or station whose slot is within 24 px of the cursor (the slot's foot on the map or the slot on
+the screen; it replaces the flag there, in the army chosen - `set_piece` with an army, one step of the
+history), elsewhere it flies on a flagpole of its own (the pole and that flag in its slot, one whole);
+772, which has its own pole, stands on the ground as l09's four; Shift puts the flag alone where the
+cursor is. Both slots take all four flags (the pole's FLAG: row 1 2 4 5). The preview shows the flag
+in the slot (the host circled) or on its new pole, the status line "onto the flagpole (Shift: the flag
+alone)" / "on a flagpole of its own". A flag's colour is its army (`SetArmyGamma` gives 770-774 the
+flag gammas; 774's four directions are its four coloured looks, which the gamma tints alike). Checked
+in the game on POLIGON: a flagpole, each flag placed (770, 771 ours, 772, 773 neutral, 774 pirates - each
+on its own pole but 772), 771 onto a new station (its ridge, red), 773 onto the first pole replacing its
+flag, 770 with Shift on the ground, facing the wind.
 The explosive mine (86) snaps to the
-rail point nearest within 40 px, is placed in the army of the palette's row and is marked with its
+rail point nearest within 40 px - and only there: in play `F086_0` closes the rail point nearest to it
+(`SetSemaphore` takes the nearest one however far), so a mine away from the track would close some
+other track; Shift does not free it -, is placed **unarmed** (behave 0, as `F086_14` makes a mine born
+in play; the map's mines are made so when the level is held, "mines unarmed until the level runs" in
+`LocoFix.log`): a placed mine copied the behave of l12's (1, `BEH_AGGRESSIVE`, the palette's state
+too), and armed from the start `F086_0` never closed its point - the test command `D` showed its rail
+point with no semaphore in Run the level (no birth handler runs in editor mode), and its own army's
+trains would drive onto it; now the point and its neighbour have `sem 4` + army a moment after the
+level runs. It is placed in the army of the palette's row and is marked with its
 army by the editor (`draw_mines`: a square in the army's colour and MINE: ENEMY; the engine hides a
 mine of another army than the player's, also on the held level, so the editor draws its sprite, and
 `pick` takes it although its VID has the screen flag 0x800); the authors' marker (89) is marked MINE
@@ -2518,6 +2599,18 @@ the citadel (`CITADEL 1 gate hits vid 5 army 0` in `error.log`) while its tower 
 pulled in and ate the one beside it, the mine blew up the two over it, the waves nest sent its green
 flies and the guard nest a grey one while a train of ours was within 400 px; the citadel's ARMY row
 set to OURS turned its tower green and back with Ctrl+Z.
+
+Checked again (a review of every whole, POLIGON): the fort, the mining plant, the citadel, Charybdis,
+the crusher, Scylla, a fly nest, a semaphore, the flagpole, the station, the border post, the level
+exit, the oil derrick, both chimneys and the pool placed away from the track (where the cursor is),
+each turned with R and its army changed with A, saved, loaded and saved again - the two saves the
+same object for object (254), every piece at its offset for the new direction (the fort's guns at
+(-32, -24) / (33, 23) for 32, the plant's gun on its side, the station's flag on its ridge for 64, the
+chimneys' smoke and glow at their frame's top) and the faction pieces in the new army; run: the
+runner found each (`CITADEL`, `CHARYBDIS`, `NEST`, `CRUSHER`, `SCYLLA` lines), Scylla and the crusher
+bit and the nest sent its first fly. What changed in this review: the mining plant now goes onto the
+track as the missions' (it went anywhere), the flagpole's and station's slots take every flag and
+their default armies are the missions' (the enemy's, the neutrals'), a mine is placed unarmed.
 
 **The rows of the ground's tools** (`editor_edit.cpp`, the section of the same name). While the
 Ground height or the Paint tool is chosen, a row of buttons stands above the bar's strip: the depot
@@ -2768,12 +2861,12 @@ pictures (22 px right of the device's middle, 18 up), the title in the menu titl
 the text in the menu font (VID 2), the page arrows (VIDs 475/476) and the start button (VID 477)
 with "back to the map". **Help** (the ? button or F1) shows the editor's help pages the way the
 game shows its own (`maps\menu4.lst` -> `menu41.txt` ...): `maps\edithelp.lst` lists
-`maps\edithelp1.txt` ... `edithelp21.txt` - in the order a new user needs them: what the editor
+`maps\edithelp1.txt` ... `edithelp23.txt` - in the order a new user needs them: what the editor
 is (the bar, the status line, the two buttons), the bar's tools, selecting and placing (the mouse,
 undo), the keys, laying track, trains, the object's panel, all objects and decals, the mission,
 saving and playing, the ground (height, paint, water, regions, map size), the ground tools' rows,
 then the train arrivals and the orders (13, 14) turning (15) and the citadel, Charybdis, fly nests and mines (16; page 1 names 13-16), a factory's plan (17), the crusher, Scylla and the decorations' sets (18), the gravel bed (19), the neutrals and the pirates (20), the map files (21: a map is its folder, the
-page finds it, Rename or delete, the names) - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
+page finds it, Rename or delete, the names), placing - the track as a help, overlaps, flags (22), the rails' lattice (23) - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
 44 characters a line - the ESC pairs not counted, so a line with lit words is longer in the file - and 14
 lines, ESC 7 / ESC 2 switch to the lit font VID 7 and back to VID 2):
 English in `game/maps/` (the fallback of every pack) and the others in `lang/<code>/game/editor/`; the files are
@@ -2784,8 +2877,8 @@ tab-separated (`maps\edithelp5.txt<TAB>HelpCatTrack<TAB>TRACK AND TRAINS`); the 
 the order of their first pages, a page keeps its number (its line), and a line with the file alone is
 in the category of the page before - so a new page is one line of the list, with a category of its
 own (a new `HelpCat...` key in the six packs) or an existing one. Six now: BASICS (1-4, 15), TRACK AND
-TRAINS (5, 6), OBJECTS (7, 8, 16), MISSION, SAVING (9, 10, 21), GROUND (11, 12), ARRIVALS, FACTORIES (13,
-14, 17). The 23 rows of categories and titles (up to 37 characters) do not fit a page's 14 lines, so
+TRAINS (5, 6, 23), OBJECTS (7, 8, 16, 18, 20, 22), MISSION, SAVING (9, 10, 21), GROUND (11, 12, 19), ARRIVALS, FACTORIES (13,
+14, 17). The 29 rows of categories and titles (up to 37 characters) do not fit a page's 14 lines, so
 the contents are laid out as the palette: the categories down the left (two lines at most, the chosen
 one lit and underlined; the mouse over one, Up / Down or a click chooses it), the chosen one's pages on
 the right as the Menu panel's rows - the lamp (VID 472, pulsing under the mouse) and the page's title
@@ -3305,11 +3398,11 @@ mode above) are not tested in full screen.
   points of the next steps are known, and the test cursor in the middle of the game area (the
   cursor starts where the real one was, and at an edge the engine's edge scrolling moved the view
   away again until an `m` step brought it in), `D<x>:<y>` writes the rail points near a map point with
-  their links to `LocoFix.log` (test mode; `V` takes negative points too, the editor's camera
-  goes past the map), `M<file>` sets the mission settings from a file instead of the dialog
+  their links to `LocoFix.log` (and a point's semaphore value, `sem n`: 4 + army closes it for that army; test mode; `V` takes negative points too, the editor's camera
+  goes past the map), `P<nvid>[:<army>]` picks that object of the palette to place, in that army (-1 or none: the missions'; test mode), `M<file>` sets the mission settings from a file instead of the dialog
   (test mode; the format is in `editor_mission.cpp`), `N<name>:<line>[:<w>:<h>]` makes a new map as File >
   New would with the dialog's ground line (test mode), `Z<w>:<h>` resizes the map as File > Map size (test mode), `R<name>` renames the map and `X` deletes it (Rename or delete without the dialog, test mode), `^<code>` / `+<code>` press a key with
-  Ctrl / Shift (`^90` = Ctrl+Z), `K<code>` / `U<code>` only press / only let go a key (`K16`
+  Ctrl / Shift (`^90` = Ctrl+Z), `j<x>:<y>` / `J<x>:<y>` only press / only let go the left button there, `K<code>` / `U<code>` only press / only let go a key (`K16`
   before a drag holds Shift), `C<code>` sends a character (`WM_CHAR`, which the scripts'
   `GetKey()` reads - a posted key gives the lower case letter: `C77` is the developer key M), `A<seconds>`
   presses Alt+Tab (real keys) and after that many seconds Alt+Tab again, with a screenshot of the
@@ -3338,8 +3431,19 @@ mode above) are not tested in full screen.
   `rail_of`, `rail_point_links`) on generated cases - lattice steps and wrong ones, tracks next to
   existing rails, branches from their ends, rails laid again, crowded points, ramps and rails at
   other heights, the track's height given or not, hand-picked shapes, rail objects of every
-  direction, joints with rails of every shape (`python tools\test_rail_rules.py [cases]`, 3000 by
-  default; every kind of rule failure comes up).
+  direction, joints with rails of every shape, single rails laid as the editor lays them (`through`,
+  `lay`, ramps) onto joints of other track (`python tools\test_rail_rules.py [cases]`, 3000 by
+  default; every kind of rule failure comes up); then 21 tracks over other track (crossings of a
+  straight, a diagonal and a curve at a joint and mid-rail, parallels half a step and a step apart, a
+  crossover, the same rail again, branches, lines started or ended across a joint, a fork with no
+  stem, a sharp turn) and 6 clusters of clicks at one joint (every rail of the lattice from it, ramps
+  to its 6-link limit, a crossing and a branch both ways round, switches both ways and sides, lines
+  beside and across a crowded joint), each in its four mirror images and among denser track, with
+  the answer each must get - the clicks laid as the editor lays them, the lines in one go as map_tool;
+  the 24 rail ends, each going on in three steps; and every rail of the missions' maps, POLIGON, the
+  template and the player's maps of the installed game (OpenLocoland's folder, else `..\Locoland`,
+  else `build\game`), laid again where it lies with the rails before it in the map there: each must
+  be laid (the report says what the old rules refused of them).
 - `tools\test_script_value.py` - differential test of the rewritten script value helpers:
   builds `tools\test_script_value.cpp` (which includes `src/LocoFix/script_value.h` and
   `src/LocoFix/world_script.h`), emulates

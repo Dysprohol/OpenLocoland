@@ -28,6 +28,7 @@
 #           dialog comes first, <Shot>_<n>_dialog.png);
 #           V<x>:<y> puts the top-left of the view at that map point and the test cursor in the
 #           middle of the game area, so the edge scrolling leaves the view there (editor test mode);
+#           P<nvid>[:<army>] picks that object of the palette to place (editor test mode);
 #           D<x>:<y> writes the rail points near that map point to LocoFix.log (editor test mode);
 #           F<x>:<y> opens the panel of the factory at that map point (editor test mode);
 #           M<file> sets the mission settings from a file (editor test mode, src/LocoFix/editor_mission.cpp);
@@ -35,6 +36,7 @@
 #           E<zip> exports the map, I<zip>|overwrite|rename|ask imports one (File > Export / Import map);
 #           R<name> renames the map, X deletes it (editor test mode: Rename or delete without the dialog);
 #           N<name>:<line>[:<w>:<h>] makes a new map (editor test mode: File > New, line = the dialog's ground);
+#           j<x>:<y> / J<x>:<y> only press / only let go the left button there;
 #           K<code> / U<code> only press / only let go a key (K16,l...,U16 drags with Shift held);
 #           C<code> the character with that code (WM_CHAR: C77 = 'M', a developer key);
 #           A<seconds> Alt+Tab away from the game (real keys), a screenshot of its window
@@ -328,6 +330,10 @@ if ($Steps) {
     } elseif ($vk -cmatch '^F(-?\d+):(-?\d+)$') {
       # editor test mode: the panel of the factory at a map point (its plan, its build list)
       "Factory panel $($Matches[1]),$($Matches[2]): " + [W]::Command($game, 40047, "$($Matches[1]) $($Matches[2])")
+    } elseif ($vk -cmatch '^P(\d+)(?::(-?\d+))?$') {
+      # editor test mode: the palette's object of that VID picked to place (army -1 or none: as in the missions)
+      $army = if ($Matches[2]) { $Matches[2] } else { "-1" }
+      "Pick $($Matches[1]) army ${army}: " + [W]::Command($game, 40050, "$($Matches[1]) $army")
     } elseif ($vk -cmatch '^D(-?\d+):(-?\d+)$') {
       # editor test mode: the rail points near a map point into LocoFix.log
       "Rail points $($Matches[1]),$($Matches[2]): " + [W]::Command($game, 40041, "$($Matches[1]) $($Matches[2])")
@@ -395,6 +401,13 @@ if ($Steps) {
       Start-Sleep -Milliseconds 100
       [void][W]::PostMessage($game, 0x0101, [IntPtr]$code, [IntPtr]0xC0000001)
       [void][W]::PostMessage($game, 0x0101, [IntPtr]$mod, [IntPtr]0xC0000001)
+    } elseif ($vk -cmatch '^([jJ])(\d+):(\d+)$') {
+      # the left button only pressed (j) or only let go (J) at a point: a stroke with other steps between
+      $x, $y = [int]$Matches[2], [int]$Matches[3]
+      [void][W]::PostMessage($game, 0x8001, [IntPtr]0x0200, [IntPtr](($y -shl 16) -bor $x))
+      Start-Sleep -Milliseconds 50
+      [void][W]::PostMessage($game, 0x8001, [IntPtr]$(if ($Matches[1] -ceq 'j') { 0x0201 } else { 0x0202 }), [IntPtr](($y -shl 16) -bor $x))
+      "Left button $(if ($Matches[1] -ceq 'j') { 'down' } else { 'up' }) at ${x},${y}"
     } elseif ($vk -match '^l(\d+):(\d+)-(\d+):(\d+)$') {
       # left button drag: press at the first point, move to the second in 10 steps, release
       $x0, $y0, $x1, $y1 = [int]$Matches[1], [int]$Matches[2], [int]$Matches[3], [int]$Matches[4]

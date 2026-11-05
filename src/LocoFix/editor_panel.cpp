@@ -1009,6 +1009,14 @@ int palette_icon(int nvid) {
     return -1;
 }
 
+// The army the palette gives an object (the missions'), -1 when it is not in the palette.
+int palette_army(int nvid) {
+    load_palette();
+    for (const PaletteObject& o : g_palette)
+        if (o.nvid == nvid) return o.army;
+    return -1;
+}
+
 // The state of a unit the missions have (behave and build list), for one placed where the map has
 // none of its kind (map_tool.py place's rule).
 bool palette_state(int nvid, int& behave, std::vector<short>& items) {

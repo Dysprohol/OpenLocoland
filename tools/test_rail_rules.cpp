@@ -4,8 +4,8 @@
 // input line is one case:
 //
 //     C <ax> <ay> <bx> <by>                         rail_candidates(a, b)
-//     P <n> {<x> <y> <shape> <z0> <z1>}*n <m> {<x> <y>}*m <k> {<shape>}*k <z>
-//                                                   plan_track(rails, points, shapes or None, z)
+//     P <n> {<x> <y> <shape> <z0> <z1>}*n <m> {<x> <y>}*m <k> {<shape>}*k <z> <through> <lay> <ramp>
+//                                                   plan_track(rails, points, shapes or None, z, through, lay, ramp)
 //     T <width> <height> <n> {<ax> <ay> <bx> <by>}*n
 //                                                   track_cells(segments, width, height)
 //     R <x> <y> <z> <direction>                     rail_of(x, y, z, direction)
@@ -79,13 +79,16 @@ int main() {
                 shapes.push_back(s);
             }
             std::string z;
-            in >> z;
-            const rail::Plan plan = rail::plan(rails, points, shapes, z == "any" ? rail::ANY_Z : std::stoi(z));
+            int through = 0, lay = 0, ramp = 0;
+            in >> z >> through >> lay >> ramp;
+            const rail::Plan plan = rail::plan(rails, points, shapes, z == "any" ? rail::ANY_Z : std::stoi(z), through != 0, lay != 0, ramp);
+            auto height = [](int h) { return h == rail::ANY_Z ? std::string("any") : std::to_string(h); };
             out = std::string(rail::error_code(plan.error)) + " " + std::to_string(plan.step);
             if (plan.error == rail::Error::None) {
                 for (const rail::Segment& s : plan.segments)
                     out += " " + num(s.x) + " " + num(s.y) + " " + std::to_string(s.shape) + " " + num(s.end0.x) +
-                           " " + num(s.end0.y) + " " + num(s.end1.x) + " " + num(s.end1.y) + ";";
+                           " " + num(s.end0.y) + " " + num(s.end1.x) + " " + num(s.end1.y) + " " + height(s.z0) + " " +
+                           height(s.z1) + ";";
             }
         } else if (kind == "T") {
             int width, height, n;

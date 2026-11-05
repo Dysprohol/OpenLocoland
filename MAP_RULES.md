@@ -117,6 +117,19 @@ the editor of the game (DEVELOPERS.md "Editor mode", `editor_edit.cpp`) applies 
 - A junction is two rails with the same centre - a straight and a curve - sharing their
   first point, the way mission 1 builds its junctions; the branch's first rail must join the
   existing rail by the end-vector rule. **[tool]** (first and last point checked)
+- A crossing is two tracks over each other without a link: anywhere along the rails, or at a
+  joint - a rail ending there that points neither opposite to the rails there (a join) nor the
+  same way (a shared point) gets a point of its own, unlinked; `RailMap_FindCrossings` marks the
+  links that cross when the level loads, and a car on one stops the other train
+  (`Train_HandleContact`). A track may cross a joint between its first and last point; its last
+  point must join what ends there ("last"), and its first must join what starts there ("join").
+  **[editor]** The Track tool lays what is clicked (`lay` of `plan` / `plan_track`): a crossing at a
+  joint, a dead end, a sharp turn, a joint at two heights, the same rail again (its points shared, no
+  link added) - the missions have each; the rules only choose the shape a step means (one joining the
+  line's last rail when there is one), and only a rail that would give a point a 7th link is not
+  laid. `map_tool.py track` keeps every rule for the repository's maps, and `check-track` reports
+  such places on a saved map (the missions have 0-9 each: their dead ends, duplicates and joints at
+  two heights, which the game plays).
 - A point has at most 6 links ("Too many links"). The rail ends at a joint that point the same
   way at the same height share one point, which links to the far point of each of those rails
   and to the point of the rails ending the opposite way - so the limit is per point, not per
@@ -346,7 +359,9 @@ own army (`SetSemaphore(x, y - z, 4 + army)`, 7), any other train within 30 px s
 point again). The mine marker (89, 23 on five maps) is the authors' placeholder: `TrainsTact` makes the
 first five of a map an enemy mine one time in three and deletes them all. One mine stands on a map
 (l12, army 1). **[editor]** the mine is placed itself, in the army chosen (the palette's army row),
-on the rail point nearest within 40 px; every mine and marker is marked on the map with its army
+on the rail point nearest within 40 px - nowhere else, as `F086_0` closes the rail point nearest to it
+however far -, unarmed (behave 0, as `F086_14` makes one; the map's mines too when the level is held),
+so that `F086_0` arms it and closes its point when the level runs; every mine and marker is marked on the map with its army
 (MINE: ENEMY, MINE 1 IN 3: ENEMY), the editor's drawing only - in play the engine hides it from the
 other armies; a marker's panel makes it a mine. The palette has the mine, not the marker.
 
@@ -372,7 +387,15 @@ ice houses' and the swamp chimney's smoke (under half), the pirate walls with fe
 storeys of a building stacked on copies of it, piles of crates. **[editor]** each is placed, moved,
 turned, raised and deleted as one object; a click on a piece selects the host; the panel has a row for
 a piece of several kinds (CORKSCREW: WHOLE / BROKEN, ON TOP:, FLAG:, SMOKE:, FOUNTAIN:) and puts back a
-missing one; a map's own records are found again by their offsets.
+missing one; a map's own records are found again by their offsets. **Flags** (770-774): every flag of the
+missions flies on a host - 86 on flagpoles, 31 on stations, 4 772s (a flag with a pole of its own) on
+l04's level exits and 4 on l09's ground - and faces 32, the wind (a few 43: the same frame); their army
+is their colour (the enemy's on 56 of the flagpoles, the neutrals' on 19 of the 25 stations' flags).
+**[editor]** a flag placed goes onto the flagpole or station under the cursor (its slot, at the slot's
+height: 770 +118 / 771 +92 / 773 +115 / 774 +114 on a pole, 773 +121 / 770 +127 / 771 +99 / 774 +121 on
+a station - the ones the missions do not have at the height that puts the cloth's top where theirs is),
+elsewhere on a flagpole of its own (772 alone, on the ground), facing 32; Shift places the flag alone.
+The palette gives the flagpole the enemy's flag and the station the neutrals' by default.
 
 ## 6d. Neutrals and pirates in a fight
 
