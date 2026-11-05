@@ -75,6 +75,7 @@ MAP_TEXT = re.compile(r"(brief\d*|win|loose|objectives|script\d+)\.txt", re.I)  
 WIDTHS = [("objectives.txt", 40, "objectives.txt (the mission's goals)"),
           ("script", 54, "script*.txt (the tutorial's messages, mission 1)"),
           ("", 44, "brief*.txt, win.txt, loose.txt (briefings), menu*.txt (menu pages), edithelp*.txt (help pages)")]
+HELP_LINES = 14   # the lines of a help page (docs/TRANSLATING.md)
 GROUPS = {"briefings": "mission briefings", "ourmaps": "POLIGON's and the template's texts",
           "menus": "menu pages", "editor": "editor help pages", "strings": "strings.ini",
           "launcher": "launcher labels", "installer": "Setup's window texts"}
@@ -92,7 +93,8 @@ def english_name(code):
 
 def natural(text):
     """A sort key: the numbers in a name by their value, brief.txt before brief2.txt."""
-    return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", text.replace(".", " "))]
+    stem, ext = os.path.splitext(text)
+    return [[int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", part) if t] for part in stem.split("/")] + [ext]
 
 
 def read(path):
@@ -531,7 +533,7 @@ def installer_texts(source=None):
 def todo(kit, entries, scope):
     out = []
     english_pages = [e for e in entries if e.kind == "page" and e.english is not None and kit.code != "en"
-                     and english_share(e.text, e.english) >= 0.6]
+                     and english_share(e.text, e.english) >= 0.5]
     absent = [e for e in english_pages if e.current is None]
     plain = [e for e in entries if e.kind == "page" and needs_letters(kit.code) and e not in english_pages
              and letters(e.text) >= 40 and all(ord(c) < 128 for c in e.text)]
@@ -568,8 +570,7 @@ README = """\
 OpenLocoland - translation kit for {name} ({code})
 {line}
 
-This folder holds the texts of the {name} language pack of OpenLocoland, the revival of the game
-Locoland: {what}. Translate them in place and send the whole folder (or a zip of it) back.
+{intro}
 
 Exported {date} from commit {commit}, scope: {scope}.
 
@@ -589,17 +590,20 @@ HOW THE FOLDER IS MADE
 THE RULES (the import checks them; a file that breaks one comes back to you with the line)
 
 1. Keep every file name and folder. Do not add or remove files.
-2. A line may not be wider than the English line at the same place, and never wider than:
+2. A line may not be wider than the limit of its kind (or than the English line at the same
+   place, when that one is wider):
 {widths}
    The game does not wrap text: break long sentences into more lines yourself. A page should not
-   get many more lines than the English one, or it may not fit its frame.
+   get many more lines than the English one, or it may not fit its frame; a help page
+   (edithelp*.txt) has at most 14 lines, its first line is the page's title.
 3. Capitals where the original has them: the headers, the mission titles, the objectives and
    other lines that are in capitals in English are in capitals in the translation (some fonts of
    the game have no small letters).
 4. Do not change section names ([strings], [Editor] ...), the keys (the part before "="), their
    order, or these marks inside a text: %s %d %1 %2 (filled in by the game, in the same order),
-   {{name}} fields, \\t (a tab: keep it), \\n (a new line), & (marks the letter of a menu entry
-   that Alt opens: one per entry; && writes an & itself).
+   {{name}} fields, \\t (a tab: keep it), & (marks the letter of a menu entry that Alt opens:
+   one per entry; && writes an & itself). \\n starts a new line inside an editor's text: keep as
+   many as the English has when you can.
 5. The help pages have {{F7}} and {{F2}} in their lines: they switch the font (the lit one and the
    plain one). Keep them around the same words.
 6. A character the game's fonts cannot draw is refused (typographic quotes, long dashes, the
@@ -632,9 +636,13 @@ def write_kit(kit, entries, folder, scope):
             "all": "the game's own texts (the missions' briefings, the menu pages, strings.ini) and the "
                    "texts we add to it (the map editor's help pages and labels, the launcher, Setup, "
                    "the POLIGON map)"}[scope]
-    widths = "\n".join(f"     {limit} characters  {label}" for _, limit, label in WIDTHS)
+    widths = "\n".join(textwrap.fill(label, 96, initial_indent=f"     {limit} characters  ", subsequent_indent=" " * 20)
+                       for _, limit, label in WIDTHS)
+    intro = textwrap.fill(f"This folder holds the texts of the {name} language pack of OpenLocoland, the revival "
+                          f"of the game Locoland: {what}. Translate them in place and send the whole folder (or "
+                          f"a zip of it) back.", 96)
     title = f"OpenLocoland - translation kit for {name} ({kit.code})"
-    readme = README.format(name=name, code=kit.code, line="=" * len(title), what=what, cp=f"CP{kit.cp}",
+    readme = README.format(name=name, code=kit.code, line="=" * len(title), intro=intro, cp=f"CP{kit.cp}",
                            date=datetime.date.today().isoformat(), commit=commit, scope=scope, widths=widths)
     with open(os.path.join(folder, "README.txt"), "w", encoding="utf-8", newline="\r\n") as f:
         f.write(readme)
@@ -813,7 +821,9 @@ def check_page(entry, text, checker):
             if letters(en) >= 3 and en.upper() == en and FONT_MARK.sub("", line).upper() != FONT_MARK.sub("", line):
                 r.warnings.append(f"line {n}: the English line is in capitals, this one is not: {line.strip()[:60]}")
     english_lines = len(english) - (english[-1:] == [""])
-    if english and len(lines) > english_lines + 2:
+    if name.lower().startswith("edithelp") and len(lines) > HELP_LINES:
+        r.problems.append(f"{len(lines)} lines - a help page holds at most {HELP_LINES}")
+    elif english and len(lines) > english_lines + 2:
         r.warnings.append(f"{len(lines)} lines, the English has {english_lines} - check that the page still fits")
     data, problems = encode_lines(from_kit("\n".join(lines)), checker.cp)
     r.problems += problems   # (the characters without a byte are a ? in `data`: the fonts check the rest)
@@ -1105,7 +1115,7 @@ def import_kit(args):
                   f"overwritten - check the diff):\n    " + changed.replace("\n", "\n    "))
     print(f"\naccepted ({len(accepted)}):")
     for r in accepted:
-        print(f"  {r.entry.kit}   ({r.changed} {'keys' if r.entry.items is not None else 'lines'} changed)")
+        print(f"  {r.entry.kit}   ({changes_of(r)} changed)")
         for w in r.warnings:
             print(f"      warning: {w}")
     print(f"\nrejected ({len(rejected)}):")
@@ -1115,13 +1125,15 @@ def import_kit(args):
             print(f"      {p}")
         for w in r.warnings:
             print(f"      warning: {w}")
-    reasons = Counter(r.skip for r in skipped)
-    print(f"\nnot written ({len(skipped)}): " + ", ".join(f"{n} {why}" for why, n in reasons.items()))
+    if skipped:
+        reasons = Counter(r.skip for r in skipped)
+        print(f"\nnot written ({len(skipped)}): " + ", ".join(f"{n} {why}" for why, n in reasons.items()))
     if unknown:
         print(f"\nnot files of the kit, left out ({len(unknown)}): " + ", ".join(unknown))
     missing = sorted(set(by_scope[kit.default_scope()]) - set(files), key=natural)
     if missing and len(missing) < len(by_scope[kit.default_scope()]):
-        print(f"\nnot in the folder ({len(missing)}): " + ", ".join(missing[:10]) + (" ..." if len(missing) > 10 else ""))
+        print(f"\n{len(missing)} file(s) of the kit not in the folder (only what is there is imported): "
+              + ", ".join(missing[:5]) + (" ..." if len(missing) > 5 else ""))
     if args.dry_run:
         print("\n--dry-run: nothing written")
         return 1 if rejected else 0
@@ -1178,6 +1190,11 @@ def write_and_commit(kit, accepted, args):
     return 0
 
 
+def changes_of(r):
+    unit = "key" if r.entry.items is not None else "line"
+    return f"{r.changed} {unit}{'s' if r.changed != 1 else ''}"
+
+
 def commit_message(kit, accepted, args):
     name = english_name(kit.code)
     groups = {}
@@ -1192,10 +1209,11 @@ def commit_message(kit, accepted, args):
             missions = sorted({r.entry.kit.split("/")[2] for r in rs}, key=natural)
             parts.append(f"{GROUPS[group]} {', '.join(missions)}" if len(missions) <= 4 else
                          f"{GROUPS[group]} of {len(missions)} missions")
-        elif group in ("strings", "launcher", "installer"):
-            parts.append(GROUPS[group])
+        elif group in ("editor", "menus"):
+            numbers = sorted((re.sub(r"\D", "", r.entry.kit.rsplit("/", 1)[-1]) for r in rs), key=int)
+            parts.append(f"{GROUPS[group]} {', '.join(numbers)}" if len(numbers) <= 6 else f"{len(numbers)} {GROUPS[group]}")
         else:
-            parts.append(f"{GROUPS[group]} ({len(rs)})")
+            parts.append(GROUPS[group])
     subject = f"{name} translation: " + ", ".join(parts)
     translator = re.sub(r"\s*<.*", "", args.author) if args.author else "the translator"
     cp = f"CP{kit.cp}"
@@ -1206,8 +1224,7 @@ def commit_message(kit, accepted, args):
     lines = []
     for group in GROUPS:
         for r in groups.get(group, []):
-            unit = "keys" if r.entry.items is not None else "lines"
-            lines.append(f"- {os.path.relpath(r.entry.target, REPO).replace(chr(92), '/')} ({r.changed} {unit})")
+            lines.append(f"- {os.path.relpath(r.entry.target, REPO).replace(chr(92), '/')} ({changes_of(r)})")
     return subject + "\n\n" + textwrap.fill(body, 72) + "\n\n" + "\n".join(lines)
 
 

@@ -198,6 +198,84 @@ python tools\build.py --target <test folder>
 The game does not wrap lines, so check the long ones on screen.
 
 
+## For translators without git
+
+A volunteer does not need git, Python or the code pages: we send a folder of UTF-8 files, they
+translate them in any editor, they send the folder back, and one command checks it and commits it
+in their name.
+
+```bash
+python tools\translate_kit.py export <code> <folder> [--ours | --game | --all] [--zip]
+```
+
+writes the pack's texts into `<folder>` (and with `--zip` also `<folder>.zip`, the one to send):
+
+```
+<folder>/
+├── README.txt                   the rules, in English, for the translator
+├── TODO.txt                     what is left (computed, below)
+├── language.ini                 the launcher's labels
+├── installer.txt                Setup's window texts (TEXTS of tools/installer.py), key=value
+└── game/
+    ├── strings.override.ini     the keys of the scope
+    ├── briefings/<map>/*.txt    each with <name>.en.txt beside it: the English page
+    ├── menus/menu*.txt
+    └── editor/edithelp*.txt
+```
+
+Every file is UTF-8, converted from the pack's code page, at the pack's own path. Beside each page
+is its English original (`brief.en.txt` beside `brief.txt`): the game's texts from `captured/en`,
+ours from the English at the root (`game/maps/edithelp*.txt`, `game/maps.new/<map>/*.txt`). In the
+key files the English of each key is on a `;EN> ...` line above it; the help pages' font switches
+(ESC 7 / ESC 2) are written `{F7}` / `{F2}`. A text the pack does not have yet - or has only as
+`lang/_template`'s placeholder - is written as the English, so a new language (a copy of
+`lang/_template`, see "Adding a language") gets the whole English as its starting point.
+
+The scope: `--ours` is what we add to the game - the editor's help pages, our keys of
+`strings.override.ini` (those `lang/en/game/strings.override.ini` defines), POLIGON's and the
+template's texts, the launcher's labels and Setup's; `--game` the game's own texts - the missions'
+briefings, the menu pages and the other keys of `strings.ini`; `--all` both. Without one, a fan
+translation (`base=` another language, Czech) gets `--all` and a language Steam ships `--ours`:
+its game texts are Steam's.
+
+`TODO.txt` lists the pages still in English (or most of their lines), the pages without any letter
+outside ASCII (for every language but English: diacritics still to come), the keys of ours the
+pack lacks (in the kit with the English text, to translate) and the values still the same as the
+English. `README.txt` gives the rules: the widths per kind of file (44 characters in the
+briefings, menu pages and help pages, 40 in `objectives.txt`, 54 in the tutorial's `script*.txt`,
+or the English line's at that place when it is wider; 14 lines a help page), capitals where the
+original has them, the section names, keys, `%s` `%d` `%1` `{name}` `\t` `&` and the file names
+unchanged, the language written normally with its letters, and to send the whole folder back.
+
+```bash
+python tools\translate_kit.py import <code> <folder or zip> --author "Name <email>" [--dry-run] [--partial]
+```
+
+reads the files back (`*.en.txt`, `README.txt` and `TODO.txt` are left out), converts each to the
+pack's code page and checks it, and prints a report: the accepted files with the number of lines
+or keys changed, the rejected ones with each line and its reason, the unchanged ones by count. A
+file is rejected for a character the code page has no byte for (its line and column), a character
+the pack's fonts cannot draw (`check_lang.py`'s check, with every font set a fan pack may be built
+on), a line wider than its limit, a help page over 14 lines, sections or keys changed or moved, a
+value whose `%` conversions (and their order), `{fields}`, `\t` or single `&` differ from the
+English, a setting of `language.ini` that is ours (`codepage`, `base`), or `installer.txt`'s
+`{fields}` against `TEXTS`. A line in small letters where the English has capitals, a page much
+longer than the English and a changed number of `\n` are warnings. A page left as the English that
+the pack did not have is not added.
+
+The accepted files are written into `lang/<code>/` with the line endings of the file there (CRLF
+in the pages, LF in `strings.override.ini`; a new page CRLF), only the changed keys of a key file
+rewritten in place (a new key after the one before it) and `installer.txt` into `TEXTS[<code>]` of
+`tools/installer.py`. Then `check_lang.py` runs for the pack - it must pass, or the files are put
+back - and one commit is made with `--author`, the translator's name and e-mail, so GitHub credits
+them, and a message naming the pack and the file groups. Our own corrections afterwards are a
+commit of their own, by hand. A rejected file stops it all - nothing written, nothing committed -
+unless `--partial`; `--dry-run` only reports, and the files to import must have no changes of
+their own in the checkout. The kit's `README.txt` names the commit it was exported from; when a
+file of the pack has changed since, the report says so (the translator's file would replace it).
+Both commands take `--captured <folder>` for the captures (`languages.CAPTURED` by default).
+
+
 ## Language codes
 
 | Code | Language   | Code page | Steam depot      |
