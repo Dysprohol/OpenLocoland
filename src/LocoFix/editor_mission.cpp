@@ -27,8 +27,8 @@
 // briefing pages brief.txt, brief2.txt ... listed in brief.lst (with the high scores page,
 // hiscores.txt, last when the list had it - the game writes that one); a text the language pack
 // has a copy of (the sandbox's, lang\<code>\maps\sandbox) is written to that copy. A map saved as
-// maps\<folder>\<folder>.map gets its line in maps\custom.lst (the folder and its title), so it
-// shows on the custom maps page of the menu.
+// maps\<folder>\<folder>.map is on the custom maps page of the menu by itself (custom_maps.cpp),
+// with the "// title:" line as its title.
 //
 // File > Mission settings... edits all of it in a Windows dialog (built in memory, Unicode, the
 // game in GDI mode as for the file dialogs - editor.cpp).
@@ -36,6 +36,7 @@
 #include "dialog_template.h"
 #include "editor_mission.h"
 #include "editor_text.h"
+#include "custom_maps.h"
 
 #include <algorithm>
 #include <cctype>
@@ -61,7 +62,6 @@ namespace {
 constexpr int LINE_WIDTH = 44;          // characters a line of the briefing (menutact.lgc)
 constexpr int PATROLS = 10;             // ATA_PATROL0 ... ATA_PATROL9
 constexpr const char* TEMPLATE_SCRIPT = "maps\\template\\template.lgc";
-constexpr const char* CUSTOM_LIST = "maps\\custom.lst";
 
 // the settings the editor writes as they were read, with the template's values
 const char* const SETTINGS[][2] = {
@@ -2004,14 +2004,6 @@ std::string folder_name(const std::string& map) {   // maps\<name>\<name>.map ->
     return slash == std::string::npos ? folder : folder.substr(slash + 1);
 }
 
-// The title of a folder on the custom maps page, if it is there.
-std::string custom_title(const std::string& folder) {
-    const std::vector<std::string> lines = split_lines(read_file(CUSTOM_LIST));
-    for (size_t i = 0; i + 1 < lines.size(); i += 2)
-        if (lstrcmpiA(trim(lines[i]).c_str(), folder.c_str()) == 0) return trim(lines[i + 1]);
-    return "";
-}
-
 Mission read_mission(const Parsed& p, bool block, const std::string& map) {
     Mission m;
     auto get = [&](const char* name, const std::string& fallback) {
@@ -2079,7 +2071,6 @@ Mission read_mission(const Parsed& p, bool block, const std::string& map) {
         m.brief.push_back(read_text(name));
     }
     std::string title = p.title;
-    if (title.empty()) title = custom_title(folder_name(map));
     if (title.empty()) title = upper(folder_name(map));
     m.title = from_pack(title);
     auto header = p.defines.find("BRIEF_HEADER");
@@ -2411,27 +2402,6 @@ bool parse_patrol(const std::string& raw, TrainPatrol& out) {
     int r = 0;
     return std::sscanf(code.c_str() + at, "PatrolEngine(FindNearestSprite(GETSPRITE_VID+%d , %d , %d , %d ) , %d , %d )", &out.nvid,
                        &out.x, &out.y, &r, &out.to_x, &out.to_y) == 6;
-}
-
-// ---- custom.lst ----
-
-void add_to_custom_list(const std::string& folder, const std::string& title) {
-    std::vector<std::string> lines;
-    for (const std::string& line : split_lines(read_file(CUSTOM_LIST)))
-        if (!trim(line).empty()) lines.push_back(trim(line));
-    bool found = false;
-    for (size_t i = 0; i + 1 < lines.size(); i += 2)
-        if (lstrcmpiA(lines[i].c_str(), folder.c_str()) == 0) {
-            lines[i + 1] = title;
-            found = true;
-        }
-    if (!found) {   // the page scrolls: the list has any length
-        lines.push_back(folder);
-        lines.push_back(title);
-    }
-    std::string data;
-    for (size_t i = 0; i < lines.size(); ++i) data += (i ? "\r\n" : "") + lines[i];   // as the repository's
-    if (write_file(CUSTOM_LIST, data)) patch::log("mission: %s on the custom maps page as %s", folder.c_str(), title.c_str());
 }
 
 // ---- the dialog ----
@@ -2769,8 +2739,6 @@ Fields current_fields() {
 std::vector<EnemyTrain>& mission_start() { return g_mission.start; }
 std::vector<int> mission_type_cars(const std::string& type) { return template_cars(type_number_of(type), g_parsed); }
 std::vector<PushLine>& mission_push_lines() { return g_lines; }
-void mission_list_map(const std::string& folder, const std::string& title) { add_to_custom_list(folder, title); }
-std::string mission_listed_title(const std::string& folder) { return custom_title(folder); }
 const std::vector<TrainPatrol>& mission_patrols() { return g_patrols; }
 const std::vector<PushLine>& mission_script_push_lines() { return g_script_lines; }
 bool mission_managed() { return g_managed; }
@@ -3207,14 +3175,9 @@ void mission_save(const std::string& map) {
     patch::log("mission: %s written - %u push lines, %u start trains, %u in the queue, %u briefing pages",
                script.c_str(), static_cast<unsigned>(g_lines.size()), static_cast<unsigned>(g_mission.start.size()),
                static_cast<unsigned>(g_mission.factories.queue.size()), static_cast<unsigned>(pages.size()));
-    // maps\<name>\<name>.map: the custom maps page (not the template itself, nor a map of a scratch
-    // folder: the editor's new map, Run the level's copy)
-    const std::string name = folder_name(map);
-    const size_t slash = map.find_last_of('\\'), dot = map.find_last_of('.');
-    const std::string base = slash == std::string::npos ? map : map.substr(slash + 1, dot - slash - 1);
-    if (lstrcmpiA(folder.c_str(), ("maps\\" + name).c_str()) == 0 && lstrcmpiA(base.c_str(), name.c_str()) == 0 &&
-        lstrcmpiA(name.c_str(), "template") != 0 && !editor_unsaved_map(map))
-        add_to_custom_list(name, ascii_upper(g_mission.title, 24));
+    // the custom maps page finds maps\<name>\<name>.map by itself (custom_maps.cpp): its list now,
+    // for a new map or a new title (not for a scratch folder: the editor's new map, Run the level's copy)
+    if (!editor_unsaved_map(map)) custom_maps_list();
 }
 
 // An arrival of the test file: words key=value - army=0-3, cars=5,20,20, at=x,y,z (the entry),

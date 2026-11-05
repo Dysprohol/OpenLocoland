@@ -39,6 +39,7 @@ const char* editor_level_redirect(const char* map);
 void editor_level_loaded(void* world);
 void restart_level_loading(const char* map);   // restart.cpp
 void factions_level_loading(const char* map);  // factions.cpp
+const char* custom_maps_level_guard(const char* map);   // custom_maps.cpp: a map that is not there - the menu
 
 namespace {
 
@@ -159,7 +160,7 @@ const auto g_level_load = reinterpret_cast<LevelLoad_t>(LEVEL_LOAD);
 
 int __fastcall LevelLoad_measured(void* world, void* edx, const char* name) {
     report_level();
-    const char* map = editor_level_redirect(test_map_replace(name));
+    const char* map = custom_maps_level_guard(editor_level_redirect(test_map_replace(name)));
     lstrcpynA(g_level, map ? map : "?", sizeof g_level);
     restart_level_loading(map);
     factions_level_loading(map);

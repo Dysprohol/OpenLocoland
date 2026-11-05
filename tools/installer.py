@@ -31,7 +31,7 @@ gets their language; fan translations are marked unofficial.
 The window is in English unless another of its languages is picked; a new install sets the
 game's language to English (when that pack can be built) or the one picked. Running it again
 over an install updates it: build.py writes only our files and the game's originals, so the
-player's high scores, maps and lines of maps\custom.lst stay, and the progress in the registry
+player's high scores and maps stay (the custom maps page finds every map folder), and the progress in the registry
 is not touched - the two options are written with the values shown (the current ones of the
 registry), and the game's language only when it was changed in the window; what earlier versions
 left and this one does not write is removed (build.clean_up, listed in the log). OpenLocoland.json

@@ -124,8 +124,12 @@ Mapa strategiczna ma **drugą stronę**: przycisk `►►►` w jej prawym dolny
 ![Strona własnych map](img/custom-maps-pl.jpg)
 
 - **EDYTOR MAP** (pierwszy wiersz) uruchamia edytor - zob. [edytor map](#5-edytor-map).
-- Pod nim są własne mapy: te dołączone do gry i te, które zrobisz albo dostaniesz od znajomych.
-  Długa lista się przewija - strzałki obok niej, kółko myszy, klawisze w górę i w dół.
+- Pod nim są własne mapy: te dołączone do gry i te, które zrobisz albo dostaniesz od znajomych -
+  każdy folder mapy w `maps\` folderu gry, znaleziony sam (folder skopiowany albo usunięty pojawia się
+  lub znika nawet przy otwartej stronie). Długa lista się przewija - strzałki obok niej, kółko myszy,
+  klawisze w górę i w dół.
+- Mapa, której nie da się otworzyć (jej folder zniknął, brak obrazu terenu albo skryptu), mówi dlaczego
+  w wierszu pod listą.
 - Kliknięcie mapy pokazuje jej odprawę; **URUCHOM GRE** gra ją jak misję kampanii.
 - Młotek i klucz na prawo od tytułu mapy (**Edytuj mape**) otwierają tę mapę w edytorze.
 
@@ -178,7 +182,7 @@ Co widać:
   ![Strona pomocy](img/editor-help-pl.jpg)
 
   **Przycisk menu** otwiera menu edytora ze wszystkimi poleceniami - **NOWA MAPA**, **WCZYTAJ MAPE**,
-  **ZAPISZ MAPE**, **EKSPORT MAPY**, **IMPORT MAPY**, **USTAWIENIA MISJI**, **ROZMIAR MAPY**, **ZAGRAJ
+  **ZAPISZ MAPE**, **EKSPORT MAPY**, **IMPORT MAPY**, **ZMIEN NAZWE / USUN**, **USTAWIENIA MISJI**, **ROZMIAR MAPY**, **ZAGRAJ
   ZAPISANA MAPE**, **COFNIJ**, **PONOW**, **TEST BEZ ZAPISU**, **POWROT DO MENU**, **WYJDZ Z GRY**;
   wiersz stanu mówi, co robi to pod myszą.
 
@@ -537,13 +541,13 @@ duże **ZAPISANO** z plikiem mapy na środku widoku, z kliknięciem menu.
 
 Mapa to jej folder: `maps\<nazwa>\` w folderze gry zawiera mapę (`<nazwa>.map`), jej pomalowany teren
 (`<nazwa>.vid`), skrypt (`<nazwa>.lgc`) i teksty. Żeby dać ją znajomemu ręcznie: wyślij cały folder;
-znajomy wkłada go do `maps\` swojego folderu gry i dopisuje na końcu `maps\custom.lst` (Notatnik)
-dwa wiersze: nazwę folderu i tytuł wielkimi literami, np.
+znajomy wkłada go do `maps\` swojego folderu gry i mapa jest na stronie własnych map. Folder
+przemianowany w Eksploratorze też działa: gra sama zmienia nazwy plików w środku na nazwę folderu.
 
-```
-most_1
-MOST BEZ POWROTU
-```
+**Zmiana nazwy i usuwanie:** Menu → **ZMIEN NAZWE / USUN** daje mapie nową nazwę (jej folder i pliki
+idą za nią, stary folder trafia do Kosza) albo ją usuwa (po pytaniu, do Kosza). Nazwa może mieć do 64
+liter angielskich, cyfr, spacji i znaków dozwolonych w nazwach plików Windows i nie może być folderem
+gry (`l01`-`l20`, `sandbox`, `template`, `script`, `outro`).
 
 ## 7. Klawisze i narzędzia edytora
 
@@ -598,8 +602,8 @@ misji, Wysokosc terenu, Skrzynka z pieniedzmi, Pojazdy, Malowanie terenu, Woda i
 
 - **Gra się nie uruchamia albo instalator nie znajduje Locolandu.** Locoland musi być zainstalowany
   przez Steam (w dowolnym języku).
-- **Gdzie są moje mapy?** W `maps\` folderu gry (C:\Users\<ty>\Games\OpenLocoland), każda w swoim folderze; lista
-  strony własnych map to `maps\custom.lst`.
+- **Gdzie są moje mapy?** W `maps\` folderu gry (C:\Users\<ty>\Games\OpenLocoland), każda w swoim folderze;
+  strona własnych map sama pokazuje każdą z nich (`maps\custom.lst` to własna lista gry).
 - **Coś poszło nie tak.** Gra zapisuje w `logs\` swojego folderu `error.log` i `LocoFix.log`; wyślij je z
   opisem tego, co się stało.
 - **Pełny ekran.** Działa, ale sprawdzony jest tryb okna; jeśli ekran zostaje czarny, odznacz „pełny

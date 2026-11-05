@@ -33,6 +33,7 @@
 #           M<file> sets the mission settings from a file (editor test mode, src/LocoFix/editor_mission.cpp);
 #           Z<w>:<h> resizes the map (editor test mode: File > Map size);
 #           E<zip> exports the map, I<zip>|overwrite|rename|ask imports one (File > Export / Import map);
+#           R<name> renames the map, X deletes it (editor test mode: Rename or delete without the dialog);
 #           N<name>:<line>[:<w>:<h>] makes a new map (editor test mode: File > New, line = the dialog's ground);
 #           K<code> / U<code> only press / only let go a key (K16,l...,U16 drags with Shift held);
 #           C<code> the character with that code (WM_CHAR: C77 = 'M', a developer key);
@@ -339,6 +340,14 @@ if ($Steps) {
       # editor test mode: File > Map size without the dialogs
       $r = [W]::Command($game, 40044, "$($Matches[1]) $($Matches[2])")
       "Map size $($Matches[1]) x $($Matches[2]): " + $(if ($r -eq 1) { "ok" } else { "failed" })
+    } elseif ($vk -cmatch '^R(.+)$') {
+      # editor test mode: the map renamed (Rename or delete without the dialog)
+      $r = [W]::Command($game, 40048, $Matches[1])
+      "Rename to $($Matches[1]): " + $(if ($r -eq 1) { "ok" } else { "failed" })
+    } elseif ($vk -ceq 'X') {
+      # editor test mode: the map deleted (Rename or delete without the questions)
+      $r = [W]::Command($game, 40049, "")
+      "Delete: " + $(if ($r -eq 1) { "ok" } else { "failed" })
     } elseif ($vk -cmatch '^E(.+)$') {
       # editor test mode: File > Export map into that .zip without the dialogs
       $r = [W]::Command($game, 40045, $Matches[1])

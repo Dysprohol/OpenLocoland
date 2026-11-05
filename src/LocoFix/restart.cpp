@@ -45,6 +45,7 @@ bool editor_level_running();                      // editor.cpp: Run the level i
 void editor_hold_level();                         // editor.cpp: ... and the level is held again
 int recalc_grid_z_extern(uint8_t* world);         // ground.cpp
 int mouse_wheel_extern(uint8_t* world);           // menu_input.cpp
+bool custom_maps_extern(uint8_t* world, int function);   // custom_maps.cpp: 204-206, the custom maps page
 bool restart_game(bool editor, const std::string& map, bool back_to_editor = false);
 
 namespace {
@@ -121,6 +122,7 @@ INT_PTR WINAPI DialogBoxParamA_restart(HINSTANCE instance, LPCSTR name, HWND par
 int __fastcall CallExtern_restart(uint8_t* world, void* edx, int function) {
     if (function == EXTERN_RECALC_GRID_Z) return recalc_grid_z_extern(world);
     if (function == EXTERN_MOUSE_WHEEL) return mouse_wheel_extern(world);
+    if (custom_maps_extern(world, function)) return 0;
     if (function == EXTERN_PLAYED_FROM_EDITOR) {
         const int how = g_return_editor && !g_played.empty() ? 1 : editor_level_running() ? 2 : 0;
         reinterpret_cast<PushInt_t>(SCRIPT_PUSH_INT)(world + WORLD_SCRIPT, nullptr, how);

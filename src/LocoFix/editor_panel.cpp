@@ -96,7 +96,7 @@ constexpr int STEP = 10;   // in front of the bar (its parts are steps 0-4)
 
 // the window menu's commands (editor.cpp)
 constexpr int ID_LOAD = 40001, ID_SAVE = 40002, ID_EXIT = 40004, ID_RUN = 40010, ID_BACK = 40011, ID_PLAY = 40012,
-              ID_MISSION = 40013, ID_NEW = 40014, ID_RESIZE = 40015, ID_EXPORT = 40016, ID_IMPORT = 40017, ID_UNDO = 40030,
+              ID_MISSION = 40013, ID_NEW = 40014, ID_RESIZE = 40015, ID_EXPORT = 40016, ID_IMPORT = 40017, ID_FILES = 40018, ID_UNDO = 40030,
               ID_REDO = 40031;
 
 using CreateFileA_t = HANDLE(WINAPI*)(LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE);
@@ -110,11 +110,11 @@ struct Command {
 const Command COMMANDS[] = {
     {"PanelNew", "NEW MAP", ID_NEW},          {"PanelLoad", "LOAD MAP", ID_LOAD},
     {"PanelSave", "SAVE MAP", ID_SAVE},       {"PanelExport", "EXPORT MAP", ID_EXPORT},
-    {"PanelImport", "IMPORT MAP", ID_IMPORT}, {"PanelMission", "MISSION SETTINGS", ID_MISSION},
-    {"PanelMapSize", "MAP SIZE", ID_RESIZE},  {"PanelPlay", "PLAY THE SAVED MAP", ID_PLAY},
-    {"PanelUndo", "UNDO", ID_UNDO},           {"PanelRedo", "REDO", ID_REDO},
-    {"PanelRun", "QUICK TEST, NO SAVE", ID_RUN}, {"PanelBack", "BACK TO THE MENU", ID_BACK},
-    {"PanelExit", "EXIT THE GAME", ID_EXIT},
+    {"PanelImport", "IMPORT MAP", ID_IMPORT}, {"PanelFiles", "RENAME OR DELETE", ID_FILES},
+    {"PanelMission", "MISSION SETTINGS", ID_MISSION}, {"PanelMapSize", "MAP SIZE", ID_RESIZE},
+    {"PanelPlay", "PLAY THE SAVED MAP", ID_PLAY}, {"PanelUndo", "UNDO", ID_UNDO},
+    {"PanelRedo", "REDO", ID_REDO},           {"PanelRun", "QUICK TEST, NO SAVE", ID_RUN},
+    {"PanelBack", "BACK TO THE MENU", ID_BACK}, {"PanelExit", "EXIT THE GAME", ID_EXIT},
 };
 constexpr int COMMAND_COUNT = sizeof COMMANDS / sizeof COMMANDS[0];
 constexpr int ROWS = 7;
@@ -779,6 +779,8 @@ const char* panel_tip(POINT m) {
         if (row >= 0 && COMMANDS[row].id == ID_RUN)
             return ui_text("TipRun", "Quick test here (Ctrl+R): runs the map as it is now in this window and saves nothing; Ctrl+R comes "
                                      "back to the edits");
+        if (row >= 0 && COMMANDS[row].id == ID_FILES)
+            return ui_text("TipFiles", "Rename the map (its folder and files) or delete it");
         if (row >= 0 && COMMANDS[row].id == ID_PLAY)
             return ui_text("TipPlay", "Play the saved map: starts the game anew on the saved map (asks to save first) and comes back "
                                       "to the editor");

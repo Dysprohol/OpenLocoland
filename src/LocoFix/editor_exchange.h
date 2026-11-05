@@ -21,5 +21,9 @@ bool exchange_read(const std::string& zip, Package& p, std::string& error);
 // Unpacks it into maps\<name>\ (renamed from its own name when they differ; `overwrite`: the old
 // files there go first). The map's path, or empty with `error`.
 std::string exchange_install(const Package& p, const std::string& name, bool overwrite, std::string& error);
+// The package's files renamed for maps\<name>\ (what exchange_install writes there).
+std::vector<PackageFile> exchange_renamed(const Package& p, const std::string& name);
+// Every file of a map folder (a game path) as a package whose files and paths carry `name`.
+bool exchange_read_folder(const std::string& folder, const std::string& name, Package& p, std::string& error);
 // Its ground is a campaign terrain of the game (or none): nothing of the picture is in it.
 bool exchange_campaign_ground(const Package& p);

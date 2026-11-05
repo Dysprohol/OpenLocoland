@@ -21,6 +21,7 @@
 #include "dialog_template.h"
 #include "editor_ground.h"
 #include "editor_text.h"
+#include "custom_maps.h"
 
 std::string language_file(const std::string& path);   // language.cpp: the pack's copy of a file
 
@@ -495,12 +496,7 @@ std::string make_map(const std::string& name, bool generated, const Terrain& ter
     return map;
 }
 
-bool valid_name(const std::string& name) {
-    if (name.empty() || name.size() > 24 || name == "template") return false;
-    for (char c : name)
-        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_')) return false;
-    return true;
-}
+bool valid_name(const std::string& name) { return map_name_problem(name).empty(); }   // custom_maps.cpp's rules
 
 // ---- resizing ----
 
@@ -895,11 +891,11 @@ INT_PTR CALLBACK new_map_proc(HWND dialog, UINT m, WPARAM w, LPARAM l) {
     }
     if (LOWORD(w) != IDOK) return FALSE;
     auto* choice = reinterpret_cast<Choice*>(GetWindowLongPtrW(dialog, DWLP_USER));
-    char name[64] = "";
+    char name[MAX_PATH] = "";
     GetDlgItemTextA(dialog, IDC_NAME, name, sizeof name);
     if (!valid_name(name)) {
-        MessageBoxW(dialog, ui_wtext("NewBadName", "The name of the map's folder: small letters, digits and _, at most 24.").c_str(),
-                    ui_wtext("NewTitle", "New map").c_str(), MB_OK | MB_ICONWARNING);
+        MessageBoxW(dialog, ui_wide(map_name_problem(name) + "\n\n" + map_name_rule()).c_str(), ui_wtext("NewTitle", "New map").c_str(),
+                    MB_OK | MB_ICONWARNING);
         return TRUE;
     }
     choice->name = name;
@@ -952,7 +948,7 @@ INT_PTR CALLBACK size_proc(HWND dialog, UINT m, WPARAM w, LPARAM l) {
 void new_map_dialog(HWND owner) {
     using namespace dialog;
     DialogTemplate t(ui_wtext("NewTitle", "New map").c_str(), 300, 140);
-    t.item(STATIC, ui_wtext("NewFolder", "Folder in maps\\ (small letters, digits, _):").c_str(), -1, SS_LEFT, 8, 10, 150, 8);
+    t.item(STATIC, ui_wtext("NewFolder", "Name (its folder in maps\\):").c_str(), -1, SS_LEFT, 8, 10, 150, 8);
     t.item(EDIT, L"", IDC_NAME, LINE, 160, 8, 132, 12);
     t.item(STATIC, ui_wtext("NewGround", "Ground:").c_str(), -1, SS_LEFT, 8, 30, 40, 8);
     t.item(COMBOBOX, L"", IDC_GROUND, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, 50, 28, 242, 200);

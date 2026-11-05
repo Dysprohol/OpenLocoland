@@ -61,6 +61,8 @@
 // Test mode (LOCOFIX_TEST=1) also takes WM_COPYDATA with dwData 40001 or 40002 and a file name:
 // Load or Save without a dialog, so tools/test_game.ps1 can save and load maps.
 #include "patch.h"
+#include "custom_maps.h"
+#include "dialog_template.h"
 #include "editor_exchange.h"
 #include "editor_ground.h"
 #include "editor_mission.h"
@@ -68,6 +70,7 @@
 #include <shobjidl.h>
 #include <cctype>
 #include <cstdio>
+#include <cstring>
 
 bool level_save_succeeded();   // level_save.cpp
 bool restart_game(bool editor, const std::string& map, bool back_to_editor);   // restart.cpp
@@ -138,6 +141,7 @@ constexpr int ID_NEW = 40014;         // ours: File > New...
 constexpr int ID_RESIZE = 40015;      // ours: File > Map size...
 constexpr int ID_EXPORT = 40016;      // ours: File > Export map...
 constexpr int ID_IMPORT = 40017;      // ours: File > Import map...
+constexpr int ID_FILES = 40018;       // ours: Rename or delete the map (the Menu panel)
 constexpr int ID_UNDO = 40030, ID_REDO = 40031, ID_DELETE = 40032, ID_ROTATE_RIGHT = 40033,
               ID_ROTATE_LEFT = 40034, ID_ARMY = 40035, ID_SEMAPHORE = 40036;   // ours: the Edit menu
 constexpr int OPTIONS_POSITION = 1;   // the "Options" item (id 0xFFFF) on the menu bar
@@ -148,6 +152,8 @@ constexpr int TEST_NEW_MAP = 40043;   // test mode: WM_COPYDATA "<name> <ground>
 constexpr int TEST_RESIZE = 40044;    // test mode: WM_COPYDATA "<width> <height>" - File > Map size without the dialogs
 constexpr int TEST_EXPORT = 40045;    // test mode: WM_COPYDATA <zip> - File > Export map without the dialogs
 constexpr int TEST_IMPORT = 40046;    // test mode: WM_COPYDATA "<zip>|overwrite|rename|ask" - File > Import map
+constexpr int TEST_RENAME = 40048;    // test mode: WM_COPYDATA <name> - the map renamed (Rename or delete)
+constexpr int TEST_DELETE = 40049;    // test mode: WM_COPYDATA - the map deleted (Rename or delete)
 constexpr int TEST_FACTORY = 40047;   // test mode: WM_COPYDATA "x y" - the panel of the factory there
 constexpr UINT WM_SAVE_AFTER_RUN = WM_APP + 0x52;   // Run the level's copy held again: save it (wParam 1: then end the game)
 constexpr uintptr_t SET_POSITION = 0x41c680;   // SetPosition: the centre of the view, clamped
@@ -358,6 +364,12 @@ std::string folder_of(const std::string& map) {
     return slash == std::string::npos ? "" : map.substr(0, slash);
 }
 
+std::string name_of(const std::string& map) {   // maps\<folder>\<name>.map -> <name>
+    const size_t slash = map.find_last_of('\\'), dot = map.find_last_of('.');
+    const size_t start = slash == std::string::npos ? 0 : slash + 1;
+    return map.substr(start, dot == std::string::npos || dot < start ? std::string::npos : dot - start);
+}
+
 bool auto_folder(const std::string& folder) {
     return !folder.empty() && GetFileAttributesA((folder + "\\" + AUTO_MARK).c_str()) != INVALID_FILE_ATTRIBUTES;
 }
@@ -446,9 +458,41 @@ void load_map(const std::string& path) {
     patch::log("editor: load %s", path.c_str());
 }
 
+bool asks();
+
+// The ground image the loaded map names, when that file is missing (empty: it is there, or the map
+// names none). The engine then holds a black ground of its own, which Level_Save does not write: the
+// saved map has no ground at all - the user's POINT lost its picture that way (renamed by hand from
+// map1, loaded without maps\map1\map1.vid and saved).
+std::string missing_ground() {
+    const std::string image = map_ground_image(game_path(level_file()));
+    return !image.empty() && GetFileAttributesA(image.c_str()) == INVALID_FILE_ATTRIBUTES ? image : "";
+}
+
+bool ask_without_ground(HWND window, const std::string& image) {
+    DialogScope scope;
+    const std::string text = ui_printf(ui_format("SaveNoGround", "The ground image %s of this map is missing, so the ground is black and a "
+                                                                 "save writes the map without any ground. Put the file back first.\n\n"
+                                                                 "Save it without its ground anyway?"),
+                                       image.c_str());
+    return ui_message_box(window, text.c_str(), ui_text("FileSaveTitle", "Save map"), MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) == IDYES;
+}
+
 bool save_map(const std::string& path) {
     uint8_t* w = world();
     if (!w) return false;
+    const std::string lost = missing_ground();
+    if (!lost.empty() && !auto_folder(folder_of(game_path(path)))) {
+        bool go = false;
+        if (asks()) {
+            const HWND window = *reinterpret_cast<HWND*>(w + WORLD_HWND);
+            go = ask_without_ground(window, lost);
+        }
+        if (!go) {
+            patch::log("editor: not saved - the ground image %s is missing, the save would have no ground", lost.c_str());
+            return false;
+        }
+    }
     // a new map's folder (maps\<name>\ for the custom maps page)
     const size_t slash = path.find_last_of('\\');
     if (slash != std::string::npos && slash > 0) CreateDirectoryA(path.substr(0, slash).c_str(), nullptr);
@@ -465,10 +509,16 @@ bool save_map(const std::string& path) {
     if (!scratch) edit_saved();
     // a painted ground: its own image next to the map, the map pointing at it
     ground_save(game_path(path));
-    // the new map saved under its name takes its ground image along (the scratch folder goes when
-    // the editor leaves it)
+    // a map saved under a new name takes its ground image along when the picture lies in another
+    // map's folder - the new map's scratch folder (it goes when the editor leaves it), POLIGON's or
+    // another custom map's (renamed or deleted, it would take the picture with it); a campaign
+    // terrain stays the game's maps\lNN\lNN.vid
     const std::string image = map_ground_image(game_path(path));
-    if (!scratch && !image.empty() && auto_folder(folder_of(image))) {
+    const std::string image_folder = lower_path(folder_of(image));
+    const bool campaign_ground = image_folder.size() == 8 && image_folder.compare(0, 6, "maps\\l") == 0 &&
+                                 std::isdigit(static_cast<unsigned char>(image_folder[6])) && std::isdigit(static_cast<unsigned char>(image_folder[7]));
+    if (!scratch && !image.empty() && !campaign_ground && image_folder != lower_path(folder_of(game_path(path))) &&
+        GetFileAttributesA(image.c_str()) != INVALID_FILE_ATTRIBUTES) {
         const std::string base = game_path(path), own = base.substr(0, base.find_last_of('.')) + ".vid";
         if (CopyFileA(image.c_str(), own.c_str(), FALSE) && set_map_ground_image(base, own))
             patch::log("editor: %s takes its ground along as %s", base.c_str(), own.c_str());
@@ -556,6 +606,8 @@ bool scratch_folder(const std::string& folder) {
     return lower.compare(0, 9, "maps\\_new") == 0 || lower == lower_path(RUN_FOLDER) || auto_folder(folder);
 }
 
+bool game_folder_map(const std::string& map);
+
 // A file chosen in a Windows dialog, as a game path; empty when cancelled. Load opens in maps\ with
 // no name proposed; Save in the map's folder with its name. The editor's new map has no name yet:
 // the dialog opens in maps\ with the first free name mapN; a map of the release opens it
@@ -571,7 +623,7 @@ std::string choose_map(HWND owner, bool save) {
     if (!save) folder.clear(), file.clear();
     const bool release = save && release_map(game_path(current));
     std::string title = save ? ui_text("FileSaveTitle", "Save map") : ui_text("FileLoadTitle", "Load map");
-    if (save && (release || scratch_folder(folder_of(game_path(current))))) {
+    if (save && (release || scratch_folder(folder_of(game_path(current))) || game_folder_map(game_path(current)))) {
         // a name of its own proposed: the first free maps\poligon<n>\ for POLIGON, maps\map<n>\ else
         const std::string base = release && lower_path(game_path(current)).compare(0, 13, "maps\\sandbox\\") == 0 ? "poligon" : "map";
         folder.clear();
@@ -602,9 +654,23 @@ std::string choose_map(HWND owner, bool save) {
         patch::log("editor: not saved outside the game folder: %s", map.c_str());
         return "";
     }
-    if (save && lower_path(folder_of(map)) == "maps") {
-        const std::string name = map.substr(5, map.find_last_of('.') - 5);
-        map = "maps\\" + name + "\\" + name + ".map";
+    const std::string name = name_of(map), own = "maps\\" + name + "\\" + name + ".map";
+    if (save && !release_map(own)) {   // the name's rules (custom_maps.cpp); a map of the release is refused below
+        const std::string problem = map_name_problem(name);
+        if (!problem.empty()) {
+            if (!g_test || g_test_ask) {
+                DialogScope scope;
+                ui_message_box(owner, (problem + "\n\n" + map_name_rule()).c_str(), ui_text("FileSaveTitle", "Save map"),
+                               MB_OK | MB_ICONINFORMATION);
+            }
+            patch::log("editor: not saved, the name %s: %s", name.c_str(), problem.c_str());
+            return "";
+        }
+    }
+    if (save && lower_path(map) != lower_path(own)) {
+        // a map is always maps\<name>\<name>.map, whatever folder the dialog was in: so it is on the
+        // custom maps page and nothing is saved among another map's or the game's files
+        map = own;
         if (GetFileAttributesA(map.c_str()) != INVALID_FILE_ATTRIBUTES && (!g_test || g_test_ask)) {
             DialogScope scope;
             const std::string text = ui_printf(ui_format("AskOverwrite", "There is a map %s already. Overwrite it?"), map.c_str());
@@ -890,25 +956,30 @@ bool import_package(HWND window, const std::string& zip_given, Import mode) {
         if (asks()) ask(window, ui_printf(ui_format("ImportBad", "%s is not a map package: %s"), zip.c_str(), error.c_str()), MB_OK | MB_ICONWARNING);
         return false;
     }
-    // the folder's name: small letters, digits and _, at most 24
-    std::string name;
-    for (char c : p.name)
-        if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') name += c;
-    if (name.empty()) name = "imported";
-    name = name.substr(0, 21);
-    std::string title = p.title;
+    // the folder's name: the package's own, or what of it the rules allow (custom_maps.cpp)
+    std::string name = p.name;
+    if (!map_name_problem(name).empty()) {
+        name.clear();
+        for (char c : p.name)
+            if (c >= 32 && c < 127 && !std::strchr("\\/:*?\"<>|", c)) name += c;
+        while (!name.empty() && (name.back() == ' ' || name.back() == '.')) name.pop_back();
+        while (!name.empty() && name.front() == ' ') name.erase(0, 1);
+        name = name.substr(0, 60);
+        if (!map_name_problem(name).empty() && map_name_problem(name + "_2").empty()) name += "_2";   // a game folder's name
+        if (!map_name_problem(name).empty()) name = "imported";
+    }
+    const std::string title = p.title;
     bool overwrite = false;
-    const bool listed = !mission_listed_title(name).empty();
     if (folder_exists(name)) {
         Import choice = mode;
-        if (!listed || game_folder_map("maps\\" + name + "\\")) {
+        if (!custom_map_exists(name) || game_map_folder(name)) {
             choice = Import::Rename;   // the game's own folder, or one not of the custom maps page: never overwritten
         } else if (mode == Import::Ask) {
             const int answer = ask(window,
                                    ui_printf(ui_format("ImportExists", "There is a map %s (%s) already. Overwrite it?\n\n"
                                                                        "Yes: overwrite it.  No: import this one as a new map.  Cancel: "
                                                                        "do not import."),
-                                             name.c_str(), mission_listed_title(name).c_str()),
+                                             name.c_str(), custom_map_title(name).c_str()),
                                    MB_YESNOCANCEL | MB_ICONQUESTION);
             if (answer == IDCANCEL) return false;
             choice = answer == IDYES ? Import::Overwrite : Import::Rename;
@@ -918,8 +989,7 @@ bool import_package(HWND window, const std::string& zip_given, Import mode) {
         } else {
             int k = 2;
             while (folder_exists(name + "_" + std::to_string(k))) ++k;
-            name += "_" + std::to_string(k);
-            title = title.substr(0, 21) + " " + std::to_string(k);
+            name += "_" + std::to_string(k);   // the page tells two of the same title apart (" 2")
         }
     }
     const std::string map = exchange_install(p, name, overwrite, error);
@@ -928,7 +998,7 @@ bool import_package(HWND window, const std::string& zip_given, Import mode) {
         if (asks()) ask(window, ui_printf(ui_format("ImportFailed", "The map could not be imported: %s"), error.c_str()), MB_OK | MB_ICONWARNING);
         return false;
     }
-    mission_list_map(name, title);
+    custom_maps_list();   // on the page as a folder copied by hand would be
     patch::log("exchange: imported %s as %s (%s)%s", zip.c_str(), map.c_str(), title.c_str(),
                exchange_campaign_ground(p) ? ", on a campaign terrain" : ", with its own ground");
     bool open = !asks();
@@ -940,6 +1010,135 @@ bool import_package(HWND window, const std::string& zip_given, Import mode) {
                    MB_YESNO | MB_ICONQUESTION) == IDYES;
     if (open && ask_save(window)) load_map(map);
     return true;
+}
+
+// ---- Rename and Delete (the Menu panel's RENAME OR DELETE; custom_maps.cpp moves the files) ----
+//
+// The map of the editor - a map of its own, maps\<name>\<name>.map - gets a new name: its folder is
+// copied under it with every file renamed and its paths fixed, the editor opens the copy, and the old
+// folder goes to the Recycle Bin once the copy is loaded. Delete moves its folder to the Recycle Bin
+// (after a question) and the editor goes on with a new empty map.
+
+enum : int { IDC_FILES_NAME = 1001, IDC_FILES_DELETE };   // 1001: test_game.ps1's Q step types the name there
+struct FilesChoice {
+    std::string folder, title, name;
+    int action = 0;   // 1 rename, 2 delete
+};
+
+INT_PTR CALLBACK files_proc(HWND dialog, UINT m, WPARAM w, LPARAM l) {
+    auto* c = reinterpret_cast<FilesChoice*>(GetWindowLongPtrW(dialog, DWLP_USER));
+    if (m == WM_INITDIALOG) {
+        SetWindowLongPtrW(dialog, DWLP_USER, l);
+        c = reinterpret_cast<FilesChoice*>(l);
+        SetDlgItemTextW(dialog, IDC_FILES_NAME, wide_acp(c->folder).c_str());
+        SendDlgItemMessageW(dialog, IDC_FILES_NAME, EM_SETSEL, 0, -1);
+        SetFocus(GetDlgItem(dialog, IDC_FILES_NAME));
+        return FALSE;
+    }
+    if (m != WM_COMMAND || !c) return FALSE;
+    const std::wstring title = ui_wtext("FilesTitle", "Rename or delete the map");
+    if (LOWORD(w) == IDCANCEL) {
+        EndDialog(dialog, 0);
+        return TRUE;
+    }
+    if (LOWORD(w) == IDOK) {
+        char name[MAX_PATH] = "";
+        GetDlgItemTextA(dialog, IDC_FILES_NAME, name, sizeof name);
+        std::string problem = lower_path(name) == lower_path(c->folder) ? ui_text("RenameSame", "That is its name already.")
+                                                                          : map_name_problem(name);
+        if (problem.empty() && GetFileAttributesA(("maps\\" + std::string(name)).c_str()) != INVALID_FILE_ATTRIBUTES)
+            problem = ui_printf(ui_format("RenameTaken", "There is a folder maps\\%s already."), name);
+        if (!problem.empty()) {
+            MessageBoxW(dialog, ui_wide(problem).c_str(), title.c_str(), MB_OK | MB_ICONINFORMATION);
+            return TRUE;
+        }
+        c->name = name;
+        c->action = 1;
+        EndDialog(dialog, 1);
+        return TRUE;
+    }
+    if (LOWORD(w) == IDC_FILES_DELETE) {
+        const std::string text = ui_printf(ui_format("DeleteAsk", "Delete the map %s - the folder maps\\%s with all its files? It goes "
+                                                                  "to the Recycle Bin."),
+                                           c->title.c_str(), c->folder.c_str());
+        if (MessageBoxW(dialog, ui_wide(text).c_str(), title.c_str(), MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDYES) {
+            c->action = 2;
+            EndDialog(dialog, 2);
+        }
+        return TRUE;
+    }
+    return FALSE;
+}
+
+std::string g_remove_after_load;   // the old folder of a renamed or deleted map: removed once the next map is loaded
+
+// The folder of the editor's map when it can be renamed or deleted (a map of its own); empty otherwise.
+std::string own_folder() {
+    const std::string map = game_path(current_map()), name = name_of(map);
+    if (auto_folder(folder_of(map)) || game_folder_map(map) || game_map_folder(name) ||
+        lower_path(folder_of(map)) != lower_path("maps\\" + name) || !custom_map_exists(name))
+        return "";
+    return folder_of(map).substr(5);
+}
+
+bool rename_current(HWND window, const std::string& to) {
+    const std::string from = own_folder();
+    if (from.empty() || !ask_save(window)) return false;   // the edits into the old folder first
+    std::string error;
+    if (!custom_map_rename(from, to, false, error)) {
+        patch::log("editor: %s not renamed to %s: %s", from.c_str(), to.c_str(), error.c_str());
+        if (asks()) {
+            DialogScope scope;
+            ui_message_box(window, error.c_str(), ui_text("FilesTitle", "Rename or delete the map"), MB_OK | MB_ICONWARNING);
+        }
+        return false;
+    }
+    edit_saved();
+    g_remove_after_load = from;
+    load_map("maps\\" + to + "\\" + to + ".map");
+    return true;
+}
+
+bool delete_current() {
+    const std::string folder = own_folder();
+    if (folder.empty()) return false;
+    edit_saved();   // its edits go with it
+    g_remove_after_load = folder;
+    load_map(start_map("maps\\template\\template.map"));
+    return true;
+}
+
+void files_dialog(HWND window) {
+    const std::string folder = own_folder();
+    if (folder.empty()) {
+        if (asks()) {
+            DialogScope scope;
+            ui_message_box(window,
+                           ui_text("FilesGameMap", "Save the map under a name of its own first (File > Save): the campaign's maps, "
+                                                   "POLIGON, the template and a new map without a name are not renamed or deleted."),
+                           ui_text("FilesTitle", "Rename or delete the map"), MB_OK | MB_ICONINFORMATION);
+        }
+        return;
+    }
+    using namespace dialog;
+    FilesChoice c;
+    c.folder = folder;
+    c.title = custom_map_title(folder);
+    const std::wstring map = ui_wide(ui_printf(ui_format("FilesMap", "The map %s, the folder maps\\%s\\"), c.title.c_str(), folder.c_str()));
+    DialogTemplate t(ui_wtext("FilesTitle", "Rename or delete the map").c_str(), 300, 106);
+    t.item(STATIC, map.c_str(), -1, SS_LEFT | SS_NOPREFIX, 8, 8, 284, 8);
+    t.item(STATIC, ui_wtext("FilesName", "New name:").c_str(), -1, SS_LEFT, 8, 26, 60, 8);
+    t.item(EDIT, L"", IDC_FILES_NAME, LINE, 70, 24, 222, 12);
+    t.item(STATIC, ui_wide(map_name_rule()).c_str(), -1, SS_LEFT | SS_NOPREFIX, 8, 42, 284, 32);
+    t.item(BUTTON, ui_wtext("FilesRename", "Rename").c_str(), IDOK, BS_DEFPUSHBUTTON | WS_TABSTOP, 8, 84, 70, 14);
+    t.item(BUTTON, ui_wtext("FilesDelete", "Delete the map...").c_str(), IDC_FILES_DELETE, BS_PUSHBUTTON | WS_TABSTOP, 84, 84, 90, 14);
+    t.item(BUTTON, ui_wtext("ButtonCancel", "Cancel").c_str(), IDCANCEL, BS_PUSHBUTTON | WS_TABSTOP, 242, 84, 50, 14);
+    {
+        DialogScope scope;
+        DialogBoxIndirectParamW(GetModuleHandleW(nullptr), t.get(), window, files_proc, reinterpret_cast<LPARAM>(&c));
+    }
+    if (c.action == 1) rename_current(window, c.name);
+    else if (c.action == 2) delete_current();
 }
 
 void handle_command(HWND window, int id) {
@@ -985,6 +1184,8 @@ void handle_command(HWND window, int id) {
         export_current(window, "");
     } else if (id == ID_IMPORT) {
         import_package(window, "", Import::Ask);
+    } else if (id == ID_FILES) {
+        if (g_held) files_dialog(window);
     } else if (id == ID_ABOUT) {
         about(window);
     } else if (id == ID_RUN) {
@@ -1037,7 +1238,7 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
         break;
     case WM_COMMAND:
         if (HIWORD(w) <= 1 && (LOWORD(w) == ID_LOAD || LOWORD(w) == ID_SAVE || LOWORD(w) == ID_ABOUT ||
-                               (LOWORD(w) >= ID_RUN && LOWORD(w) <= ID_IMPORT) ||
+                               (LOWORD(w) >= ID_RUN && LOWORD(w) <= ID_FILES) ||
                                (LOWORD(w) >= ID_UNDO && LOWORD(w) <= ID_SEMAPHORE))) {
             handle_command(window, LOWORD(w));
             return 0;
@@ -1094,6 +1295,8 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
                 ui_english(english);
                 return done ? TRUE : FALSE;
             }
+            if (data->dwData == TEST_RENAME) return g_held && rename_current(window, path) ? TRUE : FALSE;
+            if (data->dwData == TEST_DELETE) return g_held && delete_current() ? TRUE : FALSE;
             if (data->dwData == TEST_MISSION) {
                 const ArrivalsState arrivals_before = mission_arrivals();
                 const FactoryState factories_before = mission_factories();
@@ -1186,6 +1389,27 @@ void editor_level_loaded(void* w) {
         g_current = game_path(map);
         mission_load(game_path(map));
         hold_level(world, true);
+        const std::string lost = missing_ground();
+        if (!lost.empty()) {
+            patch::log("editor: the ground image %s of %s is missing - the ground is black", lost.c_str(), map);
+            edit_message_line(ui_printf(ui_format("MsgNoGround", "the ground image %s is missing - the ground is black; put the file back "
+                                                                 "before saving"),
+                                        lost.c_str()));
+        }
+        // the old folder of a map renamed or deleted (Rename or delete): its files are not in use now
+        if (!g_remove_after_load.empty() && lower_path(folder_of(game_path(map))) != lower_path("maps\\" + g_remove_after_load)) {
+            const std::string folder = g_remove_after_load;
+            g_remove_after_load.clear();
+            std::string error;
+            if (custom_map_remove(folder, error)) {
+                edit_message_line(ui_printf(ui_format("MsgRemoved", "maps\\%s went to the Recycle Bin"), folder.c_str()));
+            } else if (asks()) {
+                if (HWND window = *reinterpret_cast<HWND*>(world + WORLD_HWND)) {
+                    DialogScope scope;
+                    ui_message_box(window, error.c_str(), ui_text("FilesTitle", "Rename or delete the map"), MB_OK | MB_ICONWARNING);
+                }
+            }
+        }
         if (g_run_back) {   // back from Run the level: the view and the chosen object as they were
             g_run_back = false;
             if (graphics()) {

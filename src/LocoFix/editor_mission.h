@@ -71,10 +71,6 @@ bool mission_dialog(HWND owner, bool* open_arrivals = nullptr, bool* open_plan =
 // After the map was saved as `map`: its script (a new map gets one), the texts and its entry
 // on the custom maps page.
 void mission_save(const std::string& map);
-// The custom maps page (maps\custom.lst): a map's folder with its title added (or its title
-// changed), and the title a folder has there (empty: not on the page).
-void mission_list_map(const std::string& folder, const std::string& title);
-std::string mission_listed_title(const std::string& folder);
 // Test mode: the settings of a file (editor_mission.cpp says how) instead of the dialog.
 bool mission_settings_from_file(const std::string& path);
 

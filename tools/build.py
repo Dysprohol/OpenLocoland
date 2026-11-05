@@ -164,7 +164,8 @@ HELP_PAGE = re.compile(r"^edithelp\d*\.(txt|lst)$", re.I)
 SCRATCH_MARK = "editor_new.txt"
 SCRATCH_DIR = re.compile(r"^_new\d*$", re.I)
 SAVING = ".saving"
-# never removed, whatever a list says: the player's own (with player_data: the high scores)
+# never removed, whatever a list says: the player's own (with player_data: the high scores); maps\custom.lst
+# is the custom maps page's list, which LocoFix writes from the folders of maps\ (custom_maps.cpp)
 PLAYER_FILES = {os.path.join("maps", "custom.lst"), "OpenLocoland.json", "Locoland.cfg"}
 OBJECTS_OVERRIDE = "objects.override"   # in game/: changed values of objects.res (res_tool.py)
 MAPS_OVERRIDE = "maps.override"         # in game/: changed objects of maps (map_tool.py)
@@ -270,27 +271,6 @@ def new_maps(game, target, counter):
                 copy(os.path.join(directory, f), dst, counter)
         built.append(name)
     return built
-
-
-CUSTOM_LIST = os.path.join("maps", "custom.lst")
-
-
-def merge_custom_list(src, dst, target, counter):
-    """maps\\custom.lst: the repository's maps, then those the game folder's list has besides
-    them and whose map is there - the ones the map editor added (LocoFix, editor_mission.cpp)."""
-    def pairs(path):
-        lines = [l.strip() for l in open(path, encoding="latin-1").read().splitlines() if l.strip()]
-        return [(lines[i], lines[i + 1]) for i in range(0, len(lines) - 1, 2)]
-    entries = pairs(src)
-    if os.path.exists(dst):
-        known = {folder.lower() for folder, _ in entries}
-        entries += [(folder, title) for folder, title in pairs(dst) if folder.lower() not in known
-                    and os.path.isfile(os.path.join(target, "maps", folder, folder + ".map"))]
-    data = "\r\n".join(f"{folder}\r\n{title}" for folder, title in entries).encode("latin-1")
-    if not os.path.exists(dst) or open(dst, "rb").read() != data:
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
-        open(dst, "wb").write(data)
-        counter[0] += 1
 
 
 def identify_version(steam):
@@ -627,9 +607,7 @@ def build(steam, target, locofix=None, captured=None, progress=None, version=Non
 
     for rel in game_files(game):
         name = patch_text.target_name(rel)
-        if os.path.normcase(rel) == os.path.normcase(CUSTOM_LIST):
-            merge_custom_list(os.path.join(game, rel), os.path.join(a.target, rel), a.target, copied)
-        elif name is None:
+        if name is None:
             if rel.lower() in DEV_FILES and not dev:
                 continue
             copy(os.path.join(game, rel), os.path.join(a.target, rel), copied)

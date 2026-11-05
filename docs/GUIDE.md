@@ -124,7 +124,11 @@ The strategic map has a **second page**: the `►►►` button at its bottom ri
 
 - **MAP EDITOR** (the first row) starts the editor - see [the map editor](#5-the-map-editor).
 - Under it are the custom maps: those that came with the game and those you make or get from
-  friends. A long list scrolls - the arrows beside it, the mouse wheel, the up and down keys.
+  friends - every map folder in `maps\` of the game folder, found by itself (a folder copied in or
+  deleted shows or goes even while the page is open). A long list scrolls - the arrows beside it, the
+  mouse wheel, the up and down keys.
+- A map that cannot be opened (its folder gone, its ground image or script missing) says why on the
+  line under the list.
 - A click on a map shows its briefing; **START GAME** plays it like a campaign mission.
 - The hammer and wrench right of a map's title (**Edit the map**) opens that map in the editor.
 
@@ -177,7 +181,7 @@ What you see:
   ![A page of the help](img/editor-help-en.jpg)
 
   The **menu button** opens the editor's menu with every command - **NEW MAP**, **LOAD MAP**, **SAVE
-  MAP**, **EXPORT MAP**, **IMPORT MAP**, **MISSION SETTINGS**, **MAP SIZE**, **PLAY THE SAVED MAP**,
+  MAP**, **EXPORT MAP**, **IMPORT MAP**, **RENAME OR DELETE**, **MISSION SETTINGS**, **MAP SIZE**, **PLAY THE SAVED MAP**,
   **UNDO**, **REDO**, **QUICK TEST, NO SAVE**, **BACK TO THE MENU**, **EXIT THE GAME**; the status line
   says what the one under the mouse does.
 
@@ -542,13 +546,13 @@ map's file in the middle of the view for a moment, with the menus' click.
 
 A map is its folder: `maps\<name>\` in the game folder holds the map (`<name>.map`), its painted
 ground (`<name>.vid`), its script (`<name>.lgc`) and its texts. To give it to a friend by hand:
-send the whole folder; they put it into `maps\` of their game folder and add two lines at the end of
-`maps\custom.lst` (Notepad): the folder's name and the title in capitals, e.g.
+send the whole folder; they put it into `maps\` of their game folder and it is on the custom maps
+page. A folder renamed in Explorer works too: the game renames the files inside after the folder.
 
-```
-bridge_1
-BRIDGE OF NO RETURN
-```
+**Rename or delete:** Menu -> **RENAME OR DELETE** gives the map a new name (its folder and files
+follow, the old folder goes to the Recycle Bin) or deletes it (after a question, into the Recycle Bin).
+A name may have up to 64 English letters, digits, spaces and the signs Windows allows in file names,
+and must not be a folder of the game (`l01`-`l20`, `sandbox`, `template`, `script`, `outro`).
 
 ## 7. Keys and tools of the editor
 
@@ -603,8 +607,8 @@ Mission settings, Ground height, Money crate, Vehicles, Paint the ground, Water 
 
 - **The game does not start, or Setup does not find Locoland.** Locoland must be installed through
   Steam (any language).
-- **Where are my maps?** In `maps\` of the game folder (C:\Users\<you>\Games\OpenLocoland), one folder each; the
-  list of the custom maps page is `maps\custom.lst`.
+- **Where are my maps?** In `maps\` of the game folder (C:\Users\<you>\Games\OpenLocoland), one folder each;
+  the custom maps page lists every one of them by itself (`maps\custom.lst` is the game's own list of them).
 - **Something went wrong.** The game writes `error.log` and `LocoFix.log` into `logs\` of its folder; send them
   with a description of what happened.
 - **Full screen.** It works, but windowed mode is the tested one; if the screen stays black, untick

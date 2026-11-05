@@ -16,6 +16,7 @@
 // are read from the package, by their names alone, so nothing is written outside maps\<new>\.
 #include "patch.h"
 #include "editor_exchange.h"
+#include "custom_maps.h"
 
 #include <algorithm>
 #include <cctype>
@@ -527,12 +528,12 @@ bool exchange_read(const std::string& zip, Package& p, std::string& error) {
         return false;
     }
     const std::string dir = folder_part(map_entry);
-    p.name = lower(base_name(map_entry).substr(0, base_name(map_entry).size() - 4));
+    p.name = base_name(map_entry).substr(0, base_name(map_entry).size() - 4);
     for (const Entry& e : entries)
         if (folder_part(e.name) == dir) p.files.push_back({base_name(e.name), e.data});
     for (const PackageFile& e : p.files) {
-        if (lower(e.name) == p.name + ".map") p.ground = map_ground_image_of(e.data);
-        if (lower(e.name) == p.name + ".lgc") {
+        if (lower(e.name) == lower(p.name + ".map")) p.ground = map_ground_image_of(e.data);
+        if (lower(e.name) == lower(p.name + ".lgc")) {
             const size_t at = e.data.find("// title:");
             if (at != std::string::npos) {
                 const size_t eol = e.data.find_first_of("\r\n", at);
@@ -560,6 +561,39 @@ bool exchange_read(const std::string& zip, Package& p, std::string& error) {
     return true;
 }
 
+// The package's files as maps\<name>\ holds them: the files that carry the package's name (<old>.map,
+// .lgc, .vid) renamed, the folder in the paths of the script, the lists and the texts (maps\<old>\ ->
+// maps\<name>\, either spelling of the backslash) and the map's ground record pointing into the
+// new folder when its picture is one of the package's files (a ground kept elsewhere - a campaign
+// terrain, another map's picture - stays where it is).
+std::vector<PackageFile> exchange_renamed(const Package& p, const std::string& name) {
+    const std::string folder = "maps\\" + name + "\\";
+    const std::string old_single = "maps\\" + p.name + "\\", old_double = "maps\\\\" + p.name + "\\\\";
+    const std::string new_single = folder, new_double = "maps\\\\" + name + "\\\\";
+    bool own_ground = false;
+    for (const PackageFile& e : p.files) own_ground |= !p.ground.empty() && lower(e.name) == lower(base_name(p.ground));
+    std::vector<PackageFile> out;
+    for (const PackageFile& e : p.files) {
+        std::string file = e.name;
+        if (starts_with_ci(file, p.name + ".")) file = name + file.substr(p.name.size());
+        std::string data = e.data;
+        const std::string ext = lower(file.substr(file.find_last_of('.') == std::string::npos ? file.size() : file.find_last_of('.')));
+        if (lower(name) != lower(p.name) && (ext == ".lgc" || ext == ".lst" || ext == ".txt")) {
+            // the folder in the paths, then the files that carry the name (<old>.map ...)
+            data = replace_ci(replace_ci(data, old_double, new_double), old_single, new_single);
+            data = replace_ci(data, new_double + p.name + ".", new_double + name + ".");
+            data = replace_ci(data, new_single + p.name + ".", new_single + name + ".");
+            if (lower(file) == lower(name + ".lgc")) data = custom_map_retitled(data, p.name, name);   // a title that was the old name
+        }
+        if (ext == ".map" && own_ground && !campaign_image(p.ground))
+            data = map_with_ground_image(data, folder + (starts_with_ci(base_name(p.ground), p.name + ".")
+                                                             ? name + base_name(p.ground).substr(p.name.size())
+                                                             : base_name(p.ground)));
+        out.push_back({file, data});
+    }
+    return out;
+}
+
 // Writes a package into maps\<name>\ (`overwrite`: the files of an old map there go first), the
 // names and paths renamed from the package's name. Returns the map's path, empty with `error`.
 std::string exchange_install(const Package& p, const std::string& name, bool overwrite, std::string& error) {
@@ -575,35 +609,45 @@ std::string exchange_install(const Package& p, const std::string& name, bool ove
         }
     }
     CreateDirectoryA(folder.c_str(), nullptr);
-    const std::string old_single = "maps\\" + p.name + "\\", old_double = "maps\\\\" + p.name + "\\\\";
-    const std::string new_single = folder, new_double = "maps\\\\" + name + "\\\\";
     std::string map;
-    for (const PackageFile& e : p.files) {
-        std::string file = e.name;
-        if (starts_with_ci(file, p.name + ".")) file = name + file.substr(p.name.size());
-        std::string data = e.data;
-        const std::string ext = lower(file.substr(file.find_last_of('.') == std::string::npos ? file.size() : file.find_last_of('.')));
-        if (name != p.name && (ext == ".lgc" || ext == ".lst" || ext == ".txt")) {
-            // the folder in the paths, then the files that carry the name (<old>.map ...)
-            data = replace_ci(replace_ci(data, old_double, new_double), old_single, new_single);
-            data = replace_ci(data, new_double + p.name + ".", new_double + name + ".");
-            data = replace_ci(data, new_single + p.name + ".", new_single + name + ".");
-        }
-        if (ext == ".map") {
-            if (!p.ground.empty() && !campaign_image(p.ground))
-                data = map_with_ground_image(data, folder + (starts_with_ci(base_name(p.ground), p.name + ".")
-                                                                 ? name + base_name(p.ground).substr(p.name.size())
-                                                                 : base_name(p.ground)));
-            if (lower(file) == lower(name + ".map")) map = folder + file;
-        }
-        if (!write_file(folder + file, data)) {
-            error = folder + file + " cannot be written";
+    for (const PackageFile& e : exchange_renamed(p, name)) {
+        if (lower(e.name) == lower(name + ".map")) map = folder + e.name;
+        if (!write_file(folder + e.name, e.data)) {
+            error = folder + e.name + " cannot be written";
             return "";
         }
     }
     patch::log("exchange: %s (%s) unpacked into %s, %u files", p.name.c_str(), p.title.c_str(), folder.c_str(),
                static_cast<unsigned>(p.files.size()));
     return map;
+}
+
+// Every file of the folder `folder` (a game path, maps\<folder>) as a package whose files and paths
+// carry the name `name` - a map folder copied or renamed by hand (custom_maps.cpp), or one renamed in
+// the editor. The high scores come along: they are the map's on this install.
+bool exchange_read_folder(const std::string& folder, const std::string& name, Package& p, std::string& error) {
+    p = Package();
+    p.name = name;
+    WIN32_FIND_DATAA f;
+    HANDLE h = FindFirstFileA((folder + "\\*").c_str(), &f);
+    if (h == INVALID_HANDLE_VALUE) {
+        error = folder + " cannot be read";
+        return false;
+    }
+    do {
+        if (f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+        const std::string path = folder + "\\" + f.cFileName;
+        std::string data = read_file(path);
+        if (data.empty() && (f.nFileSizeLow || f.nFileSizeHigh)) {
+            FindClose(h);
+            error = path + " cannot be read";
+            return false;
+        }
+        if (lower(f.cFileName) == lower(name + ".map")) p.ground = map_ground_image_of(data);
+        p.files.push_back({f.cFileName, data});
+    } while (FindNextFileA(h, &f));
+    FindClose(h);
+    return true;
 }
 
 bool exchange_campaign_ground(const Package& p) { return p.ground.empty() || campaign_image(p.ground); }

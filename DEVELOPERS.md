@@ -152,7 +152,7 @@ For working on the engine, generate the local reverse-engineering output (not in
 
 | Folder | Contents |
 |---|---|
-| `game/` | Our files for the game folder (`Locoland.cfg`, `dgVoodoo.conf`, `maps/custom.lst` - the custom maps of the menu) and changes to original files as `<file>.patch` (`maps/logo.lgc.patch`, `maps/menu.lgc.patch`) - same structure as the game folder; `maps/script/cheats.lgc`, `unlock.lgc` and their `_on` variants are the launcher's options (LocoFix fix 30); `update.txt` is the launcher's notice when the update check cannot reach GitHub (fix 33). `objects.override/` would hold changed values of `objects.res` (see "Editing objects.res"), `maps.override/<map>/` changed objects of a map (`l11`: a rail of mission 11, `BUGS.md` F21) and `maps.new/<map>/` whole new maps (see "Editing maps and images"); `maps.new/template` (the empty template) and `maps.new/sandbox` (the one to play) at the moment, and `run_map.cmd` - a double-click at the game starts the sample map, `run_map <map>` any map; `edit_map.cmd` the same in editor mode (see "Editor mode"); these two are developer helpers, copied only by `build.py --dev`. |
+| `game/` | Our files for the game folder (`Locoland.cfg`, `dgVoodoo.conf`) and changes to original files as `<file>.patch` (`maps/logo.lgc.patch`, `maps/menu.lgc.patch`) - same structure as the game folder; `maps/script/cheats.lgc`, `unlock.lgc` and their `_on` variants are the launcher's options (LocoFix fix 30); `update.txt` is the launcher's notice when the update check cannot reach GitHub (fix 33). `objects.override/` would hold changed values of `objects.res` (see "Editing objects.res"), `maps.override/<map>/` changed objects of a map (`l11`: a rail of mission 11, `BUGS.md` F21) and `maps.new/<map>/` whole new maps (see "Editing maps and images"); `maps.new/template` (the empty template) and `maps.new/sandbox` (the one to play) at the moment, and `run_map.cmd` - a double-click at the game starts the sample map, `run_map <map>` any map; `edit_map.cmd` the same in editor mode (see "Editor mode"); these two are developer helpers, copied only by `build.py --dev`. |
 | `docs/` | The player's guide for the release, in Polish and English only (the German, Hungarian and Russian players get the English one): `PRZEWODNIK.md` (Polish) and `GUIDE.md` (English) - installing, what is new in the game, the custom maps page, the map editor with a tutorial and its keys - and a few screenshots of the game in `docs/img/`. Version 0.2; keep the guides in step with the in-game help pages (`maps/edithelp*.txt`) and "Editor mode" below. |
 | `lang/<code>/` | Our translation work for each language pack (`cs`, `de`, `en`, `hu`, `pl`, `ru`): `language.ini` (the launcher's name and labels, `codepage`, `base` for a translation Steam does not ship) and in `game/` the texts by kind, each assembled into its place in `<game>\lang\<code>\` (`languages.pack_path`): `game/strings.override.ini` -> `strings.ini` (changes to the captured file), `game/briefings/<map>/` -> `maps\<map>\` (the missions', POLIGON's and the template's texts), `game/menus/menu*.txt` -> `maps\` (the menu's pages), `game/editor/edithelp*.txt` -> `maps\` (the editor's help pages), `game/scripts/*.lgc.patch` -> `maps\script\` and `game/scripts/shiftb.txt.patch` -> `maps\` (the developer mode); and in `fonts/` a pack's own letters, `<font>.png` pasted into the captured `fonts\<font>*.bmp` (`tools/font_cells.py`, Czech - see "Languages"). A pack ships only what it changes; the rest comes from its capture. `lang/_template/` is the starting point of a new translation (a placeholder for every file and `README.md` notes per folder) and not a pack: `languages.packs()` leaves out folders starting with `_`, and no `README.md` is shipped. Each pack's texts are in its code page (CP1250/1251/1252); format details in `docs/TRANSLATING.md` and `tools/patch_text.py`. |
 | `external/dgVoodoo2/` | dgVoodoo2 2.87.5 (`DDraw.dll`, `D3DImm.dll`, unmodified; credit in `NOTICE.md`). |
@@ -783,10 +783,9 @@ gore/dol" - `MenuVid940AllDir`/`MenuVid941AllDir` - and not the difficulty's; ea
 the list goes on that way), the mouse wheel (LocoFix's script function `GetMouseWheel()`, extern
 201, `menu_input.cpp`: the engine keeps the wheel's turn in the mouse state but no script function
 read it), the up and down keys and Page Up / Page Down. The entries come from `maps\custom.lst`
-(`game/maps/custom.lst`, ASCII, CRLF), two lines per map - its folder in `maps\` and its title
-- so a map is added without changing the script (the script language cannot list a folder;
-the map editor adds the maps it saves, and `build.py` keeps those lines when it writes the
-repository's list into the game). A map shows its
+(ASCII, CRLF), two lines per map - its folder in `maps\` and its title -, which LocoFix writes
+from the folders of `maps\` each time the page is made (the script language cannot list a folder:
+"Map files" below); the menu shows what the list holds. A map shows its
 briefing pages (`maps\<folder>\brief.lst`) under its title, with a previous button back to the
 list on the first page, and the start button loads `maps\<folder>\<folder>.map` the way a
 campaign mission starts. "EDYTOR MAP" calls `StartEditor(map)` in `menu.lgc`, the one place the
@@ -817,6 +816,69 @@ page opening at the menu's start when the flag matches, and - with the player da
 HKCU (`BUGS.md` F15) - the return: after the sandbox, "Wyjdz do menu glownego" of its Esc menu
 opens the main menu on the custom maps page, and so does a new start of the game straight
 into `maps\menu.map` after a run of the sandbox (the flag 2 read from the registry).
+
+**Map files** (`src/LocoFix/custom_maps.cpp`). A custom map is a folder of `maps\` that holds
+`<folder>.map` - with its script `<folder>.lgc`, its texts, `brief.lst` and, with a picture of its
+own, `<folder>.vid`; nothing else makes it one. The page lists every such folder, however it came
+(saved in the editor, imported, copied in by hand, renamed in Explorer), but the campaign's `lNN`,
+`script`, `outro`, the template and the editor's scratch (`_new*`, `_run`, a folder marked with
+`editor_new.txt`): the menu's script calls LocoFix's `ListCustomMaps()` (extern 204, free in
+`export.lgc`) in `ReadCustomList`, which writes `maps\custom.lst` anew when it changed - POLIGON
+first, then the maps in the order the list had them, then the new ones by name; a folder is written
+as spelled on disk and compared without case, so a map is never listed twice and a folder that is
+gone leaves the list. The title is the script's `// title:` line, else its `BRIEF_HEADER`, else the
+folder's name, in ASCII capitals (the menu's font, the same list in every pack; the briefing pages
+have no header of their own, so `brief.lst` gives none); two maps of one title show as TITLE, TITLE 2 ....
+While the page is open, `CustomMapsChanged()` (205: a change notification on `maps\` and its
+subfolders - a file or folder added, removed or renamed) makes the page again, so a folder copied in
+or deleted shows at once. Before a row's briefing, its edit icon or the briefing's start button,
+`CustomMapProblem(folder)` (206: the reason in the pack's words, in capitals, or "") checks the map:
+gone, its folder's name not ASCII, the `.map` unreadable, its ground image or its script missing; the
+reason shows on the line under the list (`CUSTOM_MSG_Y`) and the page is made again, so a ghost
+leaves it - before, a row of a missing folder showed an empty briefing and its start left the game on a
+black screen (the user's `custom.lst` had kept `map1` after the folder became `point`). Any level
+whose `.map` is not there loads the main menu instead (`custom_maps_level_guard` in the `Level_Load`
+wrapper of `frame_limit.cpp`). A map whose ground image is missing plays on a black ground, so the
+page refuses it, and the editor says so in the status line and asks before saving it: the engine
+holds a black ground of its own then, which a save does not write - the saved map has no ground at
+all (checked: a copy of `village` without its `.vid`, saved: 164 objects instead of 165, no OBJ; the
+user's POINT lost its picture so, `point.vid` lying unused next to it).
+
+A folder whose files or paths carry another name - `maps\<new>\<old>.map` (the only `.map` of a
+folder without `<new>.map`), or a script whose `CUSTOM_MAP` names `maps\<old>\` - is brought in line
+when the list is made, as an import under a new name does it (`exchange_read_folder` and
+`exchange_renamed` of `editor_exchange.cpp`): the files `<old>.*` renamed, the folder in the paths of
+the script, the lists and the texts, the ground record when its picture is one of the folder's files,
+and a title or briefing header that was the old name in capitals becomes the new one's - the new files
+written first, then the old names removed; a folder written to in the last 3 s (a copy under way) is
+looked at again 3 s later. So a map renamed or copied by hand, a package unzipped by hand and an
+imported one end the same (checked: a package imported as `point_2` and unzipped by hand as `point_4`,
+every file the same but the names).
+
+The names (`map_name_problem`, the one rule for File > New, the save dialog, Rename and Import): 1 to
+64 characters (the paths stay far below MAX_PATH), printable ASCII (the script and the list keep the
+name as bytes, which another code page reads as other letters), none of Windows' `\ / : * ? " < > |`,
+no space at either end and no dot at the end, not a device name (CON, NUL, COM1 ...), not a folder of
+the game (`lNN`, `script`, `outro`, `sandbox`, `template`, `_new...`, `_run`). Capitals, spaces,
+dots and signs are fine: a folder with a space was checked in the engine (its script, texts,
+briefing and the page). Before, a name was small letters, digits and `_`, at most 24 - none of it
+needed. Every map the editor saves is `maps\<name>\<name>.map`, whatever folder the save dialog was
+in (before, only a name typed into `maps\` got its folder; one typed into another map's folder or a
+campaign folder was saved there, off the page or over the campaign's files).
+
+**Rename or delete** (the Menu panel's RENAME OR DELETE, `editor.cpp`): a dialog with the map's title
+and folder, its new name (`IDC_FILES_NAME` 1001, so `test_game.ps1`'s `Q` step types into it), the
+rule and Rename / Delete the map... / Cancel, for a map of its own (not a campaign map, POLIGON, the
+template or the new map without a name). Rename saves edits first (asked), copies the folder under the
+new name with every file renamed and its paths and title fixed (as above; the high scores come along),
+checks each file written, opens the copy and moves the old folder to the Recycle Bin once the copy is
+loaded; the map keeps its place in the list. A name that breaks the rule or is taken is refused with
+the reason, and the old folder stays as it was when anything fails. Delete asks, then the editor goes
+on with a new empty map and the folder goes to the Recycle Bin (`SHFileOperationW`, `FOF_ALLOWUNDO`).
+A map saved from another (its ground image in the other's folder) gets a copy of the picture before
+that folder is renamed or deleted (`custom_maps_keep_grounds`), and Save As takes the picture along
+whenever it lies in another map's folder (before: only from the scratch folder). Test mode: `R<name>`
+and `X` steps of `test_game.ps1` (WM_COPYDATA 40048 / 40049, no dialog).
 
 **The ground of a map** (`map_tool.py ground <folder> <width> <height>`). The ground of a
 map is a picture cut into 256x256 tiles (`ground.png`, its height `height.png` and the
@@ -1397,6 +1459,8 @@ front of the game's:
 - File > New...: a new map in its own folder, on a campaign map's terrain or a meadow (below),
 - File > Map size...: the map's size (below),
 - File > Mission settings...: the mission's settings and texts in a dialog (below),
+- Rename or delete (the Menu panel's RENAME OR DELETE, id 40018): the map's folder renamed, or moved
+  to the Recycle Bin ("Map files" in the data section),
 - File > Play the map: the game starts again in normal mode on the current map (the one last
   loaded or saved), to play what was edited, and comes back to the editor when the map is left
   for the main menu; File > Back to the menu: the same to the main menu (both below),
@@ -1525,7 +1589,7 @@ Save, Ctrl+S, a Yes to "Save the changes?" (of Load, New, Play, Back, Exit), Exp
 for the name in the save dialog, which opens in `maps\` with the first free `mapN` offered; a name
 typed straight into `maps\` becomes `maps\<name>\<name>.map` (a map already there is overwritten
 only after a question), the map's own folder with its ground image (`<name>.vid`), script and texts,
-and its line in `maps\custom.lst`; a title or briefing header NEW MAP becomes the folder's name in
+and so on the custom maps page; a title or briefing header NEW MAP becomes the folder's name in
 capitals, as TEMPLATE does, and POLIGON's own "POLIGON" when POLIGON is saved under a name (checked:
 POLIGON and the template loaded and saved as `pp1` / `tt1` - PP1 and TT1 in the script's title,
 `BRIEF_HEADER` and `custom.lst`; POLIGON kept its title before). A map is not saved outside the game folder ("A map is saved in the maps
@@ -1756,9 +1820,9 @@ win's text on the victory screen; money 4321, morning, snow now and then, no lig
 morning's light, the snow, no flash in a minute, the second briefing page (the right arrow), the
 loss's text on the defeat screen; money 100, evening, meteorites all the time, lightning ticked -
 the meteorites, no flash (lightning comes only in a clear sky or the rain). A map saved as
-`maps\<name>\<name>.map` gets its line in `maps\custom.lst` (the folder and its title in ASCII
-capitals; not the template), so it shows on the WLASNE MAPY page; `build.py`
-keeps the lines the editor added when it writes the repository's list into the game. A new map
+`maps\<name>\<name>.map` shows on the WLASNE MAPY page with the title of its script ("Map files";
+before, the editor added a line to `maps\custom.lst` and `build.py` merged the repository's list with
+the lines the editor had added - a folder renamed or deleted by hand left its line behind). A new map
 (no script of its name yet) gets the script of the map it was saved from when that one has the
 blocks, otherwise the template's (`maps\template\template.lgc`, made by `map_tool.py new
 --script`: a whole mission like the sandbox - `CUSTOM_MAP`, the texts, the reinforcement, the
@@ -2641,8 +2705,10 @@ nothing is written outside `maps\<folder>\`), and checks that a map with a groun
 it. A folder of that name on the custom maps page is overwritten when the player answers Yes
 (No: the map comes as `<folder>_2` ...; Cancel: nothing); a game folder (a campaign map, the
 template, the scripts) is never overwritten. A renamed map gets its files, the paths of its script
-and lists and its ground record renamed. The map is added to `maps\custom.lst` (its title from the
-script's "// title:", " 2" ... when renamed) and offered to be opened in the editor (after the
+and lists and its ground record renamed, and a title that was the old name follows the new one. The
+folder keeps the package's name when the rules of "Map files" allow it (before: small letters, digits
+and `_` only, so `Point` became `point`); the page lists it as it does a folder copied in by hand, and
+it is offered to be opened in the editor (after the
 question about unsaved edits). The question about unsaved edits comes before every way the level
 goes - Load, New, Play the map, Back to the menu, Exit, closing the window, opening an imported map -
 from the window's menu and the Menu panel alike. Test mode: `E<zip>` and `I<zip>|overwrite|rename|ask`
@@ -2702,11 +2768,12 @@ pictures (22 px right of the device's middle, 18 up), the title in the menu titl
 the text in the menu font (VID 2), the page arrows (VIDs 475/476) and the start button (VID 477)
 with "back to the map". **Help** (the ? button or F1) shows the editor's help pages the way the
 game shows its own (`maps\menu4.lst` -> `menu41.txt` ...): `maps\edithelp.lst` lists
-`maps\edithelp1.txt` ... `edithelp20.txt` - in the order a new user needs them: what the editor
+`maps\edithelp1.txt` ... `edithelp21.txt` - in the order a new user needs them: what the editor
 is (the bar, the status line, the two buttons), the bar's tools, selecting and placing (the mouse,
 undo), the keys, laying track, trains, the object's panel, all objects and decals, the mission,
 saving and playing, the ground (height, paint, water, regions, map size), the ground tools' rows,
-then the train arrivals and the orders (13, 14) turning (15) and the citadel, Charybdis, fly nests and mines (16; page 1 names 13-16), a factory's plan (17), the crusher, Scylla and the decorations' sets (18), the gravel bed (19), the neutrals and the pirates (20) - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
+then the train arrivals and the orders (13, 14) turning (15) and the citadel, Charybdis, fly nests and mines (16; page 1 names 13-16), a factory's plan (17), the crusher, Scylla and the decorations' sets (18), the gravel bed (19), the neutrals and the pirates (20), the map files (21: a map is its folder, the
+page finds it, Rename or delete, the names) - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
 44 characters a line - the ESC pairs not counted, so a line with lit words is longer in the file - and 14
 lines, ESC 7 / ESC 2 switch to the lit font VID 7 and back to VID 2):
 English in `game/maps/` (the fallback of every pack) and the others in `lang/<code>/game/editor/`; the files are
@@ -2717,7 +2784,7 @@ tab-separated (`maps\edithelp5.txt<TAB>HelpCatTrack<TAB>TRACK AND TRAINS`); the 
 the order of their first pages, a page keeps its number (its line), and a line with the file alone is
 in the category of the page before - so a new page is one line of the list, with a category of its
 own (a new `HelpCat...` key in the six packs) or an existing one. Six now: BASICS (1-4, 15), TRACK AND
-TRAINS (5, 6), OBJECTS (7, 8, 16), MISSION, SAVING (9, 10), GROUND (11, 12), ARRIVALS, FACTORIES (13,
+TRAINS (5, 6), OBJECTS (7, 8, 16), MISSION, SAVING (9, 10, 21), GROUND (11, 12), ARRIVALS, FACTORIES (13,
 14, 17). The 23 rows of categories and titles (up to 37 characters) do not fit a page's 14 lines, so
 the contents are laid out as the palette: the categories down the left (two lines at most, the chosen
 one lit and underlined; the mouse over one, Up / Down or a click chooses it), the chosen one's pages on
@@ -2816,8 +2883,8 @@ mode above) are not tested in full screen.
 - Mission 11 (`maps\l11\l11.map`): a rail at 745,2075 laid as a ramp the wrong way up
   is laid flat (`game/maps.override/l11/objects.tsv`, `BUGS.md` F21), so the line at x 745
   goes on south there instead of ending; trains no longer go round through the fort gate.
-- The strategic map of the menu has a second page with the custom maps (`maps\custom.lst`:
-  the sandbox "POLIGON") and the map editor entry (`game/maps/menu.lgc.patch`; "The custom
+- The strategic map of the menu has a second page with the custom maps (every map folder of
+  `maps\`, POLIGON first: "Map files") and the map editor entry (`game/maps/menu.lgc.patch`; "The custom
   maps page" above).
 - `objects.res`: 24 sounds pointing to non-existent files get `wav\null.wav` (the game's
   empty sound), so the engine does not look for them and missions do not report "Invalid
@@ -3241,7 +3308,7 @@ mode above) are not tested in full screen.
   their links to `LocoFix.log` (test mode; `V` takes negative points too, the editor's camera
   goes past the map), `M<file>` sets the mission settings from a file instead of the dialog
   (test mode; the format is in `editor_mission.cpp`), `N<name>:<line>[:<w>:<h>]` makes a new map as File >
-  New would with the dialog's ground line (test mode), `Z<w>:<h>` resizes the map as File > Map size (test mode), `^<code>` / `+<code>` press a key with
+  New would with the dialog's ground line (test mode), `Z<w>:<h>` resizes the map as File > Map size (test mode), `R<name>` renames the map and `X` deletes it (Rename or delete without the dialog, test mode), `^<code>` / `+<code>` press a key with
   Ctrl / Shift (`^90` = Ctrl+Z), `K<code>` / `U<code>` only press / only let go a key (`K16`
   before a drag holds Shift), `C<code>` sends a character (`WM_CHAR`, which the scripts'
   `GetKey()` reads - a posted key gives the lower case letter: `C77` is the developer key M), `A<seconds>`
@@ -3477,9 +3544,8 @@ so Enter or Space installs.
 
 **Updating** is running a newer Setup over the install: `build.py` copies only what changed and
 leaves alone what it does not write, so the player keeps the high score tables (not
-overwritten once the game wrote them), the maps made in the editor (`maps\<name>\`), the lines
-the editor added to `maps\custom.lst` (merged with the repository's list, see "The custom maps
-page"), the exported and imported maps, and everything in the registry: the settings, the
+overwritten once the game wrote them), the maps made in the editor (`maps\<name>\`, which the custom maps page finds by itself -
+`maps\custom.lst` is LocoFix's list of them, which the build no longer writes), the exported and imported maps, and everything in the registry: the settings, the
 options as they were and the campaign progress (`Players`). The two maps of the release itself,
 `maps\sandbox` and `maps\template`, are written anew - a map edited in place there is lost, a map
 saved under a name of its own is not.
