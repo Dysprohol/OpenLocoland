@@ -31,6 +31,7 @@
 #include "patch.h"
 
 #include <cstdint>
+#include <cstdlib>
 #include <fstream>
 #include <string>
 #include <unordered_map>
@@ -59,6 +60,11 @@ template <typename T> T& at(void* p, size_t offset) {
 int army(void* o) { return (at<uint32_t>(o, O_FLAGS) >> 10) & 3; }
 
 bool g_on = false;   // the level's script has FACTIONS
+// The armies that answer only whoever attacks them (bit n: army n): `#define FACTIONS_PEACEFUL <mask>`
+// of the script, else 4 - the neutrals; the editor sets the neutrals' and the pirates' bits
+// (AiKnobs.peaceful). Ours and the enemy always fight each other.
+unsigned g_peaceful = 4;
+bool peaceful(int a) { return ((g_peaceful >> a) & 1) != 0 && a > 1; }
 
 // The armies a neutral object answers (bit n: army n), with its VID: an object made later at the
 // same address is another one.
@@ -111,16 +117,17 @@ float distance(void* a, void* b) {   // Object_FindTarget's: the longer side and
 // Before an explosion damages `target`: a neutral hit by another army holds a grudge against it,
 // and so does every armed neutral that sees it.
 void __cdecl note_hit(void* target, void* source) {
-    if (!g_on || !target || !source || army(target) != NEUTRAL) return;
+    if (!g_on || !target || !source || !peaceful(army(target))) return;
+    const int side = army(target);
     const int by = army(source);
-    if (by == NEUTRAL) return;
+    if (by == side) return;
     add_grudge(target, by);
     void* map = *reinterpret_cast<void**>(G_OBJECT_MAP);
     if (!map) return;
     void** units = at<void**>(map, MAP_UNITS);
     for (int i = at<int>(map, MAP_UNITS_COUNT) - 1; units && i >= 0; --i) {
         void* u = units[i];
-        if (!u || u == target || army(u) != NEUTRAL) continue;
+        if (!u || u == target || army(u) != side) continue;
         const float sight = sight_of(u);
         if (sight > 0 && distance(u, target) <= sight) add_grudge(u, by);
     }
@@ -135,9 +142,10 @@ int __cdecl may_target(void* shooter, void* target) {
     if (at<uint32_t>(vid, V_FLAGS) & 0x20000) return 0;
     const bool neutral_trains = (at<uint32_t>(*reinterpret_cast<void**>(G_WORLD), WORLD_FLAGS) & 2) != 0 &&
                                 from == 1 && at<int>(vid, V_CLASS) == 0x15;
-    if (g_on) {
-        if (from == NEUTRAL) return holds_grudge(shooter, to);
-        if (to == NEUTRAL) return from == PIRATES || any_army || neutral_trains || holds_grudge(target, from);
+    if (g_on) {   // a peaceful army fires only at whom it holds a grudge against; an army against all sides
+                  // (neither ours nor the enemy, not peaceful) fires at the peaceful ones too
+        if (peaceful(from)) return holds_grudge(shooter, to);
+        if (peaceful(to)) return from > 1 || any_army || (to == NEUTRAL && neutral_trains) || holds_grudge(target, from);
         return 1;
     }
     return to != NEUTRAL || any_army || neutral_trains;
@@ -190,6 +198,23 @@ __declspec(naked) void hit_whole() {
     }
 }
 
+// The value of `#define FACTIONS_PEACEFUL <n>` of the map's script, `fallback` without it.
+unsigned script_peaceful(const char* map, unsigned fallback) {
+    std::string path = map ? map : "";
+    const size_t dot = path.find_last_of('.');
+    if (dot == std::string::npos) return fallback;
+    std::ifstream in(patch::game_folder() + path.substr(0, dot) + ".lgc");
+    static const std::string KEY = "#define FACTIONS_PEACEFUL";
+    std::string line;
+    while (std::getline(in, line)) {
+        const size_t start = line.find_first_not_of(" \t");
+        if (start == std::string::npos || line.compare(start, KEY.size(), KEY) != 0) continue;
+        const std::string rest = line.substr(start + KEY.size());
+        if (!rest.empty() && (rest[0] == ' ' || rest[0] == '\t')) return static_cast<unsigned>(std::strtoul(rest.c_str(), nullptr, 0)) & 15u;
+    }
+    return fallback;
+}
+
 // `#define FACTIONS 1` on a line of its own in the map's script (<map>.lgc).
 bool script_has_factions(const char* map) {
     std::string path = map ? map : "";
@@ -212,7 +237,10 @@ void factions_level_loading(const char* map) {
     g_grudges.clear();
     const bool was = g_on;
     g_on = script_has_factions(map);
-    if (g_on || was) patch::log("factions: %s %s", map ? map : "?", g_on ? "- the editor's rules (FACTIONS)" : "- the engine's rules");
+    g_peaceful = g_on ? script_peaceful(map, 4) : 4;
+    if (g_on || was)
+        patch::log("factions: %s %s, peaceful armies mask %u", map ? map : "?", g_on ? "- the editor's rules (FACTIONS)" : "- the engine's rules",
+                   g_peaceful);
 }
 
 void install_factions() {

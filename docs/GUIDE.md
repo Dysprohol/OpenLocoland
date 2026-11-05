@@ -449,7 +449,11 @@ the line's end when the level starts, and its order begins there. A point the tr
 one-way line it may not enter - is named when the order is given and in the ORDERS row's text in the
 status line: in play such a train drives up to the line and stops.
 
-**Red lights for the neutrals and the pirates**: a neutral or a pirate train's panel has **AT RED
+**Fight rules of the armies**: a neutral's or a pirate's panel has **IN A FIGHT: ANSWERS ATTACKERS** (the neutrals'
+way: they fire only at whoever hit them) or **ALL SIDES** (the pirates' way) - for the whole army. **IT FIRES** is
+there for every armed unit: on its own or only when told (a neutral: when attacked or never).
+
+**Red lights**: every train's panel has **AT RED
 LIGHTS: STOPS** (as every train) or **DRIVES ON** - then every train of that army may run along a one-way
 line against its arrow, where your and the enemy's trains are held (the level's exit lets them off the map
 too, onto the hidden track). One rule for the whole army.
@@ -458,6 +462,13 @@ too, onto the hidden track). One rule for the whole army.
 at the top says what the row under the mouse does (and, for ORDERS, why the order cannot be carried out).
 **Click-and-hold**: hold a car of an arrival or of a factory's train (or **+ CAR**) down - the units open above
 it; let go on one to put it in that car's place (or add it). A short click works as before.
+
+**Orders for every army**: a train of any army has **ORDERS: DRIVE TO... / PATROL...** and **FIGHTS: ATTACK /
+GUARD... / AREA...**. The enemy's ATTACK, GUARD and PATROL are its AI's, as before; for the others ATTACK hunts
+the nearest hostile train, one after another, and GUARD keeps a point and takes a hostile train within 150 px.
+**AREA...**: a click on the track is the post; the **AREA** row sets the radius (- 300 PX +) and **RETURNS** (back
+to the post when the target is gone or leaves the area) or **CHASES** (after the target until it is gone). The
+selected train shows its area as a ring. Hostile means by the map's rules: the neutrals start no fight.
 
 **Target and start**: **TARGET: PICK...** and a click on a unit or building of another army (a fort: one of
 its guns) - the train attacks it when the level starts, in place of its other order; the enemy's train then

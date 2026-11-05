@@ -2239,6 +2239,46 @@ until something happens" beyond the start time (each would be a condition of `Mi
 cheap to add per condition when wanted), the AI's aggressiveness beyond CLEVER ATTACK and LIMIT_ATACKERS
 (the tactics scripts read no other per-army value), the pirates' and neutrals' own AI (they have none:
 their trains do only what the orders and the arrivals tell them).
+**Every army the same orders; guarding an area** (2026-11-05, the maintainer: every side can be given every
+kind of order and keeps its own ways by default). A train's panel has ORDERS: NONE / DRIVE TO... / PATROL...
+and FIGHTS: ATTACK / GUARD... / AREA... for every army; the enemy's ATTACK, GUARD and PATROL stay its AI's
+tasks (`ATA_FIGHT`, `ATA_STANDn`, `ATA_PATROLn` - the default way of the enemy), the rest is the runner's:
+-2 drive and -3 patrol (now for the enemy too, outside its AI), -4 target, -5 area, -6 hunt (ours', the
+neutrals' and the pirates' ATTACK: the nearest hostile train of the whole map, one after another), -7 guard
+(theirs: the point, 150 px). AREA (`TASK_AREA`, `order_radius`, `order_chase`) holds a post - the point - and,
+once a second, takes the nearest hostile train within the radius of it (`OrderFoe`: per hostile army a
+`FindNearestSprite` of class ENGINE with that army's `GETSPRITE_ARMYn`, the nearest by `SizeTo`) with
+ACT_ATTACK (`OrderArea`, state 5); back to the post with ACT_MOVE when the target is gone or - RETURNS, the
+default - when the target is 1.5 radii from the post or the train 2 radii; with CHASES only when the target
+is gone. The panel's AREA row: - n PX + (50 ... 2000, steps of 50) and RETURNS / CHASES; the selected
+train's area is a ring of dots in its army's colour round the post (a GUARD of the others' too, 150 px).
+Hostile follows the FACTIONS rules (`OrderHostile`, `OrderPeaceful`): ours and the enemy fight each other, a
+peaceful army (the neutrals by default) attacks nobody first and is attacked first only by an army against
+all sides (the pirates) or, its trains, by the enemy with NEUTRAL_TRAINS - so a neutral's AREA reacts to
+nothing unless its army fights all sides. REBUILT WHEN LOST is now for every army and order: the rebuilt
+train gets its order again from the order's runner (`PlanReorder`; the enemy's train of a non-AI order is
+taken out of the AI's slot), ours from the player's factory. A map saved before keeps its own runner and
+arrays; a save writes the new ones (`order_radius`, `order_chase` only matter for -5 ... -7). Checked in
+play on a POLIGON copy: the enemy's train on the east line guarding 450 px round where it stood (RETURNS)
+attacked the player's patrolling train each time it came within the area (12, 41, 69 s; 340-443 px from the
+post) and went back to the post each time it left (19, 49, 77 s); with CHASES it followed the target west to
+1178,1330, came back when it was gone (57 s) and took the next one at 68 s.
+
+**The armies' fight rules** (2026-11-05, the same request: every side keeps its own ways by default and can
+be set otherwise). `factions.cpp` reads `#define FACTIONS_PEACEFUL <mask>` beside FACTIONS (bit n army n,
+4 - the neutrals - without it; only the neutrals' and pirates' bits count: ours and the enemy always fight
+each other): a peaceful army fires only at an army it holds a grudge against (one that hit it, `note_hit`,
+now for any peaceful army), and is fired at first only by an army against all sides (a non-peaceful army 2
+or 3), a weapon of flag 0x80 or, the neutrals' trains, the enemy with NEUTRAL_TRAINS. A neutral's or a pirate's
+panel: IN A FIGHT: ANSWERS ATTACKERS / ALL SIDES (`AiKnobs.peaceful`, one step of the history; the define
+written only when it is not the default). IT FIRES (the armed members' behave bit 1) is now offered for
+every army: a peaceful one's WHEN ATTACKED / NEVER, the others' ON ITS OWN / ONLY WHEN TOLD; AT RED LIGHTS
+(fix 35) for every army's trains. The runner's hostility (`OrderPeaceful`) reads the same define, so an
+AREA order of a neutral reacts only when the neutrals fight all sides. Checked in play on a POLIGON copy: a
+neutral train guarding 400 px of the bottom line with the neutrals on ALL SIDES took the enemy's mortar
+train 337 px from its post at 2 s, followed it east and came back at 53 s (`factions: ... peaceful armies
+mask 0`); with the default it stayed on its post the whole run (mask 4).
+
 **What a row does, and click-and-hold** (2026-11-05; `editor_rows.cpp` `PanelRows::tip` / `hold_area`,
 `ContextRow.tip` and `LABEL_TIPS` of `editor_edit.cpp`, `ROW_TIPS` of `editor_arrivals.cpp` and
 `editor_factory.cpp`). The status line at the top names what the row under the mouse does - every row of an
@@ -3641,8 +3681,8 @@ mode above) are not tested in full screen.
       and that army may fire at them; the pirates may fire at the neutrals. On any other map
       `may_target` is the engine's test and nothing is noted, so the missions play as before,
   35. the red lights for chosen armies (`red_lights.cpp`, MAP_RULES.md 5): on a map whose script has
-      `#define PASS_RED_LIGHTS <mask>` (bit n: army n; the editor writes 4, 8 or 12 from a neutral or
-      pirate train's panel, AT RED LIGHTS: DRIVES ON, kept in `AiKnobs.red_lights`, so a change is one
+      `#define PASS_RED_LIGHTS <mask>` (bit n: army n; the editor writes it from any train's panel - every
+      army's since the fight rules, at first the neutrals' and pirates' only -, AT RED LIGHTS: DRIVES ON, kept in `AiKnobs.red_lights`, so a change is one
       step of the history) a train of such an army runs along a one-way line against its way. The
       engine tests a line in two places, both against the car's army bits: `RailDot_CanPass`'s last
       test (0x433860: the far point's pushLink against the link's backLink, ebp the engine) - ours

@@ -202,9 +202,9 @@ are kept in the editor's block of `main()` (8).
 
 **[editor]** A line holds every army's trains - the engine tests it against the army bits of the
 car, in `RailDot_CanPass` (the route) and `Train_Update` (a train heading into it stops and turns
-round). On an editor map the neutrals' or the pirates' trains may pass them (`#define
-PASS_RED_LIGHTS <mask>`, bit n army n: 4 the neutrals, 8 the pirates; a neutral or pirate train's
-panel, AT RED LIGHTS: DRIVES ON; LocoFix `red_lights.cpp`). One rule per army: the engine keeps nothing
+round). On an editor map the trains of chosen armies may pass them (`#define
+PASS_RED_LIGHTS <mask>`, bit n army n; any train's panel, AT RED LIGHTS: DRIVES ON - since 2026-11-05 for
+every army, at first the neutrals and the pirates only; LocoFix `red_lights.cpp`). One rule per army: the engine keeps nothing
 per train that would survive a train turning round or coupling.
 
 ## 6. Buildings

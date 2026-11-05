@@ -94,7 +94,7 @@ const char* const SETTINGS[][2] = {
 const char* const OWN[] = {"CUSTOM_MAP", "MONEY", "START_DAYNIGHT", "RAIN", "NUKE", "OBJECTIVES_FILE",
                            "WIN_FILE", "LOOSE_FILE", "BRIEF_LIST", "BRIEF_HEADER", "HISCORES_FILE",
                            "PLAYER_REINFORCEMENT", "LIMIT_ATACKERS", "ARRIVALS", "UNLOCKS", "UNIT_LIMITS", "ORDERS",
-                           "PLANS", "CLEVER_ATTACK", "PRICES", "FACTIONS", "PASS_RED_LIGHTS", "NEUTRAL_TRAINS"};
+                           "PLANS", "CLEVER_ATTACK", "PRICES", "FACTIONS", "PASS_RED_LIGHTS", "NEUTRAL_TRAINS", "FACTIONS_PEACEFUL"};
 constexpr int POSTS = 10;               // ATA_STAND0 ... ATA_STAND9
 
 // the train types of TrainsTactDeclares.lgc (ATT_<size>_<kind>)
@@ -799,8 +799,31 @@ const char* const ARRIVALS_RUNNER[] = {
     "  }",
     "  return u;",
     "}",
+    "// PlanReorder(i,u): a train of the map built again (plan_order) gets its order again from the order's",
+    "// runner, wherever it is; the enemy's train of an order that is not the AI's leaves the AI.",
+    "PlanReorder(int i,int u)",
+    "{",
+    "  int o,k;",
+    "  o=plan_order[i]-1;",
+    "  if( o<0 || o>=ORDERS )",
+    "    return 0;",
+    "  if( order_task[o]>=0 )   // the AI's own task: the AI has it",
+    "    return 0;",
+    "  k=plan_slot[i];",
+    "  if( !plan_fx[i] && !plan_fy[i] && k>=0 )",
+    "    if( ai_trains[k] )",
+    "      ai_trains[k]=0;",
+    "  order_unit[o]=u;",
+    "  order_state[o]=1;",
+    "  order_from_x[o]=0;",
+    "  order_from_y[o]=0;",
+    "  order_wait[o]=0;",
+    "  return 1;",
+    "}",
     "PlanMade(int i,int u,int t)",
     "{",
+    "  if( u && plan_order[i] )",
+    "    PlanReorder(i,u);",
     "  if( !plan_renew[i] )",
     "    return 0;",
     "  plan_loco[i]=0;",
@@ -1148,6 +1171,21 @@ const char* const ARRIVALS_RUNNER[] = {
     "    if( SizeTo(u,order_from_x[i],order_from_y[i]+order_from_z[i])>=40+48*mission_count || Action(u,ACT_GET_SPEED) )",
     "      return 0;",
     "  }",
+    "  if( order_task[i]<=-5 && order_task[i]>=-7 )   // guards an area (-5), hunts (-6), guards its point (-7)",
+    "  {",
+    "    if( order_task[i]==-6 )   // hunting: its post is where it starts",
+    "    {",
+    "      order_to_x[i]=GetX(u);",
+    "      order_to_y[i]=GetY(u);",
+    "      order_to_z[i]=0;",
+    "    }",
+    "    else",
+    "      Action(u,ACT_MOVE,order_to_x[i],order_to_y[i]+order_to_z[i]);",
+    "    order_state[i]=4;",
+    "    order_target[i]=0;",
+    "    Log(\"ORDER \"+itoa(i+1)+\" task \"+itoa(order_task[i])+\" train 1 guards \"+itoa(order_to_x[i])+\",\"+itoa(order_to_y[i])+\" radius \"+itoa(order_radius[i])+\" chase \"+itoa(order_chase[i])+\" at \"+itoa(t)+\" s\");",
+    "    return 1;",
+    "  }",
     "  if( order_task[i]==-4 )   // attack an object; the enemy's train goes to the AI once it is gone",
     "  {",
     "    order_target[i]=FindNearestSprite(GETSPRITE_VID+order_tvid[i],order_to_x[i],order_to_y[i]+order_to_z[i],30);",
@@ -1220,6 +1258,96 @@ const char* const ARRIVALS_RUNNER[] = {
     "  Log(\"ORDER \"+itoa(i+1)+\" target gone at \"+itoa(t)+\" s, AI slot \"+itoa(k));",
     "  return 1;",
     "}",
+    "// The armies' hostility as the map's FACTIONS rules have it: ours and the enemy fight each other; an",
+    "// army that answers only whoever attacks it (FACTIONS_PEACEFUL, bit n army n; the neutrals by",
+    "// default) attacks nobody first and is attacked first only by an army against all sides - one that",
+    "// is not peaceful and not ours or the enemy (the pirates by default) - or, the neutrals' trains, by",
+    "// the enemy with NEUTRAL_TRAINS.",
+    "OrderPeaceful(int a)",
+    "{",
+    "#ifdef FACTIONS_PEACEFUL",
+    "  return (FACTIONS_PEACEFUL>>a)&1;",
+    "#endif",
+    "  return a==2;",
+    "}",
+    "OrderHostile(int army,int a)",
+    "{",
+    "  if( a==army || OrderPeaceful(army) )",
+    "    return 0;",
+    "  if( !OrderPeaceful(a) )",
+    "    return 1;",
+    "#ifdef NEUTRAL_TRAINS",
+    "  if( army==1 && a==2 )",
+    "    return 1;",
+    "#endif",
+    "  return army>1;",
+    "}",
+    "// OrderFoe(army,x,y,r): the train of an army hostile to `army` nearest to x,y within r, 0 none.",
+    "OrderFoe(int army,int x,int y,int r)",
+    "{",
+    "  int a,u,best,d,bd;",
+    "  best=0;",
+    "  bd=r+1;",
+    "  for( a=0; a<4; a++ )",
+    "    if( OrderHostile(army,a) )",
+    "    {",
+    "      u=FindNearestSprite(GETSPRITE_UNIT+GETSPRITE_CLASS+B_ENGINE+(GETSPRITE_ARMY0<<a),x,y,r);",
+    "      if( u )",
+    "      {",
+    "        d=SizeTo(u,x,y);",
+    "        if( d<bd )",
+    "        {",
+    "          bd=d;",
+    "          best=u;",
+    "        }",
+    "      }",
+    "    }",
+    "  return best;",
+    "}",
+    "// OrderArea(i,t): a train guarding an area (order_state 4 at its post, 5 after a target). It takes",
+    "// the nearest hostile train within order_radius of its post (ACT_ATTACK); back to the post (ACT_MOVE)",
+    "// when the target is gone - or, unless it chases (order_chase), when the target is 1.5 radii from",
+    "// the post or the train 2 radii.",
+    "OrderArea(int i,int t)",
+    "{",
+    "  int u,f,px,py,r,k;",
+    "  u=order_unit[i];",
+    "  if( !GetUnitVid(u) )",
+    "  {",
+    "    order_state[i]=2;",
+    "    return 0;",
+    "  }",
+    "  px=order_to_x[i];",
+    "  py=order_to_y[i]+order_to_z[i];",
+    "  r=order_radius[i];",
+    "  if( order_state[i]==5 )",
+    "  {",
+    "    k=0;",
+    "    if( order_target[i] )",
+    "      if( GetUnitVid(order_target[i]) )",
+    "      {",
+    "        k=1;",
+    "        if( !order_chase[i] )",
+    "          if( SizeTo(order_target[i],px,py)>r*3/2 || SizeTo(u,px,py)>r*2 )",
+    "            k=0;",
+    "      }",
+    "    if( k )",
+    "      return 0;",
+    "    order_state[i]=4;",
+    "    order_target[i]=0;",
+    "    Action(u,ACT_MOVE,px,py);",
+    "    Log(\"ORDER \"+itoa(i+1)+\" area: back to its post at \"+itoa(t)+\" s from \"+itoa(GetX(u))+\",\"+itoa(GetY(u)));",
+    "    return 1;",
+    "  }",
+    "  f=OrderFoe(Action(u,ACT_GET_ARMY),px,py,r);",
+    "  if( !f )",
+    "    return 0;",
+    "  order_target[i]=f;",
+    "  order_state[i]=5;",
+    "  Action(u,ACT_ATTACK,f);",
+    "  Log(\"ORDER \"+itoa(i+1)+\" area: attacks VID \"+itoa(GetUnitVid(f))+\" army \"+itoa(Action(f,ACT_GET_ARMY))+\" at \"+itoa(t)+\" s, \"+itoa(SizeTo(f,px,py))+\" px from its post\");",
+    "  return 1;",
+    "}",
     "OrdersTact(int t)",
     "{",
     "  int i;",
@@ -1228,6 +1356,8 @@ const char* const ARRIVALS_RUNNER[] = {
     "      OrderTry(i,t);",
     "    else if( order_state[i]==3 )",
     "      OrderTarget(i,t);",
+    "    else if( order_state[i]==4 || order_state[i]==5 )",
+    "      OrderArea(i,t);",
     "}",
     "// ArrivalOnPoint(i): a train of a patrol (-3) that reached its point patrols to the other end from there.",
     "ArrivalOnPoint(int i)",
@@ -2134,7 +2264,13 @@ void read_orders(const Parsed& p, std::vector<TrainPatrol>& out) {
         if (task == -4) {
             t.task = TASK_TARGET;
             t.target = to_int(column("order_tvid", i));
-        } else if (task == -2) t.task = TASK_DRIVE;
+        } else if (task == -5) {
+            t.task = TASK_AREA;
+            t.radius = to_int(column("order_radius", i));
+            t.chase = to_int(column("order_chase", i));
+        } else if (task == -6) t.task = TASK_ATTACK;
+        else if (task == -7) t.task = TASK_GUARD;
+        else if (task == -2) t.task = TASK_DRIVE;
         else if (task == -3) t.task = TASK_PATROL;
         else if (task == 10 || task == 11) t.task = TASK_ATTACK;
         else if (task >= 0 && task < POSTS) {
@@ -2262,6 +2398,7 @@ Mission read_mission(const Parsed& p, bool block, const std::string& map) {
     ai.clever = to_int(get("CLEVER_ATTACK", "1"), 1) != 0;
     ai.red_lights = to_int(get("PASS_RED_LIGHTS", "0"), 0) & 15;
     ai.neutral_trains = to_int(get("NEUTRAL_TRAINS", "0"), 0) != 0;
+    ai.peaceful = to_int(get("FACTIONS_PEACEFUL", "4"), 4) & 12;
     ai.renew = ai.raid = -1;
     for (size_t i = 0; i < m.start.size(); ++i) {
         if (i == 0 || ai.renew == m.start[i].renew) ai.renew = m.start[i].renew;
@@ -2486,15 +2623,20 @@ std::vector<std::string> settings_block(const Mission& m, const ArrivalsState& a
         // the trains' orders (OrdersTact of the runner)
         for (const TrainPatrol& o : edit_train_patrols()) {
             std::string task;
+            // the enemy's attack, post and patrol are its AI's tasks; the others' (and the enemy's drive, area,
+            // target) the runner's: -2 drive, -3 patrol, -4 target, -5 area, -6 hunt (attack), -7 guard a point
             if (o.army == 1 && o.task == TASK_ATTACK) task = "ATA_FIGHT";
             else if (o.army == 1 && o.task == TASK_GUARD) task = post(o.to_x, o.to_y);
             else if (o.army == 1 && o.task == TASK_PATROL) task = patrol(o.from_x, o.from_y, o.to_x, o.to_y);
-            else if (o.army != 1 && o.task == TASK_DRIVE) task = "-2";
-            else if (o.army != 1 && o.task == TASK_PATROL) task = "-3";
+            else if (o.task == TASK_DRIVE) task = "-2";
+            else if (o.task == TASK_PATROL) task = "-3";
             else if (o.task == TASK_TARGET && o.target) task = "-4";
+            else if (o.task == TASK_AREA) task = "-5";
+            else if (o.task == TASK_ATTACK) task = "-6";
+            else if (o.task == TASK_GUARD) task = "-7";
             else continue;   // an order of another army (the train's army changed since)
             orders.push_back({o, task, o.army == 1 ? type_of(o.cars) : "0"});
-            if (o.rebuild && o.army && o.task != TASK_TARGET && (o.army == 1 || o.fx || o.fy)) {   // built again when lost
+            if (o.rebuild && (o.army == 1 || o.fx || o.fy)) {   // built again when lost (any order: PlanReorder gives it again)
                 FactoryTrain t;
                 t.when = WHEN_LOST_TRAIN;
                 t.time = 0;
@@ -2504,23 +2646,18 @@ std::vector<std::string> settings_block(const Mission& m, const ArrivalsState& a
                 t.cars = o.cars;
                 t.fx = o.army == 1 ? 0 : o.fx;
                 t.fy = o.army == 1 ? 0 : o.fy;
-                if (o.army == 1) {
+                if (o.army == 1) {   // through the AI's queue: its own task, else attacking until the order takes it
                     plan_types.push_back(type_of(declared_order(o.cars)));
-                    plan_tasks.push_back(task);
+                    plan_tasks.push_back(task[0] == '-' ? "ATA_FIGHT" : task);
                     if (arrivals.on) {
                         times.push_back("0");
                         queue_types.push_back("-1");
                         queue_tasks.push_back("0");
                     }
-                } else {   // the rebuilt one drives to where the lost one stood, then as it was told
-                    t.task = o.task;
-                    t.tx = o.task == TASK_PATROL ? o.from_x : o.to_x;
-                    t.ty = o.task == TASK_PATROL ? o.from_y : o.to_y;
-                    t.tz = o.task == TASK_PATROL ? o.from_z_dot : o.to_z;
-                    t.tx2 = o.to_x;
-                    t.ty2 = o.to_y;
+                } else {   // car by car in its army's factory, then its order again (PlanReorder)
+                    t.task = TASK_NONE;
                     plan_types.push_back(type_of(t.cars));
-                    plan_tasks.push_back(o.task == TASK_DRIVE ? "-2" : "-3");
+                    plan_tasks.push_back("-1");
                 }
                 q.push_back(t);
                 armies.push_back(o.army);
@@ -2545,6 +2682,8 @@ std::vector<std::string> settings_block(const Mission& m, const ArrivalsState& a
         if (ai.neutral_trains) define("NEUTRAL_TRAINS", "1");   // SetEnemyCanAttackNeutralTrains(1), by the runner
     }
     define("FACTIONS", "1");   // the neutrals' and the pirates' rules, read as the level loads (factions.cpp)
+    if (m.factories.ai.peaceful != 4)   // the armies that answer only whoever attacks them, if not the neutrals alone (factions.cpp)
+        define("FACTIONS_PEACEFUL", std::to_string(m.factories.ai.peaceful));
     if (m.factories.ai.red_lights)   // the armies whose trains pass the red lights, read as the level loads (red_lights.cpp)
         define("PASS_RED_LIGHTS", std::to_string(m.factories.ai.red_lights));
     for (const auto& e : m.extra) define(e.first, e.second);
@@ -2616,6 +2755,11 @@ std::vector<std::string> settings_block(const Mission& m, const ArrivalsState& a
         texts("order_from_y", [](const Ordered& o) { return std::to_string(o.order.from_line ? o.order.from_y : 0); });
         texts("order_from_z", [](const Ordered& o) { return std::to_string(o.order.from_line ? o.order.from_z : 0); });
         texts("order_tvid", [](const Ordered& o) { return std::to_string(o.order.task == TASK_TARGET ? o.order.target : 0); });
+        // the area's radius and chase: TASK_AREA's own; the others' hunt the whole map and chase, guard 150 px
+        texts("order_radius", [](const Ordered& o) {
+            return std::to_string(o.task == "-5" ? o.order.radius : o.task == "-6" ? 30000 : o.task == "-7" ? 150 : 0);
+        });
+        texts("order_chase", [](const Ordered& o) { return std::string(o.task == "-6" || (o.task == "-5" && o.order.chase) ? "1" : "0"); });
         texts("order_wait", [](const Ordered& o) { return std::to_string(o.order.wait); });
         texts("order_target", [](const Ordered&) { return std::string("0"); });
         texts("order_unit", [](const Ordered&) { return std::string("0"); });
@@ -3723,6 +3867,7 @@ bool mission_settings_from_file(const std::string& path) {
     bool factories_given = false;
     int red_lights = -1;   // the file's PASS_RED_LIGHTS, -1 the map's
     int neutral_trains = -1;   // the file's NEUTRAL_TRAINS, -1 the map's
+    int peaceful = -1;         // the file's FACTIONS_PEACEFUL, -1 the map's
     bool orders_given = false;   // the file's orders replace the map's
     std::vector<FactoryTrain> plans;
     bool plans_given = false;
@@ -3732,9 +3877,9 @@ bool mission_settings_from_file(const std::string& path) {
         const std::string name = trim(line.substr(0, colon));
         if (name == "order") {   // order: vid x y drive|patrol|attack|guard|target [to_x to_y to_z [target vid]] [rebuild=n] [wait=s] [start=s] (a car of the map)
             const std::vector<std::string> w = words_of(line.substr(colon + 1));
-            static const char* const TASKS[] = {"", "attack", "", "guard", "patrol", "drive", "target"};
+            static const char* const TASKS[] = {"", "attack", "", "guard", "patrol", "drive", "target", "area"};
             int task = 0;
-            for (int k = 1; k < 7; ++k)
+            for (int k = 1; k < 8; ++k)
                 if (w.size() > 3 && w[3] == TASKS[k] && *TASKS[k]) task = k;
             if (w.size() < 4 || !task) {
                 patch::log("mission test: a wrong order line: %s", line.c_str());
@@ -3747,6 +3892,8 @@ bool mission_settings_from_file(const std::string& path) {
             for (const std::string& k : w)   // rebuild=<n, -1 always> wait=<s>: built again when lost
                 if (k.rfind("rebuild=", 0) == 0) t.rebuild = to_int(k.substr(8));
                 else if (k.rfind("start=", 0) == 0) t.wait = to_int(k.substr(6));
+                else if (k.rfind("radius=", 0) == 0) t.radius = to_int(k.substr(7));
+                else if (k.rfind("chase=", 0) == 0) t.chase = to_int(k.substr(6));
                 else if (k.rfind("wait=", 0) == 0) t.rebuild_wait = to_int(k.substr(5));
             if (!orders_given) g_patrols.clear();
             orders_given = true;
@@ -3755,6 +3902,10 @@ bool mission_settings_from_file(const std::string& path) {
         }
         if (name == "red_lights") {   // red_lights: <mask> (PASS_RED_LIGHTS: 4 the neutrals, 8 the pirates)
             red_lights = to_int(trim(line.substr(colon + 1))) & 15;
+            continue;
+        }
+        if (name == "peaceful") {   // peaceful: <mask> (FACTIONS_PEACEFUL: 4 the neutrals, 8 the pirates)
+            peaceful = to_int(trim(line.substr(colon + 1))) & 12;
             continue;
         }
         if (name == "neutral_trains") {   // neutral_trains: 0|1 (NEUTRAL_TRAINS: the enemy fires at neutral trains)
@@ -3829,6 +3980,7 @@ bool mission_settings_from_file(const std::string& path) {
     }
     if (red_lights >= 0) n.factories.ai.red_lights = red_lights;
     if (neutral_trains >= 0) n.factories.ai.neutral_trains = neutral_trains;
+    if (peaceful >= 0) n.factories.ai.peaceful = peaceful;
     if (plans_given) n.factories.queue = plans;   // the factories are found by their places (edit_level_held, a save)
     g_mission = n;
     g_arrivals = arrivals;

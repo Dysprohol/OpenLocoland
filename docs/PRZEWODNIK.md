@@ -446,7 +446,11 @@ poziomu jedzie do końca tej linii i tam zaczyna rozkaz. Punkt, do którego poci
 jednokierunkową, na którą nie może wjechać - edytor podaje przy wydaniu rozkazu i w opisie wiersza ROZKAZY
 w pasku stanu: w grze taki pociąg dojeżdża do linii i staje.
 
-**Czerwone światła dla neutralnych i piratów**: panel pociągu neutralnych albo piratów ma **NA CZERWONYM:
+**Zasady walki armii**: panel jednostki neutralnych albo piratów ma **W WALCE: ODPOWIADA NAPASTNIKOM** (zwyczaj
+neutralnych: strzelają tylko do tego, kto ich trafił) albo **WSZYSCY** (zwyczaj piratów) - dla całej armii.
+**STRZELA** jest przy każdej uzbrojonej jednostce: samo albo na rozkaz (neutralna: w odpowiedzi albo nigdy).
+
+**Czerwone światła**: panel każdego pociągu ma **NA CZERWONYM:
 STAJE** (jak każdy pociąg) albo **JEDZIE** - wtedy każdy pociąg tej armii może jechać linią jednokierunkową
 pod prąd, tam gdzie twoje pociągi i pociągi wroga są zatrzymywane (wyjazd z poziomu wypuszcza go też poza
 mapę, na ukryty tor). Jedna zasada dla całej armii.
@@ -455,6 +459,13 @@ mapę, na ukryty tor). Jedna zasada dla całej armii.
 mówi, co robi wiersz pod myszą (a przy ROZKAZACH - czemu rozkaz nie może być wykonany). **Przytrzymanie**:
 przytrzymaj wagon przyjazdu albo pociągu fabryki (albo **+ WAGON**) - nad nim otwierają się jednostki; puść na
 jednej, by wstawić ją w miejsce wagonu (albo dodać). Krótkie kliknięcie działa jak dotąd.
+
+**Rozkazy dla każdej armii**: pociąg każdej armii ma **ROZKAZY: JEDZ DO... / PATROL...** i **WALKA: ATAK /
+PILNUJ... / OBSZAR...**. ATAK, PILNUJ i PATROL wroga to zadania jego AI, jak dotąd; u pozostałych ATAK poluje na
+najbliższy wrogi pociąg, jeden po drugim, a PILNUJ trzyma punkt i bierze wrogi pociąg w promieniu 150 px.
+**OBSZAR...**: kliknięcie na torze to posterunek; wiersz **OBSZAR** ustawia promień (- 300 PX +) i **WRACA** (na
+posterunek, gdy cel zginie albo wyjedzie z obszaru) albo **SCIGA** (za celem, aż zginie). Zaznaczony pociąg
+pokazuje swój obszar jako okrąg. Wrogi - według zasad mapy: neutralni nie zaczynają walki.
 
 **Cel i start**: **CEL: WSKAŻ...** i kliknięcie jednostki albo budynku innej armii (fort: jedno z jego dział)
 - pociąg atakuje go po starcie poziomu zamiast innego rozkazu; pociąg wroga przechodzi potem do swojego AI,

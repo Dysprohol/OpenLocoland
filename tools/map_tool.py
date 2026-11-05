@@ -896,8 +896,31 @@ PlanLoco(int u)
   }
   return u;
 }
+// PlanReorder(i,u): a train of the map built again (plan_order) gets its order again from the order's
+// runner, wherever it is; the enemy's train of an order that is not the AI's leaves the AI.
+PlanReorder(int i,int u)
+{
+  int o,k;
+  o=plan_order[i]-1;
+  if( o<0 || o>=ORDERS )
+    return 0;
+  if( order_task[o]>=0 )   // the AI's own task: the AI has it
+    return 0;
+  k=plan_slot[i];
+  if( !plan_fx[i] && !plan_fy[i] && k>=0 )
+    if( ai_trains[k] )
+      ai_trains[k]=0;
+  order_unit[o]=u;
+  order_state[o]=1;
+  order_from_x[o]=0;
+  order_from_y[o]=0;
+  order_wait[o]=0;
+  return 1;
+}
 PlanMade(int i,int u,int t)
 {
+  if( u && plan_order[i] )
+    PlanReorder(i,u);
   if( !plan_renew[i] )
     return 0;
   plan_loco[i]=0;
@@ -1245,6 +1268,21 @@ OrderTry(int i,int t)
     if( SizeTo(u,order_from_x[i],order_from_y[i]+order_from_z[i])>=40+48*mission_count || Action(u,ACT_GET_SPEED) )
       return 0;
   }
+  if( order_task[i]<=-5 && order_task[i]>=-7 )   // guards an area (-5), hunts (-6), guards its point (-7)
+  {
+    if( order_task[i]==-6 )   // hunting: its post is where it starts
+    {
+      order_to_x[i]=GetX(u);
+      order_to_y[i]=GetY(u);
+      order_to_z[i]=0;
+    }
+    else
+      Action(u,ACT_MOVE,order_to_x[i],order_to_y[i]+order_to_z[i]);
+    order_state[i]=4;
+    order_target[i]=0;
+    Log("ORDER "+itoa(i+1)+" task "+itoa(order_task[i])+" train 1 guards "+itoa(order_to_x[i])+","+itoa(order_to_y[i])+" radius "+itoa(order_radius[i])+" chase "+itoa(order_chase[i])+" at "+itoa(t)+" s");
+    return 1;
+  }
   if( order_task[i]==-4 )   // attack an object; the enemy's train goes to the AI once it is gone
   {
     order_target[i]=FindNearestSprite(GETSPRITE_VID+order_tvid[i],order_to_x[i],order_to_y[i]+order_to_z[i],30);
@@ -1317,6 +1355,96 @@ OrderTarget(int i,int t)
   Log("ORDER "+itoa(i+1)+" target gone at "+itoa(t)+" s, AI slot "+itoa(k));
   return 1;
 }
+// The armies' hostility as the map's FACTIONS rules have it: ours and the enemy fight each other; an
+// army that answers only whoever attacks it (FACTIONS_PEACEFUL, bit n army n; the neutrals by
+// default) attacks nobody first and is attacked first only by an army against all sides - one that
+// is not peaceful and not ours or the enemy (the pirates by default) - or, the neutrals' trains, by
+// the enemy with NEUTRAL_TRAINS.
+OrderPeaceful(int a)
+{
+#ifdef FACTIONS_PEACEFUL
+  return (FACTIONS_PEACEFUL>>a)&1;
+#endif
+  return a==2;
+}
+OrderHostile(int army,int a)
+{
+  if( a==army || OrderPeaceful(army) )
+    return 0;
+  if( !OrderPeaceful(a) )
+    return 1;
+#ifdef NEUTRAL_TRAINS
+  if( army==1 && a==2 )
+    return 1;
+#endif
+  return army>1;
+}
+// OrderFoe(army,x,y,r): the train of an army hostile to `army` nearest to x,y within r, 0 none.
+OrderFoe(int army,int x,int y,int r)
+{
+  int a,u,best,d,bd;
+  best=0;
+  bd=r+1;
+  for( a=0; a<4; a++ )
+    if( OrderHostile(army,a) )
+    {
+      u=FindNearestSprite(GETSPRITE_UNIT+GETSPRITE_CLASS+B_ENGINE+(GETSPRITE_ARMY0<<a),x,y,r);
+      if( u )
+      {
+        d=SizeTo(u,x,y);
+        if( d<bd )
+        {
+          bd=d;
+          best=u;
+        }
+      }
+    }
+  return best;
+}
+// OrderArea(i,t): a train guarding an area (order_state 4 at its post, 5 after a target). It takes
+// the nearest hostile train within order_radius of its post (ACT_ATTACK); back to the post (ACT_MOVE)
+// when the target is gone - or, unless it chases (order_chase), when the target is 1.5 radii from
+// the post or the train 2 radii.
+OrderArea(int i,int t)
+{
+  int u,f,px,py,r,k;
+  u=order_unit[i];
+  if( !GetUnitVid(u) )
+  {
+    order_state[i]=2;
+    return 0;
+  }
+  px=order_to_x[i];
+  py=order_to_y[i]+order_to_z[i];
+  r=order_radius[i];
+  if( order_state[i]==5 )
+  {
+    k=0;
+    if( order_target[i] )
+      if( GetUnitVid(order_target[i]) )
+      {
+        k=1;
+        if( !order_chase[i] )
+          if( SizeTo(order_target[i],px,py)>r*3/2 || SizeTo(u,px,py)>r*2 )
+            k=0;
+      }
+    if( k )
+      return 0;
+    order_state[i]=4;
+    order_target[i]=0;
+    Action(u,ACT_MOVE,px,py);
+    Log("ORDER "+itoa(i+1)+" area: back to its post at "+itoa(t)+" s from "+itoa(GetX(u))+","+itoa(GetY(u)));
+    return 1;
+  }
+  f=OrderFoe(Action(u,ACT_GET_ARMY),px,py,r);
+  if( !f )
+    return 0;
+  order_target[i]=f;
+  order_state[i]=5;
+  Action(u,ACT_ATTACK,f);
+  Log("ORDER "+itoa(i+1)+" area: attacks VID "+itoa(GetUnitVid(f))+" army "+itoa(Action(f,ACT_GET_ARMY))+" at "+itoa(t)+" s, "+itoa(SizeTo(f,px,py))+" px from its post");
+  return 1;
+}
 OrdersTact(int t)
 {
   int i;
@@ -1325,6 +1453,8 @@ OrdersTact(int t)
       OrderTry(i,t);
     else if( order_state[i]==3 )
       OrderTarget(i,t);
+    else if( order_state[i]==4 || order_state[i]==5 )
+      OrderArea(i,t);
 }
 // ArrivalOnPoint(i): a train of a patrol (-3) that reached its point patrols to the other end from there.
 ArrivalOnPoint(int i)
@@ -2102,6 +2232,8 @@ int order_from_z[]={0};
 int order_tvid[]={0};
 int order_wait[]={0};
 int order_target[]={0};
+int order_radius[]={0};
+int order_chase[]={0};
 int order_unit[]={0};
 int order_state[]={0};
 int unlock_x[]={0};

@@ -41,6 +41,7 @@ struct TrainPatrol {
     int fx = 0, fy = 0;
     int target = 0;   // TASK_TARGET: the VID of the object at to_x, to_y (screen) and to_z (its height)
     int wait = 0;     // the order starts `wait` s after the level starts
+    int radius = 300, chase = 0;   // TASK_AREA: the area's radius (px); 0 back to the post, 1 chases its target
 };
 // An enemy train of the script's start (start_trains*: the AI makes it when the level starts) or of
 // Mission settings' queue as the dialog reads it.
@@ -99,6 +100,7 @@ enum ArrivalTask : int {
     TASK_PATROL,       // the enemy: ATA_PATROLn, the point and the second point
     TASK_DRIVE,        // ours, the neutrals, the pirates: drive to the point (ACT_MOVE)
     TASK_TARGET,       // a train of the map, any army: attack the object (VID `target`) at the point (ACT_ATTACK)
+    TASK_AREA,         // a train of the map, any army: guard the area of `radius` around the point (the runner)
 };
 enum ArrivalIf : int {
     IF_NONE = 0,
@@ -209,10 +211,13 @@ struct AiKnobs {
     // NEUTRAL_TRAINS: the enemy's guns take neutral trains as targets (script SetEnemyCanAttackNeutralTrains,
     // World flags 2 - Object_FindTarget, factions.cpp may_target); 0: only once a neutral answers them
     int neutral_trains = 0;
+    // FACTIONS_PEACEFUL (factions.cpp): the armies that answer only whoever attacks them (bit n: army n) -
+    // the neutrals (4) by default, the pirates (8) fight all sides; a neutral's or a pirate's panel sets it
+    int peaceful = 4;
     bool operator==(const AiKnobs& o) const {
         return limit == o.limit && renew_wait == o.renew_wait && raid_length == o.raid_length && raids_from == o.raids_from &&
                all_attack == o.all_attack && renew == o.renew && raid == o.raid && clever == o.clever && red_lights == o.red_lights &&
-               neutral_trains == o.neutral_trains;
+               neutral_trains == o.neutral_trains && peaceful == o.peaceful;
     }
 };
 struct UnitLimit {   // AddUnitLimit: the army has at most `max` of the VID on the map
