@@ -2164,6 +2164,25 @@ point and a neutral factory beside the main line captured as trains passed them,
 player's train taken over going through the player's repair point. Older editor maps get it with
 CONVERT in the Arrivals panel.
 
+**The AI and the trains of an editor map - the review of 2026-11-05.** What the editor gives the trains,
+read in the code and the scripts and tried on POLIGON copies: the Train arrivals panel (an army's train made
+on a rail point past the edge at a time, n times, under a condition, then driving, patrolling or - the
+enemy's - given to its AI as `ATA_FIGHT` / `ATA_STANDn` / `ATA_PATROLn`), a factory's plan (the enemy's
+through the authors' queue and `DepoFree`, the others' car by car by the runner), the AI's knobs
+(`LIMIT_ATACKERS`, the start trains' renew and raids, `CLEVER_ATTACK`), the trains of the map with their
+orders (`OrdersTact`), the FACTIONS rules (fix 34: the neutrals answer only who hit them, the pirates fight
+all) and the push lines with their posts (the post only shows the line; the line is what holds trains, for
+every army). What was missing or wrong, and is done since: a train placed on a line that pushes got no
+order (found too late - below); an order past a one-way line looked like a train doing nothing (the editor
+now names the line); no train of any army could be let through a line (fix 35, the neutrals' and pirates'
+red lights); a lost train of the map was never built again (the start trains' renew did not survive
+CONVERT - "Rebuilt when lost" below); no order to attack a given object, no delayed start, no way to let the
+enemy fire at neutral trains ("A target and a start" below); and the panels had no word on what their rows
+do (the status line now says it for every row of the object panel, the Arrivals panel and a factory's
+panel, "The panel" below). Left as it is: the start trains' own renew and raids in a map not converted,
+the AI's own linkers (`BuildLinker`, a locomotive the AI builds to fetch a lost train's wagons - seen
+leaving the enemy factory in the tests), and the AI's fixed limits (16 trains, 10 patrols and posts).
+
 **The trains' orders** (`editor_edit.cpp` "trains", `OrdersTact` of the runner). A train of the map has
 an order in its object panel, kept with its first car in the editor's state (undoable) - the same kinds
 as the arrivals' and the factory queue's: in a map that runs arrivals, ORDERS: NONE, DRIVE TO... and
@@ -2220,6 +2239,26 @@ until something happens" beyond the start time (each would be a condition of `Mi
 cheap to add per condition when wanted), the AI's aggressiveness beyond CLEVER ATTACK and LIMIT_ATACKERS
 (the tactics scripts read no other per-army value), the pirates' and neutrals' own AI (they have none:
 their trains do only what the orders and the arrivals tell them).
+**What a row does, and click-and-hold** (2026-11-05; `editor_rows.cpp` `PanelRows::tip` / `hold_area`,
+`ContextRow.tip` and `LABEL_TIPS` of `editor_edit.cpp`, `ROW_TIPS` of `editor_arrivals.cpp` and
+`editor_factory.cpp`). The status line at the top names what the row under the mouse does - every row of an
+object's panel that has a tip (army, in a fight, it fires, at red lights, train, orders, target, starts,
+rebuilt, a post's way, colour and line, a line's action and direction, height, delete), and the labelled
+rows of the Arrivals panel and of a factory's plan entry (who, cars, entry, when, repeat, next, then, the
+points, the train); an order the train cannot carry out puts the reason there in place of the row's words
+(the ORDERS row). A train's panel is grouped by meaning: the army and its rules (army, in a fight, it fires,
+at red lights - the last three are rules of the whole army), then the train (turn round, couple), its orders
+(orders, target, starts, rebuilt) and delete. The maintainer's idea for the arrivals, the building menus of
+the Anno games: a car icon or + CAR of an arrival or of a factory's train held down for 350 ms opens a strip
+of the game's 14 factory units above it (two rows of seven, inside the panel's width), the status line names
+the unit under the mouse, and letting go on one puts it in that car's place (or adds it at the end for
++ CAR) - one step of the history; a short click does what it did (chooses the car, opens the Vehicles
+palette), letting go elsewhere nothing. The panels' `WM_LBUTTONUP` now reaches the rows (`panel_message`),
+which keep the pressed area of the last frame (`press` / `release`). Checked in the game (Polish 1024x768,
+English 1920x1080): the CARS and REPEAT tips in the status line, the train panel's tips and order, the strip
+over arrival 1's second car with "Miotacz ognia (VID 90): pusc, by go tu wstawic", the car replaced by it
+on letting go (undo 1), the factory entry's NEXT row.
+
 **The templates** (TEMPLATE... in the Arrivals panel and in the enemy factory's queue) are the authors'
 trains exactly, read from the game's own scripts when the list is first shown
 (`mission_author_trains`, `editor_mission.cpp`): every `int this_trainNN[]={...}` of

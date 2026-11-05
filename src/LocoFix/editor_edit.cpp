@@ -91,6 +91,8 @@ void editor_mission_settings();     // editor.cpp: File > Mission settings...
 void panel_draw(POINT mouse);
 void panel_draw_saved();
 const char* panel_tip(POINT mouse);
+const char* arrivals_tip(POINT mouse);   // editor_arrivals.cpp: the row under the mouse
+const char* factory_tip(POINT mouse);    // editor_factory.cpp
 bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse);
 bool panel_open();
 void panel_reset();
@@ -8086,7 +8088,8 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
         return rows;
     }
     faction_rows(o, rows);
-    if (is_car(o)) {   // its train
+    if (is_car(o)) {   // its train: the army's rules (above, and the red lights), the train, its orders, delete
+        red_light_row(o, rows);
         ContextRow train{{"CtxTrain", "TRAIN:"}, {{{"CtxReverse", "TURN ROUND (R)"}, false, [o] { reverse_train(o); }}}};
         if (car_prev(o)) train.choices.push_back({{"CtxUncouple", "UNCOUPLE (U)"}, false, [o] { uncouple(o); }});
         if (coupling_partner(o)) train.choices.push_back({{"CtxCouple", "COUPLE (C)"}, false, [o] { couple(o); }});
@@ -8130,7 +8133,6 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
         rows.push_back(orders);
         if (mission_arrivals().on) target_rows(o, rows);
         rebuild_row(o, rows);
-        red_light_row(o, rows);
         rows.push_back({{"CtxDelete", "DELETE (DEL):"},
                         {{{"CtxDeleteCar", "CAR"}, false, [o] {
                               delete_objects({o});
@@ -8301,10 +8303,34 @@ std::vector<ContextRow> line_rows(int i) {
     return rows;
 }
 
+// The tips of the rows that give none themselves, by the row's label (the status line, context_tip).
+struct LabelTip {
+    const char *label, *key, *english;
+};
+const LabelTip LABEL_TIPS[] = {
+    {"CtxArmy", "TipCtxArmy", "Army: whose it is - ours, the enemy's, the neutrals' or the pirates' (A)"},
+    {"CtxNeutralFight", "TipCtxFight", "In a fight: whom it fights by the rules of the map"},
+    {"CtxFires", "TipCtxFires", "It fires: whether its guns fire on their own"},
+    {"CtxTrain", "TipCtxTrain", "Train: turn it round (R), uncouple this car from the one in front (U), couple it to the nearest train (C)"},
+    {"CtxDelete", "TipCtxDelete", "Delete: this object (Del) - a car, or its whole train (Shift+Del)"},
+    {"CtxTurn", "TipCtxTurn", "Turn: R / E or the mouse wheel"},
+    {"CtxPostFor", "TipCtxPostFor", "For trains: the way the trains this post is for go - the other way turns it round"},
+    {"CtxColour", "TipCtxColour", "Colour: red stops its trains, green lets them in (T)"},
+    {"CtxLine", "TipCtxLine", "Line: the post's own one-way line - what it does to its trains (L / Shift+L)"},
+    {"CtxLineAction", "TipCtxLineAction", "Action: pushes the trains along it, or only forbids the way against it (T)"},
+    {"CtxLineWay", "TipCtxLineWay", "Direction: the way the line runs - R turns it round"},
+    {"CtxHeight", "TipCtxHeight", "Height: above the ground (PgUp / PgDn, Home: on the ground)"},
+};
+
 std::vector<ContextRow> open_rows() {
-    if (g_context) return context_rows(g_context);
-    if (g_context_line >= 0 && g_context_line < static_cast<int>(mission_push_lines().size())) return line_rows(g_context_line);
-    return {};
+    std::vector<ContextRow> rows;
+    if (g_context) rows = context_rows(g_context);
+    else if (g_context_line >= 0 && g_context_line < static_cast<int>(mission_push_lines().size())) rows = line_rows(g_context_line);
+    for (ContextRow& r : rows)
+        if (!r.tip.key && !*r.tip.english && r.label.key)
+            for (const LabelTip& t : LABEL_TIPS)
+                if (std::strcmp(t.label, r.label.key) == 0) r.tip = {t.key, t.english};
+    return rows;
 }
 
 void draw_context() {
@@ -8613,6 +8639,8 @@ void draw_overlay() {
     if (const char* tip = panel_tip(g_mouse)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // the Help or Menu button
     if (const char* tip = music_tip(g_mouse)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // the music player
     if (const char* tip = context_tip(g_mouse)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // a row of an object's panel
+    if (const char* tip = arrivals_tip(g_mouse)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // a row of the Arrivals panel
+    if (const char* tip = factory_tip(g_mouse)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);    // a row of a factory's panel
     std::snprintf(status, sizeof status, ui_format("StatusLine", "EDITOR - %s - undo %u, redo %u%s   %s"), tool_text,
                   static_cast<unsigned>(g_undo.size()), static_cast<unsigned>(g_redo.size()),
                   g_dirty ? ui_text("StatusNotSaved", " - not saved") : "",

@@ -451,6 +451,11 @@ STAJE** (jak każdy pociąg) albo **JEDZIE** - wtedy każdy pociąg tej armii mo
 pod prąd, tam gdzie twoje pociągi i pociągi wroga są zatrzymywane (wyjazd z poziomu wypuszcza go też poza
 mapę, na ukryty tor). Jedna zasada dla całej armii.
 
+**Co robi wiersz**: w panelu pociągu albo budynku, w panelu przyjazdów i w panelu fabryki pasek stanu u góry
+mówi, co robi wiersz pod myszą (a przy ROZKAZACH - czemu rozkaz nie może być wykonany). **Przytrzymanie**:
+przytrzymaj wagon przyjazdu albo pociągu fabryki (albo **+ WAGON**) - nad nim otwierają się jednostki; puść na
+jednej, by wstawić ją w miejsce wagonu (albo dodać). Krótkie kliknięcie działa jak dotąd.
+
 **Cel i start**: **CEL: WSKAŻ...** i kliknięcie jednostki albo budynku innej armii (fort: jedno z jego dział)
 - pociąg atakuje go po starcie poziomu zamiast innego rozkazu; pociąg wroga przechodzi potem do swojego AI,
 pozostałe stają. **START: OD RAZU** albo **PO n S** wstrzymuje rozkaz do tego czasu. Ekran **AI...** fabryki

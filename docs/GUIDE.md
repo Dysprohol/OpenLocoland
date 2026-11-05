@@ -454,6 +454,11 @@ LIGHTS: STOPS** (as every train) or **DRIVES ON** - then every train of that arm
 line against its arrow, where your and the enemy's trains are held (the level's exit lets them off the map
 too, onto the hidden track). One rule for the whole army.
 
+**What a row does**: in a train's or building's panel, the Arrivals panel and a factory's panel the status line
+at the top says what the row under the mouse does (and, for ORDERS, why the order cannot be carried out).
+**Click-and-hold**: hold a car of an arrival or of a factory's train (or **+ CAR**) down - the units open above
+it; let go on one to put it in that car's place (or add it). A short click works as before.
+
 **Target and start**: **TARGET: PICK...** and a click on a unit or building of another army (a fort: one of
 its guns) - the train attacks it when the level starts, in place of its other order; the enemy's train then
 goes to its AI, the others' stay. **STARTS: AT ONCE** or **AFTER n S** holds the order until then. The enemy

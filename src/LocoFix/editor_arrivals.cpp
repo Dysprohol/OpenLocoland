@@ -86,7 +86,34 @@ float put(float x, float y, const std::string& text, bool current = false, std::
     return g_rows.put(x, y, text, current, std::move(act));
 }
 
+std::string g_hold_tip;   // the strip's unit under the mouse, for the status line
+// What each row does, for the status line (the row's label key, the tip's key and its English).
+struct RowTip {
+    const char *label, *key, *english;
+};
+const RowTip ROW_TIPS[] = {
+    {"ArrWho", "TipArrWho", "Who: whose train arrives - ours, the enemy's, the neutrals' or the pirates'"},
+    {"ArrEntryLabel", "TipArrEntry", "Entry: the rail point the train is made on - past the edge of the map, where a line that pushes brings it in"},
+    {"ArrWhen", "TipArrWhen", "When: the first wave - at the start, after a time, when the player has no train or pays"},
+    {"ArrRepeat", "TipArrRepeat", "Repeat: how many waves come and how long after the one before"},
+    {"ArrThen", "TipArrThen", "Then: what the train does once it is made (the enemy's: its AI's task)"},
+    {"ArrPoint", "TipArrPoint", "Point: the rail point of its task - PICK, then a click on the track"},
+    {"ArrPoints", "TipArrPoints", "Points: the two ends of its patrol - PICK, then two clicks on the track"},
+    {"PlanTrain", "TipPlanTrain", "Train: what the factory builds, by its cars (ours, the neutrals' and the pirates' with the price)"},
+};
+const char* const TIP_CARS_KEY = "TipArrCars";
+const char* const TIP_CARS = "Cars: the train in its order - a click chooses a car (< > move it, REMOVE); held, a car or + CAR opens the "
+                             "units: let go on one to put it there or add it";
+// The units the click-and-hold strip offers: the game's factory units in their order (F1 ... ]).
+const std::vector<int> HOLD_UNITS = {5, 10, 20, 25, 80, 85, 45, 30, 35, 82, 97, 90, 75, 62};
+
+void row_tip(float y, const char* key) {
+    for (const RowTip& t : ROW_TIPS)
+        if (std::strcmp(t.label, key) == 0) g_rows.tip(g_px + LEFT - 4, y - ROW / 2, g_px + LEFT + WIDTH * g_cw, y + ROW / 2, ui_text(t.key, t.english));
+}
+
 float label(float y, const char* key, const char* english) {
+    row_tip(y, key);
     put(g_px + LEFT, y, ui_text(key, english));
     return g_px + LEFT + LABEL;
 }
@@ -356,9 +383,16 @@ float draw_who(const Arrival& a, float y) {
 float draw_cars(const Arrival& a, float y) {
     const int n = static_cast<int>(a.cars.size());
     if (g_car >= n) g_car = -1;
+    g_rows.tip(g_px + LEFT - 4, y - ROW / 2, g_px + LEFT + WIDTH * g_cw, y + 2 * ROW + ICON / 2, ui_text(TIP_CARS_KEY, TIP_CARS));
     put(g_px + LEFT, y, ui_text("ArrCars", "CARS:"));
     if (g_car < 0) {
-        if (n < MAX_CARS) put(g_px + LEFT, y + ROW, ui_text("ArrAddCar", "+ CAR"), false, [] { panel_open_vehicles_for_train(false); });
+        if (n < MAX_CARS)   // a click opens the Vehicles palette; held, the units' strip adds the one let go on
+            g_rows.hold_text(g_px + LEFT, y + ROW, ui_text("ArrAddCar", "+ CAR"), [] { panel_open_vehicles_for_train(false); }, HOLD_UNITS,
+                             [](int v) {
+                                 change({"OpArrivalCar", "arrival train"}, [v](Arrival& r) {
+                                     if (r.cars.size() < MAX_CARS) r.cars.push_back(v);
+                                 });
+                             });
         put(g_px + LEFT, y + 2 * ROW, ui_text("ArrTemplates", "TEMPLATE..."), false, [] {
             g_screen = Screen::Templates;
             g_template_page = 0;
@@ -396,7 +430,12 @@ float draw_cars(const Arrival& a, float y) {
         if (frame >= 0) edit_draw_picture(VID_ICONS, frame, cx, cy, STEP - 1);
         else put(x + 4, cy, std::to_string(a.cars[i]));
         if (i == g_car || hover(x, cy - ICON / 2, x + ICON, cy + ICON / 2)) edit_draw_picture(VID_FRAME, 0, cx, cy, STEP);
-        g_rows.area(x, cy - ICON / 2, x + ICON, cy + ICON / 2, [i] { g_car = g_car == i ? -1 : i; });   // chosen, or not again
+        g_rows.hold_area(x, cy - ICON / 2, x + ICON, cy + ICON / 2, [i] { g_car = g_car == i ? -1 : i; },   // chosen, or not again
+                         HOLD_UNITS, [i](int v) {   // held: swapped for the unit let go on
+                             change({"OpArrivalCar", "arrival train"}, [i, v](Arrival& r) {
+                                 if (i < static_cast<int>(r.cars.size())) r.cars[i] = v;
+                             });
+                         });
         x += ICON;
     }
     if (n > SHOWN_CARS) {   // the rest of a long train: scrolled
@@ -620,10 +659,25 @@ void arrivals_draw(POINT m) {
     if (g_screen == Screen::Arrival) draw_arrival_screen();
     else if (g_screen == Screen::Templates) draw_templates_screen();
     else draw_list_screen();
+    // the click-and-hold strip of a car or + CAR held down: over everything of the panel
+    const int under = g_rows.draw_hold(ICON, g_px + LEFT - 20, g_px + LEFT + WIDTH * g_cw + 20, [](int vid, float cx, float cy, bool lit) {
+        const int frame = palette_icon(vid);
+        if (frame >= 0) edit_draw_picture(VID_ICONS, frame, cx, cy, STEP - 1);
+        if (lit) edit_draw_picture(VID_FRAME, 0, cx, cy, STEP);
+    });
+    g_hold_tip = under ? ui_printf(ui_format("TipHoldUnit", "%s (VID %d): let go to put it here"), (object_name(under) ? object_name(under) : "?"), under) : std::string();
 }
 
 // A click in the panel (not on its close button): true when it hit a choice.
-bool arrivals_click(POINT m) { return g_rows.click(m); }
+bool arrivals_click(POINT m) { return g_rows.press(m) || g_rows.click(m); }
+// The left button let go: a short click on a car or + CAR does what a click does, a long one takes the
+// unit let go on from the strip.
+bool arrivals_release(POINT m) { return g_rows.release(m); }
+// The status line's text for the row under the mouse (or the strip's unit), nullptr none.
+const char* arrivals_tip(POINT m) {
+    if (!g_hold_tip.empty() && g_rows.held()) return g_hold_tip.c_str();
+    return g_rows.tip_at(m);
+}
 
 // A screen back: an arrival or the templates -> the list / the arrival; false at the list.
 bool arrivals_has_back() { return mission_arrivals().on && g_screen != Screen::List; }

@@ -61,12 +61,14 @@ void edit_pick_object(int nvid, int army);
 // editor_arrivals.cpp: the Arrivals panel
 void arrivals_draw(POINT mouse);
 bool arrivals_click(POINT mouse);
+bool arrivals_release(POINT mouse);
 void arrivals_add_car(int nvid);
 bool arrivals_back();   // a step back inside the panel (an arrival -> the list); false at the list
 bool arrivals_has_back();
 // editor_factory.cpp: a factory's panel
 void factory_draw(POINT mouse);
 bool factory_click(POINT mouse);
+bool factory_release(POINT mouse);
 void factory_add_car(int nvid);
 bool factory_back();   // the templates -> the queue; false at the queue
 bool factory_has_back();
@@ -903,7 +905,10 @@ bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse) {
         else if (g_panel == Panel::Palette && (w == VK_RIGHT || w == VK_NEXT))
             g_palette_page = (std::min)(pages_of(group_index()) - 1, g_palette_page + 1);
         return true;
-    case WM_LBUTTONUP:
+    case WM_LBUTTONUP:   // a car held down in the Arrivals or a factory's panel: its click, or the strip's unit
+        if (g_panel == Panel::Arrivals) arrivals_release(mouse);
+        else if (g_panel == Panel::Factory) factory_release(mouse);
+        return true;
     case WM_RBUTTONUP:
     case WM_KEYUP:
     case WM_CHAR:
