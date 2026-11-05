@@ -105,6 +105,8 @@ int order_wait[]={0};
 int order_target[]={0};
 int order_radius[]={0};
 int order_chase[]={0};
+int order_home_x[]={0};
+int order_home_y[]={0};
 int order_unit[]={0};
 int order_state[]={0};
 int unlock_x[]={0};
@@ -823,19 +825,25 @@ OrderTry(int i,int t)
     if( SizeTo(u,order_from_x[i],order_from_y[i]+order_from_z[i])>=40+48*mission_count || Action(u,ACT_GET_SPEED) )
       return 0;
   }
-  if( order_task[i]<=-5 && order_task[i]>=-7 )   // guards an area (-5), hunts (-6), guards its point (-7)
+  if( order_task[i]<=-5 && order_task[i]>=-7 )   // watches an area (-5), hunts (-6), guards its point (-7)
   {
-    if( order_task[i]==-6 )   // hunting: its post is where it starts
+    order_home_x[i]=GetX(u);   // its own place: where it stands now (-5, -6), its point (-7)
+    order_home_y[i]=GetY(u);
+    if( order_task[i]==-6 )   // hunting: the whole map round where it starts
     {
       order_to_x[i]=GetX(u);
       order_to_y[i]=GetY(u);
       order_to_z[i]=0;
     }
-    else
-      Action(u,ACT_MOVE,order_to_x[i],order_to_y[i]+order_to_z[i]);
+    if( order_task[i]==-7 )   // guarding its point: it drives there
+    {
+      order_home_x[i]=order_to_x[i];
+      order_home_y[i]=order_to_y[i]+order_to_z[i];
+      Action(u,ACT_MOVE,order_home_x[i],order_home_y[i]);
+    }
     order_state[i]=4;
     order_target[i]=0;
-    Log("ORDER "+itoa(i+1)+" task "+itoa(order_task[i])+" train 1 guards "+itoa(order_to_x[i])+","+itoa(order_to_y[i])+" radius "+itoa(order_radius[i])+" chase "+itoa(order_chase[i])+" at "+itoa(t)+" s");
+    Log("ORDER "+itoa(i+1)+" task "+itoa(order_task[i])+" train 1 watches "+itoa(order_to_x[i])+","+itoa(order_to_y[i])+" radius "+itoa(order_radius[i])+" chase "+itoa(order_chase[i])+" from its place "+itoa(order_home_x[i])+","+itoa(order_home_y[i])+" at "+itoa(t)+" s");
     return 1;
   }
   if( order_task[i]==-4 )   // attack an object; the enemy's train goes to the AI once it is gone
@@ -956,22 +964,34 @@ OrderFoe(int army,int x,int y,int r)
     }
   return best;
 }
-// OrderArea(i,t): a train guarding an area (order_state 4 at its post, 5 after a target). It takes
-// the nearest hostile train within order_radius of its post (ACT_ATTACK); back to the post (ACT_MOVE)
-// when the target is gone - or, unless it chases (order_chase), when the target is 1.5 radii from
-// the post or the train 2 radii.
+// OrderArea(i,t): a train watching an area (order_state 4 at its own place, order_home, or on its way
+// back there; 5 after a target). The area is order_radius round order_to - anywhere, the train does
+// not drive there: it takes the nearest hostile train within the radius and 120 px more of the
+// area's centre (ACT_ATTACK; one coming near is taken before it is in) and, once the target is gone
+// - or, unless it chases (order_chase), 240 px past the area's edge -, the next one in the area,
+// else it drives back to its own place (ACT_MOVE). The others: the hunt (-6) has the whole map and
+// chases; the guard of a point (-7) has 150 px round its point, its own place, and lets the target
+// go at 1.5 radii from it or the train at 2 radii.
 OrderArea(int i,int t)
 {
-  int u,f,px,py,r,k;
+  int u,f,px,py,r,k,r_in,r_out;
   u=order_unit[i];
   if( !GetUnitVid(u) )
   {
     order_state[i]=2;
+    Log("ORDER "+itoa(i+1)+" area: the train is lost at "+itoa(t)+" s");
     return 0;
   }
   px=order_to_x[i];
   py=order_to_y[i]+order_to_z[i];
   r=order_radius[i];
+  r_in=r;
+  r_out=r*3/2;
+  if( order_task[i]==-5 )
+  {
+    r_in=r+120;
+    r_out=r+240;
+  }
   if( order_state[i]==5 )
   {
     k=0;
@@ -980,24 +1000,37 @@ OrderArea(int i,int t)
       {
         k=1;
         if( !order_chase[i] )
-          if( SizeTo(order_target[i],px,py)>r*3/2 || SizeTo(u,px,py)>r*2 )
+        {
+          if( SizeTo(order_target[i],px,py)>r_out )
             k=0;
+          if( order_task[i]==-7 )
+            if( SizeTo(u,px,py)>r*2 )
+              k=0;
+        }
       }
     if( k )
       return 0;
+    f=OrderFoe(Action(u,ACT_GET_ARMY),px,py,r_in);
+    if( f && f!=order_target[i] )   // the next one in the area
+    {
+      order_target[i]=f;
+      Action(u,ACT_ATTACK,f);
+      Log("ORDER "+itoa(i+1)+" area: attacks VID "+itoa(GetUnitVid(f))+" army "+itoa(Action(f,ACT_GET_ARMY))+" at "+itoa(t)+" s, "+itoa(SizeTo(f,px,py))+" px from the area's centre");
+      return 1;
+    }
     order_state[i]=4;
     order_target[i]=0;
-    Action(u,ACT_MOVE,px,py);
-    Log("ORDER "+itoa(i+1)+" area: back to its post at "+itoa(t)+" s from "+itoa(GetX(u))+","+itoa(GetY(u)));
+    Action(u,ACT_MOVE,order_home_x[i],order_home_y[i]);
+    Log("ORDER "+itoa(i+1)+" area: back to its place "+itoa(order_home_x[i])+","+itoa(order_home_y[i])+" at "+itoa(t)+" s from "+itoa(GetX(u))+","+itoa(GetY(u)));
     return 1;
   }
-  f=OrderFoe(Action(u,ACT_GET_ARMY),px,py,r);
+  f=OrderFoe(Action(u,ACT_GET_ARMY),px,py,r_in);
   if( !f )
     return 0;
   order_target[i]=f;
   order_state[i]=5;
   Action(u,ACT_ATTACK,f);
-  Log("ORDER "+itoa(i+1)+" area: attacks VID "+itoa(GetUnitVid(f))+" army "+itoa(Action(f,ACT_GET_ARMY))+" at "+itoa(t)+" s, "+itoa(SizeTo(f,px,py))+" px from its post");
+  Log("ORDER "+itoa(i+1)+" area: attacks VID "+itoa(GetUnitVid(f))+" army "+itoa(Action(f,ACT_GET_ARMY))+" at "+itoa(t)+" s, "+itoa(SizeTo(f,px,py))+" px from the area's centre, the train at "+itoa(GetX(u))+","+itoa(GetY(u)));
   return 1;
 }
 OrdersTact(int t)

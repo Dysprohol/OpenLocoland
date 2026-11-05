@@ -462,10 +462,13 @@ jednej, by wstawić ją w miejsce wagonu (albo dodać). Krótkie kliknięcie dzi
 
 **Rozkazy dla każdej armii**: pociąg każdej armii ma **ROZKAZY: JEDZ DO... / PATROL...** i **WALKA: ATAK /
 PILNUJ... / OBSZAR...**. ATAK, PILNUJ i PATROL wroga to zadania jego AI, jak dotąd; u pozostałych ATAK poluje na
-najbliższy wrogi pociąg, jeden po drugim, a PILNUJ trzyma punkt i bierze wrogi pociąg w promieniu 150 px.
-**OBSZAR...**: kliknięcie na torze to posterunek; wiersz **OBSZAR** ustawia promień (- 300 PX +) i **WRACA** (na
-posterunek, gdy cel zginie albo wyjedzie z obszaru) albo **SCIGA** (za celem, aż zginie). Zaznaczony pociąg
-pokazuje swój obszar jako okrąg. Wrogi - według zasad mapy: neutralni nie zaczynają walki.
+najbliższy wrogi pociąg, jeden po drugim, a PILNUJ jedzie na punkt i go trzyma (bierze wrogi pociąg w promieniu
+150 px). **OBSZAR...** jest inny: pociąg nie jedzie nigdzie - stoi tam, gdzie stoi, i broni strefy wokół
+klikniętego punktu (gdziekolwiek na mapie, także z dala od pociągu). Gdy wrogi pociąg wjedzie do strefy albo
+zbliży się do niej na 120 px, pociąg rusza i atakuje najbliższego; wiersz **OBSZAR** ustawia promień
+(- 300 PX +) i **WRACA** (na swoje miejsce, gdy cel zginie albo odjedzie 240 px za strefę) albo **SCIGA** (za
+celem, aż zginie, potem na swoje miejsce). Zaznaczony pociąg pokazuje swoją strefę jako okrąg i kropkowaną
+linię od siebie do jej środka. Wrogi - według zasad mapy: neutralni nie zaczynają walki.
 
 **Cel i start**: **CEL: WSKAŻ...** i kliknięcie jednostki albo budynku innej armii (fort: jedno z jego dział)
 - pociąg atakuje go po starcie poziomu zamiast innego rozkazu; pociąg wroga przechodzi potem do swojego AI,

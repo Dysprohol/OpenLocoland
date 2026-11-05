@@ -465,10 +465,14 @@ it; let go on one to put it in that car's place (or add it). A short click works
 
 **Orders for every army**: a train of any army has **ORDERS: DRIVE TO... / PATROL...** and **FIGHTS: ATTACK /
 GUARD... / AREA...**. The enemy's ATTACK, GUARD and PATROL are its AI's, as before; for the others ATTACK hunts
-the nearest hostile train, one after another, and GUARD keeps a point and takes a hostile train within 150 px.
-**AREA...**: a click on the track is the post; the **AREA** row sets the radius (- 300 PX +) and **RETURNS** (back
-to the post when the target is gone or leaves the area) or **CHASES** (after the target until it is gone). The
-selected train shows its area as a ring. Hostile means by the map's rules: the neutrals start no fight.
+the nearest hostile train, one after another, and GUARD goes to a point and holds it (takes a hostile train
+within 150 px). **AREA...** is different: the train goes nowhere - it stays where it stands and defends the area
+round the point clicked (anywhere on the map, far from the train too). When a hostile train enters the area or
+comes within 120 px of it, the train sets off and attacks the nearest one; the **AREA** row sets the radius
+(- 300 PX +) and **RETURNS** (back to its own place once the target is gone or 240 px out of the area) or
+**CHASES** (after the target until it is gone, then back to its place). The selected train shows its area as a
+ring and a dotted line from the train to its middle. Hostile means by the map's rules: the neutrals start no
+fight.
 
 **Target and start**: **TARGET: PICK...** and a click on a unit or building of another army (a fort: one of
 its guns) - the train attacks it when the level starts, in place of its other order; the enemy's train then

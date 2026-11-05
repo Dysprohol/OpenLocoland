@@ -303,6 +303,13 @@ moves or deletes its line and posts.
   starts: the runner finds the map's trains on the first frame and gives the order once the train has
   stopped at that end (`order_from`); an order's point past a one-way line the train may not enter is
   reached only up to that line - the editor says so.
+- **[editor] Orders that fight** (the runner's, any army): GUARD (-7) drives to its point and holds
+  it - a hostile train within 150 px is attacked, the train comes back to the point; AREA (-5) does
+  not move: the area (`order_radius` round `order_to`, anywhere) is watched from where the train
+  stands when it gets its order (`order_home`), a hostile train within the radius + 120 px of the
+  area's centre is attacked, and the train drives back to its own place once the target is gone or -
+  RETURNS - 240 px past the area's edge (CHASES: only once it is gone). The train may stand in its
+  area or far from it.
 
 ## 6b. Creatures and mines
 

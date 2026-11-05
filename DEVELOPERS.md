@@ -2245,7 +2245,8 @@ and FIGHTS: ATTACK / GUARD... / AREA... for every army; the enemy's ATTACK, GUAR
 tasks (`ATA_FIGHT`, `ATA_STANDn`, `ATA_PATROLn` - the default way of the enemy), the rest is the runner's:
 -2 drive and -3 patrol (now for the enemy too, outside its AI), -4 target, -5 area, -6 hunt (ours', the
 neutrals' and the pirates' ATTACK: the nearest hostile train of the whole map, one after another), -7 guard
-(theirs: the point, 150 px). AREA (`TASK_AREA`, `order_radius`, `order_chase`) holds a post - the point - and,
+(theirs: the point, 150 px). AREA (`TASK_AREA`, `order_radius`, `order_chase`) first held a post - the point - and
+(it watches from the train's own place now: the next paragraph),
 once a second, takes the nearest hostile train within the radius of it (`OrderFoe`: per hostile army a
 `FindNearestSprite` of class ENGINE with that army's `GETSPRITE_ARMYn`, the nearest by `SizeTo`) with
 ACT_ATTACK (`OrderArea`, state 5); back to the post with ACT_MOVE when the target is gone or - RETURNS, the
@@ -2263,6 +2264,30 @@ play on a POLIGON copy: the enemy's train on the east line guarding 450 px round
 attacked the player's patrolling train each time it came within the area (12, 41, 69 s; 340-443 px from the
 post) and went back to the post each time it left (19, 49, 77 s); with CHASES it followed the target west to
 1178,1330, came back when it was gone (57 s) and took the next one at 68 s.
+
+**AREA watches from where the train stands** (2026-11-05, the maintainer: AREA went to its point like
+GUARD and clashed with it). GUARD (-7) goes to the point and holds it; AREA (-5) does not move: the area
+(`order_radius` round `order_to`) can be anywhere - in the editor a click off the track takes the ground
+point under it (`map_point`), near a track the rail point as before - and the train watches it from its
+own place, where it stands when it gets the order (after a pushing line, or where a rebuilt train is
+made): `order_home_x/y`, two arrays of the runner the save writes (zeros, filled by `OrderTry`; the hunt's
+place is its start, the guard's its point). Once a second `OrderArea` takes the nearest hostile train
+within the radius + 120 px of the area's centre - one coming near is taken before it is in - and lets it go
+at the radius + 240 px (RETURNS; the second margin so that it does not turn back and forth at the edge),
+CHASES only when it is gone; then it takes the next hostile train in the area, else it drives back to its
+own place (ACT_MOVE `order_home`; a train attacked again on its way back keeps that place). A lost train is
+logged (`ORDER n area: the train is lost`). The guard keeps its old rule (1.5 radii, the train 2 radii
+from its point). The editor draws the selected train's area as before - the ring in its army's colour -
+and a line of small dots from its first car to the area's middle; the AREA row is unchanged. Checked in
+play on a POLIGON copy (Polish, 1024x768, the bottom line's mortar train made ours patrolling west, the
+east line's gun train watching 150 px round 700,1299 from 1810,1128): it stood until the patrol came
+260 px from the centre (9 s), went back to 1810,1128 at 25 s (the target 400 px off), was taken again on
+its way back at 35 s and back at 42 s, again 53 - 95 s; a patrol turning 240 px from the centre (in the
+margin, never in the area) was attacked at 254 - 266 px (10, 25, 42, 57, 74 s) and let go each time, one
+turning 310 px away caused nothing in 70 s; with CHASES and the roles swapped (the mortar train watching
+1810,700 from 1437,1375) it set off at 3 s (238 px), followed, took the next car at 85 s and was back on
+1437,1375 at 100 s once the train was gone. In the editor: AREA... and a click on the grass set the area
+on 1550,930, the ring there and the dotted line from the train.
 
 **The armies' fight rules** (2026-11-05, the same request: every side keeps its own ways by default and can
 be set otherwise). `factions.cpp` reads `#define FACTIONS_PEACEFUL <mask>` beside FACTIONS (bit n army n,

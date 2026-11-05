@@ -475,7 +475,7 @@ struct Order {
     int rebuild = 0, rebuild_wait = 30;   // built again when lost: 0 no, n times, -1 always; s after the loss
     int target = 0;   // TASK_TARGET: the VID of the object at x, y (screen), z its height
     int wait = 0;     // it starts `wait` s after the level starts
-    int radius = 300, chase = 0;   // TASK_AREA: the radius around x, y; 1 chases its target out of the area
+    int radius = 300, chase = 0;   // TASK_AREA: the watched area round x, y (anywhere; the train stays put); 1 chases its target out of it
 };
 std::map<uint8_t*, Order> g_patrols;
 
@@ -2082,6 +2082,14 @@ void set_train_order(uint8_t* c, int task, float sx, float sy) {
         order.y = static_cast<int>(std::lround(at<float>(t, O_Y) - at<float>(t, O_Z)));
         order.z = static_cast<int>(std::lround(at<float>(t, O_Z)));
         order.target = nvid_of(t);
+    } else if (task == TASK_AREA && !track_spot(sx, sy, CAR_REACH).found) {   // the watched area: any point of the map
+        uint8_t* w = world();
+        float x = 0, y = 0, z = 0;
+        map_point({static_cast<LONG>(std::lround(sx - at<float>(w, W_CAMERA_X))), static_cast<LONG>(std::lround(sy - at<float>(w, W_CAMERA_Y)))},
+                  vid_of(c), x, y, z);
+        order.x = static_cast<int>(std::lround(x));
+        order.y = static_cast<int>(std::lround(y - z));
+        order.z = static_cast<int>(std::lround(z));
     } else if (task && task != TASK_ATTACK) {
         const TrackSpot spot = track_spot(sx, sy, CAR_REACH);
         if (!spot.found || !spot.dot) {
@@ -2113,7 +2121,7 @@ void set_train_order(uint8_t* c, int task, float sx, float sy) {
     else if (task == TASK_ATTACK && army_of(c) == 1) MESSAGE("MsgOrderAttack", "orders: the enemy's AI sends the train to attack");
     else if (task == TASK_ATTACK) MESSAGE("MsgOrderHunt", "orders: the train hunts the nearest hostile train, one after another");
     else if (task == TASK_AREA)
-        MESSAGE("MsgOrderArea", "orders: the train guards the area of %d px around %d,%d", order.radius, order.x, order.y);
+        MESSAGE("MsgOrderArea", "orders: the train stays where it stands and defends the area of %d px round %d,%d", order.radius, order.x, order.y);
     else if (task == TASK_TARGET)
         MESSAGE("MsgOrderTarget", "orders: the train attacks %s (VID %d) at %d,%d", object_name(order.target) ? object_name(order.target) : "",
                 order.target, order.x, order.y);
@@ -7808,7 +7816,8 @@ uint8_t* rebuild_factory(uint8_t* car) {
     return best;
 }
 
-// A train guarding an area: its radius (steps of 50 px) and whether it comes back to its post or chases.
+// A train watching an area from where it stands: its radius (steps of 50 px) and whether it comes back to its own place
+// once the target is out of the area or chases it.
 void area_row(uint8_t* o, const Order& order, std::vector<ContextRow>& rows) {
     auto set = [o](int radius, int chase) {
         const std::vector<uint8_t*> cars = all_cars();
@@ -7831,8 +7840,9 @@ void area_row(uint8_t* o, const Order& order, std::vector<ContextRow>& rows) {
                      {{nullptr, "+"}, false, [set, r, c] { set(r + 50, c); }},
                      {{"CtxAreaReturns", "RETURNS"}, c == 0, [set, r] { set(r, 0); }},
                      {{"CtxAreaChases", "CHASES"}, c != 0, [set, r] { set(r, 1); }}},
-                    {"TipArea", "Area: its radius round the point (steps of 50 px); RETURNS - back to the point once the target is gone or out "
-                                "of the area, CHASES - after its target wherever it goes, back when it is gone"}});
+                    {"TipArea", "Area: the area the train watches from where it stands (radius in steps of 50 px); RETURNS - back to its own "
+                                "place once the target is gone or 240 px out of the area, CHASES - after its target wherever it goes, back to "
+                                "its place when it is gone"}});
 }
 
 // A train's TARGET (any army, a map that runs arrivals): an object it attacks when the level starts (the
@@ -8164,7 +8174,10 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
                 g_patrol_train = o;
                 g_order_task = task;
                 g_context = nullptr;
-                MESSAGE("MsgPatrolPick", "patrol: click the point of the track the train goes to and fro to");
+                if (task == TASK_AREA)
+                    MESSAGE("MsgAreaPick", "area: click the middle of the area the train watches - anywhere on the map");
+                else
+                    MESSAGE("MsgPatrolPick", "patrol: click the point of the track the train goes to and fro to");
             };
         };
         auto current = [&](int task) { return (has && order.task == task) || (g_patrol_train == o && g_order_task == task); };
@@ -8185,9 +8198,9 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
             fights.choices.push_back({{"CtxOrderArea", "AREA..."}, current(TASK_AREA), pick(TASK_AREA)});
             fights.tip = army_of(o) == 1
                              ? UiText{"TipFightsEnemy", "Fights: ATTACK and GUARD give the train to the enemy's AI (it attacks the player / keeps the "
-                                                        "point); AREA: it takes a hostile train in the area round its point and comes back"}
-                             : UiText{"TipFightsOwn", "Fights: ATTACK hunts the nearest hostile train, one after another; GUARD keeps the point "
-                                                      "and takes a hostile train within 150 px; AREA: the same in a radius of your own"};
+                                                        "point); AREA: it stays put, takes a hostile train in or near the area and comes back to its place"}
+                             : UiText{"TipFightsOwn", "Fights: ATTACK hunts the nearest hostile train, one after another; GUARD goes to the point "
+                                                      "and holds it (150 px); AREA: stays put and defends an area of your own, anywhere"};
         }
         static std::string order_tip;   // what stands in its way, else what the row does
         order_tip = has ? order_problem(o, order.task, order.x, order.y) : std::string();
@@ -8565,7 +8578,7 @@ void draw_overlay() {
                   : o.task == TASK_AREA   ? ui_text("WordArea", "area")
                                           : ui_text("WordPatrol", "patrol"),
                   false, 3);
-        // an area guarded (its radius; a guard of ours, the neutrals' or the pirates': 150 px): a ring of dots in the army's colour
+        // an area watched (its radius) or a point guarded (a guard of ours, the neutrals' or the pirates': 150 px): a ring of dots in the army's colour
         const int army = army_of(g_selection[0]);
         const int radius = o.task == TASK_AREA ? o.radius : o.task == TASK_GUARD && army != 1 ? 150 : 0;
         static const uint32_t RING[4] = {0xf030c030, 0xf0e03020, 0xf0e0d020, 0xf0909090};
@@ -8573,6 +8586,17 @@ void draw_overlay() {
             const float a = k * 6.2831853f / 120;
             const float dx = std::cos(a) * radius, dy = std::sin(a) * radius;
             reinterpret_cast<FillRect_t>(FILL_RECT)(g, nullptr, sx + dx - 1.5f, sy + dy - 1.5f, sx + dx + 1.5f, sy + dy + 1.5f, RING[army & 3]);
+        }
+        // the area watched from where the train stands: a line of small dots from its first car to the area's middle
+        if (o.task == TASK_AREA) {
+            uint8_t* front = train_of(g_selection[0]).front();
+            const float fx = at<float>(front, O_X) - cam_x, fy = at<float>(front, O_Y) - at<float>(front, O_Z) - cam_y;
+            const float length = std::sqrt((sx - fx) * (sx - fx) + (sy - fy) * (sy - fy));
+            const int dots = static_cast<int>(length / 12);
+            for (int k = 1; k < dots; ++k) {
+                const float lx = fx + (sx - fx) * k / dots, ly = fy + (sy - fy) * k / dots;
+                reinterpret_cast<FillRect_t>(FILL_RECT)(g, nullptr, lx - 1, ly - 1, lx + 1, ly + 1, RING[army & 3]);
+            }
         }
     }
     if (g_patrol_train && !removed(g_patrol_train)) {   // picking it: the rail point under the cursor

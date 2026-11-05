@@ -41,7 +41,7 @@ struct TrainPatrol {
     int fx = 0, fy = 0;
     int target = 0;   // TASK_TARGET: the VID of the object at to_x, to_y (screen) and to_z (its height)
     int wait = 0;     // the order starts `wait` s after the level starts
-    int radius = 300, chase = 0;   // TASK_AREA: the area's radius (px); 0 back to the post, 1 chases its target
+    int radius = 300, chase = 0;   // TASK_AREA: the watched area's radius (px); 0 back to its own place, 1 chases its target
 };
 // An enemy train of the script's start (start_trains*: the AI makes it when the level starts) or of
 // Mission settings' queue as the dialog reads it.
@@ -100,7 +100,7 @@ enum ArrivalTask : int {
     TASK_PATROL,       // the enemy: ATA_PATROLn, the point and the second point
     TASK_DRIVE,        // ours, the neutrals, the pirates: drive to the point (ACT_MOVE)
     TASK_TARGET,       // a train of the map, any army: attack the object (VID `target`) at the point (ACT_ATTACK)
-    TASK_AREA,         // a train of the map, any army: guard the area of `radius` around the point (the runner)
+    TASK_AREA,         // a train of the map, any army: stays put and defends the area of `radius` round the point (the runner)
 };
 enum ArrivalIf : int {
     IF_NONE = 0,
