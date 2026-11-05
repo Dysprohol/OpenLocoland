@@ -9,7 +9,8 @@ with the frame of that number in a font picture: fonts\*.bmp, a 16 x 16 grid of 
 pack - the English ones hold Cyrillic in 0xC0-0xFF, the Polish ones Polish letters in place of
 some of it - so a letter may be in the code page and still have no picture in the pack's fonts.
 A pack with its own letters (lang/<code>/fonts/*.png, Czech) is checked against the fonts as they
-are assembled: its base's with its cells pasted in (font_cells.py).
+are assembled: its base's with its cells pasted in (font_cells.py) - and, when its own language is
+captured (the Czech edition), against that capture's fonts with only their empty cells filled.
 
 For every pack this checks what we ship in lang/<code>/ (game/strings.override.ini, the texts of
 game/briefings, game/menus and game/editor)
@@ -182,9 +183,10 @@ def check(code, captured, font_code=None):
     language (languages.build_base), against the fonts of each and for keys left to its base."""
     if font_code or not languages.fan_pack(code) or languages.needs_base(code):
         return check_fonts(code, captured, font_code)
+    own = [code] if os.path.isdir(os.path.join(captured, code)) else []   # its own edition's capture
     bases = [c for c in languages.FALLBACK_BASES if os.path.isdir(os.path.join(captured, c))]
     ok = all([check_fonts(code, captured, base if base != languages.pack_base(code) else None, False)
-              for base in bases or [languages.pack_base(code)]])
+              for base in own + bases or [languages.pack_base(code)]])
     keys = left_to_base(code, captured, bases)
     if keys:
         print(f"  {len(keys)} key(s) of strings.ini left to the base differ between the captured languages "
@@ -197,13 +199,14 @@ def check_fonts(code, captured, font_code=None, depot_note=True):
     problems = []
     items = texts(code)
     fonts_folder = os.path.join(captured, font_code or languages.pack_base(code), "fonts")   # a translation: its base's
+    own = (font_code or languages.pack_base(code)) == code   # the pack's own capture: its letters stay
     sheets = font_cells.sheets(os.path.join(REPO, "lang", code))   # the pack's own letters, pasted in
     fonts, cyrillic = {}, {}
     for vid, name in FONT_FILES.items():
         path = find_file(fonts_folder, name)
         if path:
             sheet = font_cells.sheet_for(name, sheets)
-            fonts[vid] = glyphs(path, font_cells.apply(open(path, "rb").read(), sheet, cp) if sheet else None)
+            fonts[vid] = glyphs(path, font_cells.apply(open(path, "rb").read(), sheet, cp, only_empty=own) if sheet else None)
         # the English fonts keep the game's original Cyrillic in 0xC0-0xFF: in a pack of another
         # code page a letter drawn with the very same picture comes out as the Cyrillic one
         path = find_file(os.path.join(captured, "en", "fonts"), name)
@@ -238,7 +241,7 @@ def check_fonts(code, captured, font_code=None, depot_note=True):
     else:
         status = f"checked with the fonts of {font_code}" if font_code else "fonts checked"
         if sheets:
-            status += " with its own letters"
+            status += " with its own letters" + (" in the empty cells only (its own capture)" if own else "")
     print(f"{code}: code page {cp}, {len(items)} texts, {status}")
     if depot_note and (len(fonts) != len(FONT_FILES) or font_code):
         depot = {v: k for k, v in languages.DEPOT_LANGUAGES.items()}.get(languages.pack_base(code))

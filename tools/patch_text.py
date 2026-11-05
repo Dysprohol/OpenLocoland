@@ -19,6 +19,10 @@ Override syntax (bytes are copied as they are - write it in the encoding of the 
                     in this file (or at the end of the section)
     key             only names an existing key, as a place to insert the next keys after
     -key            removes the later duplicates of `key` (the engine reads the first one)
+    !key=value      a correction of the original's own value, applied only when the override
+                    fills the original (fill_only of merge_ini: a pack assembled on a capture
+                    of its own language, languages.install), where key=value sets only the
+                    keys the original lacks or leaves empty; otherwise the line is left out
 
     python tools\patch_text.py diff <original> <changed> <file.patch>
     python tools\patch_text.py apply <original> <file.patch> <output>
@@ -92,8 +96,10 @@ def apply_patch(original, patch, name="file"):
 
 # --------------------------------------------------------------- override -----
 
-def merge_ini(original, override, name="file.ini"):
-    """Applies an .override.ini (see the module description) to the original INI bytes."""
+def merge_ini(original, override, name="file.ini", fill_only=False):
+    """Applies an .override.ini (see the module description) to the original INI bytes. With
+    `fill_only` the original's own values stay: a key=value line sets only a key the original
+    lacks or leaves empty, and the lines marked ! (its corrections) are applied."""
     src = _lines(original)
     newline = b"\r\n" if b"\r\n" in original else b"\n"
 
@@ -144,12 +150,22 @@ def merge_ini(original, override, name="file.ini"):
                     del src[i]
             after = None
             continue
+        correction = s.startswith(b"!")
+        if correction:
+            if b"=" not in s:
+                raise ValueError(f"{name}: '{s.decode('latin-1')}' - a correction needs a value")
+            if not fill_only:
+                continue
+            line = s = s[1:].lstrip()
         key = (s.split(b"=", 1)[0] if b"=" in s else s).strip().lower()
         i = find(section, key)
         if b"=" not in s:
             if i is None:
                 raise ValueError(f"{name}: no key {s.decode('latin-1')} in [{section.decode('latin-1')}]")
         elif i is not None:
+            if fill_only and not correction and src[i].split(b"=", 1)[1].strip():
+                after = i   # the original's own value stays
+                continue
             ending = src[i][len(src[i].rstrip(b"\r\n")):] or newline
             src[i] = line.lstrip() + ending
         else:
@@ -178,15 +194,16 @@ def write_if_changed(path, data):
     return True
 
 
-def changed_file(change_file, original_file, original=None):
+def changed_file(change_file, original_file, original=None, fill_only=False):
     """Content of the game file that `change_file` (.patch or .override.ini) describes; the
-    original is read from `original_file` unless its content is given."""
+    original is read from `original_file` unless its content is given. `fill_only` is
+    merge_ini's: an override then only fills and corrects the original."""
     name = os.path.basename(change_file)
     if original is None:
         original = read(original_file)
     if name.endswith(".patch"):
         return apply_patch(original, read(change_file), change_file)
-    return merge_ini(original, read(change_file), change_file)
+    return merge_ini(original, read(change_file), change_file, fill_only)
 
 
 def target_name(rel_path):

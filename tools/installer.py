@@ -583,18 +583,21 @@ def pack_base(code):
 
 
 def game_languages(steam, skip_verify=False):
-    """(buildable, missing): the codes of the packs of lang\\ that can be built from the captures
-    and Steam's languages, and of those whose language Steam still has to download. A fan
-    translation is built on any captured language when its own base is not there
-    (languages.build_base). If skip_verify=True (for CD/beta-demo), also look for languages in
-    the game folder."""
+    """(buildable, missing, have): the codes of the packs of lang\\ that can be built from the
+    captures, Steam's languages and the editions at hand (languages.available), of those whose
+    language Steam still has to download, and of the languages there are. A fan translation is
+    built on any captured language when its own base is not there (languages.build_base)."""
     packs = languages.packs()
-    have = languages.available(steam, local=skip_verify) if is_game(steam) else set()
+    have = languages.available(steam) if is_game(steam) else set()
     buildable = [c for c in packs if languages.build_base(c, have)]
-    return buildable, [c for c in packs if c not in buildable]
+    return buildable, [c for c in packs if c not in buildable], have
 
 
-def is_fan_pack(code):
+def is_fan_pack(code, have=None):
+    """Marked unofficial: a translation Steam does not ship, built on another language's files
+    (languages.unofficial - not when its own edition is at hand)."""
+    if hasattr(languages, "unofficial"):
+        return languages.unofficial(code, have)
     return hasattr(languages, "fan_pack") and languages.fan_pack(code)
 
 
@@ -1042,7 +1045,7 @@ class Installer:
                 self.show_header_image(image)
             else:
                 self.show_header_text()
-        self.buildable, self.missing = game_languages(steam, skip_verify=self.skip_verify.get())
+        self.buildable, self.missing, self.have = game_languages(steam, skip_verify=self.skip_verify.get())
         self.target_changed()
         self.apply_texts()
 
@@ -1054,13 +1057,13 @@ class Installer:
         self.refresh()
 
     def language_label(self, code):
-        return pack_name(code) + (" " + self.t("unofficial") if is_fan_pack(code) else "")
+        return pack_name(code) + (" " + self.t("unofficial") if is_fan_pack(code, self.have) else "")
 
     def language_reason(self, code):
         """Why a pack cannot be built, and what to do about it."""
         if self.skip_verify.get() or not depot_line(code):
             return self.t("not_found")
-        if is_fan_pack(code):   # a translation that needs its own base (needs_base=1) or no capture at all
+        if is_fan_pack(code, self.have):   # a translation that needs its own base (needs_base=1) or no capture at all
             return self.t("needs_files", base=pack_name(pack_base(code)), line=depot_line(code))
         return self.t("needs_depot", line=depot_line(code))
 
@@ -1266,7 +1269,7 @@ def silent(a):
     steam = a.steam or find_game() or ""
     update = read_manifest(target) is not None
     skip_verify = getattr(a, "skip_verify", False)
-    buildable, missing = game_languages(steam, skip_verify=skip_verify)
+    buildable, missing, _ = game_languages(steam, skip_verify=skip_verify)
     language = a.game_lang or (None if update else first_game_language(buildable, False))
     choices = {"cheats": a.cheats == "1", "unlock": a.unlock == "1", "desktop": not a.no_shortcuts, "clean": not a.no_clean,
                "start_menu": not a.no_shortcuts, "lang": a.lang or first_ui_language(), "game_language": language, "skip_verify": skip_verify}

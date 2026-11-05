@@ -36,7 +36,9 @@ na pulpicie i w menu Start (instalator może ich nie tworzyć).
 
 **Język gry.** Lista w instalatorze pokazuje wszystkie języki gry. Wybrać można języki twojej kopii
 ze Steama oraz fanowskie tłumaczenia oznaczone **(nieoficjalne)** (czeski), które instalator
-zbuduje na dowolnym języku, jaki masz. Pozostałe są wyszarzone, a obok jest wiersz, który pobiera
+zbuduje na dowolnym języku, jaki masz. Jeśli masz czeskie wydanie gry (płyta „Steamland”), umieść
+jego folder o nazwie `Steamland` obok folderu gry ze Steama - albo wskaż go jako folder Steama, gdy
+nie masz kopii ze Steama: instalator użyje wtedy jego własnych tekstów i czcionek dla czeskiego. Pozostałe są wyszarzone, a obok jest wiersz, który pobiera
 je ze Steama (np. `download_depot 352130 352132` dla niemieckiego): wpisz go w konsoli Steama
 (`steam://open/console` w pasku adresu przeglądarki albo w Win+R), poczekaj, aż Steam go pobierze,
 i uruchom instalator ponownie - zostawi wybrany język i doda nowy.

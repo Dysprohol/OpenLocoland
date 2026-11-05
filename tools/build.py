@@ -205,7 +205,7 @@ ROOT_LANGUAGE = os.path.join("lang", "root.txt")   # the code of the root's lang
 def root_language(steam):
     """The language of the Steam copy's own files (the root's without an English capture): the one
     Steam installed, or the capture whose strings.ini is the Steam folder's. None if unknown."""
-    code = languages.steam_language(steam)
+    code = languages.steam_language(steam) or languages.edition_language(steam)
     if code:
         return code
     try:
@@ -575,7 +575,7 @@ def build(steam, target, locofix=None, captured=None, progress=None, version=Non
 
     # the languages first: the English capture makes the root of the game English
     for code, n in languages.capture_all(a.steam).items():
-        print(f"captured/{code}: {n} language files captured from Steam")
+        print(f"captured/{code}: {n} language files captured")
     english = english_files()   # the root's language files: the English ones
     if not english:
         print("captured/en: no English capture - the game's root keeps the language Steam has "
@@ -629,7 +629,10 @@ def build(steam, target, locofix=None, captured=None, progress=None, version=Non
             print(f"lang/{code}: skipped - not downloaded yet (Steam console: "
                   f"download_depot {languages.STEAM_APP_ID} {depots.get(languages.pack_base(code), '?')})")
             continue
-        if base != languages.pack_base(code):
+        if base == code and languages.fan_pack(code):
+            print(f"lang/{code}: built on captured/{code} (an edition of the game in that language): "
+                  f"its texts and fonts, ours over them")
+        elif base != languages.pack_base(code):
             print(f"lang/{code}: built on captured/{base} (no captured/{languages.pack_base(code)}): "
                   f"its fonts and logo are those of {base}")
         written = languages.install(code, a.steam, a.target, lambda src, dst: copy(src, dst, copied),

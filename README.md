@@ -26,8 +26,8 @@ The [trailer](https://www.youtube.com/watch?v=04BeRSnfL6o) and more videos of th
 - **Old bugs fixed.** Some of the original's crashes, missing sounds and a car the factory could
   never build are fixed; the ones still open are listed in [BUGS.md](BUGS.md).
 - **Languages with their gaps filled.** English, German, Hungarian, Polish and Russian get their
-  missing texts, a Czech fan translation (unofficial) works on any Steam copy, and Setup lists them
-  all.
+  missing texts, a Czech fan translation (unofficial) works on any Steam copy (with the files of the
+  Czech CD edition at hand, its own texts are used instead), and Setup lists them all.
 - **Custom maps.** A second page of the strategic map holds **POLIGON**, a ready mission to try,
   and every map you make or get from a friend.
 - **A map editor inside the game (work in progress).** Make your own missions - lay the track,

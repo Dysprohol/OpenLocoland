@@ -137,12 +137,15 @@ puts them in `steamapps\content\app_352130\depot_<id>\`. `build.py` captures the
 files of the installed game and of every downloaded depot into `captured/<code>/` (outside
 git) and assembles the packs that have a capture (a fan translation such as Czech: its base's,
 else any captured language - "Czech" below); the others are skipped with the command to
-download them. The depot folders can be deleted after the build; keep `captured/`. A
+download them. The Czech edition of the game sold on CD ("Steamland") is captured the same way
+when its files are at hand - the Steam folder itself when it is the edition, or a folder named
+`Steamland` in or next to it ("The Czech edition" below). The depot folders can be deleted after the build; keep `captured/`. A
 checkout without `captured/` (a new worktree) uses the installer's captures in
 `%LOCALAPPDATA%\OpenLocoland\captured` when there are any (`languages.CAPTURED`); `--captured`
 of `build.py` and `check_lang.py` names another folder.
 `python tools\languages.py capture [<code>] [--force]` captures the installed language by
-hand (`--force` replaces an existing capture, e.g. after a Steam update).
+hand (`--force` replaces an existing capture, e.g. after a Steam update; `--steam <folder>`
+another folder, e.g. the Czech edition's).
 
 For working on the engine, generate the local reverse-engineering output (not in git):
 `.venv\Scripts\python tools\unpack.py` (`re/exe`, `re/data`) and
@@ -276,7 +279,8 @@ list switches it. Portuguese has no pack: its Steam depot is byte for byte the E
 Portuguese system gets English.
 
 **Czech** is a seventh language that Steam does not ship: the Czech fan translation (unofficial)
-of the English version - `strings.ini`, the menus' and the missions' texts. A pack like it names
+of the English version - `strings.ini`, the menus' and the missions' texts (a player who has the
+Czech edition of the game gets its own texts and fonts instead: "The Czech edition" below). A pack like it names
 its base in `language.ini` (`base=en` in `[language]`, `languages.pack_base`) and is marked
 unofficial in the launcher's and Setup's lists (`[launcher] unofficial=` of the chosen language,
 Setup's `TEXTS`): `build.py` assembles it from that language's capture with `lang/cs/` over it -
@@ -347,6 +351,32 @@ fonts and a picture of every changed cell, enlarged, under its base letter, into
 corrected by eye at 4-8x, and are edited with any picture editor that keeps the four colours.
 LocoFix needs nothing for them: the fonts are opened with CreateFileA, which takes the chosen
 pack's copy (`language.cpp`), as the Polish pack's own fonts are.
+
+**The Czech edition.** The game was sold in the Czech Republic on CD as "Steamland" (US Action,
+2003): the Steam exe of 2003-10-07 byte for byte, the same `objects.res`, maps and scripts, with
+Czech `strings.ini`, menu pages and mission texts, and fonts that have every Czech letter in its
+CP1250 cell (the Cyrillic gone; no `vid\logo.bmp` - the root's English "Steamland" logo fits
+it). The inventory of a tester's copy, its slips and what was decided are in
+`notes/czech-edition.md`. `languages.py` knows the edition by the SHA-256 of its `strings.ini`
+(`EDITIONS`), and `build.py` and Setup capture it like a depot into `captured/cs` (`capture_all`,
+`edition_folders`): from the game folder itself when that is the edition - a player without Steam
+points `build.py --steam` or Setup's Steam folder at it, and the rest of the build is as with
+Steam - or from a folder named `Steamland` in or next to the Steam game's (`EDITION_FOLDER`); by
+hand, `languages.py capture --steam <folder>`. With that capture the Czech pack is built on it
+(`build_base`: a pack's own capture before its `base=`) and is not a fan translation any more:
+`languages.install` keeps the edition's texts and fonts and takes from `lang/cs/` only what the
+edition does not have - the files the capture has no file for (the editor's help pages,
+POLIGON's and the template's texts; the pack's translations of the edition's menu pages and
+mission texts are left out, `translates`), of `strings.override.ini` the keys the edition lacks
+or leaves empty (ours and the editor's; `patch_text.merge_ini` `fill_only`) and the lines marked
+`!`, corrections of the edition's own slips (three typos in headers, two messages ending in a `…`
+its fonts cannot draw; elsewhere a `!` line is ignored), and of the font sheets only the cells
+the fonts leave empty (`font_cells.apply` `only_empty`: none on the edition's). The assembled
+`language.ini` gets `base=` the capture built on (`pack_ini`), so the launcher's mark
+(`language.cpp`) and Setup's (`languages.unofficial`) show only on another language's capture.
+`check_lang.py` checks the pack against the edition's fonts as well, and `font_cells.py preview
+cs --base cs` shows what its fonts have already. Without the edition nothing changes: the pack
+builds on the English capture, or another captured language, as before.
 
 Each pack's texts are bytes in its own code page, the one its fonts are drawn for:
 `codepage=` in `[language]` of `language.ini` - 1250 Polish and Hungarian, 1251 Russian, 1252

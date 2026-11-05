@@ -21,7 +21,8 @@ starts with <font>: font8x13.png also to font8x13light.bmp, font-Objectives.png 
 -green, -red and -yellow copies, each in its own colours. The file keeps its own format (16- or
 24-bit, Steam's header) and only the sheet's cells change, so the fonts of any captured language
 take the letters (on the Russian fonts they replace Cyrillic, on the Polish ones the Polish
-letters of the same bytes).
+letters of the same bytes). On a capture of the pack's own language (the Czech edition's fonts
+have every Czech letter) only the cells the font leaves empty are made (apply's only_empty).
 
 `preview` writes the pack's fonts as they would be assembled on a captured language (default:
 the pack's base) into a folder, with a picture of the changed cells enlarged next to the base
@@ -75,6 +76,11 @@ class Bitmap:
         cw, ch = self.width // 16, self.height // 16
         return (byte % 16) * cw, (byte // 16) * ch, cw, ch
 
+    def empty(self, byte, paper):
+        """Whether the cell of `byte` draws nothing: every pixel but the grid line is the paper's."""
+        x0, y0, cw, ch = self.cell(byte)
+        return all(self.get(x0 + x, y0 + y) == paper for y in range(ch - 1) for x in range(cw - 1))
+
 
 def colours(bitmap):
     """{"ink", "shadow", "paper"} -> raw pixel of a font: the paper is the space's, the ink the most
@@ -126,15 +132,18 @@ def sheet_cells(sheet_path):
     return image.size, cells
 
 
-def apply(font_data, sheet_path, codepage):
+def apply(font_data, sheet_path, codepage, only_empty=False):
     """The font file `font_data` with the cells of a sheet made from its own Latin letters (see the
-    module's text). Raises ValueError when the sheet does not fit the font."""
+    module's text); with `only_empty` only those the font draws nothing in (Bitmap.empty).
+    Raises ValueError when the sheet does not fit the font."""
     bitmap = Bitmap(font_data)
     size, cells = sheet_cells(sheet_path)
     if size != (bitmap.width, bitmap.height):
         raise ValueError(f"{sheet_path} is {size[0]} x {size[1]}, the font {bitmap.width} x {bitmap.height}")
     paint = colours(bitmap)
     for byte, pixels in sorted(cells.items()):
+        if only_empty and not bitmap.empty(byte, paint["paper"]):
+            continue
         letter = base_letter(byte, codepage)
         if letter is None:
             raise ValueError(f"{sheet_path}: cell 0x{byte:02X} is not a letter with a mark in code page {codepage}")
@@ -166,7 +175,8 @@ def sheet_for(font_name, pack_sheets):
 
 def preview(code, base=None, out=None, zoom=6):
     """Writes the fonts of pack `code` assembled on captured language `base` into `out`, with
-    <font>.cells.png: each changed cell, enlarged, under the base's cell of that byte and its letter."""
+    <font>.cells.png: each changed cell, enlarged, under the base's cell of that byte and its letter.
+    On the pack's own capture (base == code) only the empty cells are made, as build.py does."""
     from PIL import Image
     import languages
     base = base or languages.build_base(code)
@@ -182,9 +192,17 @@ def preview(code, base=None, out=None, zoom=6):
         if not sheet:
             continue
         original = open(os.path.join(folder, name), "rb").read()
-        made = apply(original, sheet, codepage)
+        made = apply(original, sheet, codepage, only_empty=base == code)
         open(os.path.join(out, name), "wb").write(made)
         _, cells = sheet_cells(sheet)
+        if base == code:
+            bitmap = Bitmap(original)
+            paper = colours(bitmap)["paper"]
+            kept = sorted(b for b in cells if not bitmap.empty(b, paper))
+            cells = {b: p for b, p in cells.items() if b not in kept}
+            print(f"{name}: {len(kept)} cells the capture's font draws already, left as they are")
+            if not cells:
+                continue
         before, after = Image.open(os.path.join(folder, name)).convert("RGB"), Image.open(os.path.join(out, name)).convert("RGB")
         cw, ch = before.width // 16, before.height // 16
         picture = Image.new("RGB", (len(cells) * (cw + 2) * zoom, (3 * ch + 4) * zoom), (255, 0, 255))

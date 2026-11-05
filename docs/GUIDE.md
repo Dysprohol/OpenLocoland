@@ -36,7 +36,9 @@ on the desktop and in the Start menu (Setup can leave them out).
 
 **Game language.** Setup's list shows all the game's languages. The ones you can choose are those
 of your Steam copy, plus the fan translations marked **(unofficial)** (Czech), which Setup builds on
-whatever language you have. The others are greyed, with the line that gets them from Steam
+whatever language you have. If you have the Czech edition of the game (the CD "Steamland"), put its
+folder, named `Steamland`, next to the Steam game's folder - or choose it as the Steam folder when
+you have no Steam copy: Setup then uses its own texts and fonts for Czech. The others are greyed, with the line that gets them from Steam
 (e.g. `download_depot 352130 352132` for German): type it into the Steam console
 (`steam://open/console` in the browser's address bar or Win+R), wait until Steam has downloaded it
 and run Setup again - it keeps your chosen language and adds the new one.

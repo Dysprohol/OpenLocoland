@@ -40,7 +40,8 @@ file that is missing comes from the capture.
 with a `README.md` per folder. It is not a pack (`languages.packs()` leaves out folders
 starting with `_`), and no `README.md` is shipped.
 
-Packs now: `cs` (Czech fan translation, `base=en`), `de`, `en`, `hu`, `pl`, `ru`.
+Packs now: `cs` (Czech: a fan translation on `base=en`, or on the Czech edition's own files when a
+player has them - "A capture of the pack's own language" below), `de`, `en`, `hu`, `pl`, `ru`.
 
 
 ## Adding a language
@@ -89,7 +90,8 @@ MenuLoad=&Nahrat...\tAlt+F3
 ```
 `key=value` sets the key of the captured `strings.ini`; a section the original does not have
 (`[Editor]`, the map editor's texts) is added at its end. A bare `key` line only names a place
-to insert the next keys after. Syntax in `tools/patch_text.py`.
+to insert the next keys after, `-key` drops the later duplicates of a key, and `!key=value`
+corrects a value of an edition in the pack's own language (below). Syntax in `tools/patch_text.py`.
 
 In the editor's `Menu*` entries `&` marks the letter that opens the item with Alt (exactly one
 per entry, and no two items of one menu on the same letter), `\t` separates the keyboard
@@ -162,6 +164,21 @@ A pack that really needs its base's files (letters only those fonts have) says `
 `[language]`; Setup then lists it greyed with that language's `download_depot` line.
 
 
+## A capture of the pack's own language
+
+When a player has an edition of the game in the pack's language that Steam does not ship (the
+Czech edition sold on CD, `notes/czech-edition.md`), `build.py` captures it into `captured/<code>`
+(`languages.EDITIONS` names such editions by the SHA-256 of their `strings.ini`; the folder is the
+game folder itself, or one named `Steamland` in or next to the Steam game's) and builds the pack
+on it instead of on `base=`. The edition's texts and fonts then stay: of the pack only its own
+files are taken (the editor's help pages, POLIGON's and the template's texts; a translation of a
+menu page or a mission text the capture has is left out), `strings.override.ini` fills only the
+keys the capture lacks or leaves empty, and a line `!key=value` corrects a value of the edition
+itself (on any other base the line is ignored). The font sheets paint only empty cells. The
+launcher shows no "(unofficial)" then, and `check_lang.py` checks the pack with that capture's
+fonts as well.
+
+
 ## Checking a translation
 
 ```bash
@@ -191,4 +208,4 @@ The game does not wrap lines, so check the long ones on screen.
 | pl   | Polish     | 1250      | 352134           |
 | pt   | Portuguese | 1252      | 352135 (the English files; no pack) |
 | ru   | Russian    | 1251      | 352136           |
-| cs   | Czech      | 1250      | none (fan translation, `base=en`; any captured language without it) |
+| cs   | Czech      | 1250      | none (fan translation, `base=en`; any captured language without it; the Czech CD edition's own files when at hand) |
