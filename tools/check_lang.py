@@ -87,11 +87,13 @@ def glyphs(path, data=None):
     return {byte: c for byte, c in out.items() if c != empty or byte == 0x20}
 
 
-def ini_texts(path):
-    """(where, value bytes, fonts) of every value of an override file."""
+def ini_texts(path, data=None, label=None):
+    """(where, value bytes, fonts) of every value of an override file (of its content `data` when
+    given; `where` starts with `label`, by default the file's path in the repository)."""
     out = []
     section = ""
-    for n, raw in enumerate(open(path, "rb").read().split(b"\n"), 1):
+    label = label or safe_relpath(path, REPO)
+    for n, raw in enumerate((open(path, "rb").read() if data is None else data).split(b"\n"), 1):
         line = raw.rstrip(b"\r")
         if not line.strip() or line.startswith(b";"):
             continue
@@ -108,14 +110,17 @@ def ini_texts(path):
             (section == "Editor" and (key in EDITOR_TITLES or key.startswith(("Group", "HelpCat"))))
         fonts = STRINGS_FONTS + ((TITLE_FONT,) if header else ())
         # \n and \t of the editor's texts are escapes, not letters
-        out.append((f"{safe_relpath(path, REPO)}:{n} [{section}] {key}",
+        out.append((f"{label}:{n} [{section}] {key}",
                     value.replace(b"\\n", b" ").replace(b"\\t", b" "), fonts))
     return out
 
 
-def map_texts(path):
+def map_texts(path, data=None, label=None):
+    """(where, line bytes, fonts) of every line of a map's text (of its content `data` when given;
+    `where` is `label`, by default the file's path in the repository, and the line's number)."""
     out = []
-    data = open(path, "rb").read()
+    data = open(path, "rb").read() if data is None else data
+    label = label or safe_relpath(path, REPO)
     used = OBJECTIVES_FONTS if os.path.basename(path).lower() == "objectives.txt" else MAP_TEXT_FONTS
     for n, line in enumerate(data.split(b"\n"), 1):
         line = line.rstrip(b"\r")
@@ -128,7 +133,7 @@ def map_texts(path):
                 continue
             clean.append(line[i])
             i += 1
-        out.append((f"{safe_relpath(path, REPO)}:{n}", bytes(clean), used))
+        out.append((f"{label}:{n}", bytes(clean), used))
     return out
 
 
@@ -183,10 +188,8 @@ def check(code, captured, font_code=None):
     language (languages.build_base), against the fonts of each and for keys left to its base."""
     if font_code or not languages.fan_pack(code) or languages.needs_base(code):
         return check_fonts(code, captured, font_code)
-    own = [code] if os.path.isdir(os.path.join(captured, code)) else []   # its own edition's capture
     bases = [c for c in languages.FALLBACK_BASES if os.path.isdir(os.path.join(captured, c))]
-    ok = all([check_fonts(code, captured, base if base != languages.pack_base(code) else None, False)
-              for base in own + bases or [languages.pack_base(code)]])
+    ok = all([check_fonts(code, captured, fonts, False) for fonts in font_codes(code, captured)])
     keys = left_to_base(code, captured, bases)
     if keys:
         print(f"  {len(keys)} key(s) of strings.ini left to the base differ between the captured languages "
@@ -194,10 +197,23 @@ def check(code, captured, font_code=None):
     return ok and not keys
 
 
-def check_fonts(code, captured, font_code=None, depot_note=True):
+def font_codes(code, captured, font_code=None):
+    """The font sets check() checks pack `code` with, as check_fonts' `font_code` (None: the
+    pack's base): one, or for a fan translation its own edition's capture and every captured
+    language it may be built on (languages.build_base)."""
+    if font_code or not languages.fan_pack(code) or languages.needs_base(code):
+        return [font_code]
+    own = [code] if os.path.isdir(os.path.join(captured, code)) else []   # its own edition's capture
+    bases = [c for c in languages.FALLBACK_BASES if os.path.isdir(os.path.join(captured, c))]
+    return [base if base != languages.pack_base(code) else None for base in own + bases or [languages.pack_base(code)]]
+
+
+def load_fonts(code, captured, font_code=None):
+    """The fonts that draw pack `code`'s texts - its base's (or `font_code`'s) with the pack's own
+    letters pasted in - as {VID: glyphs()}, the English fonts' original Cyrillic 0xC0-0xFF for a
+    pack of another code page as {VID: glyphs()}, whether the pack has letters of its own, and
+    whether the fonts are its own capture's."""
     cp = codepage(code)
-    problems = []
-    items = texts(code)
     fonts_folder = os.path.join(captured, font_code or languages.pack_base(code), "fonts")   # a translation: its base's
     own = (font_code or languages.pack_base(code)) == code   # the pack's own capture: its letters stay
     sheets = font_cells.sheets(os.path.join(REPO, "lang", code))   # the pack's own letters, pasted in
@@ -212,6 +228,15 @@ def check_fonts(code, captured, font_code=None, depot_note=True):
         path = find_file(os.path.join(captured, "en", "fonts"), name)
         if path and cp != 1251:
             cyrillic[vid] = {b: c for b, c in glyphs(path).items() if b >= 0xC0}
+    return fonts, cyrillic, bool(sheets), own
+
+
+def glyph_problems(items, cp, fonts, cyrillic):
+    """What is wrong with texts `items` ((where, bytes, fonts) of ini_texts / map_texts) in code
+    page `cp` and `fonts` (load_fonts): [text] of the bytes outside the code page and the control
+    bytes, and {(font, byte, char, what): [where]} of the characters without a picture or drawn
+    as the Cyrillic letter."""
+    problems = []
     missing = {}   # (font, byte, char, what) -> places
     for where, data, used in items:
         try:
@@ -233,6 +258,14 @@ def check_fonts(code, captured, font_code=None, depot_note=True):
                 elif vid in cyrillic and cyrillic[vid].get(byte) == fonts[vid][byte]:
                     letter = bytes([byte]).decode("cp1251")
                     missing.setdefault((vid, byte, char, f"is drawn as the Cyrillic {letter!r}"), []).append(where)
+    return problems, missing
+
+
+def check_fonts(code, captured, font_code=None, depot_note=True):
+    cp = codepage(code)
+    items = texts(code)
+    fonts, cyrillic, sheets, own = load_fonts(code, captured, font_code)
+    problems, missing = glyph_problems(items, cp, fonts, cyrillic)
     for (vid, byte, char, what), places in sorted(missing.items()):
         problems.append(f"{char!r} (0x{byte:02X}) {what} in {FONT_FILES[vid]} (VID {vid}): "
                         f"{len(places)} line(s), e.g. {places[0]}")
