@@ -78,6 +78,10 @@ void panel_open_palette(bool vehicles);   // editor_panel.cpp: All objects, or t
 int panel_palette_army(int which);   // editor_panel.cpp: the palette's army row, -1 the missions'
 void panel_set_palette_army(int which, int army);
 int palette_army(int nvid);   // editor_panel.cpp: the army the palette gives an object, -1 none
+std::vector<int> panel_group_nvids(const char* group);   // editor_panel.cpp: a group's objects (GroupDecals: the decals)
+void panel_strip(int which, std::vector<int>& nvids, std::vector<int>& armies, std::string& name);   // a palette's chosen group
+void panel_choose_group(int which, const char* group);   // editor_panel.cpp: a palette's chosen group (its key)
+void edit_pick_object(int nvid, int army);   // below: the palette's pick
 void load_palette();                                                    // editor_panel.cpp
 extern "C" void reset_palette_cache();                                  // editor_panel.cpp
 bool editor_level_held();           // editor.cpp
@@ -380,15 +384,22 @@ struct State {
 // y - z. What it does, as Region_Draw, Region_InitFog and Vid_GetTerrainVariant show:
 //  - fog: between two heights (low, high) of the ground's picture, in its colour (ARGB), over the
 //    rectangle or - flag 8 - over the whole view, pulsing with flag 1 (Graphics_DrawFog);
-//  - an image tiled over it (its VID's own: 750 is the light water's picture);
+//  - an image tiled over it (its VID's own: 750 is the light water's picture) - in play, and in the
+//    held level once the region was saved and loaded; fresh from the palette it shows only its frame
+//    (the created and the loaded object differ in nothing but their times and the high bits of
+//    GameObject.flags; the cause is not found);
 //  - six pairs of VIDs: an object of the first VID created in it, less than 25 above it, is made of
 //    the second instead - the missions turn the big and the small explosion (308, 309) into the
-//    explosion on water (338) or on lava (528) there (World_CreateObject);
+//    explosion on water (338) or on lava (528) there (World_CreateObject); with flag 8 anywhere on
+//    the map (Vid_GetTerrainVariant skips the rectangle);
+//  - a creature (Creature_Construct, Creature_Move: the underwater dragon, the fish, the golem) keeps
+//    to the region it starts in (World_FindRegionAt) - l11's and l17's dragons stand in theirs;
 //  - 750 and 752 grow rain circles (VID 339) while it rains (daynight.lgc: SetVidData(VID_CHILD)).
+// No script refers to a region (GETSPRITE_REGION is declared and never used).
 // The missions' 41 kinds: plain markers (751 with nothing set), splash regions over lakes and lava
 // (751 with the pairs, often flag 8), fog regions (l01, l05, l07, l13, l18), rain circles (752).
 constexpr size_t RG_FOG_TABLE = 0x78, RG_FLAGS = 0x7c, RG_HIGH = 0x80, RG_LOW = 0x84, RG_COLOUR = 0x88,
-                 RG_WIDTH = 0x90, RG_HEIGHT = 0x94, RG_FROM = 0xa0, RG_TO = 0xb8;
+                 RG_WIDTH = 0x90, RG_HEIGHT = 0x94, RG_IMAGE = 0x98, RG_FROM = 0xa0, RG_TO = 0xb8;   // RG_IMAGE: the Vid tiled over it (750: the light water)
 constexpr uintptr_t REGION_INIT_FOG = 0x435c50;
 constexpr int B_REGION = 23, VID_REGION = 751, VID_REGION_RAIN = 752, VID_REGION_WATER = 750;
 constexpr int SPLASH_FROM[] = {308, 309}, SPLASH_TO[] = {0, 338, 528};   // none, water, lava
@@ -1331,7 +1342,7 @@ bool movable(uint8_t* o) { return class_of(o) != B_RAIL; }   // a car moves with
 
 // ---- the bar ----
 
-enum class Tool { Select, Delete, Section, Place, Track, PushLine, Settings, Height, Decals, Paint, Water, Region, Arrivals };
+enum class Tool { Select, Delete, Place, Track, PushLine, Settings, Height, Decals, Paint, Water, Region, Arrivals };
 constexpr int PALETTE_NVID = -2;   // the entry that places what the palette panel picked (editor_panel.cpp)
 constexpr int VEHICLES_NVID = -3;  // the same for the vehicles' palette (the cars, below "trains")
 
@@ -1342,7 +1353,7 @@ struct Entry {
     Tool tool;
     int nvid;     // 0: the decal chosen with [ and ]
     int atlas;    // VID_ICONS or VID_EDITOR_ICONS
-    int icon;     // its frame
+    int icon;     // its frame; -1: an empty slot of the strip (nothing drawn, nothing chosen)
     int army;
     bool red;
 };
@@ -1350,30 +1361,32 @@ struct Entry {
 // The first ten sit in the ten slots of the state bar's base (keys 1-0), the others in the
 // strip above them, as the depot panel's units.
 const Entry ENTRIES[] = {
+    // the base (keys 1-0): the tools that act on what is there, then the things of the track that are
+    // placed, All objects last
     {"ToolSelect", "Select", "1", Tool::Select, -1, VID_EDITOR_ICONS, 0, 0, false},
     {"ToolDelete", "Delete", "2", Tool::Delete, -1, VID_ICONS, 3, 0, false},
     {"ToolTrack", "Track", "3", Tool::Track, VID_RAIL, VID_EDITOR_ICONS, 1, 0, false},
-    {"ToolFactory", "Factory", "4", Tool::Place, VID_DEPOT, VID_ICONS, 10, 0, false},
-    {"ToolRepairPoint", "Repair point", "5", Tool::Place, VID_WORKSHOP, VID_ICONS, 2, 0, false},
-    {"ToolFort", "Fort", "6", Tool::Place, VID_FORT, VID_EDITOR_ICONS, 3, 1, false},
-    {"ToolPalette", "All objects", "7", Tool::Place, PALETTE_NVID, VID_EDITOR_ICONS, 10, 0, false},
+    {"ToolPushLine", "Push line", "4", Tool::PushLine, -1, VID_EDITOR_ICONS, 7, 0, false},
+    {"ToolFactory", "Factory", "5", Tool::Place, VID_DEPOT, VID_ICONS, 10, 0, false},
+    {"ToolRepairPoint", "Repair point", "6", Tool::Place, VID_WORKSHOP, VID_ICONS, 2, 0, false},
+    {"ToolFort", "Fort", "7", Tool::Place, VID_FORT, VID_EDITOR_ICONS, 3, 1, false},
     {"ToolSemaphoreGreen", "Semaphore green", "8", Tool::Place, VID_SEMAPHORE, VID_EDITOR_ICONS, 4, 0, false},
     {"ToolSemaphoreRed", "Semaphore red", "9", Tool::Place, VID_SEMAPHORE, VID_EDITOR_ICONS, 5, 0, true},
-    {"ToolArrivals", "Train arrivals", "0", Tool::Arrivals, -1, VID_ICONS, 11, 0, false},
-    {"ToolSection", "Delete a section of track", "", Tool::Section, -1, VID_EDITOR_ICONS, 2, 0, false},
-    {"ToolDecals", "Decals", "[ ]", Tool::Decals, 0, VID_EDITOR_ICONS, 6, 0, false},
-    {"ToolPushLine", "Push line", "", Tool::PushLine, -1, VID_EDITOR_ICONS, 7, 0, false},
-    {"ToolMission", "Mission settings", "", Tool::Settings, -1, VID_EDITOR_ICONS, 14, 0, false},   // the gear
+    {"ToolPalette", "All objects", "0", Tool::Place, PALETTE_NVID, VID_EDITOR_ICONS, 10, 0, false},
+    // the strip: the ground's tools, the rarer things placed, an empty slot, the panels last
     {"ToolHeight", "Ground height", "", Tool::Height, -1, VID_EDITOR_ICONS, 8, 0, false},
-    {"ToolCrate", "Money crate", "", Tool::Place, VID_CRATE, VID_EDITOR_ICONS, 9, 3, false},
-    {"ToolVehicles", "Vehicles", "", Tool::Place, VEHICLES_NVID, VID_ICONS, 12, 0, false},
     {"ToolPaint", "Paint the ground", "", Tool::Paint, -1, VID_EDITOR_ICONS, 11, 0, false},
     {"ToolWater", "Water and lava", "", Tool::Water, -1, VID_EDITOR_ICONS, 12, 0, false},
     {"ToolRegion", "Region", "", Tool::Region, -1, VID_EDITOR_ICONS, 13, 0, false},
+    {"ToolMine", "Mining plant", "", Tool::Place, VID_MINE_BUILDING, VID_EDITOR_ICONS, 2, 1, false},   // as the fort: snaps, its guns
+    {"ToolCrate", "Money crate", "", Tool::Place, VID_CRATE, VID_EDITOR_ICONS, 9, 3, false},
+    {"ToolVehicles", "Vehicles", "", Tool::Place, VEHICLES_NVID, VID_ICONS, 12, 0, false},
+    {nullptr, "", "", Tool::Select, -1, 0, -1, 0, false},   // an empty slot, free for later
+    {"ToolArrivals", "Train arrivals", "", Tool::Arrivals, -1, VID_ICONS, 11, 0, false},
+    {"ToolMission", "Mission settings", "", Tool::Settings, -1, VID_EDITOR_ICONS, 14, 0, false},   // the gear
 };
 constexpr int ENTRY_COUNT = sizeof ENTRIES / sizeof ENTRIES[0];
 constexpr int SLOTS = 10;           // the slots of the base, then the strip
-constexpr int DECAL_ENTRY = 11;
 // The state bar's base (VID 450, 1024 x 50) with its ten slots (41 px apart, the first one's
 // middle 327.5 px from the left edge and 22.5 from the top, as the unit bar uses them) and
 // the depot panel's strip (VID 497, 409 x 41, ten 41 px cells) a slot higher above them.
@@ -1391,13 +1404,28 @@ POINT g_push_begin = {};
 int g_push_selected = -1;
 
 const Entry& entry() { return ENTRIES[g_entry]; }
-const char* label_of(const Entry& e) { return ui_text(e.text, e.label); }
+const char* label_of(const Entry& e) { return e.text ? ui_text(e.text, e.label) : ""; }
 
-int decal_nvid() { return g_decals.empty() ? -1 : g_decals[g_decal % g_decals.size()]; }
 // what the palette picked for its two entries: All objects (0) and Vehicles (1)
 int g_picked_nvid[2] = {0, 0}, g_picked_army[2] = {0, 0};
 bool is_palette(const Entry& e) { return e.nvid == PALETTE_NVID || e.nvid == VEHICLES_NVID; }
 int palette_of(const Entry& e) { return e.nvid == VEHICLES_NVID ? 1 : 0; }
+bool is_decal(int nvid);   // the decals, below
+
+// The Decals tool's decal: the All objects entry's object when that is a decal, else the one [ and ]
+// chose last (the Decals entry's).
+int decal_nvid() {
+    if (entry().nvid == PALETTE_NVID && is_decal(g_picked_nvid[0])) return g_picked_nvid[0];
+    return g_decals.empty() ? -1 : g_decals[g_decal % g_decals.size()];
+}
+
+// The tool at work: the entry's, except that a decal picked in the All objects palette makes the entry
+// the Decals tool - the scatter brush -, so a decal is placed one way wherever it was picked (the
+// palette's DECORATIONS category and the Decals entry's row are one list, find_decals).
+Tool tool() {
+    if (entry().nvid == PALETTE_NVID && is_decal(g_picked_nvid[0])) return Tool::Decals;
+    return entry().tool;
+}
 
 int place_nvid() {
     return is_palette(entry()) ? g_picked_nvid[palette_of(entry())] : entry().nvid != 0 ? entry().nvid : decal_nvid();
@@ -1416,36 +1444,13 @@ const char* place_label() {
     return name && *name ? name : label_of(entry());
 }
 
-// The decals (spriteClass 8) of objects.res. The editor mode loads them as class 0 (Vid_Read),
-// so they are read from the file: the OBJ records, the class after the name.
+// The decals: the palette's DECORATIONS group (GroupDecals of game/editor/palette.tsv - the 61 class-8
+// VIDs of objects.res, which build.py checks the group against), in its order. The row above the bar
+// and the palette show the one list; the editor mode loads the decals as class 0 (Vid_Read).
 void find_decals() {
     if (!g_decals.empty()) return;
-    const char* res = at<const char*>(world(), W_RESOURCE_PATH);
-    HANDLE f = CreateFileA(res, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
-    if (f == INVALID_HANDLE_VALUE) return;
-    std::string d(GetFileSize(f, nullptr), '\0');
-    DWORD got = 0;
-    const bool read = !d.empty() && ReadFile(f, &d[0], static_cast<DWORD>(d.size()), &got, nullptr) && got == d.size();
-    CloseHandle(f);
-    if (!read) return;
-    auto u32 = [&](size_t pos) { uint32_t v = 0; if (pos + 4 <= d.size()) std::memcpy(&v, &d[pos], 4); return v; };
-    for (size_t pos = 12; pos + 8 <= d.size();) {
-        const uint32_t size = u32(pos + 4);
-        if (d.compare(pos, 4, "OBJ ") == 0) {
-            const uint32_t flags = u32(pos + 8);
-            const uint32_t count = (flags & 0x80000000) ? u32(pos + 16) : flags;
-            size_t record = pos + ((flags & 0x80000000) ? 20 : 12);
-            for (uint32_t i = 0; i < count && record + 8 <= d.size(); ++i) {
-                const size_t data = record + 4;
-                const size_t name_end = d.find('\0', data + 4);
-                if (name_end == std::string::npos) break;
-                const int nvid = static_cast<int>(u32(data));
-                if (u32(name_end + 1 + 4) == 8 && vid_by_number(nvid)) g_decals.push_back(nvid);
-                record = data + u32(record);
-            }
-        }
-        pos += 8 + ((size + 1) & ~1u);
-    }
+    g_decals = panel_group_nvids("GroupDecals");
+    patch::log("edit: %u decals (the palette's GroupDecals)", static_cast<unsigned>(g_decals.size()));
 }
 Box view() {
     void* g = graphics();
@@ -1468,6 +1473,7 @@ void entry_cell(int i, float& x, float& y) {
 
 int bar_entry_at(float x, float y) {
     for (int i = 0; i < ENTRY_COUNT; ++i) {
+        if (ENTRIES[i].icon < 0) continue;   // an empty slot
         float cx, cy;
         entry_cell(i, cx, cy);
         if (std::fabs(x - cx) < SLOT / 2 && std::fabs(y - cy) < SLOT / 2) return i;
@@ -1489,7 +1495,7 @@ void close_context();   // the context panel, below
 void end_strokes();   // a stroke under way ends first (the mouse, below)
 
 void choose_entry(int i) {
-    if (i < 0 || i >= ENTRY_COUNT) return;
+    if (i < 0 || i >= ENTRY_COUNT || ENTRIES[i].icon < 0) return;
     if (ENTRIES[i].tool == Tool::Arrivals) {   // a panel, not a tool
         panel_open_arrivals();
         return;
@@ -1500,9 +1506,11 @@ void choose_entry(int i) {
     const bool again = g_entry == i;
     g_entry = i;
     close_context();   // an object's panel goes with the tool it was opened in
-    if (is_palette(entry()) || (again && entry().tool == Tool::Decals))
-        panel_open_palette(entry().nvid == VEHICLES_NVID);   // pick an object (a decal for the Decals entry) there
-    if (entry().tool == Tool::Place) {
+    if (is_palette(entry())) panel_open_palette(entry().nvid == VEHICLES_NVID);   // pick an object there
+    if (tool() == Tool::Decals && is_palette(entry())) {   // the All objects entry with a decal: the brush
+        g_selection.clear();
+        MESSAGE("MsgDecal", "decal: %s (VID %d)", object_name(decal_nvid()) ? object_name(decal_nvid()) : "?", decal_nvid());
+    } else if (tool() == Tool::Place) {
         g_selection.clear();
         if (place_nvid() > 0) MESSAGE("MsgPlace", "place: %s (VID %d)", place_label(), place_nvid());
     } else {
@@ -1510,11 +1518,29 @@ void choose_entry(int i) {
     }
 }
 
-// The decal of the Decals tool (the row, [ and ]): the tool chosen with it.
+// The palette's entry (0 All objects, 1 Vehicles) takes the bar without opening the palette: the
+// object picked in the palette or the strip is placed with it.
+void take_palette_entry(int which) {
+    const int nvid = which ? VEHICLES_NVID : PALETTE_NVID;
+    if (entry().nvid == nvid) return;
+    end_strokes();
+    end_line();
+    g_push_started = false;
+    for (int i = 0; i < ENTRY_COUNT; ++i)
+        if (ENTRIES[i].nvid == nvid) g_entry = i;
+    close_context();
+    g_selection.clear();
+}
+
+// The Decals tool's decal ([ and ] from any tool, the strip): the All objects entry with it, its strip
+// on DECORATIONS.
 void choose_decal(int k) {
     if (g_decals.empty()) return;
     g_decal = (std::max)(0, (std::min)(static_cast<int>(g_decals.size()) - 1, k));
-    if (g_entry != DECAL_ENTRY) choose_entry(DECAL_ENTRY);
+    take_palette_entry(0);
+    g_picked_nvid[0] = g_decals[g_decal];
+    g_picked_army[0] = 0;
+    panel_choose_group(0, "GroupDecals");
     const char* name = object_name(decal_nvid());
     MESSAGE("MsgDecal", "decal: %s (VID %d)", name ? name : "?", decal_nvid());
 }
@@ -1583,7 +1609,7 @@ bool is_marker(uint8_t* o);   // the context panel, below
 
 void select(uint8_t* o) {
     g_selection = o ? group_of(o) : std::vector<uint8_t*>();
-    if (entry().tool != Tool::PushLine) g_push_selected = -1;   // a line selected in the Select tool
+    if (tool() != Tool::PushLine) g_push_selected = -1;   // a line selected in the Select tool
     if (o && is_marker(o)) {   // its parking army 3 is not what it is in play
         MESSAGE("MsgSelectedMarker", "selected the reinforcement's point locomotive at %.0f,%.0f - in play: %s", at<float>(o, O_X),
                 at<float>(o, O_Y),
@@ -1601,6 +1627,18 @@ void select(uint8_t* o) {
                 text += ui_printf(ui_format("MsgAboveGround", ", %d above the ground"), static_cast<int>(std::lround(lift_of(o))));
             return text;
         });
+    if (o && is_region(o)) {   // what the engine holds of a region, for the log
+        uint8_t* image = at<uint8_t*>(o, RG_IMAGE);
+        std::string pairs;
+        for (int i = 0; i < 6; ++i)
+            if (uint8_t* from = at<uint8_t*>(o, RG_FROM + 4 * i))
+                pairs += " " + std::to_string(at<int>(from, V_NVID)) + "->" +
+                         std::to_string(at<uint8_t*>(o, RG_TO + 4 * i) ? at<int>(at<uint8_t*>(o, RG_TO + 4 * i), V_NVID) : -1);
+        patch::log("edit: region VID %d at %.0f,%.0f z %.0f: %.0f x %.0f, flags 0x%x, fog low %d high %d colour %08x, image VID %d, pairs%s",
+                   nvid_of(o), at<float>(o, O_X), at<float>(o, O_Y), at<float>(o, O_Z), at<float>(o, RG_WIDTH), at<float>(o, RG_HEIGHT),
+                   at<uint32_t>(o, RG_FLAGS), at<int>(o, RG_LOW), at<int>(o, RG_HIGH), at<uint32_t>(o, RG_COLOUR),
+                   image ? at<int>(image, V_NVID) : -1, pairs.empty() ? " none" : pairs.c_str());
+    }
 }
 
 // ---- trains ----
@@ -2224,15 +2262,26 @@ void push_change(int key);   // push lines, below
 //  - a factory and a repair point are turned by their track (dragged along it), and so is a
 //    factory, repair point or crate to place; rails are not turned (the Track tool lays them again).
 void turn(int steps) {
-    if (entry().tool == Tool::PushLine) {
+    if (tool() == Tool::PushLine) {
         push_change('R');
         return;
     }
-    if (entry().tool == Tool::Track) {
+    if (tool() == Tool::Track) {
         MESSAGE("MsgTurnTrack", "track: a rail goes the way of its line - R / E turn nothing here");
         return;
     }
-    if (entry().tool == Tool::Place) {
+    if (tool() == Tool::Decals) {   // the decal to place: a step of its looks, as the Place tool's preview
+        uint8_t* v = vid_by_number(decal_nvid());
+        const int dirs = v ? (std::max)(1, at<int>(v, V_ND_DIR)) : 1;
+        if (dirs <= 1) {
+            MESSAGE("MsgOneDirection", "VID %d has one direction only", decal_nvid());
+            return;
+        }
+        g_place_direction = to_step(g_place_direction + steps * (256 / dirs) + 256, dirs);
+        MESSAGE("MsgDirection", "direction %d", g_place_direction);
+        return;
+    }
+    if (tool() == Tool::Place) {
         float sx, sy, wx, wy, wz;
         int wd;
         mouse_on_map(sx, sy);
@@ -2383,7 +2432,7 @@ void set_army(int army) {
 }
 
 void next_army() {
-    if (entry().tool == Tool::Place && is_palette(entry())) {   // what the palette places next (its row agrees)
+    if (tool() == Tool::Place && is_palette(entry())) {   // what the palette places next (its row agrees)
         panel_set_palette_army(palette_of(entry()), (place_army() + 1) & 3);
         MESSAGE("MsgPlaceArmy", "place: %s (VID %d), army %d (%s)", place_label(), place_nvid(), place_army(), army_name(place_army()));
         return;
@@ -3802,7 +3851,8 @@ void decal_step(bool first) {
             if (!scatter) break;
             continue;
         }
-        const int direction = dirs > 1 ? random_below(dirs) * 256 / dirs : 0;
+        // the look shown (R / E), or - scattered - one of its looks at random
+        const int direction = dirs <= 1 ? 0 : scatter ? random_below(dirs) * 256 / dirs : to_step(g_place_direction, dirs);
         if (uint8_t* o = create(decal_nvid(), px, py, ground_z(v, px, py), direction, 0)) {
             g_stroke.made.push_back(o);
             ++placed;
@@ -4372,6 +4422,12 @@ const FogPreset FOGS[] = {{{"CtxFogNone", "NONE"}, 0, 0, 0xff000000},
                           {{"CtxFogDust", "DUST"}, 25, 15, 0xff966400},
                           {{"CtxFogHaze", "HAZE"}, 5, 10, 0xffff3296},
                           {{"CtxFogGlow", "GLOW"}, 5, 8, 0xffff6400}};
+
+void draw_vid(uint8_t* v, int frame, float x, float y, float z);   // below
+
+void draw_vid(uint8_t* v, int frame, float x, float y, float z);   // below
+
+void draw_vid(uint8_t* v, int frame, float x, float y, float z);   // below
 
 // The rectangles of the regions, dashed, the selected one brighter: blue a splash region over water,
 // orange over lava, grey a fog, white a marker.
@@ -5558,11 +5614,11 @@ HWND g_window = nullptr;   // the window of the timer
 void end_strokes() {
     if (g_window) KillTimer(g_window, HEIGHT_TIMER);
     end_drag();
-    if (g_stroke.active && entry().tool == Tool::Height) {
+    if (g_stroke.active && tool() == Tool::Height) {
         if (g_stroke.brush == Brush::Ramp) ramp_apply();
         end_height_stroke();
     }
-    if (g_stroke.active && entry().tool == Tool::Decals) end_decal_stroke();
+    if (g_stroke.active && tool() == Tool::Decals) end_decal_stroke();
     end_ground_stroke();
     if (g_region_drag) {
         float sx, sy;
@@ -5579,12 +5635,12 @@ void end_strokes() {
 // tools (the decals turn at random, the ground has no direction) and Shift+wheel, the selected
 // object's height, is for the Select tool.
 bool brush_tool() {
-    const Tool t = entry().tool;
+    const Tool t = tool();
     return t == Tool::Height || t == Tool::Decals || t == Tool::Paint || t == Tool::Water;
 }
 
 void brush_size(int steps) {
-    if (entry().tool == Tool::Paint || entry().tool == Tool::Water) {
+    if (tool() == Tool::Paint || tool() == Tool::Water) {
         g_paint_radius = (std::max)(MIN_PAINT_RADIUS, (std::min)(MAX_PAINT_RADIUS, g_paint_radius + steps * PAINT_STEP));
         MESSAGE("MsgBrushSize", "brush %d px", g_paint_radius);
     } else {
@@ -6045,12 +6101,12 @@ void draw_ground_tool(bool heights) {
             fill(graphics(), nullptr, px - cam_x - 1.5f, py - sz - cam_y - 1.5f, px - cam_x + 1.5f, py - sz - cam_y + 1.5f,
                  shift_down() ? 0xe0ff4040 : 0xe0ffffff);
         }
-        if (uint8_t* v = vid_by_number(decal_nvid()))
-            if (!shift_down()) draw_vid(v, frame_for(v, 0), x - cam_x, y - cam_y, ground_z(v, x, y));
+        uint8_t* v = vid_by_number(decal_nvid());
+        if (v && !shift_down()) draw_vid(v, frame_for(v, g_place_direction), x - cam_x, y - cam_y, ground_z(v, x, y));
         const char* name = object_name(decal_nvid());
         std::snprintf(text, sizeof text,
-                      ui_format("StatusDecals", "Decals: %s, VID %d ([ ]), radius %d (wheel, + -), spacing %d px (< >) - Shift takes away"),
-                      name ? name : "?", decal_nvid(), g_radius, g_spacing);
+                      ui_format("StatusDecals", "Decals: %s, VID %d ([ ]), direction %d (R / E), radius %d (wheel, + -), spacing %d px (< >) - Shift takes away"),
+                      name ? name : "?", decal_nvid(), v ? to_step(g_place_direction, at<int>(v, V_ND_DIR)) : 0, g_radius, g_spacing);
     }
     g_ground_status = text;
 }
@@ -6080,7 +6136,7 @@ void draw_paint_tool() {
              my + r * std::sin(a) + 1.5f, erase ? 0xe0ff4040 : 0xe0ffffff);
     }
     char text[300];
-    if (entry().tool == Tool::Paint && g_paint_bed) {
+    if (tool() == Tool::Paint && g_paint_bed) {
         // where the stroke lands: the band's two edges along each rail whose line the brush reaches
         // (bed_dab beds those), BED_RISE up the screen as ground_bed lays it
         uint8_t* w = world();
@@ -6114,7 +6170,7 @@ void draw_paint_tool() {
                       bed_kind_name(g_bed_kind), g_bed_width, g_paint_radius, g_paint_strength,
                       g_paint_hard ? ui_text("WordHard", "hard") : ui_text("WordSoft", "soft"),
                       bed_painted() ? ui_text("WordBedPainted", "painted into the picture") : ui_text("WordBedDecals", "decals (a campaign terrain)"));
-    } else if (entry().tool == Tool::Paint) {
+    } else if (tool() == Tool::Paint) {
         const std::vector<GroundTexture>& t = ground_textures();
         if (g_texture < static_cast<int>(t.size())) {
             const uint16_t c = t[g_texture].mean;
@@ -6279,6 +6335,7 @@ void draw_bar() {
     // character: 60 locks a frame without it)
     for (int i = 0; i < ENTRY_COUNT; ++i) {
         const Entry& e = ENTRIES[i];
+        if (e.icon < 0) continue;   // an empty slot
         float x, ey;
         entry_cell(i, x, ey);
         draw_text(FONT_KEYS, x + 18, ey + 9, e.key, true, 4);
@@ -6292,10 +6349,9 @@ void draw_bar() {
     locked.unlock();
     for (int i = 0; i < ENTRY_COUNT; ++i) {
         const Entry& e = ENTRIES[i];
+        if (e.icon < 0) continue;   // an empty slot
         float x, ey;
         entry_cell(i, x, ey);
-        // the Decals entry has the atlas' own bush, lit as the others (the chosen decal's colour picture
-        // stood out unlit among them; the tool's row shows the chosen decal)
         if (vid_by_number(e.atlas)) {
             draw_screen(e.atlas, e.icon, x, ey, 2);
         } else {   // objects.res without the editor's icons: the name
@@ -6501,6 +6557,7 @@ bool music_click(POINT m) {
 // off and on (EditorHints in the registry next to FrameLimit; on by default).
 
 bool on_options(float x, float y);   // the rows, below
+float rows_top();                    // the top of the highest row above the bar (the view's bottom with none)
 constexpr DWORD HINT_DELAY = 700;   // ms the cursor rests before the hint
 bool g_hints_loaded = false, g_hints = true;
 POINT g_hint_mouse = {-1, -1};
@@ -6537,8 +6594,7 @@ const char* hint_of(Tool t) {
     case Tool::Delete: return ui_text("HintDelete", "click: delete, Shift+click on a rail: its section");
     case Tool::Track: return ui_text("HintTrack", "click: start / end, wheel: ramp, V: kind, middle: delete a rail");
     case Tool::Place: return ui_text("HintPlace", "click: place, R / E: turn, Shift: where the cursor is");
-    case Tool::Section: return ui_text("HintSection", "click on a rail: delete its section");
-    case Tool::Decals: return ui_text("HintDecals", "click / drag: scatter, [ ]: decal, Shift: take away");
+    case Tool::Decals: return ui_text("HintDecals", "click / drag: scatter, R / E: turn, [ ]: decal, Shift: take away");
     case Tool::PushLine: return ui_text("HintPushLine", "click: begin, click: end; on a line: Del, T, R");
     case Tool::Height: return ui_text("HintHeight", "drag: the mode, right: lower, M: mode, Alt+click: level");
     case Tool::Paint:
@@ -6563,7 +6619,7 @@ void draw_hint() {
     const float mx = static_cast<float>(g_mouse.x), my = static_cast<float>(g_mouse.y);
     const int entry_under = bar_entry_at(mx, my);
     if (entry_under < 0 && (on_bar(mx, my) || on_options(mx, my))) return;   // the plates, the rows, the music
-    const char* text = hint_of(entry_under >= 0 ? ENTRIES[entry_under].tool : entry().tool);
+    const char* text = hint_of(entry_under >= 0 ? ENTRIES[entry_under].tool : tool());
     uint8_t* font = vid_by_number(FONT_TIPS);
     if (!text || !*text || !font) return;
     const std::string shown = std::string(" ") + text + " ";
@@ -6572,6 +6628,7 @@ void draw_hint() {
     float x = mx + 14, y = my + 22;   // below right of the arrow, as the game's tips
     if (x + w > v.r - 2) x = (std::max)(v.l + 2, v.r - 2 - w);
     if (y + LINE_HEIGHT > v.b - 2 || entry_under >= 0) y = my - 22 - LINE_HEIGHT;   // above the bar
+    if (y + LINE_HEIGHT > rows_top() - 2) y = rows_top() - 2 - LINE_HEIGHT;   // and above the rows standing on it
     draw_text(FONT_TIPS, x, y, shown.c_str());
 }
 
@@ -6582,17 +6639,19 @@ void draw_hint() {
 // one VID 7 for what is set and what is under the mouse): the Ground height tool's modes, size,
 // strength and edge, the Paint tool's textures (their colours; the chosen one framed), size, strength
 // and edge. A group that does not fit beside the others goes into a row above. A click on a button
-// sets it; the rows are not the map (nothing under them is painted or picked). The Decals tool's row
-// holds the decals, each its palette icon (VID 944: its own picture fitted into a 40 px cell; the
-// chosen one framed), as many as the view's width takes, the rest on pages behind < and > (the page
-// follows [ and ], which still cycle them).
+// sets it; the rows are not the map (nothing under them is painted or picked). While an object of the
+// palette is to be placed (the All objects and Vehicles entries, the Decals entry) the row is the quick
+// strip of the palette's chosen group - for decals the DECORATIONS group -: GROUP n / m:, each object
+// its palette icon (VID 944: its own picture fitted into a 40 px cell; the chosen one framed, the one
+// under the mouse named right above it), as many as the view's width takes, the rest on pages behind <
+// and > (the page follows [ and ], which step through the strip); a click picks the object.
 
 struct OptionItem {
     UiText text;            // a button or a label
     std::string value;      // or a number shown as it is
     int swatch = -1;        // or the colour of a texture (Paint)
     int rail = 0;           // or a kind of rail, its own straight (the Track tool)
-    int decal = 0;          // or a decal, its palette icon (the Decals tool; -1 an empty cell)
+    int object = 0;         // or an object of the strip, its palette icon (-1 an empty cell)
     bool lit = false, button = false;
     std::function<void()> act;
 };
@@ -6601,20 +6660,20 @@ using OptionGroup = std::vector<OptionItem>;
 struct OptionHit {
     float l, t, r, b;
     std::function<void()> act;
-    int decal = 0;   // the decal of a Decals row's icon
+    int object = 0;   // the object of a strip's icon
 };
 std::vector<OptionHit> g_option_hits;    // the buttons where the last frame drew them
 std::vector<Box> g_option_rows;          // the rows' boxes
 constexpr int OPTION_STEP = 3, CONTEXT_FONT_VID = 2, CONTEXT_FONT_LIT = 7;   // the menu font and its lit one
 constexpr float SWATCH = 15;
 
-bool options_tool() {
-    return entry().tool == Tool::Height || entry().tool == Tool::Paint || entry().tool == Tool::Track || entry().tool == Tool::Decals;
-}
+bool strip_tool() { return tool() == Tool::Decals || (tool() == Tool::Place && is_palette(entry())); }
+bool options_tool() { return tool() == Tool::Height || tool() == Tool::Paint || tool() == Tool::Track || strip_tool(); }
 constexpr float RAIL_ICON = 71;   // a straight rail across (VID 610 ... 71 x 50)
 constexpr float DECAL_ICON = 40;  // a palette icon (VID 944)
-int g_decal_page = 0;             // the page of the Decals row
-int g_decal_shown = -1;           // the decal the page was last set for
+int g_strip_page = 0;             // the page of the strip above the bar
+int g_strip_shown = -1;           // the object the page was last set for
+std::string g_strip_name;         // the group the page was last set for
 
 OptionItem option_button(UiText text, bool lit, std::function<void()> act) {
     OptionItem i;
@@ -6668,41 +6727,68 @@ OptionGroup option_edge(bool& hard) {
 
 void choose_decal(int k);   // the Decals tool's decal, below
 
-// The Decals row: DECAL n / 61:, < the icons of a page >.
-OptionGroup decal_group() {
+// The strip's list: the group chosen in the entry's palette (the decals: DECORATIONS).
+struct Strip {
+    std::vector<int> nvids, armies;
+    std::string name;   // the group's
+    int chosen = 0;     // the nvid framed
+};
+
+Strip strip() {
+    Strip s;
+    panel_strip(palette_of(entry()), s.nvids, s.armies, s.name);
+    s.chosen = g_picked_nvid[palette_of(entry())];
+    return s;
+}
+
+int strip_index(const Strip& s) {   // the chosen object's place in the strip, -1 when it is not there
+    const auto found = std::find(s.nvids.begin(), s.nvids.end(), s.chosen);
+    return found == s.nvids.end() ? -1 : static_cast<int>(found - s.nvids.begin());
+}
+
+void strip_pick(const Strip& s, int k) {   // the strip's object k picked, as the palette picks it
+    if (k < 0 || k >= static_cast<int>(s.nvids.size())) return;
+    edit_pick_object(s.nvids[k], s.armies[k]);
+}
+
+// The strip above the bar: GROUP n / m:, < the icons of a page >.
+OptionGroup strip_group() {
     OptionGroup g;
-    const int n = static_cast<int>(g_decals.size());
+    const Strip s = strip();
+    const int n = static_cast<int>(s.nvids.size());
     if (!n) return g;
+    const int chosen = strip_index(s);
     float cw = 8;
     if (uint8_t* font = vid_by_number(CONTEXT_FONT_VID)) cw = at<float>(font, V_SIZE_X);
     const Box v = view();
-    const float room = (v.r - v.l) - 40 - 24 - 2 * (2 * cw) - 16 * cw;   // the strip's ends, the arrows, the label
+    OptionItem label;
+    label.value = chosen >= 0 ? ui_printf(ui_format("OptStrip", "%s %d / %d:"), s.name.c_str(), chosen + 1, n) : s.name + ":";
+    const float room = (v.r - v.l) - 40 - 24 - 2 * (2 * cw) - (label.value.size() + 1) * cw;   // the strip's ends, the arrows, the label
     const int per = (std::max)(1, (std::min)(n, static_cast<int>(room / (DECAL_ICON + 4))));
     const int pages = (n + per - 1) / per;
-    if (g_decal != g_decal_shown) {   // [ ], ] or the palette chose another: its page
-        g_decal_page = g_decal / per;
-        g_decal_shown = g_decal;
+    if (s.chosen != g_strip_shown || s.name != g_strip_name) {   // another object or group: its page
+        g_strip_page = chosen >= 0 ? chosen / per : 0;
+        g_strip_shown = s.chosen;
+        g_strip_name = s.name;
     }
-    g_decal_page = (std::max)(0, (std::min)(pages - 1, g_decal_page));
-    OptionItem label;
-    label.value = ui_printf(ui_format("OptDecal", "DECAL %d / %d:"), g_decal + 1, n);
+    g_strip_page = (std::max)(0, (std::min)(pages - 1, g_strip_page));
     g.push_back(label);
     auto page = [pages](int step) {
-        return [pages, step] { g_decal_page = (g_decal_page + step + pages) % pages; };
+        return [pages, step] { g_strip_page = (g_strip_page + step + pages) % pages; };
     };
     if (pages > 1) g.push_back(option_button({nullptr, "<"}, false, page(-1)));
-    for (int k = g_decal_page * per; k < (std::min)(n, (g_decal_page + 1) * per); ++k) {
+    for (int k = g_strip_page * per; k < (std::min)(n, (g_strip_page + 1) * per); ++k) {
         OptionItem i;
-        i.decal = g_decals[k];
-        i.lit = k == g_decal;
+        i.object = s.nvids[k];
+        i.lit = k == chosen;
         i.button = true;
-        i.act = [k] { choose_decal(k); };
+        i.act = [s, k] { strip_pick(s, k); };
         g.push_back(i);
     }
     if (pages > 1)   // the last page as wide as the others, so the arrows stay where they are
-        for (int k = n; k < pages * per && g_decal_page == pages - 1; ++k) {
+        for (int k = n; k < pages * per && g_strip_page == pages - 1; ++k) {
             OptionItem empty;
-            empty.decal = -1;
+            empty.object = -1;
             g.push_back(empty);
         }
     if (pages > 1) g.push_back(option_button({nullptr, ">"}, false, page(1)));
@@ -6711,11 +6797,11 @@ OptionGroup decal_group() {
 
 std::vector<OptionGroup> option_groups() {
     std::vector<OptionGroup> groups;
-    if (entry().tool == Tool::Decals) {
-        groups.push_back(decal_group());
+    if (strip_tool()) {
+        groups.push_back(strip_group());
         return groups;
     }
-    if (entry().tool == Tool::Track) {   // the kinds of rail (V cycles them) and the next rail's ramp (the wheel, PgUp / PgDn)
+    if (tool() == Tool::Track) {   // the kinds of rail (V cycles them) and the next rail's ramp (the wheel, PgUp / PgDn)
         OptionGroup kinds{option_label({"OptRailKind", "RAIL:"})};
         for (int k = 0; k < 4; ++k) {
             OptionItem i;
@@ -6734,7 +6820,7 @@ std::vector<OptionGroup> option_groups() {
                           option_button({"OptRailDown", "DOWN"}, g_ramp < 0, [] { set_ramp(-1); })});
         return groups;
     }
-    if (entry().tool == Tool::Height) {
+    if (tool() == Tool::Height) {
         OptionGroup modes;
         const struct {
             Brush brush;
@@ -6812,7 +6898,7 @@ std::vector<OptionGroup> option_groups() {
 float option_width(const OptionItem& i, float cw) {
     if (i.swatch >= 0) return SWATCH + 5;
     if (i.rail) return RAIL_ICON + 8;
-    if (i.decal) return DECAL_ICON + 4;
+    if (i.object) return DECAL_ICON + 4;
     const char* text = i.value.empty() ? i.text.get() : i.value.c_str();
     return std::strlen(text) * cw + cw;
 }
@@ -6867,6 +6953,12 @@ template <typename F> void layout_options(F f) {
     }
 }
 
+float rows_top() {
+    float top = view().b;
+    for (const Box& b : g_option_rows) top = (std::min)(top, b.t);
+    return top;
+}
+
 bool on_options(float x, float y) {
     if (on_music(x, y)) return true;   // the music player too (above)
     for (const Box& b : g_option_rows)
@@ -6895,8 +6987,8 @@ void draw_options() {
             }
             const float mx = (l + r) / 2;
             if (uint8_t* rv = vid_by_number(i.rail)) draw_screen(i.rail, frame_for(rv, rail::DIRECTION[1]), mx, cy, OPTION_STEP + 1);
-        } else if (i.decal < 0) {   // an empty cell of the last page
-        } else if (i.decal) {   // its palette icon (its own picture fitted into the cell); the chosen one framed
+        } else if (i.object < 0) {   // an empty cell of the last page
+        } else if (i.object) {   // its palette icon (its own picture fitted into the cell); the chosen one framed
             const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
             const float mx = x + iw / 2, h = DECAL_ICON / 2 + 2;
             if (i.lit || hover) {
@@ -6906,9 +6998,9 @@ void draw_options() {
                 fill(graphics(), nullptr, mx - h, cy - h, mx - h + 2, cy + h, c);
                 fill(graphics(), nullptr, mx + h - 2, cy - h, mx + h, cy + h, c);
             }
-            const int icon = palette_icon(i.decal);
+            const int icon = palette_icon(i.object);
             if (icon >= 0 && vid_by_number(VID_PALETTE_ICONS)) draw_screen(VID_PALETTE_ICONS, icon, mx, cy, OPTION_STEP + 1);
-            else if (uint8_t* dv = vid_by_number(i.decal)) draw_screen(i.decal, frame_for(dv, 0), mx, cy + DECAL_ICON / 4, OPTION_STEP + 1);
+            else if (uint8_t* dv = vid_by_number(i.object)) draw_screen(i.object, frame_for(dv, 0), mx, cy + DECAL_ICON / 4, OPTION_STEP + 1);
         } else if (i.swatch >= 0) {
             const std::vector<GroundTexture>& t = ground_textures();
             const uint16_t c = t[i.swatch].mean;
@@ -6922,15 +7014,35 @@ void draw_options() {
             draw_text(i.lit || hover ? CONTEXT_FONT_LIT : CONTEXT_FONT_VID, x + (i.button ? 0 : 0), cy - ch / 2, text, false, OPTION_STEP);
             if (i.lit) reinterpret_cast<FillRect_t>(FILL_RECT)(graphics(), nullptr, x, cy + ch / 2 + 1, x + iw - 8, cy + ch / 2 + 3, 0xe0f0e080);
         }
-        if (i.button) g_option_hits.push_back({x - 2, cy - SLOT / 2, x + iw, cy + SLOT / 2, i.act, i.decal});
+        if (i.button) g_option_hits.push_back({x - 2, cy - SLOT / 2, x + iw, cy + SLOT / 2, i.act, i.object});
     });
 }
 
-// The decal of the Decals row under the mouse, 0 when none.
-int decal_under_mouse() {
+// The object of the strip under the mouse, 0 when none.
+int strip_under_mouse() {
     for (const OptionHit& h : g_option_hits)
-        if (h.decal && g_mouse.x >= h.l && g_mouse.x < h.r && g_mouse.y >= h.t && g_mouse.y < h.b) return h.decal;
+        if (h.object > 0 && g_mouse.x >= h.l && g_mouse.x < h.r && g_mouse.y >= h.t && g_mouse.y < h.b) return h.object;
     return 0;
+}
+
+// The name of the strip's object under the mouse, in the mouse tips' font right above its icon (the
+// status line at the top is far from the row in a wide window), shown at once - not after a rest, as
+// the cursor hints are, and whether they are on or not: it is the icon's label.
+void draw_row_tip() {
+    if (panel_open()) return;
+    for (const OptionHit& h : g_option_hits) {
+        if (h.object <= 0 || g_mouse.x < h.l || g_mouse.x >= h.r || g_mouse.y < h.t || g_mouse.y >= h.b) continue;
+        const char* name = object_name(h.object);
+        uint8_t* font = vid_by_number(FONT_TIPS);
+        if (!name || !*name || !font) return;
+        const std::string shown = std::string(" ") + name + " ";
+        const float cw = at<float>(font, V_SIZE_X), w = cw * shown.size();
+        const Box v = view();
+        float x = (h.l + h.r) / 2 - w / 2;
+        x = (std::max)(v.l + 2, (std::min)(x, v.r - 2 - w));
+        draw_text(FONT_TIPS, x, h.t - LINE_HEIGHT - 2, shown.c_str());
+        return;
+    }
 }
 
 // A click on the rows: true when it was theirs (a button set, or nothing under the click).
@@ -7474,9 +7586,11 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
         }
         rows.push_back(fog);
         const uint32_t flags = at<uint32_t>(o, RG_FLAGS);
-        rows.push_back({{"CtxFogOver", "FOG OVER:"},
+        // flag 8: the fog over the whole view and the pairs anywhere on the map (Vid_GetTerrainVariant skips
+        // the rectangle with it) - so OVER, not FOG OVER
+        rows.push_back({{"CtxFogOver", "OVER:"},
                         {{{"CtxFogRegion", "THE REGION"}, !(flags & 8), [o] { region_change(o, [o] { at<uint32_t>(o, RG_FLAGS) &= ~8u; }); }},
-                         {{"CtxFogView", "THE VIEW"}, (flags & 8) != 0, [o] { region_change(o, [o] { at<uint32_t>(o, RG_FLAGS) |= 8u; }); }},
+                         {{"CtxFogView", "THE WHOLE MAP"}, (flags & 8) != 0, [o] { region_change(o, [o] { at<uint32_t>(o, RG_FLAGS) |= 8u; }); }},
                          {{"CtxPulse", "PULSING"}, (flags & 1) != 0, [o] { region_change(o, [o] { at<uint32_t>(o, RG_FLAGS) ^= 1u; }); }}}});
         rows.push_back({{"CtxDelete", "DELETE (DEL):"},
                         {{{"CtxDeleteIt", "DELETE"}, false, [o] {
@@ -7840,7 +7954,7 @@ void draw_overlay() {
     const float mx = cam_x + g_mouse.x, my = cam_y + g_mouse.y;
 
     double began = ground_clock();
-    if (g_show_heights || entry().tool == Tool::Height) draw_contours();
+    if (g_show_heights || tool() == Tool::Height) draw_contours();
     g_frame_times.contours += ground_clock() - began;
     for (uint8_t* o : g_selection) circle(o, 1);
     // a selected train's patrol: its far point, marked like the route markers' squares
@@ -7863,17 +7977,17 @@ void draw_overlay() {
         }
     }
     int cursor = CURSOR_ARROW;
-    if (over_bar && g_mouse.x >= 0 && !panel_open() && entry().tool == Tool::Track && !g_line.empty())
+    if (over_bar && g_mouse.x >= 0 && !panel_open() && tool() == Tool::Track && !g_line.empty())
         draw_track();   // the line's next rails stay in sight with the cursor over the bar too
     if (!over_bar && g_mouse.x >= 0 && !panel_open()) {
-        if (entry().tool == Tool::Delete || entry().tool == Tool::Section) {
+        if (tool() == Tool::Delete) {
             if (uint8_t* o = pick(mx, my)) {
-                const bool section = (shift_down() || entry().tool == Tool::Section) && class_of(o) == B_RAIL;
+                const bool section = shift_down() && class_of(o) == B_RAIL;
                 for (uint8_t* d : section ? section_of(o) : is_car(o) && !shift_down() ? std::vector<uint8_t*>{o} : group_of(o))
                     circle(d, 0);
             }
             cursor = CURSOR_DELETE;
-        } else if (entry().tool == Tool::Place && vid_by_number(place_nvid()) &&
+        } else if (tool() == Tool::Place && vid_by_number(place_nvid()) &&
                    at<int>(vid_by_number(place_nvid()), V_CLASS) == B_ENGINE) {   // a car: on the track
             uint8_t* v = vid_by_number(place_nvid());
             const CarPlan p = plan_car(g_mouse);
@@ -7888,7 +8002,7 @@ void draw_overlay() {
             } else {
                 g_place_status = std::string(place_label()) + ": " + p.why.get();
             }
-        } else if (entry().tool == Tool::Place) {
+        } else if (tool() == Tool::Place) {
             uint8_t* v = vid_by_number(place_nvid());
             g_place_status.clear();
             if (v) {
@@ -7936,15 +8050,15 @@ void draw_overlay() {
                     }
                 }
             }
-        } else if (entry().tool == Tool::Track) {
+        } else if (tool() == Tool::Track) {
             draw_track();
-        } else if (entry().tool == Tool::PushLine) {
+        } else if (tool() == Tool::PushLine) {
             // drawn below with the lines
-        } else if (entry().tool == Tool::Height || entry().tool == Tool::Decals) {
+        } else if (tool() == Tool::Height || tool() == Tool::Decals) {
             began = ground_clock();
-            draw_ground_tool(entry().tool == Tool::Height);
+            draw_ground_tool(tool() == Tool::Height);
             g_frame_times.tool += ground_clock() - began;
-        } else if (entry().tool == Tool::Paint || entry().tool == Tool::Water) {
+        } else if (tool() == Tool::Paint || tool() == Tool::Water) {
             began = ground_clock();
             draw_paint_tool();
             g_frame_times.tool += ground_clock() - began;
@@ -7957,7 +8071,7 @@ void draw_overlay() {
     set_cursor(cursor);
     draw_regions();
     draw_mines();
-    draw_push_lines(entry().tool == Tool::PushLine);
+    draw_push_lines(tool() == Tool::PushLine);
     draw_enemy_trains();
     draw_arrivals();
 
@@ -7968,56 +8082,60 @@ void draw_overlay() {
     draw_options();
     g_frame_times.options += ground_clock() - began;
 
-    // the status line, in the mouse tips' font on a dark band: the tool (or the entry under
+    // the status line, in the mouse tips' font on a dark band: the tool_text (or the entry under
     // the cursor), the undo and redo counts, "not saved" and the last message
     const Box v = view();
     g_status_ends.clear();
     music_tick();
     char status[400];
-    char tool[160];
+    char tool_text[160];
     const int hover = bar_entry_at(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y));
     const Entry& shown = hover >= 0 ? ENTRIES[hover] : entry();
     const bool palette = is_palette(shown);
     const int shown_nvid = palette ? g_picked_nvid[palette_of(shown)] : shown.nvid != 0 ? shown.nvid : decal_nvid();
     if (shown.tool == Tool::Place && shown_nvid > 0)
-        std::snprintf(tool, sizeof tool, ui_format("StatusToolVid", "%s: VID %d, direction %d"),
+        std::snprintf(tool_text, sizeof tool_text, ui_format("StatusToolVid", "%s: VID %d, direction %d"),
                       palette && object_name(shown_nvid) ? object_name(shown_nvid) : label_of(shown), shown_nvid,
                       vid_by_number(shown_nvid) ? to_step(g_place_direction, at<int>(vid_by_number(shown_nvid), V_ND_DIR))
                                                 : g_place_direction);
     else
-        std::snprintf(tool, sizeof tool, "%s", label_of(shown));
+        std::snprintf(tool_text, sizeof tool_text, "%s", label_of(shown));
     if (shown.tool == Tool::Place && shown_nvid > 0 && palette && &shown == &entry()) {   // the palette's army
-        const size_t n = std::strlen(tool);
-        std::snprintf(tool + n, sizeof tool - n, ui_format("StatusToolArmy", ", army %d (%s)"), place_army(), army_name(place_army()));
+        const size_t n = std::strlen(tool_text);
+        std::snprintf(tool_text + n, sizeof tool_text - n, ui_format("StatusToolArmy", ", army %d (%s)"), place_army(), army_name(place_army()));
     }
-    if (hover >= 0 && *shown.key) std::snprintf(tool + std::strlen(tool), sizeof tool - std::strlen(tool), " (%s)", shown.key);
-    if (const char* tip = panel_tip(g_mouse)) std::snprintf(tool, sizeof tool, "%s", tip);   // the Help or Menu button
-    if (const char* tip = music_tip(g_mouse)) std::snprintf(tool, sizeof tool, "%s", tip);   // the music player
-    std::snprintf(status, sizeof status, ui_format("StatusLine", "EDITOR - %s - undo %u, redo %u%s   %s"), tool,
+    if (hover >= 0 && *shown.key) std::snprintf(tool_text + std::strlen(tool_text), sizeof tool_text - std::strlen(tool_text), " (%s)", shown.key);
+    if (const char* tip = panel_tip(g_mouse)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // the Help or Menu button
+    if (const char* tip = music_tip(g_mouse)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // the music player
+    std::snprintf(status, sizeof status, ui_format("StatusLine", "EDITOR - %s - undo %u, redo %u%s   %s"), tool_text,
                   static_cast<unsigned>(g_undo.size()), static_cast<unsigned>(g_redo.size()),
                   g_dirty ? ui_text("StatusNotSaved", " - not saved") : "",
                   GetTickCount() - g_message_time < 6000 ? g_message.c_str() : "");
     status_line(v.l, v.t, status);
-    if (entry().tool == Tool::Track) status_line(v.l, v.t + LINE_HEIGHT, g_track_status.c_str());
-    if (entry().tool == Tool::PushLine) status_line(v.l, v.t + LINE_HEIGHT, g_push_status.c_str());
+    if (tool() == Tool::Track) status_line(v.l, v.t + LINE_HEIGHT, g_track_status.c_str());
+    if (tool() == Tool::PushLine) status_line(v.l, v.t + LINE_HEIGHT, g_push_status.c_str());
     if (g_arrival_pick != ArrivalPick::None) status_line(v.l, v.t + LINE_HEIGHT, g_arrival_status.c_str());
-    if (const int d = entry().tool == Tool::Decals ? decal_under_mouse() : 0) {   // a decal of the row under the mouse
-        const char* name = object_name(d);
+    const int under = strip_under_mouse();   // an object of the strip under the mouse
+    if (under) {
+        const char* name = object_name(under);
         status_line(v.l, v.t + LINE_HEIGHT,
-                    ui_printf(ui_format("StatusDecalHover", "Decals: %s, VID %d - a click picks it"), name ? name : "?", d).c_str());
-    } else if (entry().tool == Tool::Height || entry().tool == Tool::Decals || entry().tool == Tool::Paint || entry().tool == Tool::Water) {
+                    ui_printf(ui_format("StatusStripHover", "%s: %s, VID %d - a click picks it"), strip().name.c_str(), name ? name : "?", under).c_str());
+    } else if (tool() == Tool::Height || tool() == Tool::Decals || tool() == Tool::Paint || tool() == Tool::Water) {
         status_line(v.l, v.t + LINE_HEIGHT, g_ground_status.c_str());
     }
-    if (entry().tool == Tool::Region)
+    if (tool() == Tool::Region)
         status_line(v.l, v.t + LINE_HEIGHT,
                     ui_text("StatusRegion", "Region: drag its rectangle on the map; the right button on its frame opens its panel"));
-    if (entry().tool == Tool::Place && !g_place_status.empty())
+    if (tool() == Tool::Delete)
+        status_line(v.l, v.t + LINE_HEIGHT,
+                    ui_text("StatusDelete", "Delete: a click deletes the object under the cursor; Shift+click on a rail deletes its section, up to a junction or an end"));
+    if (tool() == Tool::Place && !g_place_status.empty() && !under)
         status_line(v.l, v.t + LINE_HEIGHT, g_place_status.c_str());
-    if (entry().tool == Tool::Select && !g_selection.empty() && liftable(g_selection[0]))   // the selected object's height
+    if (tool() == Tool::Select && !g_selection.empty() && liftable(g_selection[0]))   // the selected object's height
         status_line(v.l, v.t + LINE_HEIGHT,
                     ui_printf(ui_format("StatusLift", "height above the ground: %d (PgUp / PgDn, Shift by 16; Home: on the ground)"),
                               static_cast<int>(std::lround(lift_of(g_selection[0])))).c_str());
-    if (entry().tool == Tool::Track) {
+    if (tool() == Tool::Track) {
         char bed[200];
         std::snprintf(bed, sizeof bed, ui_format("StatusRailLevel", "rail (V): %s, level %d, every rail %s (wheel, PgUp / PgDn), gravel bed (B): %s"),
                       rail_kind_name(RAIL_KINDS[g_rail_kind]), track_level(),
@@ -8026,12 +8144,13 @@ void draw_overlay() {
                       swamp_rail(RAIL_KINDS[g_rail_kind]) ? "602" : g_bed ? std::to_string(g_bed).c_str() : ui_text("WordNone", "none"));
         status_line(v.l, v.t + 2 * LINE_HEIGHT, bed);
     }
-    int below = entry().tool == Tool::Track ? 3 : 2;   // below the tool's lines (the Track tool has two)
+    int below = tool() == Tool::Track ? 3 : 2;   // below the tool's lines (the Track tool has two)
     if (!g_line_status.empty()) status_line(v.l, v.t + below++ * LINE_HEIGHT, g_line_status.c_str());   // the push line under the cursor
     if (!g_enemy_status.empty()) status_line(v.l, v.t + below * LINE_HEIGHT, g_enemy_status.c_str());
     music_draw();
     draw_sockets();
     draw_context();
+    draw_row_tip();
     draw_hint();
     panel_draw(g_mouse);   // the Help and Menu buttons, an open panel in front of everything
 }
@@ -8105,8 +8224,8 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             g_stroke.gap = g_gstroke.gap = true;
             return false;
         }
-        if (g_stroke.active && entry().tool == Tool::Height) height_step();
-        if (g_stroke.active && entry().tool == Tool::Decals) decal_step(false);
+        if (g_stroke.active && tool() == Tool::Height) height_step();
+        if (g_stroke.active && tool() == Tool::Decals) decal_step(false);
         if (g_gstroke.active) ground_step(false);
         return false;   // the game scrolls by it
     case WM_LBUTTONDOWN: {
@@ -8125,27 +8244,27 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             pick_arrival_at(cursor_dot());
             return true;
         }
-        if (entry().tool == Tool::Select && arrival_marker_click(g_mouse)) return true;
-        if (entry().tool == Tool::Select && start_mark_click()) return true;
+        if (tool() == Tool::Select && arrival_marker_click(g_mouse)) return true;
+        if (tool() == Tool::Select && start_mark_click()) return true;
         uint8_t* w0 = world();
         const float x = at<float>(w0, W_CAMERA_X) + g_mouse.x, y = at<float>(w0, W_CAMERA_Y) + g_mouse.y;
-        if (entry().tool == Tool::Place) {
+        if (tool() == Tool::Place) {
             place(g_mouse);
-        } else if (entry().tool == Tool::Track) {   // a click starts a section, the next lays it and ends it
+        } else if (tool() == Tool::Track) {   // a click starts a section, the next lays it and ends it
             if (g_line.empty()) start_line();
             else {
                 const size_t steps = g_undo.size();
                 lay_step();
                 if (g_undo.size() != steps) end_line();   // laid: the next click starts anew (a rail's end within 20 px)
             }
-        } else if (entry().tool == Tool::Height && alt_down()) {   // the pipette: the level for Flatten
+        } else if (tool() == Tool::Height && alt_down()) {   // the pipette: the level for Flatten
             float cx, cy;
             const rail::Cell c = cursor_cell(cx, cy);
             if (in_grid(c)) {
                 g_flatten_level = ground_cell(c.first, c.second);
                 MESSAGE("MsgLevelTaken", "ground: level %d taken - Flatten goes to it", g_flatten_level);
             }
-        } else if (entry().tool == Tool::Paint && alt_down()) {   // the pipette: the texture painted there
+        } else if (tool() == Tool::Paint && alt_down()) {   // the pipette: the texture painted there
             float px, py;
             mouse_on_map(px, py);
             const int t = ground_paintable(true) ? ground_texture_at(px, py) : -1;
@@ -8157,41 +8276,41 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             } else {
                 MESSAGE("MsgTextureOriginal", "the picture here is the original (or painted before this session)");
             }
-        } else if (entry().tool == Tool::Height) {
+        } else if (tool() == Tool::Height) {
             start_height_stroke(false);
             height_step();
             g_window = window;
             SetTimer(window, HEIGHT_TIMER, HEIGHT_REPEAT, nullptr);
             if (!g_test) SetCapture(window);
-        } else if (entry().tool == Tool::Decals) {
+        } else if (tool() == Tool::Decals) {
             g_stroke = Stroke();
             g_stroke.active = true;
             decal_step(true);
             if (!g_test) SetCapture(window);
-        } else if (entry().tool == Tool::Paint || entry().tool == Tool::Water) {
-            start_ground_stroke(entry().tool == Tool::Water);
+        } else if (tool() == Tool::Paint || tool() == Tool::Water) {
+            start_ground_stroke(tool() == Tool::Water);
             ground_step(true);
             if (!g_test) SetCapture(window);
-        } else if (entry().tool == Tool::Region) {
+        } else if (tool() == Tool::Region) {
             float sx, sy;
             mouse_on_map(sx, sy);
             g_region_start = {static_cast<LONG>(sx), static_cast<LONG>(sy)};
             g_region_drag = true;
             if (!g_test) SetCapture(window);
-        } else if (entry().tool == Tool::PushLine) {
+        } else if (tool() == Tool::PushLine) {
             float px, py;
             mouse_on_map(px, py);
             push_click(static_cast<int>(px), static_cast<int>(py));
-        } else if (entry().tool == Tool::Delete || entry().tool == Tool::Section) {
+        } else if (tool() == Tool::Delete) {
             if (uint8_t* o = pick(x, y))
-                delete_objects((shift_down() || entry().tool == Tool::Section) && class_of(o) == B_RAIL ? section_of(o)
+                delete_objects(shift_down() && class_of(o) == B_RAIL ? section_of(o)
                                : is_car(o) && !shift_down()                                         ? std::vector<uint8_t*>{o}
                                                                                                     : group_of(o));
         } else if (g_patrol_train && !removed(g_patrol_train)) {   // the patrol's point
             uint8_t* c = g_patrol_train;
             g_patrol_train = nullptr;
             set_train_patrol(c, true, x, y);
-        } else if (const int li = entry().tool == Tool::Select ? line_at(static_cast<int>(x), static_cast<int>(y)) : -1; li >= 0) {
+        } else if (const int li = tool() == Tool::Select ? line_at(static_cast<int>(x), static_cast<int>(y)) : -1; li >= 0) {
             select(nullptr);   // a push line, by its bar or its arrow
             select_line(li);
         } else {
@@ -8209,7 +8328,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         // the button let go where its message did not come (outside the window, the capture lost):
         // the stroke ends as with the button up
         if (!g_test && GetKeyState(g_stroke.right ? VK_RBUTTON : VK_LBUTTON) >= 0) end_strokes();
-        else if (g_stroke.active && entry().tool == Tool::Height && GetTickCount() - g_stroke.time >= HEIGHT_REPEAT) height_step(true);
+        else if (g_stroke.active && tool() == Tool::Height && GetTickCount() - g_stroke.time >= HEIGHT_REPEAT) height_step(true);
         else if (!g_stroke.active) KillTimer(window, HEIGHT_TIMER);
         return true;
     case WM_LBUTTONUP:
@@ -8231,33 +8350,33 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             g_patrol_train = nullptr;
             return true;
         }
-        if (entry().tool == Tool::Track && !g_line.empty()) {
+        if (tool() == Tool::Track && !g_line.empty()) {
             end_line();   // the right button ends the line first, then the tool
             return true;
         }
-        if (entry().tool == Tool::PushLine && g_push_started) {
+        if (tool() == Tool::PushLine && g_push_started) {
             g_push_started = false;   // the begin is dropped first
             return true;
         }
-        if ((entry().tool == Tool::Height || entry().tool == Tool::Paint || entry().tool == Tool::Water) &&
+        if ((tool() == Tool::Height || tool() == Tool::Paint || tool() == Tool::Water) &&
             !on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)) &&
             !on_options(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
             // the right button stays with these tools (Esc leaves them): Raise lowers, the brushes of
             // the picture put the original back
-            if (entry().tool == Tool::Height && g_brush == Brush::Raise) {
+            if (tool() == Tool::Height && g_brush == Brush::Raise) {
                 start_height_stroke(true);
                 height_step();
                 g_window = window;
                 SetTimer(window, HEIGHT_TIMER, HEIGHT_REPEAT, nullptr);
                 if (!g_test) SetCapture(window);
-            } else if (entry().tool != Tool::Height) {
-                start_ground_stroke(entry().tool == Tool::Water, true);
+            } else if (tool() != Tool::Height) {
+                start_ground_stroke(tool() == Tool::Water, true);
                 ground_step(true);
                 if (!g_test) SetCapture(window);
             }
             return true;
         }
-        if (entry().tool == Tool::Select && !on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
+        if (tool() == Tool::Select && !on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
             if (arrival_marker_click(g_mouse) || start_mark_click()) {
                 g_context = nullptr;
                 return true;
@@ -8289,16 +8408,16 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         g_middle_down = g_mouse;   // deletes the rail under the cursor
         return false;
     case WM_MBUTTONUP:
-        if (entry().tool == Tool::Track && std::abs(g_mouse.x - g_middle_down.x) + std::abs(g_mouse.y - g_middle_down.y) < 4 &&
+        if (tool() == Tool::Track && std::abs(g_mouse.x - g_middle_down.x) + std::abs(g_mouse.y - g_middle_down.y) < 4 &&
             !on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)))
             delete_rail_at_cursor();
         return false;
     case WM_MOUSEWHEEL:
         if (brush_tool())   // the brushes: the wheel sizes the brush, as + and - do
             brush_size(GET_WHEEL_DELTA_WPARAM(w) > 0 ? 1 : -1);
-        else if (entry().tool == Tool::Track)   // the next rail climbs / falls a step, as PgUp / PgDn; nothing turns
+        else if (tool() == Tool::Track)   // the next rail climbs / falls a step, as PgUp / PgDn; nothing turns
             set_ramp(GET_WHEEL_DELTA_WPARAM(w) > 0 ? (std::min)(1, g_ramp + 1) : (std::max)(-1, g_ramp - 1));
-        else if (shift_down() && !g_selection.empty() && entry().tool != Tool::Place && entry().tool != Tool::Track)
+        else if (shift_down() && !g_selection.empty() && tool() != Tool::Place && tool() != Tool::Track)
             lift(GET_WHEEL_DELTA_WPARAM(w) > 0 ? LIFT_STEP : -LIFT_STEP, false);   // Shift: the object's height
         else
             turn(GET_WHEEL_DELTA_WPARAM(w) > 0 ? 1 : -1);
@@ -8317,42 +8436,42 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         const bool ctrl = g_ctrl || GetKeyState(VK_CONTROL) < 0;
         if (ctrl && w == 'Z') undo(false);
         else if (ctrl && w == 'Y') undo(true);
-        else if (entry().tool == Tool::PushLine && (w == VK_DELETE || w == 'T' || w == 'R')) push_change(static_cast<int>(w));
-        else if (entry().tool == Tool::PushLine && w == 'S') push_semaphores();
-        else if (entry().tool == Tool::Height && w == 'M') {
+        else if (tool() == Tool::PushLine && (w == VK_DELETE || w == 'T' || w == 'R')) push_change(static_cast<int>(w));
+        else if (tool() == Tool::PushLine && w == 'S') push_semaphores();
+        else if (tool() == Tool::Height && w == 'M') {
             g_brush = g_brush == Brush::Raise ? Brush::Flatten : g_brush == Brush::Flatten ? Brush::Smooth
                     : g_brush == Brush::Smooth ? Brush::Ramp : g_brush == Brush::Ramp ? Brush::Rough : Brush::Raise;
             MESSAGE("MsgBrush", "ground: %s", brush_name());
         } else if (brush_tool() && (w == VK_OEM_PLUS || w == VK_ADD || w == VK_OEM_MINUS || w == VK_SUBTRACT)) {
             brush_size(w == VK_OEM_PLUS || w == VK_ADD ? 1 : -1);
-        } else if (entry().tool == Tool::Paint && g_paint_bed && (w == VK_OEM_4 || w == VK_OEM_6)) {
+        } else if (tool() == Tool::Paint && g_paint_bed && (w == VK_OEM_4 || w == VK_OEM_6)) {
             set_bed_kind((g_bed_kind + (w == VK_OEM_6 ? 1 : BED_KINDS - 1)) % BED_KINDS);
             MESSAGE("MsgBedKind", "gravel bed: %s (VID %d, also under new track)", bed_kind_name(g_bed_kind), BEDS[g_bed_kind]);
-        } else if (entry().tool == Tool::Paint && (w == VK_OEM_4 || w == VK_OEM_6)) {
+        } else if (tool() == Tool::Paint && (w == VK_OEM_4 || w == VK_OEM_6)) {
             const int n = static_cast<int>(ground_textures().size());
             if (n) g_texture = (g_texture + (w == VK_OEM_6 ? 1 : n - 1)) % n;
             MESSAGE("MsgTexture", "texture: %s", ground_texture_name(g_texture));
-        } else if (entry().tool == Tool::Water && w == 'W') {
+        } else if (tool() == Tool::Water && w == 'W') {
             g_water_kind = (g_water_kind + 1) % WATER_KIND_COUNT;
             MESSAGE("MsgWaterKind", "water: %s (VID %d)", ui_text(WATER_KINDS[g_water_kind].key, WATER_KINDS[g_water_kind].english),
                     WATER_KINDS[g_water_kind].nvid);
-        } else if (entry().tool == Tool::Decals && (w == VK_OEM_COMMA || w == VK_OEM_PERIOD)) {
+        } else if (tool() == Tool::Decals && (w == VK_OEM_COMMA || w == VK_OEM_PERIOD)) {
             g_spacing = (std::max)(MIN_SPACING, (std::min)(MAX_SPACING, g_spacing + (w == VK_OEM_PERIOD ? SPACING_STEP : -SPACING_STEP)));
             MESSAGE("MsgSpacing", "spacing %d px", g_spacing);
-        } else if (entry().tool == Tool::Track && w == 'V') {
+        } else if (tool() == Tool::Track && w == 'V') {
             g_rail_kind = (g_rail_kind + 1) % 4;
             MESSAGE("MsgRailKind", "track: %s rails (VID %d)", rail_kind_name(RAIL_KINDS[g_rail_kind]), RAIL_KINDS[g_rail_kind]);
-        } else if (entry().tool == Tool::Track && (w == VK_PRIOR || w == VK_NEXT)) {
+        } else if (tool() == Tool::Track && (w == VK_PRIOR || w == VK_NEXT)) {
             const int want = w == VK_PRIOR ? 1 : -1;
             set_ramp(g_ramp == want ? 0 : want);
-        } else if (entry().tool != Tool::Track && entry().tool != Tool::PushLine && !g_selection.empty() &&
+        } else if (tool() != Tool::Track && tool() != Tool::PushLine && !g_selection.empty() &&
                    (w == VK_PRIOR || w == VK_NEXT || w == VK_HOME)) {   // the selected object's height
             const int step = shift_down() ? LIFT_BIG_STEP : LIFT_STEP;
             lift(w == VK_PRIOR ? step : -step, w == VK_HOME);
         } else if (w == 'H' && !ctrl) {
             g_show_heights = !g_show_heights;
             MESSAGE("MsgHeights", "ground heights everywhere (H): %s", g_show_heights ? ui_text("WordOn", "on") : ui_text("WordOff", "off"));
-        } else if (entry().tool == Tool::Track && w == 'B') {
+        } else if (tool() == Tool::Track && w == 'B') {
             const int* at_bed = std::find(std::begin(BEDS), std::end(BEDS), g_bed);
             g_bed = g_bed == 0 ? BEDS[0] : (at_bed + 1 == std::end(BEDS) ? 0 : *(at_bed + 1));
             if (g_bed) g_bed_kind = bed_kind_of(g_bed);   // the Paint tool's bed the same
@@ -8368,7 +8487,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
                                ? section_of(g_selection[0]) : g_selection);
         else if (w == 'U' && !g_selection.empty() && is_car(g_selection[0])) uncouple(g_selection[0]);
         else if (w == 'C' && !g_selection.empty() && is_car(g_selection[0])) couple(g_selection[0]);
-        else if (w == 'L' && entry().tool != Tool::PushLine && entry().tool != Tool::Track) post_line(shift_down());
+        else if (w == 'L' && tool() != Tool::PushLine && tool() != Tool::Track) post_line(shift_down());
         else if (w == 'R') turn(1);
         else if (w == 'E') turn(-1);
         else if (w == 'A') next_army();
@@ -8379,17 +8498,23 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
                 back_to_panel();
             } else if (g_patrol_train) {
                 g_patrol_train = nullptr;
-            } else if (entry().tool == Tool::Track && !g_line.empty()) {
+            } else if (tool() == Tool::Track && !g_line.empty()) {
                 end_line();
-            } else if (entry().tool == Tool::PushLine && g_push_started) {
+            } else if (tool() == Tool::PushLine && g_push_started) {
                 g_push_started = false;
             } else {
                 choose_entry(0);
                 select(nullptr);
             }
-        } else if (w == VK_OEM_4 || w == VK_OEM_6) {
-            if (!g_decals.empty())
+        } else if (w == VK_OEM_4 || w == VK_OEM_6) {   // the next / previous object of the strip above the bar
+            const Strip s = strip();
+            const int n = static_cast<int>(s.nvids.size());
+            if (is_palette(entry()) && n) {   // the palette's group
+                const int k = strip_index(s);
+                strip_pick(s, k < 0 ? 0 : (k + (w == VK_OEM_6 ? 1 : n - 1)) % n);
+            } else if (!g_decals.empty()) {   // the decals
                 choose_decal((g_decal + (w == VK_OEM_6 ? 1 : static_cast<int>(g_decals.size()) - 1)) % static_cast<int>(g_decals.size()));
+            }
         } else if (w >= '0' && w <= '9') {
             choose_entry((static_cast<int>(w - '0') + 9) % 10);
         } else {
@@ -8399,12 +8524,12 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
     }
     case WM_CHAR:   // the debug keys of the game are characters (DebugMode): ours are not for it
         return std::strchr("rReEaAtTlLuUcChH[]0123456789\x1b\x1a\x19", static_cast<int>(w)) != nullptr ||
-               (entry().tool == Tool::PushLine && (w == 's' || w == 'S')) ||
-               ((entry().tool == Tool::Height || entry().tool == Tool::Decals) && std::strchr("+-=mM", static_cast<int>(w))) ||
-               (entry().tool == Tool::Decals && std::strchr(",.<>", static_cast<int>(w))) ||
-               ((entry().tool == Tool::Paint || entry().tool == Tool::Water) && std::strchr("+-=", static_cast<int>(w))) ||
-               (entry().tool == Tool::Water && (w == 'w' || w == 'W')) ||
-               (entry().tool == Tool::Track && std::strchr("bBvV", static_cast<int>(w)));
+               (tool() == Tool::PushLine && (w == 's' || w == 'S')) ||
+               ((tool() == Tool::Height || tool() == Tool::Decals) && std::strchr("+-=mM", static_cast<int>(w))) ||
+               (tool() == Tool::Decals && std::strchr(",.<>", static_cast<int>(w))) ||
+               ((tool() == Tool::Paint || tool() == Tool::Water) && std::strchr("+-=", static_cast<int>(w))) ||
+               (tool() == Tool::Water && (w == 'w' || w == 'W')) ||
+               (tool() == Tool::Track && std::strchr("bBvV", static_cast<int>(w)));
     }
     return false;
 }
@@ -9051,9 +9176,9 @@ bool edit_arrival_picking() { return g_arrival_pick != ArrivalPick::None; }
 bool edit_escape() {
     if (g_context || g_context_line >= 0) close_context();
     else if (g_patrol_train) g_patrol_train = nullptr;
-    else if (entry().tool == Tool::Track && !g_line.empty()) end_line();
-    else if (entry().tool == Tool::PushLine && g_push_started) g_push_started = false;
-    else if (entry().tool != Tool::Select) choose_entry(0);
+    else if (tool() == Tool::Track && !g_line.empty()) end_line();
+    else if (tool() == Tool::PushLine && g_push_started) g_push_started = false;
+    else if (tool() != Tool::Select) choose_entry(0);
     else return false;
     return true;
 }
@@ -9288,22 +9413,18 @@ void edit_convert_arrivals() {
 // "Vehicles" entry) places it, in the army the missions give it.
 void edit_pick_object(int nvid, int army) {
     const auto decal = std::find(g_decals.begin(), g_decals.end(), nvid);
-    if (g_entry == DECAL_ENTRY && decal != g_decals.end()) {   // opened from the Decals entry: the brush's decal
-        g_decal = static_cast<int>(decal - g_decals.begin());
-        MESSAGE("MsgDecal", "decal: %s (VID %d)", object_name(nvid) ? object_name(nvid) : "?", nvid);
-        return;
-    }
+    if (decal != g_decals.end()) g_decal = static_cast<int>(decal - g_decals.begin());   // the brush's decal, wherever it is picked
     uint8_t* v = vid_by_number(nvid);
     const int which = v && at<int>(v, V_CLASS) == B_ENGINE ? 1 : 0;
     g_picked_nvid[which] = nvid;
     g_picked_army[which] = army;
     if (is_flag(nvid)) g_place_direction = FLAG_WIND;   // flying with the wind, as all the missions' flags
-    for (int i = 0; i < ENTRY_COUNT; ++i)
-        if (ENTRIES[i].nvid == (which ? VEHICLES_NVID : PALETTE_NVID)) g_entry = i;
+    take_palette_entry(which);
     end_line();
     g_selection.clear();
     g_context = nullptr;
-    MESSAGE("MsgPlaceArmy", "place: %s (VID %d), army %d (%s)", place_label(), nvid, place_army(), army_name(place_army()));
+    if (decal != g_decals.end()) MESSAGE("MsgDecal", "decal: %s (VID %d)", object_name(nvid) ? object_name(nvid) : "?", nvid);   // the Decals tool now
+    else MESSAGE("MsgPlaceArmy", "place: %s (VID %d), army %d (%s)", place_label(), nvid, place_army(), army_name(place_army()));
 }
 
 // Test mode (WM_COPYDATA "nvid army", test_game.ps1 P<nvid>:<army>): the palette's object to place,

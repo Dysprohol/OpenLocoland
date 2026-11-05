@@ -317,7 +317,7 @@ The row above the bar picks the kind of the next rails - plain, swamp (on its em
 destroyed swamp, each shown as its rail - and whether the rails go up, flat or down; `V` cycles the kinds too. `PgUp` / `PgDn` or the mouse wheel make every rail laid climb or descend a step after the one before, until you change it (ramps onto higher
 ground: each ramp 11 levels; the status line shows the level). For a line on a hill, lay it up its ramps first, then raise the ground around the top and
 flatten it starting on the track. `B` picks the gravel bed under new rails. The wheel's click, Del
-or the **Delete a section of track** tool removes rails.
+or the Delete tool removes a rail; Shift+click with the Delete tool removes a whole section.
 
 **The gravel bed.** Once the track is laid, **Paint the ground** -> **MODE: GRAVEL BED** (the other
 mode, **TEXTURE**, paints the textures anywhere) lays the bed under the rails the brush goes over -
@@ -333,7 +333,7 @@ every rail of the map at once. A stroke is one undo.
 
 ### 5. Train arrivals
 
-**Train arrivals** (key 0) opens a panel with the trains that come onto the map during the mission -
+**Train arrivals** (the strip) opens a panel with the trains that come onto the map during the mission -
 the player's train at the start, reinforcements, enemy waves. It first lists them, one arrival in two
 lines of plain words ("1. OURS, ENTRY 1: Engine + CARS: 1", "AT THE START, ONCE"); a click on one
 opens it, **+ NEW** makes one, **COPY n** and **DELETE n** act on the one opened last.
@@ -370,7 +370,7 @@ attack), editable like any train.
 
 ### 6. The factory, the repair point, one-way lines and semaphores
 
-**Factory** (key 4) and **Repair point** (key 5) go where the authors put them - the preview
+**Factory** (key 5) and **Repair point** (key 6) go where the authors put them - the preview
 shows where; away from the track, or with Shift, they stay where the cursor is, without a line:
 
 - a **factory** at the **dead end of a spur**, turned the way out. It comes with its **exit line**:
@@ -385,7 +385,7 @@ Dragging one of them moves it, with its line, to the nearest right place (droppe
 track or with Shift: where it is dropped); deleting it deletes the line too. A **blocker** (the buffer stop, in the RAILWAY group of All objects) is placed freely and
 turned with R / E like any object: set it at the end of a track yourself.
 
-**One-way lines** (the strip's **Push line**): a line on the track no train may enter against its
+**One-way lines** (**Push line**, key 4): a line on the track no train may enter against its
 direction, as the missions mark the entry onto the map, the exit, the factories and the repair
 points. Click its beginning and its end on the track - on the map a line has a bar at its beginning
 and arrows the way it runs, and the mouse over it tells what it does; then, on a selected line - the status line names its beginning, its end and what it does; in the
@@ -451,10 +451,10 @@ AGAINST ALL SIDES**). A map of the editor plays so; the campaign's missions keep
 
 ### 7. The enemy
 
-- **Fort** (key 6, the enemy's): it goes **onto the track**, turned along it - it is a gate the
+- **Fort** (key 7, the enemy's): it goes **onto the track**, turned along it - it is a gate the
   trains drive through (`R` or `E` turns it round there). It comes armed: its panel (right button) sets the gun in each socket - a cannon or
   missiles. The fort itself cannot be destroyed; its guns can.
-- **All objects** (key 7) opens the palette with every object the missions use, by theme (meadow,
+- **All objects** (key 0) opens the palette with every object the missions use, by theme (meadow,
   forest, desert, ice, volcanic, swamp, park, pirates, city, industry, railway, flags and crates,
   wrecks, units and creatures, effects): click one, then place it. Under the icons the **ARMY** row
   sets whose it will be - AS IN THE MISSIONS, OURS, ENEMY, NEUTRAL or PIRATES (the Vehicles palette
@@ -492,7 +492,7 @@ AGAINST ALL SIDES**). A map of the editor plays so; the campaign's missions keep
   the track. The train drives to and fro between where it stands and that point.
 - More enemy trains: more trains on the map with their orders, the enemy's arrivals (step 5) and the
   trains the enemy's factory builds - its plan (step 6). For those the enemy needs a factory: put one
-  (key 4) at a dead end of its own and `A` to the enemy.
+  (key 5) at a dead end of its own and `A` to the enemy.
 - A **money crate** (strip) lies on the track: a unit of the player that takes it gets 100.
 
 Remember the rule of the game: the factory, the repair point and the fort stand **on the track or
@@ -500,10 +500,14 @@ right next to it**.
 
 ### 8. Decorate
 
-The strip's **Decals**: grass, bushes, flowers, stones, wrecks... The row above the bar shows each
-of them (its arrows turn the pages); a click there picks one, and so do `[` `]` and a click on the
-entry. A click on the map puts one, a drag scatters them in the radius (wheel, `+` `-`), never nearer than
-the spacing (`<` `>`). Shift+drag takes them away. Trees, houses and the rest are in **All objects**.
+**Decals**: grass, bushes, flowers, stones, paving, the gravel beds, wrecks... - the **Decorations**
+theme of All objects, every decal in one list (`[` `]` from any tool take you there). The row above the
+bar shows the theme (its arrows turn the pages); the name of the one under the pointer shows above it, a
+click there picks one, and so do `[` `]`. A click on the map
+puts one as shown (`R` `E` turn it), a drag scatters them in the radius (wheel, `+` `-`) in their looks
+at random, never nearer than the spacing (`<` `>`). Shift+drag takes them away. A decal picked in any
+theme of **All objects** is placed the same way. Trees, houses and the rest are in All objects too, and
+while one of them is to be placed the row above the bar shows its theme the same way.
 
 **Sets of the missions** (All objects): what the authors always put together is one object, its panel
 choosing the part - the border post with its corkscrew (whole or broken), the level exit with its top,
@@ -511,7 +515,9 @@ a flagpole or a station with its flag, chimneys with their smoke or glow, an oil
 **crusher** (pirates) stands across the track and bites all but its army every 25 seconds; its panel
 says when it stops - when its army's towers fall, or never. **Scylla** (swamp) bites everyone on a
 diagonal track every 15 seconds. When the pirates' towers fall, the corkscrews break.
-A **Region** (strip): drag its rectangle; its panel sets fog (mist, dust, haze, glow) and splashes.
+A **Region** (strip): drag its rectangle; its panel sets fog (mist, dust, haze, glow) and splashes, over
+it or the whole map; a creature placed inside keeps to it. The **Effects** theme of All objects has the
+region of light water (a lake's look) and the one with rain circles.
 
 ### 9. Look at it working
 
@@ -593,15 +599,16 @@ and must not be a folder of the game (`l01`-`l20`, `sandbox`, `template`, `scrip
 | 1 | Select | select, drag, turn, army, panel |
 | 2 | Delete | a click deletes; Shift+click on a rail: its section |
 | 3 | Track | lays rails (V kind, PgUp/PgDn or the wheel ramp, B bed) |
-| 4 | Factory | at a dead end, with its exit line |
-| 5 | Repair point | on a straight piece, with its line |
-| 6 | Fort | on the track, armed |
-| 7 | All objects | the palette |
+| 4 | Push line | a one-way line on the track |
+| 5 | Factory | at a dead end, with its exit line |
+| 6 | Repair point | on a straight piece, with its line |
+| 7 | Fort | on the track, armed |
 | 8 / 9 | Semaphore green / red | beside the track |
-| 0 | Train arrivals | the panel of the trains that arrive |
+| 0 | All objects | the palette |
 
-**The strip** (above the bar, left to right): Delete a section of track, Decals, Push line,
-Mission settings, Ground height, Money crate, Vehicles, Paint the ground, Water and lava, Region.
+**The strip** (above the bar, left to right): Ground height, Paint the ground, Water and lava, Region,
+Mining plant, Money crate, Vehicles, an empty slot, Train arrivals, Mission settings - the ground's
+tools, the rarer things placed, the two panels last.
 
 **Keys:**
 
@@ -614,7 +621,7 @@ Mission settings, Ground height, Money crate, Vehicles, Paint the ground, Water 
 | Del / Shift+Del | delete / a whole train or section |
 | Ctrl+Z / Ctrl+Y | undo / redo |
 | U / C | uncouple / couple a car |
-| `[` `]` | the decal, the texture |
+| `[` `]` | the next object of the row above the bar, the texture |
 | `<` `>` | the decals' spacing |
 | wheel, `+` `-` | the brush's size (Ground height, Decals, Paint, Water) |
 | M | the ground brush: raise, lower, flatten, smooth |

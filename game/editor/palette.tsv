@@ -228,6 +228,69 @@ GroupWrecks	92	0	Obj92	Burnt cart 2
 GroupWrecks	93	0	Obj93	Cart wreckage
 GroupWrecks	96	0	Obj96	Gun wreckage
 GroupWrecks	98	0	Obj98	Unit wreckage
+# every decal (spriteClass 8 of objects.res, build.py checks the list), in the file's order: the one list
+# behind the Decals tool's row and the palette's DECORATIONS category (editor_edit.cpp find_decals)
+GroupDecals	93	0	Obj93	Cart wreckage
+GroupDecals	96	0	Obj96	Gun wreckage
+GroupDecals	98	0	Obj98	Unit wreckage
+GroupDecals	109	0	Obj109	Cobble stone
+GroupDecals	120	0	Obj120	Forest grass
+GroupDecals	121	0	Obj121	Blue bush
+GroupDecals	129	0	Obj129	Yellow grass
+GroupDecals	132	0	Obj132	Chip plant
+GroupDecals	133	0	Obj133	Flower stalks
+GroupDecals	135	0	Obj135	Bush 2
+GroupDecals	177	0	Obj177	Ore heap
+GroupDecals	208	0	Obj208	Cattail
+GroupDecals	212	0	Obj212	Yellow swamp grass
+GroupDecals	214	0	Obj214	Nails
+GroupDecals	217	0	Obj217	Reeds
+GroupDecals	218	0	Obj218	Yellow bush
+GroupDecals	223	0	Obj223	Grass patch
+GroupDecals	226	0	Obj226	Grass tuft
+GroupDecals	227	0	Obj227	Meadow stone
+GroupDecals	236	0	Obj236	Rosette
+GroupDecals	245	0	Obj245	Triangle grass
+GroupDecals	248	0	Obj248	Autumn grass
+GroupDecals	266	0	Obj266	Charybdis roots
+GroupDecals	277	0	Obj277	Snowy stones
+GroupDecals	278	0	Obj278	Snowdrift
+GroupDecals	279	0	Obj279	Ice reeds
+GroupDecals	280	0	Obj280	Blue druse
+GroupDecals	285	0	Obj285	Scattered nuts
+GroupDecals	294	0	Obj294	Lava gravel
+GroupDecals	295	0	Obj295	Lava stone
+GroupDecals	296	0	Obj296	Volcanic grass
+GroupDecals	530	0	Obj530	Open volcano
+GroupDecals	612	0	Obj612	Gravel bed (meadow)
+GroupDecals	615	0	Obj615	Gravel bed (ice)
+GroupDecals	616	0	Obj616	Gravel bed (volcanic)
+GroupDecals	617	0	Obj617	Gravel bed (desert)
+GroupDecals	627	0	Obj627	Pipeline
+GroupDecals	800	0	Obj800	Rocks
+GroupDecals	804	0	Obj804	Platform
+GroupDecals	814	0	Obj814	Meadow paving
+GroupDecals	817	0	Obj817	Curb stone
+GroupDecals	842	0	Obj842	Underground house
+GroupDecals	849	0	Obj849	Desert fence
+GroupDecals	853	0	Obj853	Desert curb
+GroupDecals	855	0	Obj855	Small flowers
+GroupDecals	856	0	Obj856	Desert paving
+GroupDecals	859	0	Obj859	Cylinder bush
+GroupDecals	869	0	Obj869	Small road posts
+GroupDecals	871	0	Obj871	Road posts
+GroupDecals	876	0	Obj876	Winter paving
+GroupDecals	888	0	Obj888	Barrels
+GroupDecals	890	0	Obj890	Roof grass
+GroupDecals	910	0	Obj910	Silver grass
+GroupDecals	911	0	Obj911	Swamp reeds
+GroupDecals	922	0	Obj922	Park bush
+GroupDecals	925	0	Obj925	Tussock
+GroupDecals	926	0	Obj926	Park paving
+GroupDecals	929	0	Obj929	Pool steps
+GroupDecals	931	0	Obj931	Fern
+GroupDecals	936	0	Obj936	Round bush
+GroupDecals	937	0	Obj937	Mine cart
 GroupUnits	70	1		
 GroupUnits	72	2		
 GroupUnits	77	2		

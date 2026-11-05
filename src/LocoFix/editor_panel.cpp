@@ -29,6 +29,7 @@
 // the missions use (game/editor/palette.tsv, the game's copy editor\palette.tsv with each one's
 // icon in VID 944 and a unit's state from the missions - patch_data.make_editor_palette): the
 // groups down the left (meadow, forest, desert, ice, volcanic, swamp, park, pirates, city, industry,
+// railway, flags, wrecks, decorations - every decal, the Decals tool's list -, units, effects,
 // railway, flags and crates, wrecks, units and creatures), a page of 16 icons on the right, the name
 // of the one under the mouse below them, the page arrows when a group has more. A click on an icon
 // picks the object - the bar's entry places it, in the army the palette gives it - and closes the
@@ -266,9 +267,10 @@ bool g_vehicles = false;                 // the palette of the Vehicles entry
 const char VEHICLE_GROUP[] = "GroupTrain";
 
 bool vehicle_group(const std::string& g) { return g.compare(0, sizeof VEHICLE_GROUP - 1, VEHICLE_GROUP) == 0; }
-int g_group = 0, g_palette_page = 0;
+int g_group_of[2] = {0, 0}, g_palette_page = 0;   // the group chosen in each palette (0 All objects, 1 Vehicles)
+int& group_index() { return g_group_of[g_vehicles ? 1 : 0]; }
 constexpr int VID_PALETTE_ICONS = 944, VID_FRAME = 456, PALETTE_COLUMNS = 4, PALETTE_ROWS = 3;
-constexpr float GROUP_X = -165, GROUP_Y = -78, GROUP_DY = 13, GRID_X = -20, GRID_Y = -80, CELL = 41, NAME_Y = 92;
+constexpr float GROUP_X = -165, GROUP_Y = -84, GROUP_DY = 12.5f, GRID_X = -20, GRID_Y = -80, CELL = 41, NAME_Y = 92;   // 16 groups above the buttons
 // the army of what is placed next, under the icons: ARMY: (and AS IN THE MISSIONS for All objects),
 // then the four armies two a line
 constexpr float ARMY_Y = GRID_Y + PALETTE_ROWS * CELL + 4, ARMY_DY = 14, ARMY_DX = 92;
@@ -276,8 +278,6 @@ constexpr float ARMY_Y = GRID_Y + PALETTE_ROWS * CELL + 4, ARMY_DY = 14, ARMY_DX
 int g_palette_army[2] = {-1, 0};
 const char* const ARMY_KEYS[] = {"CtxOurs", "CtxEnemy", "CtxNeutral", "CtxPirates"};
 const char* const ARMY_WORDS[] = {"OURS", "ENEMY", "NEUTRAL", "PIRATES"};
-
-std::map<int, int> g_icon_only;   // nvid -> icon frame of the objects the palette does not show
 
 void load_palette() {
     if (!g_palette.empty()) return;
@@ -302,10 +302,6 @@ void load_palette() {
             o.items = f.size() > 7 ? f[7] : "";
             o.has_state = true;
         }
-        if (o.group == "-") {   // only an icon (a decal the palette leaves out, for the Decals tool's row)
-            g_icon_only[o.nvid] = o.frame;
-            continue;
-        }
         if (std::find(g_all_groups.begin(), g_all_groups.end(), o.group) == g_all_groups.end())
             g_all_groups.push_back(o.group);
         g_palette.push_back(o);
@@ -316,21 +312,23 @@ void load_palette() {
 
 extern "C" void reset_palette_cache() {
     g_palette.clear();
-    g_icon_only.clear();
     g_all_groups.clear();
     g_groups.clear();
     load_palette();
 }
 
-void show_groups(bool vehicles) {
-    if (vehicles != g_vehicles || g_groups.empty()) {
-        g_group = 0;
-        g_palette_page = 0;
-    }
-    g_vehicles = vehicles;
-    g_groups.clear();
+// The groups of one palette: all but the vehicles', or those.
+std::vector<std::string> groups_of(bool vehicles) {
+    std::vector<std::string> out;
     for (const std::string& g : g_all_groups)
-        if (vehicle_group(g) == vehicles) g_groups.push_back(g);
+        if (vehicle_group(g) == vehicles) out.push_back(g);
+    return out;
+}
+
+void show_groups(bool vehicles) {
+    if (vehicles != g_vehicles || g_groups.empty()) g_palette_page = 0;   // each palette keeps its group
+    g_vehicles = vehicles;
+    g_groups = groups_of(vehicles);
 }
 
 std::vector<const PaletteObject*> group_objects(int group) {
@@ -624,7 +622,7 @@ int pages_of(int group) {
 }
 
 const PaletteObject* object_at(POINT m) {
-    const std::vector<const PaletteObject*> objects = group_objects(g_group);
+    const std::vector<const PaletteObject*> objects = group_objects(group_index());
     const int per = PALETTE_COLUMNS * PALETTE_ROWS;
     for (int i = 0; i < per; ++i) {
         const int k = g_palette_page * per + i;
@@ -675,15 +673,15 @@ bool on_palette_previous(POINT m) {
 
 bool on_palette_next(POINT m) {
     const Place p = picture();
-    return g_palette_page + 1 < pages_of(g_group) && inside(m, p.x + NEXT_X, p.y + BUTTONS_Y, ARROW_W, BUTTON_H);
+    return g_palette_page + 1 < pages_of(group_index()) && inside(m, p.x + NEXT_X, p.y + BUTTONS_Y, ARROW_W, BUTTON_H);
 }
 
 void draw_palette(POINT m) {
     load_palette();
-    g_group = (std::max)(0, (std::min)(g_group, static_cast<int>(g_groups.size()) - 1));
+    group_index() = (std::max)(0, (std::min)(group_index(), static_cast<int>(g_groups.size()) - 1));
     // the group's name as the title and ALL OBJECTS / VEHICLES in the strip above it, as the help's
     // pages have CONTENTS there: the two in one title ran past the frame (it holds about 20 letters)
-    const std::string group = g_groups.empty() ? "" : g_groups[g_group];
+    const std::string group = g_groups.empty() ? "" : g_groups[group_index()];
     const char* header = g_vehicles ? ui_text("VehiclesHeader", "VEHICLES") : ui_text("PaletteHeader", "ALL OBJECTS");
     draw_frame(VID_MENU_PICTURE, group.empty() ? header : ui_text(group.c_str(), group.c_str() + 5));
     const Place p = picture();
@@ -691,10 +689,10 @@ void draw_palette(POINT m) {
     const int hover_group = group_at(m);
     for (int i = 0; i < static_cast<int>(g_groups.size()); ++i) {
         const Place g = group_place(i);
-        edit_draw_text(i == g_group || i == hover_group ? FONT_LIT : FONT_TEXT, g.x, g.y,
+        edit_draw_text(i == group_index() || i == hover_group ? FONT_LIT : FONT_TEXT, g.x, g.y,
                        ui_text(g_groups[i].c_str(), g_groups[i].c_str() + 5), STEP + 3);
     }
-    const std::vector<const PaletteObject*> objects = group_objects(g_group);
+    const std::vector<const PaletteObject*> objects = group_objects(group_index());
     const int per = PALETTE_COLUMNS * PALETTE_ROWS;
     const PaletteObject* hover = object_at(m);
     for (int i = 0; i < per; ++i) {
@@ -722,7 +720,7 @@ void draw_palette(POINT m) {
         }
     }
     if (g_palette_page > 0) edit_draw_picture(VID_PREVIOUS, 0, p.x + PREVIOUS_X, p.y + BUTTONS_Y, STEP + 2);
-    if (g_palette_page + 1 < pages_of(g_group)) edit_draw_picture(VID_NEXT, 0, p.x + NEXT_X, p.y + BUTTONS_Y, STEP + 2);
+    if (g_palette_page + 1 < pages_of(group_index())) edit_draw_picture(VID_NEXT, 0, p.x + NEXT_X, p.y + BUTTONS_Y, STEP + 2);
     draw_close(m);
 }
 
@@ -858,7 +856,7 @@ bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse) {
                 g_palette_army[g_vehicles ? 1 : 0] = a->army;
                 patch::log("panel: palette army %d", a->army);
             } else if (group_at(mouse) >= 0) {
-                g_group = group_at(mouse);
+                group_index() = group_at(mouse);
                 g_palette_page = 0;
             } else if (const PaletteObject* o = object_at(mouse)) {
                 patch::log("panel: palette picks VID %d", o->nvid);
@@ -881,7 +879,7 @@ bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse) {
     case WM_MOUSEWHEEL:
         if (g_panel == Panel::Help) turn_page(GET_WHEEL_DELTA_WPARAM(w) > 0 ? -1 : 1);
         if (g_panel == Panel::Palette)
-            g_palette_page = (std::max)(0, (std::min)(g_palette_page + (GET_WHEEL_DELTA_WPARAM(w) > 0 ? -1 : 1), pages_of(g_group) - 1));
+            g_palette_page = (std::max)(0, (std::min)(g_palette_page + (GET_WHEEL_DELTA_WPARAM(w) > 0 ? -1 : 1), pages_of(group_index()) - 1));
         return true;
     case WM_KEYDOWN:
         if (w == VK_ESCAPE) {
@@ -899,11 +897,11 @@ bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse) {
         else if (g_panel == Panel::Help && (w == VK_LEFT || w == VK_PRIOR || w == VK_UP)) turn_page(-1);
         else if (g_panel == Panel::Help && (w == VK_RIGHT || w == VK_NEXT || w == VK_DOWN)) turn_page(1);
         else if (g_panel == Panel::Palette && (w == VK_UP || w == VK_DOWN)) {
-            g_group = (std::max)(0, (std::min)(g_group + (w == VK_UP ? -1 : 1), static_cast<int>(g_groups.size()) - 1));
+            group_index() = (std::max)(0, (std::min)(group_index() + (w == VK_UP ? -1 : 1), static_cast<int>(g_groups.size()) - 1));
             g_palette_page = 0;
         } else if (g_panel == Panel::Palette && (w == VK_LEFT || w == VK_PRIOR)) g_palette_page = (std::max)(0, g_palette_page - 1);
         else if (g_panel == Panel::Palette && (w == VK_RIGHT || w == VK_NEXT))
-            g_palette_page = (std::min)(pages_of(g_group) - 1, g_palette_page + 1);
+            g_palette_page = (std::min)(pages_of(group_index()) - 1, g_palette_page + 1);
         return true;
     case WM_LBUTTONUP:
     case WM_RBUTTONUP:
@@ -999,6 +997,45 @@ void panel_open_palette(bool vehicles) {
     open(Panel::Palette);
 }
 
+// The objects of a group of the list (its key), in the list's order; empty when there is no such
+// group. editor_edit.cpp's decals are GroupDecals: the one list the Decals tool and the palette share.
+std::vector<int> panel_group_nvids(const char* group) {
+    load_palette();
+    std::vector<int> out;
+    for (const PaletteObject& o : g_palette)
+        if (o.group == group) out.push_back(o.nvid);
+    return out;
+}
+
+// The quick strip above the bar (editor_edit.cpp): the objects of the group chosen in a palette
+// (0 All objects, 1 Vehicles), the army the missions give each, and the group's name.
+void panel_strip(int which, std::vector<int>& nvids, std::vector<int>& armies, std::string& name) {
+    load_palette();
+    nvids.clear();
+    armies.clear();
+    name.clear();
+    const std::vector<std::string> groups = groups_of(which & 1);
+    if (groups.empty()) return;
+    const int g = (std::max)(0, (std::min)(g_group_of[which & 1], static_cast<int>(groups.size()) - 1));
+    for (const PaletteObject& o : g_palette)
+        if (o.group == groups[g]) {
+            nvids.push_back(o.nvid);
+            armies.push_back(o.army);
+        }
+    name = ui_text(groups[g].c_str(), groups[g].c_str() + 5);
+}
+
+// A palette's chosen group (0 All objects, 1 Vehicles; the group's key), without opening it: [ and ]
+// from another tool put the All objects entry on GroupDecals, the strip of the decals.
+void panel_choose_group(int which, const char* group) {
+    load_palette();
+    const std::vector<std::string> groups = groups_of(which & 1);
+    const auto found = std::find(groups.begin(), groups.end(), group);
+    if (found == groups.end() || g_group_of[which & 1] == static_cast<int>(found - groups.begin())) return;
+    g_group_of[which & 1] = static_cast<int>(found - groups.begin());
+    if (g_vehicles == ((which & 1) != 0)) g_palette_page = 0;
+}
+
 // The Vehicles palette for a car of the Arrivals panel's train: its pick goes there, and closing it
 // goes back to that panel.
 void panel_open_vehicles_for_train(bool factory) {
@@ -1039,8 +1076,7 @@ int palette_icon(int nvid) {
     load_palette();
     for (const PaletteObject& o : g_palette)
         if (o.nvid == nvid) return o.frame;
-    const auto only = g_icon_only.find(nvid);
-    return only == g_icon_only.end() ? -1 : only->second;
+    return -1;
 }
 
 // The army the palette gives an object (the missions'), -1 when it is not in the palette.

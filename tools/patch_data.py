@@ -40,6 +40,7 @@ parameter byte, zero-terminated file names and parameter bytes.
 """
 import os
 import struct
+import sys
 
 EMPTY = b"wav\\null.wav"
 
@@ -236,7 +237,7 @@ def make_status_bar_sides(bar_vid, output):
 # atlas' cells and the object in light grey. Frame: (what, the sprites drawn into the cell).
 EDITOR_ICON = 40
 EDITOR_ICON_ART = 34                    # the picture fits in this square of the cell
-EDITOR_ICONS = ["select", "track", "section", "fort", "semaphore_green", "semaphore_red", "decal",
+EDITOR_ICONS = ["select", "track", "mine", "fort", "semaphore_green", "semaphore_red", "decal",
                 "push_line", "height", "crate", "palette", "paint", "water", "region", "settings"]
 # the flat straight rails of vid\610.vid
 RAIL_DIAGONAL, RAIL_HORIZONTAL = 2, 1         # the flat frames of shapes 2 and 1
@@ -249,8 +250,8 @@ def make_editor_icons(vid_folder, output):
     """Writes `output` (vid\\939edit.vid), a texture image like vid\\455icon.vid with one
     40 x 40 frame per EDITOR_ICONS entry, made from the images in `vid_folder` (the game's
     vid\\ folder): the cursor arrow (001curs), two rails (610),
-    the fort (162), the semaphore in its green and red state (152), a bush (135) and the
-    cross and the green arrow of the atlas (455icon). Returns False (and writes nothing)
+    the fort (162), the mine (165), the semaphore in its green and red state (152), a bush (135)
+    and the cross and the green arrow of the atlas (455icon). Returns False (and writes nothing)
     when one of them is not the image this expects."""
     import csv
     import json
@@ -316,11 +317,12 @@ def make_editor_icons(vid_folder, output):
         arrow = texture("001curs", 0)
         rail_diagonal, rail_horizontal = sprite("610", RAIL_DIAGONAL), sprite("610", RAIL_HORIZONTAL)
         fort = sprite("162", 0)
+        mine = sprite("165", 0)
         green, red = sprite("152", 4), sprite("152", 12)   # STAND and STAND_OPEN, direction 4
         bush = sprite("135", 0)
         crate = sprite("169", 0)
         water = texture("204", 0)   # the light water's tile
-        parts = [cell_frame, cross, exit_arrow, next_arrow, arrow, rail_diagonal, rail_horizontal, fort, green, red, bush, crate,
+        parts = [cell_frame, cross, exit_arrow, next_arrow, arrow, rail_diagonal, rail_horizontal, fort, mine, green, red, bush, crate,
                  water]
         if any(p is None for p in parts):
             return False
@@ -437,7 +439,7 @@ def make_editor_icons(vid_folder, output):
             "region": icon(frame),
             "select": icon(fit(keyed(arrow), box=30)),
             "track": icon(track),
-            "section": icon(track, fit(pictogram(cross), box=26)),
+            "mine": icon(fit(grey(mine))),
             "fort": icon(fit(grey(fort))),
             "semaphore_green": icon(fit(grey(green, lamp, gain=0.95))),
             "semaphore_red": icon(fit(grey(red, lamp, gain=0.95))),
@@ -507,10 +509,12 @@ BUTTON_SIGNS = {
 # each object's icon frame and, for a unit, the state (behave, build list) of the first one on the
 # missions' maps - an object the editor places takes it, as map_tool.py place does - and the icons:
 # vid\944pal.vid (VID 944), a texture image of 40 x 40 cells, six a row in 256 x 256 textures, each
-# the atlas' dark cell with the object's own picture (frame 0, in colour) fitted into it.
+# the atlas' dark cell with the object's own picture (frame 0, in colour) fitted into it; an object
+# listed in several groups has one cell. The group DECALS_GROUP must list every decal of objects.res
+# (spriteClass 8) once: it is the list the editor's Decals tool works from.
 PALETTE_UNIT_CLASSES = {"UNIT", "BUILDING", "AVIA", "CIV_ROBOT", "ENGINE", "DEPO", "CREATURE", "BALLOON"}
 VEHICLE_GROUP = "GroupTrain"   # the groups of the vehicles palette (the cars, ENGINE)
-ICON_ONLY = "-"                # a row with only an icon (a decal the palette leaves out), not in the palette
+DECALS_GROUP = "GroupDecals"   # the group that lists every decal (spriteClass 8): the Decals tool's row and the palette share it
 # cars whose state bar icon is another car's: the explosive tank (56, the oil tank's sprite) has the
 # passenger car's icon 31 in objects.res (its weapon 32), so the two showed the same picture - it gets
 # its own sprite, as a car without an icon does
@@ -640,19 +644,21 @@ def make_editor_palette(game_folder, palette_tsv, output_tsv, output_vid):
             inner = icon.convert("L").crop((4, 4, size - 4, size - 4))   # a flat cell (the stone's 29) is no icon
             return icon.convert("RGB") if ImageStat.Stat(inner).stddev[0] > 12 else None
 
-        # the decals the palette leaves out (the gravel beds, a few others) get an icon too, for the
-        # Decals tool's row: rows of the group ICON_ONLY, which the palette does not show
-        listed = {r["nvid"] for r in rows}
-        icon_only = [{"group": ICON_ONLY, "nvid": o["nvid"], "army": "0", "key": "", "english": ""}
-                     for o in tables["objects"] if str(o["spriteClass"]) == "8" and o["nvid"] not in listed]
-        cells = []
-        for r in rows + icon_only:
+        # the DECORATIONS group is the one list of the decals (the Decals tool's row and the palette
+        # read it): every spriteClass 8 object of objects.res once, nothing else
+        decals = [o["nvid"] for o in tables["objects"] if str(o["spriteClass"]) == "8"]
+        in_group = [r["nvid"] for r in rows if r["group"] == DECALS_GROUP]
+        if sorted(in_group) != sorted(decals):
+            sys.exit(f"{palette_tsv}: {DECALS_GROUP} must list every decal of objects.res once - "
+                     f"missing {[n for n in decals if n not in in_group]}, not decals or listed twice "
+                     f"{[n for n in in_group if n not in decals or in_group.count(n) > 1]}")
+
+        def cell_of(r):
             o = objects.get(r["nvid"])
             if o and r["group"].startswith(VEHICLE_GROUP) and r["nvid"] not in STATE_BAR_ICON_NOT_ITS_OWN:   # a car: the state bar's own icon
                 icon = state_bar_icon(o)
                 if icon is not None:
-                    cells.append(icon)
-                    continue
+                    return icon
             picture = _image_frame(os.path.join(game_folder, o["imageFile"]), 0, frames_dir) if o else None
             cell = ground.copy().convert("RGBA")
             box = picture.getbbox() if picture is not None else None
@@ -662,7 +668,14 @@ def make_editor_palette(game_folder, palette_tsv, output_tsv, output_vid):
                 picture = picture.resize((max(1, round(picture.size[0] * scale)), max(1, round(picture.size[1] * scale))),
                                          Image.LANCZOS if scale < 1 else Image.NEAREST)
                 cell.alpha_composite(picture, ((size - picture.size[0]) // 2, (size - picture.size[1]) // 2))
-            cells.append(cell.convert("RGB"))
+            return cell.convert("RGB")
+
+        frames = {}   # nvid -> its cell: an object listed in several groups (a decal under its terrain and under DECORATIONS) has one icon
+        cells = []
+        for r in rows:
+            if r["nvid"] not in frames:
+                frames[r["nvid"]] = len(cells)
+                cells.append(cell_of(r))
         per_texture = (256 // size) ** 2
         textures = (len(cells) + per_texture - 1) // per_texture
         os.makedirs(atlas)
@@ -685,9 +698,9 @@ def make_editor_palette(game_folder, palette_tsv, output_tsv, output_vid):
         os.makedirs(os.path.dirname(output_tsv), exist_ok=True)
         with open(output_tsv, "w", encoding="utf-8", newline="\n") as f:
             f.write("group\tnvid\tarmy\tkey\tenglish\tframe\tbehave\titems\n")
-            for k, r in enumerate(rows + icon_only):
+            for r in rows:
                 behave, items = state.get(r["nvid"], ("", ""))
-                f.write("\t".join([r["group"], r["nvid"], r["army"], r["key"], r["english"], str(k), behave,
+                f.write("\t".join([r["group"], r["nvid"], r["army"], r["key"], r["english"], str(frames[r["nvid"]]), behave,
                                    items]) + "\n")
         return len(rows)
     finally:

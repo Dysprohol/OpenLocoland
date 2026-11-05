@@ -318,7 +318,7 @@ zniszczone bagienne, każdy pokazany swoją szyną - i czy szyny idą w górę, 
 też przełącza rodzaje. `PgUp` / `PgDn` albo kółko myszy sprawiają, że każda kładziona szyna wznosi się albo opada o stopień po poprzedniej, dopóki tego nie zmienisz (rampy na
 wyższy teren: każda rampa to 11 poziomów; wiersz stanu pokazuje poziom). Linię na wzgórze najpierw wprowadź po rampach, potem podnieś teren
 wokół jej końca i wyrównaj go, zaczynając na torze. `B` wybiera podsypkę pod nowe szyny. Kliknięcie
-kółkiem, Del albo narzędzie **Usun odcinek toru** usuwa szyny.
+kółkiem, Del albo narzędzie Usun usuwa szynę; Shift+klik narzędziem Usun usuwa cały odcinek.
 
 **Podsypka.** Gdy tory leżą, **Malowanie terenu** → **TRYB: PODSYPKA** (drugi tryb, **TEKSTURA**,
 maluje tekstury gdziekolwiek) kładzie podsypkę pod szynami, po których przejdzie pędzel - kropki
@@ -333,7 +333,7 @@ zamiast tego naklejki podsypki. Prawy przycisk przywraca oryginalny obraz, Alt+k
 
 ### 5. Przyjazdy pociągów
 
-**Przyjazdy pociagow** (klawisz 0) otwiera panel z pociągami, które w czasie misji wjeżdżają na mapę -
+**Przyjazdy pociagow** (listwa) otwiera panel z pociągami, które w czasie misji wjeżdżają na mapę -
 pociąg gracza na start, posiłki, fale wroga. Najpierw jest ich lista, każdy przyjazd w dwóch wierszach
 zwykłych słów („1. NASI, WJAZD 1: Lokomotywa + WAGONY: 1”, „NA POCZATKU, RAZ”); kliknięcie otwiera
 przyjazd, **+ NOWY** tworzy nowy, **KOPIUJ n** i **USUN n** dotyczą ostatnio otwartego.
@@ -368,7 +368,7 @@ jako znaczniki na torze; kliknięcie znacznika otwiera ten panel), dopóki w pan
 
 ### 6. Fabryka, punkt naprawczy, linie jednokierunkowe i semafory
 
-**Fabryka** (klawisz 4) i **Punkt naprawczy** (klawisz 5) stają tam, gdzie stawiali je autorzy -
+**Fabryka** (klawisz 5) i **Punkt naprawczy** (klawisz 6) stają tam, gdzie stawiali je autorzy -
 podgląd pokazuje gdzie; z dala od toru albo z Shiftem zostają tam, gdzie kursor, bez linii:
 
 - **fabryka** na **ślepym końcu bocznicy**, obrócona wyjazdem na zewnątrz. Dostaje swoją **linię
@@ -384,7 +384,7 @@ albo z Shiftem: tam, gdzie upuszczone); usunięcie usuwa też linię.
 **Bloker** (kozioł oporowy, w grupie KOLEJ we Wszystkich obiektach) stawia się swobodnie i obraca
 R / E jak każdy obiekt: ustaw go sam na końcu toru.
 
-**Linie jednokierunkowe** (**Linia jednokierunkowa** z listwy): linia na torze, na którą żaden
+**Linie jednokierunkowe** (**Linia jednokierunkowa**, klawisz 4): linia na torze, na którą żaden
 pociąg nie wjedzie pod prąd - tak misje oznaczają wjazd na mapę, wyjazd, fabryki i punkty naprawcze.
 Kliknij jej początek i koniec na torze - na mapie linia ma kreskę na początku i strzałki w stronę,
 w którą biegnie, a mysz nad nią mówi, co robi; potem na zaznaczonej linii - wiersz stanu podaje jej początek, koniec i to, co robi; także narzędziem
@@ -448,10 +448,10 @@ ona może wtedy strzelać do nich. W panelu uzbrojonego neutralnego obiektu **ST
 
 ### 7. Wróg
 
-- **Fortyfikacja** (klawisz 6, wroga): staje **na torze**, obrócona wzdłuż niego - to brama, przez
+- **Fortyfikacja** (klawisz 7, wroga): staje **na torze**, obrócona wzdłuż niego - to brama, przez
   którą przejeżdżają pociągi (`R` albo `E` obraca ją tam). Jest od razu uzbrojona: jej panel (prawy przycisk) ustawia działo w każdym
   gnieździe - działo albo rakiety. Samej fortyfikacji nie da się zniszczyć; jej działa tak.
-- **Wszystkie obiekty** (klawisz 7) otwiera paletę ze wszystkimi obiektami z misji, według tematów
+- **Wszystkie obiekty** (klawisz 0) otwiera paletę ze wszystkimi obiektami z misji, według tematów
   (łąka, las, pustynia, lód, wulkan, bagno, park, piraci, miasto, przemysł, kolej, flagi i skrzynie,
   wraki, jednostki i stworzenia, efekty): kliknij jeden, potem postaw go na mapie. Wiersz **ARMIA**
   pod ikonami ustala, czyj będzie - JAK W MISJACH, NASI, WROG, NEUTRALNI albo PIRACI (paleta Pojazdy
@@ -488,7 +488,7 @@ ona może wtedy strzelać do nich. W panelu uzbrojonego neutralnego obiektu **ST
   torze. Pociąg jeździ tam i z powrotem między miejscem, gdzie stoi, a tym punktem.
 - Więcej pociągów wroga: kolejne pociągi na mapie z rozkazami, przyjazdy wroga (krok 5) i pociągi,
   które buduje jego fabryka - jej plan (krok 6). Do tych ostatnich wróg potrzebuje fabryki: postaw ją
-  (klawisz 4) na własnym ślepym końcu i `A` na wroga.
+  (klawisz 5) na własnym ślepym końcu i `A` na wroga.
 - **Skrzynka z pieniedzmi** (listwa) leży na torze: jednostka gracza, która ją zbierze, dostaje 100.
 
 Pamiętaj o zasadzie gry: fabryka, punkt naprawczy i fortyfikacja stoją **na torze albo tuż przy
@@ -496,11 +496,15 @@ nim**.
 
 ### 8. Ozdoby
 
-**Dekoracje** z listwy: trawa, krzaki, kwiaty, kamienie, wraki... Rząd nad paskiem pokazuje każdą
-z nich (jego strzałki zmieniają strony); kliknięcie tam wybiera jedną, tak samo `[` `]` i kliknięcie
-pozycji. Kliknięcie na mapie stawia jedną, przeciąganie rozrzuca je w promieniu (kółko, `+` `-`), nigdy
-bliżej niż odstęp (`<` `>`). Shift+przeciąganie je zbiera. Drzewa, domy i reszta są we **Wszystkie
-obiekty**.
+**Dekoracje**: trawa, krzaki, kwiaty, kamienie, bruk, podsypki, wraki... - temat **Dekoracje** we
+Wszystkich obiektach, każda dekoracja na jednej liście (`[` `]` z dowolnego narzędzia tam prowadzą).
+Rząd nad paskiem pokazuje temat (jego strzałki zmieniają strony); nazwa tej pod wskaźnikiem pokazuje
+się nad nią, kliknięcie tam wybiera jedną, tak samo `[` `]`. Kliknięcie
+na mapie stawia jedną tak, jak ją widać (`R` `E` ją obracają), przeciąganie rozrzuca je w promieniu
+(kółko, `+` `-`) w losowych wyglądach, nigdy bliżej niż odstęp (`<` `>`). Shift+przeciąganie je zbiera.
+Dekoracja wybrana w dowolnym temacie **Wszystkich obiektów** stawia się tak samo. Drzewa, domy i reszta
+też są we Wszystkich obiektach, a gdy jeden z nich ma być postawiony, rząd nad paskiem pokazuje tak samo
+jego temat.
 
 **Zestawy z misji** (Wszystkie obiekty): to, co autorzy zawsze stawiali razem, jest jednym obiektem, a
 jego panel wybiera część - słup graniczny ze świdrem (cały albo złamany), wyjście z poziomu z jego
@@ -508,7 +512,9 @@ szczytem, maszt albo dworzec z flagą, kominy z dymem albo poświatą, szyb naft
 (piraci) stoi w poprzek toru i co 25 sekund gryzie wszystko poza swoją armią; jego panel mówi, kiedy
 staje - gdy padną wieże jego armii, albo nigdy. **Scylla** (bagno) na ukośnym torze gryzie każdego co
 15 sekund. Gdy padną wieże piratów, świdry się łamią. **Region** (listwa): przeciągnij jego prostokąt; jego panel ustawia mgłę (mgła, pył,
-opar, poświata) i rozpryski.
+opar, poświata) i rozpryski, nad nim albo nad całą mapą; stworzenie postawione w środku trzyma się go.
+Temat **Efekty** we Wszystkich obiektach ma region jasnej wody (wygląd jeziora) i region z kręgami w
+deszczu.
 
 ### 9. Zobacz, jak działa
 
@@ -589,15 +595,16 @@ gry (`l01`-`l20`, `sandbox`, `template`, `script`, `outro`).
 | 1 | Zaznacz | zaznaczanie, przeciąganie, obrót, armia, panel |
 | 2 | Usun | kliknięcie usuwa; Shift+klik na szynie: jej odcinek |
 | 3 | Tory | kładzie szyny (V rodzaj, PgUp/PgDn albo kółko rampa, B podsypka) |
-| 4 | Fabryka | na ślepym końcu, z linią wyjazdu |
-| 5 | Punkt naprawczy | na prostym odcinku, z linią |
-| 6 | Fortyfikacja | na torze, uzbrojona |
-| 7 | Wszystkie obiekty | paleta |
+| 4 | Linia jednokierunkowa | linia na torze w jedną stronę |
+| 5 | Fabryka | na ślepym końcu, z linią wyjazdu |
+| 6 | Punkt naprawczy | na prostym odcinku, z linią |
+| 7 | Fortyfikacja | na torze, uzbrojona |
 | 8 / 9 | Semafor zielony / czerwony | obok toru |
-| 0 | Przyjazdy pociagow | panel pociągów, które przyjeżdżają |
+| 0 | Wszystkie obiekty | paleta |
 
-**Listwa** (nad paskiem, od lewej): Usun odcinek toru, Dekoracje, Linia jednokierunkowa, Ustawienia
-misji, Wysokosc terenu, Skrzynka z pieniedzmi, Pojazdy, Malowanie terenu, Woda i lawa, Region.
+**Listwa** (nad paskiem, od lewej): Wysokosc terenu, Malowanie terenu, Woda i lawa, Region, Kopalnia,
+Skrzynka z pieniedzmi, Pojazdy, puste miejsce, Przyjazdy pociagow, Ustawienia misji - narzędzia terenu,
+rzadziej stawiane rzeczy, na końcu dwa panele.
 
 **Klawisze:**
 
@@ -610,7 +617,7 @@ misji, Wysokosc terenu, Skrzynka z pieniedzmi, Pojazdy, Malowanie terenu, Woda i
 | Del / Shift+Del | usuń / cały pociąg albo odcinek |
 | Ctrl+Z / Ctrl+Y | cofnij / ponów |
 | U / C | odczep / doczep wagon |
-| `[` `]` | dekoracja, tekstura |
+| `[` `]` | następny obiekt rzędu nad paskiem, tekstura |
 | `<` `>` | odstęp dekoracji |
 | kółko, `+` `-` | rozmiar pędzla (Wysokosc terenu, Dekoracje, Malowanie, Woda) |
 | M | pędzel terenu: podnieś, obniż, wyrównaj, wygładź |

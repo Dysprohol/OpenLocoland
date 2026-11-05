@@ -1505,7 +1505,13 @@ are Alt+F3, Alt+F2 and Alt+F10 - the plain function keys are the factory build l
 shows those. A dialog runs with the game in GDI mode (`Graphics_EnterGdiMode`, as the menu loop:
 drawing stops, `FlipToGDISurface` in full screen) and the Windows cursor shown (the game hides
 it for its own; it is also shown over the menu bar and the frame), the game's current
-directory is kept, and the menu commands wait while a dialog is open. Paths inside the game
+directory is kept, and the menu commands wait while a dialog is open; the sound is fed meanwhile
+(`editor_feed_sound`: the game loop's own per-frame update, `SoundBuffer_Process(g_sound)` 0x444950 -
+the stream's feed, its restart at the end, the fades -, called every 30 ms from a timer of the thread,
+whose `WM_TIMER` every modal loop dispatches; `DialogScope`, `ui_message_box`, the menu loop and
+`level_save.cpp`'s boxes turn it on and off; before, a dialog left the DirectSound buffer with nothing
+new in it, looping its last fragment - with the music player on, Mission settings opened to a stutter;
+the count fed and the stream's state go to `LocoFix.log` when the loop ends). Paths inside the game
 folder are passed as the game writes them (`maps\...`). Outside editor mode the accelerators do
 nothing, as before.
 
@@ -1628,7 +1634,8 @@ on the first line of the top whose status text does not reach it (`g_status_ends
 sound's update plays it and starts it again when it ends, so a file plays on until another is chosen;
 `||` is `stop_music` (StopMusic and the name taken away), and the file starts from its beginning when
 played again. Off by default; `EditorMusic` (DWORD) and `EditorMusicFile` (the name) next to `FrameLimit`
-keep the choice, so the editor comes back silent unless it was playing. Only the held level ticks it
+keep the choice, so the editor comes back silent unless it was playing. A dialog does not stop it (the
+sound is fed while one is open, "The menu" above). Only the held level ticks it
 (`music_tick` from the overlay): Run the level loads the map running and its script's
 `PlayMusicFile(music0)` names the level's file, Play the map is a game of its own, and the way back
 stops the run's music as before - then the player names its file again. Checked (Polish, English, the
@@ -1701,7 +1708,7 @@ with the engine's own pieces (scripts and object updates are off, so nothing els
 | turn | R / E, the mouse wheel, Edit > Turn right / left or the panel's TURN | by what is turned (`turn` in `editor_edit.cpp`, help page 15): `Object_SetDirection` by one of the VID's `nDir` directions, R right and E left - the guns in its sockets go to their new places, a semaphore's lamp halo (VID 154) is turned with it so the light spot it links (155) moves with it, a decal's directions are its looks, an object of one direction (the citadel, a crate, a region) says so; turned round, R and E alike - a train (`Train_Reverse`), a wreck on the track, a post beside a track (across the track, below), in the Push line tool the selected line; turned by its track - a factory, a repair point (drag it along the track; the panel's TURN row says BY ITS TRACK); a rail is not turned (laid again), and the Track tool turns nothing. Before placing, R / E turn the preview: a step of the VID's directions (the direction placed is one of its frames: a direction left from an object of more directions is rounded to them), round for a car or a post, and an object the track turns says so |
 | army | A (0 -> 1 -> 2 -> 3: ours, enemy, neutral, pirates) | `ACT_SET_ARMY` 97; the armies' colours as in play (below) |
 | semaphore red / green | T | red is the command `10,0,0,0` (MAP_RULES.md 7), shown with that animation - also the red posts of a loaded map, whose first command never runs on a held level (the command stays as it is); a post's own line changes with it ("On the track") |
-| delete | Del, or the Delete tool of the bar (the filled circle marks what a click takes, the cursor is the game's delete cursor); Shift+Del or Shift+click on a rail: its section, as far as one rail continues it at each end (up to a junction or an end) | `ACT_UNDO_REMOVE` 132 - made for the authors' MapEdit: the object leaves the layer lists (not drawn, not updated, not saved; a train car leaves its rail points and couplings); a rail also leaves the rail network (below) |
+| delete | Del, or the Delete tool of the bar (the filled circle marks what a click takes, the cursor is the game's delete cursor; its status line says so); Shift+Del or Shift+click on a rail: its section, as far as one rail continues it at each end (up to a junction or an end) - the strip's "Delete a section of track" tool, which did only that, is gone | `ACT_UNDO_REMOVE` 132 - made for the authors' MapEdit: the object leaves the layer lists (not drawn, not updated, not saved; a train car leaves its rail points and couplings); a rail also leaves the rail network (below) |
 | undo / redo | Ctrl+Z / Ctrl+Y | every change keeps the state of the objects it touched before and after (position, direction, army, present, red); undo puts the "before" back - a deleted object returns with `ACT_UNDO_INSERT` 133 - and redo the "after"; the last 500 steps are kept, at most 256 MB of them (below) |
 | place | the bar at the bottom: 1-0 or a click picks an entry, a click on the map places it, Esc or the right button go back to selecting | World `CreateObject` at the point under the cursor on the ground - over other objects too ("Placing over objects, the track as a help" below); a preview of the object (its own sprite in the chosen direction, `Graphics_DrawVid`) follows the cursor, the status line says where it goes |
 
@@ -1717,23 +1724,27 @@ white), each with its key in the factory panel's small
 font (VID 8, right-aligned at the icon's lower edge as the panel's F-keys). The icons come from the
 state bar's atlas where it has one (VID 455: the cross 3, the factory 10, the wrench 2, the cannon
 36, the locomotive 11) and otherwise from the editor's own atlas (VID 939, `vid\939edit.vid`, made
-when the game is assembled, below): the arrow, the track, a section to delete, the fort, the
-semaphores green and red, a decal, the gear of Mission settings (it had the state bar's frame 0,
+when the game is assembled, below): the arrow, the track, the mine, the fort, the
+semaphores green and red, a decal (unused now), the gear of Mission settings (it had the state bar's frame 0,
 which the game shows for no option); both lit green as the game's state bar (the menu gamma, "The
 armies' colours"). The status line at the top is in the mouse tips' font (VID 6,
 each character in its orange box - the look of the game's tips): the tool or the entry under the
 cursor with its key, the undo and redo counts, "not saved" and the last message. A text is drawn
 the way `Text_Draw` writes one: a frame of the font VID per character (its code), the VID's
-width apart. A click on the bar's plates does nothing on the map under them. Its entries: Select
-(1), Delete (2), Track (3, below), the factory 102 (4), the repair point 104 (5), the fort 162 (6, army
-1), All objects (7: the palette, below), a green (8) and a red (9) semaphore 152, Train arrivals (0: a
-panel, "Train arrivals" below), and in the strip Delete a section of track (a click on a rail deletes its section,
-as Shift+click with Delete), Decals (below; [ and ] pick which of the 61 decals of `objects.res` -
-read from the file: the editor mode loads them as class 0 -; its slot has the atlas' bush, lit as
-the other icons - the chosen decal's palette icon kept its colours and stood out unlit among them -,
-and the tool's row shows the chosen decal), the Push line tool, Mission
-settings (the dialog of the File menu; both below), Ground height, a money crate (VID 169, army 3)
-and Vehicles (the cars' palette, below), Paint the ground, Water and lava and Region (below).
+width apart. A click on the bar's plates does nothing on the map under them. Its entries are laid
+out by kind, so that a map maker finds a thing where he expects it: the base's ten slots (keys 1-0)
+hold the tools that act on what is there and the things of the track that are placed - Select (1),
+Delete (2), Track (3, below), the Push line tool (4, below), the factory 102 (5), the repair point 104
+(6), the fort 162 (7, army 1), a green (8) and a red (9) semaphore 152 and All objects (0: the
+palette, below) - and the strip above the ground's tools, the rarer things placed and the two panels
+last: Ground height, Paint the ground, Water and lava, Region (below), the mine 165 (army 1, placed
+as the fort is: onto the track, with the missions' guns in its sockets; its icon the atlas' grey
+picture of it), a money crate (VID 169, army 3), Vehicles (the cars' palette, below), an empty slot
+(free for later; the decals are the palette's DECORATIONS category - the 61 decals of `objects.res`,
+`GroupDecals` of `game/editor/palette.tsv`, one list for the strip above the bar and the palette; [
+and ] from any tool put the All objects entry on it, `choose_decal` -, and a section of track is
+deleted with the Delete tool's Shift+click), Train arrivals (a panel, "Train arrivals" below) and
+Mission settings (the dialog of the File menu, below).
 The camera of a held level goes 300 px past
 every edge of the map (`camera.cpp` widens the bounds `SetPosition` clamps to while the level is
 held), so the bar does not hide the bottom of a small map and the parts of the track out of
@@ -2149,7 +2160,7 @@ own is named "(MISSION n)". The missions' queues (`level_queue_trains`, `start_t
 The engine drives a train whatever the locomotive's place (checked in play: 20,5,20 and 20,20,5 drove
 to their points), so the only rule is a locomotive somewhere in the train.
 
-**The panel** (the bar's entry 0, a click on an arrival's entry or point on the map, the marker's
+**The panel** (the strip's Train arrivals entry, a click on an arrival's entry or point on the map, the marker's
 panel, Mission settings' Arrivals... button, which keeps the dialog's settings as OK does) is drawn
 in editor_panel.cpp's frame, in three screens. The list: each arrival in two rows of plain words
 (number, army, entry, the first car's name and the number of cars; when and how often), a click
@@ -2345,17 +2356,24 @@ missions' grounds do, so it shows as the band of gravel under the rails wherever
 (where the ground's picture stands higher than the track, a lawn of the template, both are hidden);
 in play it is painted into the ground. The
 Decals tool places the chosen decal - its name (the palette's) in the status line, its icon framed in
-the tool's row, its sprite at the cursor: a click puts one at the cursor, dragging scatters 1 + radius of
-them a step in the circle (+ and -; radius 0 one a step along the drag), each turned at random (a
-decal's directions are its variants), none nearer than the spacing (< and >, 4-64 px, 16 by default)
+the tool's row, its sprite at the cursor in the chosen look (R / E turn it, as the Place tool's preview -
+the same `g_place_direction`, so a decal picked in the row and one picked in the palette turn alike): a
+click puts one at the cursor as shown, dragging scatters 1 + radius of them a step in the circle (+ and
+-; radius 0 one a step along the drag, as shown), each turned at random (a decal's directions are its
+variants), none nearer than the spacing (< and >, 4-64 px, 16 by default)
 to a decal already there (beds aside), so they do not stack; Shift takes the decals in the circle
-away. The tool's row above the bar holds every decal, each its palette icon (VID 944 - the decals the
-palette leaves out, the beds and four more, get icon-only rows, group `-` of the game's
-`editor\palette.tsv`, which the palette does not show), the chosen one framed, a click picks it and
-the status line names the one under the mouse; as many as the view's width takes are a page, the
-others behind its < and > (the last page padded, so the arrows stay put), and the page follows [ and
-], which still pick the decal; a click on the chosen Decals entry opens the palette, where a click
-on a decal makes it the brush's. A map's first decal is the ground cover it has most of (the beds,
+away. The decals are the palette's DECORATIONS category (`GroupDecals` of `game/editor/palette.tsv`:
+every class-8 VID of `objects.res` once, in the file's order - `make_editor_palette` stops the build
+when the group and the file disagree; `find_decals` reads the group through `panel_group_nvids`), so
+the row above the bar and the palette show one list. The row is the strip of that category ("The rows
+of the ground's tools" below): each decal its palette icon (VID 944), the chosen one framed, a click
+picks it, the one under the mouse has its name right above its icon (the tips' font, `draw_row_tip`,
+at once - the status line at the top is far from the row in a wide window) and in the status line; as
+many as the view's width takes are a page, the others behind its < and > (the last page padded, so
+the arrows stay put), and the page follows [ and ], which still pick the decal - from any other tool
+they put the All objects entry on DECORATIONS with the next decal (`choose_decal`,
+`panel_choose_group`); a decal picked in any category of the palette is the brush's the same way
+("The object's panel ... the palette" above). A map's first decal is the ground cover it has most of (the beds,
 wrecks, buildings and track pieces aside), else the round bush 936. A placed factory, repair point or fort gets its footprint flattened as map_tool.py place
 does, and script function 81 `ReCalcGridZ(int unit)` - declared in export.lgc, missing in the exe -
 now does the same (`ground.cpp`, through the hook of `restart.cpp`). Track is laid flat (the ramp
@@ -2575,16 +2593,20 @@ missions' offsets, MAP_RULES.md 6), with the host's army (on a citadel of army 0
 the missions) and direction, and follows it. A gun in a socket is part of its host: a click on it
 selects the host (`pick`, `host_of`) and the right button opens the host's panel, where each socket
 has one row - SOCKET 1, SOCKET 2, numbered on the wall while the panel is open, an empty one framed -
-and a click on EMPTY, CANNON or MISSILES puts that gun in at once, underlined. The bar's entry 7, All objects, opens the palette: a
+and a click on EMPTY, CANNON or MISSILES puts that gun in at once, underlined. The bar's entry 0, All objects, opens the palette: a
 panel like Help with the groups down the left (meadow, forest, desert, ice, volcanic, swamp, park,
-pirates, city, industry, railway, flags and crates, wrecks, units and creatures: the 236 kinds of
-object of the missions, trains and cars aside; the chosen group's name is the panel's title, ALL
+pirates, city, industry, railway, flags and crates, wrecks, decorations, units and creatures: the 244
+kinds of object of the missions, trains and cars aside - DECORATIONS lists the 61 decals, the 53 the
+terrain groups already had again (one icon each, `make_editor_palette`) and the eight they lacked (the
+four gravel beds, Charybdis' roots 266, the desert paving 856, the silver grass 910, the fern 931); the chosen group's name is the panel's title, ALL
 OBJECTS / VEHICLES in the strip above it - the title holds about 20 letters, and "WSZYSTKIE OBIEKTY:
 JEDNOSTKI, ISTOTY" in one ran past the frame), 12 icons a page on the right (VID 944, made from the
 objects' own sprites when the game is assembled), the arrows or the wheel for more and the name of the
 one under the mouse (a unit's from the game's `[Units]`, the others' from `[Editor]`); a click picks
 it and the map takes it in the army the missions give it, a unit with the behave and build list of
-one of its kind on the map or, with none there, of the first on the missions' maps. Under the icons
+one of its kind on the map or, with none there, of the first on the missions' maps; a decal picked
+anywhere in the palette makes the All objects entry the Decals tool with it (`tool()`: the scatter
+brush, not a single placing - one way to place a decal wherever it was picked). Under the icons
 an army row (ARMY: AS IN THE MISSIONS - All objects only, its first choice -, OURS, ENEMY, NEUTRAL,
 PIRATES; the Vehicles palette starts on OURS) sets the army of what is placed next, the chosen one
 underlined (`panel_palette_army`); A in the Place tool steps through the armies the same way, the
@@ -2703,8 +2725,13 @@ bit and the nest sent its first fly. What changed in this review: the mining pla
 track as the missions' (it went anywhere), the flagpole's and station's slots take every flag and
 their default armies are the missions' (the enemy's, the neutrals'), a mine is placed unarmed.
 
-**The rows of the ground's tools** (`editor_edit.cpp`, the section of the same name). While the
-Decals tool is chosen, its row holds DECAL n / 61: and the decals (above). While the
+**The rows of the ground's tools** (`editor_edit.cpp`, the section of the same name). While an object
+of the palette is to be placed - the All objects and Vehicles entries - the row above the bar is the
+quick strip of the palette's chosen category (`strip_group`, `panel_strip`; the decals' is
+DECORATIONS): CATEGORY n / m: (the category's name alone while nothing of it is chosen), the
+icons of a page, the chosen one framed, the one under the mouse named right above it and in the status
+line (`StatusStripHover`); a click picks it as the palette would, [ and ] step through it, < and > turn
+the pages. While the
 Track tool is chosen, its row holds RAIL: the four kinds (`RAIL_KINDS`, each drawn as its own straight
 rail across, the chosen one framed; a click picks it as V does) and RAILS GO: UP / FLAT / DOWN (the
 ramp of the wheel and PgUp / PgDn). While the Ground height or the Paint tool is chosen, a row of buttons stands above the bar's strip: the depot
@@ -2894,6 +2921,43 @@ empty map with a lake of light water, a lava field, a sand path, a snow patch, a
 splashes, a fire from the palette - saved, loaded (the painted picture came back from its `.vid`),
 `map_tool.py check` round-tripping the map and its ground image, played: the water rippling, the lava
 erupting, the fog over the region, the fire burning.
+
+**Regions, reviewed** (2026-11-04, the Region tool against the engine). A region (`B_REGION`, `struct
+Region` 0xd0 bytes; `Region_Action` saves 80 bytes of it: flags, the fog's high and low levels, its
+colour, width, height, an unused word, its image VID, six VID pairs) is a rectangle on layer 7 around
+its place, at its z. No script refers to one (`GETSPRITE_REGION` of `export.lgc` is declared and never
+used; `daynight.lgc` only gives VIDs 750 and 752 rain circles as their child while it rains). The engine
+does four things with it: `Region_Draw` tiles its own VID's picture over it (750: the light water's
+tiles - a lake's look without the Water tool's bed) and draws the fog between its low and high levels
+in its colour (`Graphics_DrawFog`; flag 1 pulses it, flag 8 lays it over the whole view);
+`Vid_GetTerrainVariant` (from `World_CreateObject`) makes an object of a pair's first VID created inside
+it, less than 25 above it, of the second - the missions' explosions 308 / 309 become the splashes 338
+(water) or 528 (lava) -, and with flag 8 anywhere on the map; a creature (`Creature_Construct`,
+`Creature_Move`: the underwater dragon 250, the fish 418, the golem 409) remembers the region it starts
+in (`World_FindRegionAt`) and keeps to it - l11's and l17's dragons stand in theirs. The missions' 118
+regions: 751 with nothing set (creature areas and markers: l04 has 29, l17 17), splash regions over
+their lakes and lava, five fogs (l01 on a 750: dust 20-60, flags 2; l05 mist; l07; l13; l18 - the
+values read back from the loaded level: the file holds them in `Region_Action`'s order, which
+`Region_InitFog` turns into high and low), 752 in l06, l09 and l15 (l15's flood raises its 752 with
+`ChangeZUnit`). The tool has every kind: the rectangle (16 px at least) at the ground's level, its
+panel's size, EXPLOSIONS (as they are / on water / on lava: the pairs), FOG (none, or the missions'
+mist, dust, haze, glow around its level), OVER: THE REGION / THE WHOLE MAP (flag 8 - the fog and the
+pairs both; the row said FOG OVER: THE VIEW, which hid half of it) and PULSING (flag 1); the palette's
+Effects group places 750, 751 and 752 as rectangles sized in the panel; the image VID is the region's
+own and not set anywhere. Found, not fixed: a region of light water (750) fresh from the palette shows
+only its frame in the held editor, while in play, and in the editor once the map was saved and loaded
+(Run the level and back does it), it draws its water; the created and the loaded object were compared
+byte for byte (the log line of a selected region) and differ in nothing but their times and the high
+bits of `GameObject.flags`, and `Region_Draw` tiles through the Vid's own `DrawObject`, which
+`draw_vid` from the overlay did not make draw either - the cause is still to be found. Nothing else was
+wrong. Checked in the game: a mist region made with the tool on POLIGON, seen
+in the held editor and the same after Run the level, its values the same after the way back (low 50,
+high 80, colour ff006478); l05's and l01's regions read in the editor (the log line of a selected
+region: size, flags, fog, image, pairs); a 750 region from the palette tiled with water in play and in
+the editor after the way back, not before; a golem inside a marker region and one outside stood where they were placed through 20 s
+of a run (golems do not walk by themselves - l13's stand at its script's places), so the creature area
+rests on the engine's code and the missions' dragons, not on a run; the pairs on the code path only
+(an explosion inside a splash region was not provoked).
 
 **Map exchange** (`src/LocoFix/editor_exchange.cpp`, `editor.cpp`; MAP_RULES.md 11). File > Export
 map (and the Menu panel's EXPORT MAP) packs the current map of the custom maps page into an ordinary
@@ -3127,7 +3191,7 @@ mode above) are not tested in full screen.
   four quarters), the ground's paint (a brush stroke), water (a pool of the light water's own
   picture), a region (a dashed rectangle) and Mission settings (a gear: eight teeth round a ring).
 - `editor\palette.tsv` and `vid\944pal.vid`, the editor's palette ("All objects"):
-  `patch_data.make_editor_palette` reads `game/editor/palette.tsv` (the 236 kinds of object the
+  `patch_data.make_editor_palette` reads `game/editor/palette.tsv` (the 244 kinds of object the
   missions use, by group, with the army the missions give them and the `[Editor]` key of the
   name, or none for a unit named by the game's `[Units]`) and writes it to the game folder with,
   for each object, its icon's frame and - for a unit - the behave and build list of the first one

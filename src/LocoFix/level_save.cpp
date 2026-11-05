@@ -36,6 +36,8 @@
 // handed on is a String of the game's own heap (crt_new) and the caller's is freed here.
 #include "patch.h"
 
+void editor_feed_sound(bool on);   // editor.cpp: the music goes on while a message box is open
+
 namespace {
 
 constexpr uintptr_t LEVEL_SAVE = 0x41e0b0;
@@ -141,8 +143,10 @@ void __fastcall LevelSave_safe(uint8_t* world, void* edx, char* name) {
     if (copies_obj && !(level && exists(level))) {
         patch::log("level save: %s not saved - its VIDs come from %s, which is not there", target.c_str(),
                    level ? level : "(no map)");
+        editor_feed_sound(true);
         MessageBoxA(*reinterpret_cast<HWND*>(world + WORLD_HWND), "The map was not saved: the map file it was loaded from is missing.", "Save",
                     MB_OK | MB_ICONERROR);
+        editor_feed_sound(false);
         return;
     }
 
@@ -162,8 +166,10 @@ void __fastcall LevelSave_safe(uint8_t* world, void* edx, char* name) {
         const DWORD error = GetLastError();
         DeleteFileA(temp.c_str());
         patch::log("level save: %s not replaced (error %lu), the old file stays", target.c_str(), error);
+        editor_feed_sound(true);
         MessageBoxA(*reinterpret_cast<HWND*>(world + WORLD_HWND), "The map could not be saved under that name (is the file in use or read-only?).",
                     "Save", MB_OK | MB_ICONERROR);
+        editor_feed_sound(false);
         return;
     }
     g_last_save_ok = true;

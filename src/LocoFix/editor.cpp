@@ -73,6 +73,7 @@
 #include <cstring>
 
 bool level_save_succeeded();   // level_save.cpp
+void editor_feed_sound(bool on);   // below: the sound while a modal loop runs
 bool restart_game(bool editor, const std::string& map, bool back_to_editor);   // restart.cpp
 // editor_edit.cpp: editing the objects of the held level
 bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l);
@@ -162,6 +163,8 @@ constexpr uintptr_t SET_POSITION = 0x41c680;   // SetPosition: the centre of the
 constexpr uintptr_t G_SOUND = 0x5d3a54;        // g_sound: the sound object
 constexpr uintptr_t STOP_MUSIC = 0x444e50;     // StopMusic(g_sound)
 constexpr uintptr_t SOUND_MUSIC_FILE = 0x3d8;  // g_sound: the music file (a char* of the game's heap, or the empty String)
+constexpr uintptr_t SOUND_MUSIC_STREAM = 0x3d4;  // g_sound: the music stream object (its vtable slot 1: still playing)
+constexpr uintptr_t SOUND_PROCESS = 0x444950;    // SoundBuffer_Process(g_sound): the per-frame sound update of GameWorld_Run
 
 using GdiMode_t = void(__fastcall*)(void* graphics, void* edx);
 using SetPosition_t = void(__fastcall*)(void* world, void* edx, float x, float y, int mode);
@@ -262,6 +265,12 @@ void hold_level(uint8_t* w, bool hold) {
 // (every frame) now and then finds the stream stopped and starts that file again: the victory's
 // music of a won run came back a few seconds after the level was held. The name goes with it - the
 // update then stops the music for good (its own StopMusic for an empty name).
+const char* music_file_name() {   // the music file the sound plays ("" none)
+    auto* sound = *reinterpret_cast<uint8_t**>(G_SOUND);
+    const char* file = sound ? *reinterpret_cast<const char**>(sound + SOUND_MUSIC_FILE) : nullptr;
+    return file ? file : "";
+}
+
 void stop_music() {
     auto* sound = *reinterpret_cast<uint8_t**>(G_SOUND);
     if (!sound) return;
@@ -299,6 +308,57 @@ void stop_running() {
     load_map(g_run_map);
 }
 
+// ---- the sound while a dialog is open ----
+//
+// The game loop (GameWorld_Run) ends every frame with SoundBuffer_Process(g_sound), which feeds the
+// music stream, starts it again when it ends and runs the fades. A modal loop - a dialog, a message
+// box, the window's menu - runs instead of the game loop, so the DirectSound buffer played on with
+// nothing new in it and looped its last fragment: with the music player on, Mission settings opened
+// to a stutter. A timer of the thread (SetTimer without a window: DispatchMessage, which every modal
+// loop calls, hands its WM_TIMER to the procedure) calls that same update every 30 ms while one is
+// open - the game's own update, as its loop would. Nested (a message box over a dialog): one timer.
+using SoundProcess_t = void(__fastcall*)(void* sound, void* edx);
+using StreamSlot_t = int(__fastcall*)(void* stream, void* edx);
+constexpr UINT SOUND_FEED_MS = 30;
+UINT_PTR g_sound_timer = 0;
+int g_sound_feed_depth = 0;
+unsigned g_sound_fed = 0;
+
+bool music_stream_playing() {   // what SoundBuffer_Process asks the stream: still playing
+    auto* sound = *reinterpret_cast<uint8_t**>(G_SOUND);
+    if (!sound) return false;
+    auto* stream = *reinterpret_cast<uint8_t**>(sound + SOUND_MUSIC_STREAM);
+    if (!stream) return false;
+    return reinterpret_cast<StreamSlot_t>((*reinterpret_cast<uintptr_t**>(stream))[1])(stream, nullptr) != 0;
+}
+
+void CALLBACK sound_feed_proc(HWND, UINT, UINT_PTR, DWORD) {
+    if (void* sound = *reinterpret_cast<void**>(G_SOUND)) {
+        reinterpret_cast<SoundProcess_t>(SOUND_PROCESS)(sound, nullptr);
+        ++g_sound_fed;
+    }
+}
+
+}  // namespace
+
+// A modal loop begins (true) or ends (false): the sound is fed meanwhile (editor_text.cpp's message
+// boxes and level_save.cpp's call it too).
+void editor_feed_sound(bool on) {
+    if (on) {
+        if (g_sound_feed_depth++ == 0) {
+            g_sound_fed = 0;
+            g_sound_timer = SetTimer(nullptr, 0, SOUND_FEED_MS, sound_feed_proc);
+        }
+    } else if (g_sound_feed_depth > 0 && --g_sound_feed_depth == 0) {
+        if (g_sound_timer) KillTimer(nullptr, g_sound_timer);
+        g_sound_timer = 0;
+        patch::log("editor: the sound was fed %u times while a dialog, a message box or the menu was open (music %s, %s)",
+                   g_sound_fed, *music_file_name() ? music_file_name() : "none", music_stream_playing() ? "playing" : "not playing");
+    }
+}
+
+namespace {
+
 // ---- the Windows cursor ----
 //
 // The game hides it (ShowCursor(FALSE) in World_Construct) and draws its own in the scene, so
@@ -320,6 +380,7 @@ void update_cursor() {
 class DialogScope {
 public:
     DialogScope() {
+        editor_feed_sound(true);
         GetCurrentDirectoryA(MAX_PATH, dir_);
         if (graphics()) reinterpret_cast<GdiMode_t>(ENTER_GDI_MODE)(graphics(), nullptr);
         g_in_dialog = true;
@@ -330,6 +391,7 @@ public:
         update_cursor();
         if (graphics()) reinterpret_cast<GdiMode_t>(LEAVE_GDI_MODE)(graphics(), nullptr);
         SetCurrentDirectoryA(dir_);
+        editor_feed_sound(false);
     }
 
 private:
@@ -1253,6 +1315,7 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
     case WM_ENTERMENULOOP:
     case WM_EXITMENULOOP:
         g_in_menu = m == WM_ENTERMENULOOP;
+        editor_feed_sound(g_in_menu);   // the music goes on while the menu is open
         update_cursor();
         break;
     case WM_SETCURSOR:

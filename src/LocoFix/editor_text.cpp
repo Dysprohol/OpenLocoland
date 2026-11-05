@@ -157,8 +157,13 @@ BOOL ui_append_menu(HMENU menu, UINT flags, UINT_PTR id, const char* text) {
     return AppendMenuW(menu, flags, id, text ? w.c_str() : nullptr);
 }
 
+void editor_feed_sound(bool on);   // editor.cpp: the music goes on while a message box is open
+
 int ui_message_box(HWND owner, const char* text, const char* title, UINT type) {
-    return MessageBoxW(owner, ui_wide(text).c_str(), ui_wide(title).c_str(), type);
+    editor_feed_sound(true);
+    const int answer = MessageBoxW(owner, ui_wide(text).c_str(), ui_wide(title).c_str(), type);
+    editor_feed_sound(false);
+    return answer;
 }
 
 std::wstring ui_wtext(const char* key, const char* english) {
