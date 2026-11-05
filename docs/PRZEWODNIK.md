@@ -209,8 +209,9 @@ toru przyciągają się do toru tak, jak stoją w misjach - podgląd pokazuje gd
 "na tor"; z wciśniętym **Shiftem** albo z dala od toru obiekt zostaje tam, gdzie kursor, obrócony tak,
 jak wybrałeś (fabryka ani punkt naprawczy nie dostają tam linii, semafor też nie). **Mina** staje tylko na
 punkcie toru. Nic nie staje we **wrotach fabryki** (w jej środku): fabryka usuwa to, co tam stoi, gdy
-buduje wagon. **Flaga** powiewa na własnym maszcie, z wiatrem jak wszystkie flagi w misjach; nad
-masztem albo dworcem trafia na niego w miejsce jego flagi; z Shiftem sama flaga staje tam, gdzie kursor.
+buduje wagon. **Flaga** powiewa na własnym maszcie tam, gdzie ją postawisz, z wiatrem jak wszystkie flagi
+w misjach; z Shiftem nad masztem albo dworcem trafia na niego w miejsce jego flagi. R / E obracają
+flagę masztu, Shift+R / E flagę dworca.
 
 **Panel obiektu** (prawy przycisk) ma jego armię, obrót, wysokość (niżej, wyżej, na ziemi) i usuwanie, kolor semafora i linię przy
 nim, a dla fortyfikacji, kopalni i cytadeli - działo w każdym gnieździe (puste, działo albo
@@ -281,10 +282,11 @@ Kilka jednostek i dział gra zawsze sama stawia na ziemi; wiersz stanu to mówi.
 
 ### 4. Główna linia
 
-**Tory** (klawisz 3). Kliknij, żeby zacząć linię - na końcu szyny mapy albo gdziekolwiek - a każde
-następne kliknięcie kładzie szyny w stronę kursora - **jedną szynę**, gdy kursor jest blisko końca
-linii, a cały **ciąg** prostych i łuków w jego stronę, gdy jest dalej, jednym kliknięciem; prawy
-przycisk (albo Esc) kończy linię, a kliknięcie kółkiem myszy usuwa szynę pod kursorem (Ctrl+Z ją
+**Tory** (klawisz 3). Kliknij, żeby zacząć odcinek - na końcu szyny mapy albo gdziekolwiek - a
+następne kliknięcie kładzie go w stronę kursora - **jedną szynę**, gdy kursor jest blisko początku,
+a cały **ciąg** prostych i łuków w jego stronę, gdy jest dalej - i kończy go; kolejne kliknięcie
+zaczyna nowy odcinek (na końcu szyny w promieniu 20 px, więc dalszy ciąg to jedno kliknięcie więcej).
+Prawy przycisk (albo Esc) anuluje zaczęty odcinek, a kliknięcie kółkiem myszy usuwa szynę pod kursorem (Ctrl+Z ją
 przywraca). Podgląd zawsze pokazuje szyny, które kliknięcie położy; narzędzie kładzie to, co
 klikniesz - na innym torze, przez jego styki, ślepy koniec, ostry skręt, tę samą szynę jeszcze raz.
 Nie zostanie położona tylko 7. szyna w jednym punkcie (gra pozwala na 6): jej końce są **czerwone**,
@@ -303,8 +305,8 @@ mapę, żeby pociągi przyjeżdżały i odjeżdżały poza widokiem. Potem boczn
 od linii przez Y, prosty odcinek kończący się **ślepym końcem**.
 
 `V` zmienia rodzaj następnych szyn: zwykłe, bagienne (na nasypie), zniszczone albo zniszczone
-bagienne. `PgUp` / `PgDn` sprawiają, że następna szyna wznosi się albo opada (rampa na wyższy
-teren: każda rampa to 11 poziomów). Linię na wzgórze najpierw wprowadź po rampach, potem podnieś teren
+bagienne. `PgUp` / `PgDn` albo kółko myszy sprawiają, że następna szyna wznosi się albo opada (rampa na
+wyższy teren: każda rampa to 11 poziomów; wiersz stanu pokazuje poziom). Linię na wzgórze najpierw wprowadź po rampach, potem podnieś teren
 wokół jej końca i wyrównaj go, zaczynając na torze. `B` wybiera podsypkę pod nowe szyny. Kliknięcie
 kółkiem, Del albo narzędzie **Usun odcinek toru** usuwa szyny.
 
@@ -572,7 +574,7 @@ gry (`l01`-`l20`, `sandbox`, `template`, `script`, `outro`).
 |---|---|---|
 | 1 | Zaznacz | zaznaczanie, przeciąganie, obrót, armia, panel |
 | 2 | Usun | kliknięcie usuwa; Shift+klik na szynie: jej odcinek |
-| 3 | Tory | kładzie szyny (V rodzaj, PgUp/PgDn rampa, B podsypka) |
+| 3 | Tory | kładzie szyny (V rodzaj, PgUp/PgDn albo kółko rampa, B podsypka) |
 | 4 | Fabryka | na ślepym końcu, z linią wyjazdu |
 | 5 | Punkt naprawczy | na prostym odcinku, z linią |
 | 6 | Fortyfikacja | na torze, uzbrojona |
@@ -601,7 +603,7 @@ misji, Wysokosc terenu, Skrzynka z pieniedzmi, Pojazdy, Malowanie terenu, Woda i
 | H | wysokości terenu (poziomice) przy każdym narzędziu |
 | B | podsypka nowych torów |
 | V | rodzaj nowych szyn |
-| PgUp / PgDn | zaznaczony obiekt wyżej / niżej o 4 (Shift: o 16); narzędzie Tory: następna szyna wznosi się / opada |
+| PgUp / PgDn | zaznaczony obiekt wyżej / niżej o 4 (Shift: o 16); narzędzie Tory: następna szyna wznosi się / opada (także kółko) |
 | Home | zaznaczony obiekt z powrotem na ziemi |
 | W | woda, bagno albo lawa |
 | S | semafory zaznaczonej linii (narzędzie Linia jednokierunkowa) |

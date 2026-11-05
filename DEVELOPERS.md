@@ -1732,7 +1732,10 @@ locomotive stands on its points again; 510 turns of a fort left 500 steps.
 
 **Laying track** (the Track tool, key 3; `src/LocoFix/rail_rules.h`). The first click starts a
 line - at the end of a rail of the map near the cursor, or at the point of the rail lattice of
-the nearest rail end - and every next click lays rails toward the cursor (`run_to_cursor`): within a
+the nearest rail end - and the next click lays a section of rails toward the cursor (`run_to_cursor`)
+and ends the line, so the click after it starts a new one (at a rail's end within 20 px: going on is
+one click more; before, every click went on from the last rail, and a click meant to start elsewhere
+laid rails there): within a
 step of the line's end (71 x 50) the step of the lattice (one of the 12 shapes of VID 610, 71 x 50 px
 or their halves) whose end is nearest to it, any of them; farther off a run toward the lattice point
 nearest to the cursor - each rail the one of the three that go on from the last (straight, a curve to
@@ -1747,7 +1750,7 @@ rail not laid is one that would give a point a 7th link, which the engine cannot
 links"); the status line says only that ("this point already has 6 rails"), its ends red - the run
 stops before it. The preview draws the rails of the click always (the 6-link one too), wherever the
 cursor is, also over the bar - before, a step that broke a rule was not drawn at all and the
-preview seemed to vanish with the cursor far off. The right button or Esc ends the line (a second one the
+preview seemed to vanish with the cursor far off. The right button or Esc cancels a line started (a second one the
 tool). A click of the middle button (a drag of it pans the map, `mouse_pan.cpp`) deletes the rail under
 the cursor (of the rails whose box holds it, the one whose middle is nearest), with its bed and what
 stands on it (below), as one step of the history; when it was the last rail of the line being laid,
@@ -2566,18 +2569,25 @@ CRATES group had the flagpole (769, with its flag 770) and the five flags as loo
 picked went onto the ground at the direction last used - 0, its cloth seen edge on like a stick -,
 the pole's flag was ours (green) and the loose ones the enemy's, the station's flag ours, while every
 flag of the missions flies on a host facing 32 (the wind) and the pole flags are mostly the enemy's,
-the station flags the neutrals'. Now a flag picked faces 32 (R / E still turn it), goes onto the
-flagpole or station whose slot is within 24 px of the cursor (the slot's foot on the map or the slot on
-the screen; it replaces the flag there, in the army chosen - `set_piece` with an army, one step of the
-history), elsewhere it flies on a flagpole of its own (the pole and that flag in its slot, one whole);
-772, which has its own pole, stands on the ground as l09's four; Shift puts the flag alone where the
-cursor is. Both slots take all four flags (the pole's FLAG: row 1 2 4 5). The preview shows the flag
-in the slot (the host circled) or on its new pole, the status line "onto the flagpole (Shift: the flag
-alone)" / "on a flagpole of its own". A flag's colour is its army (`SetArmyGamma` gives 770-774 the
+the station flags the neutrals'. Now a flag picked faces 32 (R / E still turn it) and flies on a
+flagpole of its own where the cursor is (the pole and that flag in its slot, one whole), as the
+missions' loose flags; 772, which has its own pole, stands on the ground as l09's four. With Shift it
+goes onto the flagpole or station whose slot is within 24 px of the cursor (the slot's foot on the map
+or the slot on the screen; it replaces the flag there, in the army chosen - `set_piece` with an army,
+one step of the history); with Shift and no slot near it still flies on a pole of its own. (First it
+was the other way round: the slot by default, Shift the flag alone - the user turned it; no mission has
+a flag 770, 771, 773 or 774 without a host, so the bare flag went.) Both slots take all four flags (the
+pole's FLAG: row 1 2 4 5). The preview shows the flag in the slot (the host circled) or on its new
+pole, the status line "on a flagpole of its own (Shift: onto a flagpole or station near)" / "onto the
+flagpole (Shift)" / "... - no flagpole or station near (Shift)". A flag in a slot turns too: R / E on a
+flagpole turn its flag a step of the flag's directions (770-773 eight, 774 four - its four coloured
+looks), Shift+R / E on a station its flag (R / E alone the station), and a turn or a drag of the host
+keeps the flag's direction (`arrange_pieces` sets the other pieces' only). The five flags are five
+pictures (770 a long flag, 771 a banner, 772 one with its pole, 773 a small square flag, 774 a pennant). A flag's colour is its army (`SetArmyGamma` gives 770-774 the
 flag gammas; 774's four directions are its four coloured looks, which the gamma tints alike). Checked
 in the game on POLIGON: a flagpole, each flag placed (770, 771 ours, 772, 773 neutral, 774 pirates - each
 on its own pole but 772), 771 onto a new station (its ridge, red), 773 onto the first pole replacing its
-flag, 770 with Shift on the ground, facing the wind.
+flag; and again with Shift for the slot (below, "checked again").
 The explosive mine (86) snaps to the
 rail point nearest within 40 px - and only there: in play `F086_0` closes the rail point nearest to it
 (`SetSemaphore` takes the nearest one however far), so a mine away from the track would close some
@@ -2739,7 +2749,8 @@ left as it is; its points stand 7 above it (the VID's altitude) where a plain ra
 track rules take that into account. The destroyed rails are the death VIDs of the others:
 `Rail_Action` marks their points `broken`, trains slow down there (`Options.brokenRailSpeed`) and the
 repair car mends them as it passes (`Rail_RepairAt`); deleting one clears the mark of the points the
-other rails keep. PgUp makes the next rail climb, PgDn descend: the same shape in a ramp frame -
+other rails keep. PgUp or the wheel up makes the next rail climb, PgDn or the wheel down descend (the
+wheel turns nothing in the Track tool; the status line shows the level the next rail stands at): the same shape in a ramp frame -
 frames 12-23 raise the point of end 0, 24-35 that of end 1, by sizeZ 11 (direction (shape + 12 or
 24) * 256 / 37: 83, 89 ... 159 and 166 ... 242, the directions of the missions' 98 ramps of l11, l12
 and l15) - with its far end raised (climbing) or its near end (descending, the rail then 11 lower);

@@ -591,7 +591,16 @@ void rail_take_out(uint8_t* r) {
     uint8_t* n0 = rail_node(r, 0);
     uint8_t* n1 = rail_node(r, 1);
     const auto remove_link = reinterpret_cast<DotLink_t>(DOT_REMOVE_LINK);
-    if (n0 && n1) {
+    // a rail laid where the same rail lies shares its two points and their link (Rail_Action adds none):
+    // the link stays while another rail has it - taking it away cut the track under the laid one (an
+    // undo of a line laid over the main line left a gap in it for the trains)
+    bool shared = false;
+    for_each_object([&](uint8_t* o) {
+        if (o != r && !removed(o) && class_of(o) == B_RAIL &&
+            ((rail_node(o, 0) == n0 && rail_node(o, 1) == n1) || (rail_node(o, 0) == n1 && rail_node(o, 1) == n0)))
+            shared = true;
+    });
+    if (n0 && n1 && !shared) {
         remove_link(n0, nullptr, n1);
         remove_link(n1, nullptr, n0);
     }
@@ -1107,7 +1116,8 @@ void arrange_pieces(uint8_t* host, const std::vector<uint8_t*>& pieces) {
             if (c.nvid == nvid_of(pieces[i])) dz = c.dz;
         reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(pieces[i], nullptr, at<float>(host, O_X) + kinds[i].dx,
                                                      at<float>(host, O_Y) + kinds[i].dy, at<float>(host, O_Z) + dz);
-        set_direction(pieces[i], kinds[i].direction);
+        // a flag (770-774) keeps the direction it was turned to; the other pieces take their slot's
+        if (nvid_of(pieces[i]) < 770 || nvid_of(pieces[i]) > 774) set_direction(pieces[i], kinds[i].direction);
     }
 }
 
@@ -1225,13 +1235,22 @@ int g_bed = 612;   // the bed of new track, 0 none (B in the Track tool)
 // a bed, or the embankment under a swamp rail (VID 602, below), which goes with its rail the same way
 bool is_bed(int nvid) { return std::find(std::begin(BEDS), std::end(BEDS), nvid) != std::end(BEDS) || nvid == 602; }
 
-// The bed under a rail (the same place and direction).
+// The bed under a rail (the same place and direction): of several - a rail laid over another at
+// another height, each with its bed - the one nearest under it (a bed 18 below its rail, an embankment
+// 28), so deleting the raised rail does not take the lower one's bed.
 uint8_t* bed_of(uint8_t* r) {
     uint8_t* found = nullptr;
+    float best = 1e9f;
     for_each_object([&](uint8_t* o) {
-        if (!found && !removed(o) && is_bed(nvid_of(o)) && std::fabs(at<float>(o, O_X) - at<float>(r, O_X)) < 1 &&
-            std::fabs(at<float>(o, O_Y) - at<float>(r, O_Y)) < 1 && at<int>(o, O_DIRECTION) == at<int>(r, O_DIRECTION))
+        if (removed(o) || !is_bed(nvid_of(o)) || std::fabs(at<float>(o, O_X) - at<float>(r, O_X)) >= 1 ||
+            std::fabs(at<float>(o, O_Y) - at<float>(r, O_Y)) >= 1 || at<int>(o, O_DIRECTION) != at<int>(r, O_DIRECTION))
+            return;
+        const float depth = nvid_of(o) == 602 ? 28.0f : BED_DEPTH;
+        const float d = std::fabs(at<float>(r, O_Z) - depth - at<float>(o, O_Z));
+        if (d < best) {
+            best = d;
             found = o;
+        }
     });
     return found;
 }
@@ -2272,6 +2291,21 @@ void turn(int steps) {
         turn_post(o);
         return;
     }
+    // a flag in a flagpole's slot (the pole has one direction) or, with Shift, in a station's: the flag
+    // turns, a step of its own directions (770-773 eight, 774 four)
+    if (nvid_of(o) == 769 || (nvid_of(o) == 170 && shift_down())) {
+        for (uint8_t* f : pieces_on(o)) {
+            if (!f || nvid_of(f) < 770 || nvid_of(f) > 774) continue;
+            const int fdirs = (std::max)(1, at<int>(vid_of(f), V_ND_DIR));
+            const std::vector<uint8_t*> one{f};
+            const std::vector<State> before = states(one);
+            const int direction = (at<int>(f, O_DIRECTION) + steps * (256 / fdirs) + 256) & 255;
+            set_direction(f, direction);
+            commit({"OpTurn", "turn"}, one, before);
+            MESSAGE("MsgTurned", "turned VID %d to direction %d", nvid_of(f), direction);
+            return;
+        }
+    }
     if (wreck_on_track(o)) steps = (std::max)(1, at<int>(vid_of(o), V_ND_DIR)) / 2;   // a wreck on the track: round
     float rx, ry;
     int along;
@@ -2566,9 +2600,11 @@ void set_piece(uint8_t* host, size_t i, int nvid, int army = -1);   // wholes' p
 // a wreck object) near a rail snaps onto it as the missions have it, within each one's reach (On the
 // track, below); farther away, or with Shift held, it stays where the cursor is, turned as chosen, and
 // the status line says which (a factory or a repair point there gets no push line, a post no line).
-// A flag (770-774) goes into the slot of a flagpole or a station near the cursor, or flies on a
-// flagpole of its own, as every flag of the missions does but 772, which has its pole (l09 stands four
-// on the ground); Shift puts the flag itself at the cursor. Refused stays only what the game would undo: a car off the rails (place_car) and an object in a factory's door - its
+// A flag (770-774) flies on a flagpole of its own where the cursor is, as the missions' loose flags
+// do - but 772, which has its pole (l04 and l09 stand it on the ground), goes as it is; with Shift it
+// goes into the slot of a flagpole or a station near the cursor (FLAG_REACH), and without one near it
+// still flies on a pole of its own. A bare flag (770, 771, 773, 774 without a host) is in no mission,
+// so there is no way to place one. Refused stays only what the game would undo: a car off the rails (place_car) and an object in a factory's door - its
 // middle, where Depo_ReleaseUnit deletes whatever stands in the way of a unit it has built (AskPlace
 // with the unit's VID at the factory's place).
 constexpr int VID_FLAGPOLE = 769, VID_STATION = 170, FLAG_WIND = 32, FLAG_REACH = 24;
@@ -2585,6 +2621,7 @@ struct PlacePlan {
     UiText missing;                    // Placed::Far: what the track rule found missing
     uint8_t* flag_host = nullptr;  // Placed::Slot: a flag into this host's slot
     size_t flag_slot = 0;
+    bool flag_no_slot = false;     // Placed::Pole with Shift held: no flagpole or station near
 };
 
 // A factory whose door an object of VID v standing at x, y (not `self`) would be in: the boxes of the
@@ -2644,9 +2681,12 @@ PlacePlan plan_place(POINT p, int nvid, uint8_t* v) {
     mouse_on_map(sx, sy);
     const bool free = shift_down();
     if (is_flag(nvid)) {
-        if (free) pl.how = Placed::Shift;
-        else if (flag_slot_near(nvid, pl.x, pl.y, sx, sy, pl.flag_host, pl.flag_slot)) pl.how = Placed::Slot;
-        else if (nvid != 772) pl.how = Placed::Pole;
+        if (free && flag_slot_near(nvid, pl.x, pl.y, sx, sy, pl.flag_host, pl.flag_slot)) {
+            pl.how = Placed::Slot;
+        } else if (nvid != 772) {
+            pl.how = Placed::Pole;
+            pl.flag_no_slot = free;
+        }
     } else if (wreck_vid(nvid)) {
         if (free) pl.how = Placed::Shift;
         else if (wreck_spot(nvid, sx, sy, g_place_direction, pl.x, pl.y, pl.z, pl.direction)) pl.how = Placed::Track;
@@ -2685,9 +2725,12 @@ std::string plan_status(const PlacePlan& pl) {
     case Placed::Shift: return ui_printf(ui_format("StatusPlaceFree", "%s: where the cursor is (Shift)"), place_label());
     case Placed::Far: return ui_printf(ui_format("StatusPlaceFar", "%s: where the cursor is - %s"), place_label(), pl.missing.get());
     case Placed::Slot:
-        return ui_printf(ui_format("StatusFlagSlot", "%s: onto the %s (Shift: the flag alone)"), place_label(),
+        return ui_printf(ui_format("StatusFlagSlot", "%s: onto the %s (Shift)"), place_label(),
                          nvid_of(pl.flag_host) == VID_STATION ? ui_text("WordStation", "station") : ui_text("WordFlagpole", "flagpole"));
-    case Placed::Pole: return ui_printf(ui_format("StatusFlagPole", "%s: on a flagpole of its own (Shift: the flag alone)"), place_label());
+    case Placed::Pole:
+        if (pl.flag_no_slot)
+            return ui_printf(ui_format("StatusFlagNoSlot", "%s: on a flagpole of its own - no flagpole or station near (Shift)"), place_label());
+        return ui_printf(ui_format("StatusFlagPole", "%s: on a flagpole of its own (Shift: onto a flagpole or station near)"), place_label());
     default: return "";
     }
 }
@@ -3038,12 +3081,31 @@ void end_line() {
     g_line_original.clear();
 }
 
+// The ramp of the next rail (the wheel, PgUp / PgDn): 1 climbs, -1 falls, 0 flat.
+void set_ramp(int ramp) {
+    g_ramp = ramp;
+    MESSAGE("MsgRamp", "track: the next rail %s", g_ramp > 0 ? ui_text("WordClimbs", "climbs")
+                                                  : g_ramp < 0 ? ui_text("WordDescends", "descends")
+                                                               : ui_text("WordFlat", "flat"));
+}
+
+// The ground level the next rail stands at: the line's, or - before a click starts one - the level of
+// the rail end or the ground where it would start.
+int track_level() {
+    if (!g_line.empty()) return g_line_level;
+    const std::vector<RailObject> rails = map_rails();
+    const rail::Point p = line_start(rails);
+    int level = 0;
+    if (rail_ending_at(rails, p, &level)) return level;
+    return ground_cell((std::max)(0, (std::min)(grid_width() - 1, static_cast<int>(p.x) / 8)),
+                       (std::max)(0, (std::min)(grid_height() - 1, static_cast<int>(p.y) / 8)));
+}
+
 void start_line() {
     const std::vector<RailObject> rails = map_rails();
     const rail::Point p = line_start(rails);
     end_line();
     g_line = {p};
-    g_ramp = 0;
     if (uint8_t* r = rail_ending_at(rails, p, &g_line_level)) {
         g_line_level_known = true;
         for (int k = 0; k < 4; ++k)   // the line goes on in the rail's kind
@@ -3152,10 +3214,12 @@ void lay_step() {
 
 // The rail under a point of the map (screen coordinates plus the camera): the one whose way - the
 // line between its two ends, on the screen - passes nearest, within 20 px (at a junction several rails
-// share their box: a straight and the curves leaving its points).
+// share their box: a straight and the curves leaving its points). Within 3 px of each other the higher
+// one wins, the one drawn on top: a rail laid over a junction 11 higher passes as near as the junction's
+// curve under it, and a click on it took the curve - a gap in the junction.
 uint8_t* rail_at(float x, float y) {
     uint8_t* best = nullptr;
-    float best_d = 20;
+    float best_d = 20, best_z = 0;
     for (const RailObject& r : map_rails()) {
         if (!pickable(r.object)) continue;
         const rail::Point a = rail::end_of(r.rail, 0), b = rail::end_of(r.rail, 1);
@@ -3165,8 +3229,9 @@ uint8_t* rail_at(float x, float y) {
         const float len2 = ux * ux + uy * uy;
         const float t = len2 > 0 ? (std::max)(0.0f, (std::min)(1.0f, ((x - ax) * ux + (y - ay) * uy) / len2)) : 0;
         const float d = std::hypot(x - (ax + ux * t), y - (ay + uy * t));
-        if (d < best_d) {
+        if (d < 20 && (!best || d < best_d - 3 || (d < best_d + 3 && (z > best_z || (z == best_z && d < best_d))))) {
             best_d = d;
+            best_z = z;
             best = r.object;
         }
     }
@@ -3181,7 +3246,7 @@ void delete_rail_at_cursor() {
     mouse_on_map(x, y);
     uint8_t* r = rail_at(x, y);
     if (!r) {
-        MESSAGE("MsgTrackNoRail", "track: no rail under the cursor (a middle click deletes one, the right button ends the line)");
+        MESSAGE("MsgTrackNoRail", "track: no rail under the cursor (a middle click deletes one)");
         return;
     }
     bool last = false;   // the line's last rail
@@ -5540,7 +5605,7 @@ void draw_track() {
         mark(static_cast<float>(p.x), static_cast<float>(p.y), z, 0xc0ffff00);
         std::snprintf(text, sizeof text, ui_format("StatusTrackStart", "Track: click a start point (%.1f,%.1f%s)"), p.x, p.y,
                       r ? ui_text("StatusRailEnd", ", the end of a rail") : "");
-        g_track_status = std::string(text) + ui_text("StatusTrackKeys", " - the right button ends the line, a middle click deletes the rail under the cursor");
+        g_track_status = std::string(text) + ui_text("StatusTrackKeys", " - the right button cancels, a middle click deletes the rail under the cursor");
         return;
     }
     // the rails the click lays, always drawn - wherever the cursor is, also over the bar - their ends
@@ -5554,14 +5619,13 @@ void draw_track() {
                      static_cast<float>(s.segments[k].x) - cam_x, static_cast<float>(s.segments[k].y) - cam_y, k ? line_rail_z(nvid) : z);
     const uint32_t colour = s.valid ? 0xc000ff00 : 0xc0ff2020;
     for (const rail::Point& q : s.points) mark(static_cast<float>(q.x), static_cast<float>(q.y), z, colour);
-    std::snprintf(text, sizeof text, ui_format("StatusTrack", "Track: %u rails - %.1f,%.1f -> %.1f,%.1f %s"),
-                  static_cast<unsigned>(g_line.size() - 1), g_line.back().x, g_line.back().y, s.to.x, s.to.y,
-                  s.valid ? ui_text("WordOk", "ok") : s.reason.get());
+    std::snprintf(text, sizeof text, ui_format("StatusTrackSection", "Track: %.1f,%.1f -> %.1f,%.1f %s"),
+                  g_line.back().x, g_line.back().y, s.to.x, s.to.y, s.valid ? ui_text("WordOk", "ok") : s.reason.get());
     g_track_status = std::string(text) +
                      (s.valid && s.segments.size() > 1 ? ui_printf(ui_format("StatusTrackRun", " - a click lays %u rails"),
                                                                    static_cast<unsigned>(s.segments.size()))
-                                                       : std::string()) +
-                     ui_text("StatusTrackKeys", " - the right button ends the line, a middle click deletes the rail under the cursor");
+                                                       : std::string(ui_text("StatusTrackOne", " - a click lays this rail"))) +
+                     ui_text("StatusTrackKeys", " - the right button cancels, a middle click deletes the rail under the cursor");
 }
 
 // A filled triangle on the screen, a row of pixels at a time (Graphics_FillRect has rectangles only).
@@ -7227,7 +7291,9 @@ void draw_mines() {
     for_each_object([&](uint8_t* o) {
         if (removed(o) || (nvid_of(o) != VID_MINE && nvid_of(o) != VID_MINE_MARKER)) return;
         const float sx = at<float>(o, O_X) - cam_x, sy = at<float>(o, O_Y) - at<float>(o, O_Z) - cam_y;
-        if (at<uint32_t>(o, O_FLAGS) & 0x8000) draw_vid(vid_of(o), 0, sx, sy, at<float>(o, O_Z));   // hidden from the player
+        // hidden from the player: drawn where the engine would (draw_vid takes the map's y and lifts it by z
+        // itself - given sy, which is lifted already, the flag stood its height above the mine)
+        if (at<uint32_t>(o, O_FLAGS) & 0x8000) draw_vid(vid_of(o), 0, sx, at<float>(o, O_Y) - cam_y, at<float>(o, O_Z));
         const bool marker = nvid_of(o) == VID_MINE_MARKER;
         const int army = marker ? 1 : army_of(o);   // a marker becomes an enemy mine or nothing
         fill(graphics(), nullptr, sx - 12, sy - 12, sx + 12, sy - 10, COLOURS[army]);
@@ -7481,8 +7547,8 @@ void draw_overlay() {
                               static_cast<int>(std::lround(lift_of(g_selection[0])))).c_str());
     if (entry().tool == Tool::Track) {
         char bed[200];
-        std::snprintf(bed, sizeof bed, ui_format("StatusRail", "rail (V): %s, next %s (PgUp / PgDn), gravel bed (B): %s"),
-                      rail_kind_name(RAIL_KINDS[g_rail_kind]),
+        std::snprintf(bed, sizeof bed, ui_format("StatusRailLevel", "rail (V): %s, level %d, next %s (wheel, PgUp / PgDn), gravel bed (B): %s"),
+                      rail_kind_name(RAIL_KINDS[g_rail_kind]), track_level(),
                       g_ramp > 0 ? ui_text("WordClimbs", "climbs") : g_ramp < 0 ? ui_text("WordDescends", "descends")
                                                                      : ui_text("WordFlat", "flat"),
                       swamp_rail(RAIL_KINDS[g_rail_kind]) ? "602" : g_bed ? std::to_string(g_bed).c_str() : ui_text("WordNone", "none"));
@@ -7590,9 +7656,13 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         const float x = at<float>(w0, W_CAMERA_X) + g_mouse.x, y = at<float>(w0, W_CAMERA_Y) + g_mouse.y;
         if (entry().tool == Tool::Place) {
             place(g_mouse);
-        } else if (entry().tool == Tool::Track) {
+        } else if (entry().tool == Tool::Track) {   // a click starts a section, the next lays it and ends it
             if (g_line.empty()) start_line();
-            else lay_step();
+            else {
+                const size_t steps = g_undo.size();
+                lay_step();
+                if (g_undo.size() != steps) end_line();   // laid: the next click starts anew (a rail's end within 20 px)
+            }
         } else if (entry().tool == Tool::Height && alt_down()) {   // the pipette: the level for Flatten
             float cx, cy;
             const rail::Cell c = cursor_cell(cx, cy);
@@ -7751,6 +7821,8 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
     case WM_MOUSEWHEEL:
         if (brush_tool())   // the brushes: the wheel sizes the brush, as + and - do
             brush_size(GET_WHEEL_DELTA_WPARAM(w) > 0 ? 1 : -1);
+        else if (entry().tool == Tool::Track)   // the next rail climbs / falls a step, as PgUp / PgDn; nothing turns
+            set_ramp(GET_WHEEL_DELTA_WPARAM(w) > 0 ? (std::min)(1, g_ramp + 1) : (std::max)(-1, g_ramp - 1));
         else if (shift_down() && !g_selection.empty() && entry().tool != Tool::Place && entry().tool != Tool::Track)
             lift(GET_WHEEL_DELTA_WPARAM(w) > 0 ? LIFT_STEP : -LIFT_STEP, false);   // Shift: the object's height
         else
@@ -7797,10 +7869,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             MESSAGE("MsgRailKind", "track: %s rails (VID %d)", rail_kind_name(RAIL_KINDS[g_rail_kind]), RAIL_KINDS[g_rail_kind]);
         } else if (entry().tool == Tool::Track && (w == VK_PRIOR || w == VK_NEXT)) {
             const int want = w == VK_PRIOR ? 1 : -1;
-            g_ramp = g_ramp == want ? 0 : want;
-            MESSAGE("MsgRamp", "track: the next rail %s", g_ramp > 0 ? ui_text("WordClimbs", "climbs")
-                                                          : g_ramp < 0 ? ui_text("WordDescends", "descends")
-                                                                       : ui_text("WordFlat", "flat"));
+            set_ramp(g_ramp == want ? 0 : want);
         } else if (entry().tool != Tool::Track && entry().tool != Tool::PushLine && !g_selection.empty() &&
                    (w == VK_PRIOR || w == VK_NEXT || w == VK_HOME)) {   // the selected object's height
             const int step = shift_down() ? LIFT_BIG_STEP : LIFT_STEP;

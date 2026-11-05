@@ -208,9 +208,9 @@ onto the track the way the missions have them - the preview shows where and the 
 "onto the track"; with **Shift** held, or with no track near, it stays where the cursor is, turned as
 you chose (a factory or repair point there gets no line, a semaphore none either). A **mine** goes onto
 a rail point only. Nothing is placed in a **factory's door** (its middle): the factory deletes what
-stands there when it builds a car. A **flag** flies on a flagpole of its own, facing the wind like all
-the missions' flags; over a flagpole or a station it goes onto it, replacing the flag there; with Shift
-the flag alone goes where the cursor is.
+stands there when it builds a car. A **flag** flies on a flagpole of its own where you put it, facing
+the wind like all the missions' flags; with Shift over a flagpole or a station it goes onto it,
+replacing the flag there. R / E turn a pole's flag, Shift+R / E a station's.
 
 The **object's panel** (right button) has its army, turning, its height (lower, raise, on the ground) and delete, a semaphore's colour and
 its line, and - for a fort, a mining plant or a citadel - the gun in each of its sockets (empty, a
@@ -283,10 +283,11 @@ A few units and guns are always put on the ground by the game itself; the status
 
 ### 4. The main line
 
-**Track** (key 3). Click to start a line - at the end of a rail of the map or anywhere - and every
-next click lays rails toward the cursor - **one rail** when the cursor is near the line's end, a whole
-**run** of straight rails and curves toward it when it is farther, in one click; the right button
-(or Esc) ends the line, and a click of the mouse wheel deletes the rail under the cursor (Ctrl+Z puts
+**Track** (key 3). Click to start a section - at the end of a rail of the map or anywhere - and the
+next click lays it toward the cursor - **one rail** when the cursor is near the start, a whole **run**
+of straight rails and curves toward it when it is farther - and ends it; the click after that starts
+a new section (at the end of a rail within 20 px, so going on is one click more). The right button
+(or Esc) cancels a section started, and a click of the mouse wheel deletes the rail under the cursor (Ctrl+Z puts
 it back). The preview always shows the rails the click lays; the tool lays what you click - over other
 track, across its joints, a dead end, a sharp turn, the same rail again. Only a 7th rail at one point
 is not laid (the game allows 6): its ends are **red** and the status line says so. Good track to know:
@@ -304,8 +305,8 @@ along the map, so the trains come and go out of sight. Then a spur for the facto
 the line through a Y, a straight piece ending in a **dead end**.
 
 `V` switches the kind of the next rails: plain, swamp (on its embankment), destroyed or destroyed
-swamp. `PgUp` / `PgDn` make the next rail climb or descend (a ramp onto higher ground: each ramp
-11 levels). For a line on a hill, lay it up its ramps first, then raise the ground around the top and
+swamp. `PgUp` / `PgDn` or the mouse wheel make the next rail climb or descend (a ramp onto higher
+ground: each ramp 11 levels; the status line shows the level). For a line on a hill, lay it up its ramps first, then raise the ground around the top and
 flatten it starting on the track. `B` picks the gravel bed under new rails. The wheel's click, Del
 or the **Delete a section of track** tool removes rails.
 
@@ -578,7 +579,7 @@ and must not be a folder of the game (`l01`-`l20`, `sandbox`, `template`, `scrip
 |---|---|---|
 | 1 | Select | select, drag, turn, army, panel |
 | 2 | Delete | a click deletes; Shift+click on a rail: its section |
-| 3 | Track | lays rails (V kind, PgUp/PgDn ramp, B bed) |
+| 3 | Track | lays rails (V kind, PgUp/PgDn or the wheel ramp, B bed) |
 | 4 | Factory | at a dead end, with its exit line |
 | 5 | Repair point | on a straight piece, with its line |
 | 6 | Fort | on the track, armed |
@@ -607,7 +608,7 @@ Mission settings, Ground height, Money crate, Vehicles, Paint the ground, Water 
 | H | the ground's heights (contour lines) with any tool |
 | B | the gravel bed of new track |
 | V | the kind of new rails |
-| PgUp / PgDn | the selected object up / down by 4 (Shift: 16); Track tool: the next rail climbs / descends |
+| PgUp / PgDn | the selected object up / down by 4 (Shift: 16); Track tool: the next rail climbs / descends (the wheel too) |
 | Home | the selected object back on the ground |
 | W | water, swamp or lava |
 | S | the selected line's semaphores (Push line tool) |

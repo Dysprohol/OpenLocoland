@@ -391,10 +391,12 @@ missing one; a map's own records are found again by their offsets. **Flags** (77
 missions flies on a host - 86 on flagpoles, 31 on stations, 4 772s (a flag with a pole of its own) on
 l04's level exits and 4 on l09's ground - and faces 32, the wind (a few 43: the same frame); their army
 is their colour (the enemy's on 56 of the flagpoles, the neutrals' on 19 of the 25 stations' flags).
-**[editor]** a flag placed goes onto the flagpole or station under the cursor (its slot, at the slot's
+**[editor]** a flag placed flies on a flagpole of its own where the cursor is (772 alone, on the
+ground), facing 32; with Shift it goes onto the flagpole or station under the cursor (its slot, at the slot's
 height: 770 +118 / 771 +92 / 773 +115 / 774 +114 on a pole, 773 +121 / 770 +127 / 771 +99 / 774 +121 on
 a station - the ones the missions do not have at the height that puts the cloth's top where theirs is),
-elsewhere on a flagpole of its own (772 alone, on the ground), facing 32; Shift places the flag alone.
+without one near on a pole of its own as without Shift. R / E turn a flag in a pole's slot (Shift+R / E
+in a station's).
 The palette gives the flagpole the enemy's flag and the station the neutrals' by default.
 
 ## 6d. Neutrals and pirates in a fight
