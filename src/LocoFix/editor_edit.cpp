@@ -79,7 +79,8 @@ int panel_palette_army(int which);   // editor_panel.cpp: the palette's army row
 void panel_set_palette_army(int which, int army);
 int palette_army(int nvid);   // editor_panel.cpp: the army the palette gives an object, -1 none
 std::vector<int> panel_group_nvids(const char* group);   // editor_panel.cpp: a group's objects (GroupDecals: the decals)
-void panel_strip(int which, std::vector<int>& nvids, std::vector<int>& armies, std::string& name);   // a palette's chosen group
+void panel_strip(int which, std::vector<int>& nvids, std::vector<int>& armies, std::string& name,
+                 std::vector<std::string>& group_names);   // a palette's chosen group, or every vehicle
 void panel_choose_group(int which, const char* group);   // editor_panel.cpp: a palette's chosen group (its key)
 void edit_pick_object(int nvid, int army);   // below: the palette's pick
 void load_palette();                                                    // editor_panel.cpp
@@ -7072,16 +7073,18 @@ OptionGroup option_edge(bool& hard) {
 
 void choose_decal(int k);   // the Decals tool's decal, below
 
-// The strip's list: the group chosen in the entry's palette (the decals: DECORATIONS).
+// The strip's list: the group chosen in the All objects palette (the decals: DECORATIONS), or for
+// the Vehicles entry every vehicle, group after group.
 struct Strip {
     std::vector<int> nvids, armies;
-    std::string name;   // the group's
-    int chosen = 0;     // the nvid framed
+    std::string name;                  // the group's (VEHICLES for the vehicles)
+    std::vector<std::string> groups;   // each object's group, for the label
+    int chosen = 0;                    // the nvid framed
 };
 
 Strip strip() {
     Strip s;
-    panel_strip(palette_of(entry()), s.nvids, s.armies, s.name);
+    panel_strip(palette_of(entry()), s.nvids, s.armies, s.name, s.groups);
     s.chosen = g_picked_nvid[palette_of(entry())];
     return s;
 }
@@ -7096,7 +7099,8 @@ void strip_pick(const Strip& s, int k) {   // the strip's object k picked, as th
     edit_pick_object(s.nvids[k], s.armies[k]);
 }
 
-// The strip above the bar: GROUP n / m:, < the icons of a page >.
+// The strip above the bar: GROUP n / m: (the chosen object's group and its place in the strip - for the
+// vehicles among all of them), < the icons of a page >.
 OptionGroup strip_group() {
     OptionGroup g;
     const Strip s = strip();
@@ -7107,7 +7111,15 @@ OptionGroup strip_group() {
     if (uint8_t* font = vid_by_number(CONTEXT_FONT_VID)) cw = at<float>(font, V_SIZE_X);
     const Box v = view();
     OptionItem label;
-    label.value = chosen >= 0 ? ui_printf(ui_format("OptStrip", "%s %d / %d:"), s.name.c_str(), chosen + 1, n) : s.name + ":";
+    const char* format = ui_format("OptStrip", "%s %d / %d:");
+    label.value = chosen >= 0 ? ui_printf(format, s.groups[chosen].c_str(), chosen + 1, n) : s.name + ":";
+    if (std::find_if(s.groups.begin(), s.groups.end(), [&](const std::string& o) { return o != s.groups[0]; }) != s.groups.end()) {
+        // several groups (the vehicles): as wide as the widest label, so the icons and the arrows stay
+        // where they are when the chosen object's group changes
+        size_t widest = s.name.size() + 1;
+        for (const std::string& group : s.groups) widest = (std::max)(widest, ui_printf(format, group.c_str(), n, n).size());
+        label.value.resize((std::max)(widest, label.value.size()), ' ');
+    }
     const float room = (v.r - v.l) - 40 - 24 - 2 * (2 * cw) - (label.value.size() + 1) * cw;   // the strip's ends, the arrows, the label
     const int per = (std::max)(1, (std::min)(n, static_cast<int>(room / (DECAL_ICON + 4))));
     const int pages = (n + per - 1) / per;

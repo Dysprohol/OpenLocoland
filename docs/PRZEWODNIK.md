@@ -524,7 +524,9 @@ ona może wtedy strzelać do nich. W panelu uzbrojonego neutralnego obiektu **ST
   jej własne pociągi zatrzymują się przed nią (gdy poziom ruszy, mina zamyka im swój punkt toru).
 
 - **Pociągi**: **Pojazdy** z listwy otwierają wagony - lokomotywy, wagony bojowe, zaopatrzenie
-  (wóz z amunicją, pojazd naprawczy, cysterny), wagony cywilne, przeszkody. Wagon staje na torze
+  (wóz z amunicją, pojazd naprawczy, cysterny), wagony cywilne, przeszkody; rząd nad paskiem pokazuje
+  je wszystkie, grupa po grupie (strzałki przewracają strony, `[` `]` przechodzą po kolei, napis podaje
+  grupę wybranego wagonu i jego numer, np. WAGONY BOJOWE 5 / 23). Wagon staje na torze
   pod kursorem; postawiony na końcu pociągu dołącza się do niego. Zrób pociąg wroga: wybierz **WROG**
   w wierszu **ARMIA** palety (albo `A` przy stawianiu, albo `A` na postawionym pociągu), potem
   lokomotywa i działo. `U` odczepia wagon, `C` doczepia do innego pociągu, `R`

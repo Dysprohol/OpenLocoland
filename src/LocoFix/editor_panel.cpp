@@ -1012,22 +1012,31 @@ std::vector<int> panel_group_nvids(const char* group) {
     return out;
 }
 
-// The quick strip above the bar (editor_edit.cpp): the objects of the group chosen in a palette
-// (0 All objects, 1 Vehicles), the army the missions give each, and the group's name.
-void panel_strip(int which, std::vector<int>& nvids, std::vector<int>& armies, std::string& name) {
+// The quick strip above the bar (editor_edit.cpp): the objects of the group chosen in the All objects
+// palette (which 0), or every vehicle, group after group (which 1: 23 of them, so the palette window's
+// group does not narrow it); the army the missions give each, the strip's name (the group's, VEHICLES
+// for the vehicles) and each object's group name.
+void panel_strip(int which, std::vector<int>& nvids, std::vector<int>& armies, std::string& name,
+                 std::vector<std::string>& group_names) {
     load_palette();
     nvids.clear();
     armies.clear();
     name.clear();
+    group_names.clear();
     const std::vector<std::string> groups = groups_of(which & 1);
     if (groups.empty()) return;
     const int g = (std::max)(0, (std::min)(g_group_of[which & 1], static_cast<int>(groups.size()) - 1));
-    for (const PaletteObject& o : g_palette)
-        if (o.group == groups[g]) {
-            nvids.push_back(o.nvid);
-            armies.push_back(o.army);
-        }
-    name = ui_text(groups[g].c_str(), groups[g].c_str() + 5);
+    for (const std::string& group : groups) {
+        if (!(which & 1) && group != groups[g]) continue;
+        const std::string shown = ui_text(group.c_str(), group.c_str() + 5);
+        for (const PaletteObject& o : g_palette)
+            if (o.group == group) {
+                nvids.push_back(o.nvid);
+                armies.push_back(o.army);
+                group_names.push_back(shown);
+            }
+    }
+    name = (which & 1) ? ui_text("VehiclesHeader", "VEHICLES") : ui_text(groups[g].c_str(), groups[g].c_str() + 5);
 }
 
 // A palette's chosen group (0 All objects, 1 Vehicles; the group's key), without opening it: [ and ]

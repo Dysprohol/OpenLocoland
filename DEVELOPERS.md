@@ -2938,11 +2938,17 @@ their default armies are the missions' (the enemy's, the neutrals'), a mine is p
 
 **The rows of the ground's tools** (`editor_edit.cpp`, the section of the same name). While an object
 of the palette is to be placed - the All objects and Vehicles entries - the row above the bar is the
-quick strip of the palette's chosen category (`strip_group`, `panel_strip`; the decals' is
-DECORATIONS): CATEGORY n / m: (the category's name alone while nothing of it is chosen), the
+quick strip of the palette: for All objects its chosen category (`strip_group`, `panel_strip`; the
+decals' is DECORATIONS), CATEGORY n / m: (the category's name alone while nothing of it is chosen);
+for Vehicles every vehicle, the palette's groups one after another (23: the locomotives, combat cars,
+supply, civil, obstacles - since 2026-11-05; before, only the group last chosen in the palette window,
+so after a start the two locomotives and no wagon), labelled with the chosen car's group and its place
+among all of them (WAGONY BOJOWE 5 / 23:, POJAZDY: - `VehiclesHeader` - while none is chosen; padded to
+the widest label, so the icons do not move when the group changes), the palette window's group choice
+leaving it whole; the
 icons of a page, the chosen one framed, the one under the mouse named right above it and in the status
-line (`StatusStripHover`); a click picks it as the palette would, [ and ] step through it, < and > turn
-the pages. While the
+line (`StatusStripHover`); a click picks it as the palette would, [ and ] step through it (for the
+vehicles across the groups), < and > turn the pages. While the
 Track tool is chosen, its row holds RAIL: the four kinds (`RAIL_KINDS`, each drawn as its own straight
 rail across, the chosen one framed; a click picks it as V does) and RAILS GO: UP / FLAT / DOWN (the
 ramp of the wheel and PgUp / PgDn). While the Ground height or the Paint tool is chosen, a row of buttons stands above the bar's strip: the depot

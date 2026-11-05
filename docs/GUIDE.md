@@ -529,7 +529,9 @@ AGAINST ALL SIDES**). A map of the editor plays so; the campaign's missions keep
   them once the level runs).
 
 - **Trains**: the strip's **Vehicles** opens the cars - locomotives, combat cars, supply cars
-  (ammunition, repair car, tankers), civil cars, obstacles. A car goes on the track under the
+  (ammunition, repair car, tankers), civil cars, obstacles; the row above the bar shows all of them, group
+  after group (its arrows turn the pages, `[` `]` step through them, its label names the chosen car's
+  group and its number, e.g. COMBAT CARS 5 / 23). A car goes on the track under the
   cursor; placed at a train's end it is coupled to it. Make the enemy's train: choose **ENEMY** in the
   palette's **ARMY** row (or `A` while placing, or `A` on the placed train), then a locomotive and a
   gun car. `U` uncouples a car, `C` couples to another train,
