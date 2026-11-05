@@ -2296,29 +2296,36 @@ void place_car(POINT mouse) {
                 at<float>(o, O_Y), at<int>(o, O_DIRECTION), army_of(o), static_cast<unsigned>(length));
 }
 
-// U: the car and the cars behind it become a train of their own; nothing is laid again - every car
-// keeps its ends on the rails where they are.
-void uncouple(uint8_t* c) {
-    if (!is_car(c) || !car_prev(c)) {
-        MESSAGE("MsgUncoupleFirst", "U uncouples a car from the car in front - this one is the first of its train");
+// U: the coupling in front of the car comes apart - the car and the cars behind it become a train of
+// their own; Shift+U (`behind`): the coupling behind it - the car and the cars in front of it stay, the
+// rest behind it is the new train. Nothing is laid again: every car keeps its ends on the rails where
+// they are (the log says so). The first car of a train has no coupling in front, the last none behind.
+void uncouple(uint8_t* c, bool behind) {
+    if (!is_car(c) || (behind ? !car_next(c) : !car_prev(c))) {
+        if (behind) MESSAGE("MsgUncoupleLast", "Shift+U uncouples the cars behind this one - it is the last of its train");
+        else MESSAGE("MsgUncoupleFirst", "U uncouples a car from the car in front - this one is the first of its train");
         return;
     }
     const std::vector<uint8_t*> cars = all_cars();
     const std::vector<State> before = states(cars);
-    uint8_t* p = car_prev(c);
-    car_next(p) = nullptr;
-    car_prev(c) = nullptr;
+    uint8_t* front = behind ? c : car_prev(c);   // the coupling between these two comes apart
+    uint8_t* back = behind ? car_next(c) : c;
+    car_next(front) = nullptr;
+    car_prev(back) = nullptr;
     occupy_all();
     commit_cars({"OpUncouple", "uncouple"}, cars, before);
     g_selection = group_of(c);
     bool kept = true;
     for (size_t i = 0; i < cars.size(); ++i)
         kept &= std::memcmp(cars[i] + E_FRONT_DOT, before[i].front, sizeof before[i].front) == 0 &&
-                std::memcmp(cars[i] + E_REAR_DOT, before[i].rear, sizeof before[i].rear) == 0;
-    patch::log("edit: uncoupled VID %d from VID %d: trains of %u and %u cars, every car's ends %s", nvid_of(c), nvid_of(p),
-               static_cast<unsigned>(train_of(p).size()), static_cast<unsigned>(train_of(c).size()), kept ? "kept" : "MOVED");
-    MESSAGE("MsgUncoupled", "uncoupled: trains of %u and %u cars", static_cast<unsigned>(train_of(p).size()),
-            static_cast<unsigned>(train_of(c).size()));
+                std::memcmp(cars[i] + E_REAR_DOT, before[i].rear, sizeof before[i].rear) == 0 &&
+                at<float>(cars[i], O_X) == before[i].x && at<float>(cars[i], O_Y) == before[i].y &&
+                at<int>(cars[i], O_DIRECTION) == before[i].direction;
+    const unsigned ahead = static_cast<unsigned>(train_of(front).size()), rest = static_cast<unsigned>(train_of(back).size());
+    patch::log("edit: uncoupled %s VID %d (between VID %d and VID %d): trains of %u and %u cars, every car's place and ends %s",
+               behind ? "behind" : "in front of", nvid_of(c), nvid_of(front), nvid_of(back), ahead, rest, kept ? "kept" : "MOVED");
+    if (behind) MESSAGE("MsgUncoupledBehind", "uncoupled behind the car: this car in a train of %u, a train of %u cars behind", ahead, rest);
+    else MESSAGE("MsgUncoupled", "uncoupled in front of the car: a train of %u cars ahead, this car in a train of %u", ahead, rest);
 }
 
 // The other train C couples to: the free end met first walking the rails from a free end of the car
@@ -8675,9 +8682,12 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
         red_light_row(o, rows);
         ContextRow train{{"CtxTrain", "TRAIN:"}, {{{"CtxReverse", "TURN ROUND (R)"}, false, [o] { reverse_train(o); }}}};
         if (car_prev(o) || car_next(o)) train.choices.push_back({{"CtxTurnCar", "TURN CAR (E)"}, false, [o] { turn_car(o); }});
-        if (car_prev(o)) train.choices.push_back({{"CtxUncouple", "UNCOUPLE (U)"}, false, [o] { uncouple(o); }});
         if (coupling_partner(o)) train.choices.push_back({{"CtxCouple", "COUPLE (C)"}, false, [o] { couple(o); }});
         rows.push_back(train);
+        ContextRow apart{{"CtxUncoupleRow", "UNCOUPLE:"}, {}};
+        if (car_prev(o)) apart.choices.push_back({{"CtxUncoupleFront", "IN FRONT OF IT (U)"}, false, [o] { uncouple(o, false); }});
+        if (car_next(o)) apart.choices.push_back({{"CtxUncoupleBehind", "BEHIND IT (SHIFT+U)"}, false, [o] { uncouple(o, true); }});
+        if (!apart.choices.empty()) rows.push_back(apart);
         Order order;
         const bool has = train_order(o, order);
         auto pick = [o](int task) {
@@ -8904,7 +8914,8 @@ const LabelTip LABEL_TIPS[] = {
     {"CtxArmy", "TipCtxArmy", "Army: whose it is - ours, the enemy's, the neutrals' or the pirates' (A)"},
     {"CtxNeutralFight", "TipCtxFight", "In a fight: whom it fights by the rules of the map"},
     {"CtxFires", "TipCtxFires", "It fires: whether its guns fire on their own"},
-    {"CtxTrain", "TipCtxTrain", "Train: turn it round (R), turn this car alone (E), uncouple it from the one in front (U), couple to the train along the track (C)"},
+    {"CtxTrain", "TipCtxTrain", "Train: turn it round (R), turn this car alone (E), couple to the train along the track (C)"},
+    {"CtxUncoupleRow", "TipCtxUncouple", "Uncouple: in front of this car (U - it and the cars behind it are a new train) or behind it (Shift+U - the cars behind it); nothing moves"},
     {"CtxDelete", "TipCtxDelete", "Delete: this object (Del) - a car, or its whole train (Shift+Del)"},
     {"CtxTurn", "TipCtxTurn", "Turn: R / E or the mouse wheel"},
     {"CtxPostFor", "TipCtxPostFor", "For trains: the way the trains this post is for go - the other way turns it round"},
@@ -9644,7 +9655,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         else if (w == VK_DELETE)
             delete_objects(shift_down() && !g_selection.empty() && class_of(g_selection[0]) == B_RAIL
                                ? section_of(g_selection[0]) : g_selection);
-        else if (w == 'U' && !g_selection.empty() && is_car(g_selection[0])) uncouple(g_selection[0]);
+        else if (w == 'U' && !g_selection.empty() && is_car(g_selection[0])) uncouple(g_selection[0], shift_down());   // Shift: behind it
         else if (w == 'C' && !g_selection.empty() && is_car(g_selection[0])) couple(g_selection[0]);
         else if (w == 'L' && tool() != Tool::PushLine && tool() != Tool::Track) post_line(shift_down());
         else if (w == 'R') turn(1);

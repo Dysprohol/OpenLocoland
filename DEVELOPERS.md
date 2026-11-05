@@ -3048,7 +3048,10 @@ rails (`keep_on_spot`: PutOnRails takes the rail point nearest in 3D, which besi
 the other track's - then the car is put again nearer the spot's point); next to a train's free end met
 along the rails within 70 px it is coupled behind it (`Engine_AttachToTrain`) and takes its army, on
 a car in the middle of a train on the same link it is refused. The selected car's train: U uncouples
-the car from the car in front (nothing is laid again: every car keeps its ends), C couples an end car
+the car from the car in front (the car and those behind it are a new train), Shift+U from the car
+behind it (the car and those in front stay, the rest is the new train) - nothing is laid again: every
+car keeps its place and ends; the panel's UNCOUPLE row shows IN FRONT OF IT (U) / BEHIND IT (SHIFT+U)
+only where there is a coupling -, C couples an end car
 to the free end of another train met along the rails (the other train is laid behind it car by car,
 keeping each car's look, and takes its army), R turns the train round - `Train_Reverse` swaps its head
 and every car's ends and toggles every car's "stands backwards" flag (engineFlags bit 0), which keeps
@@ -3069,7 +3072,7 @@ each car's look kept through the AI's turns). A drag lays the whole train again 
 the spot under the cursor and the others before and behind it in their order, each with its way in the
 train, Del deletes the car and Shift+Del (the Delete tool with Shift) the train, A sets the army of the
 train. Its panel (the right button) has the army, TRAIN: turn round / turn car (with a neighbour) /
-uncouple / couple, PATROL: none / to a point... (the next click on the track is the far end) and
+couple, UNCOUPLE: in front of it / behind it, PATROL: none / to a point... (the next click on the track is the far end) and
 DELETE: car / train. Every change keeps the couplings, both ends (`RailPos`), the turned-round flag
 and the patrol of every car of the map before and after it, so undo puts every train back
 (`ACT_UNDO_REMOVE`/`INSERT` of a car unlink and relink its neighbours; the couplings are set again
@@ -3109,7 +3112,7 @@ R, E, C and a placed car first give such a train's cars their ends swapped and t
 (`normalize_chain`: the same place and look). The `edit:` lines of `LocoFix.log` give each decision
 (`move train ... to the link ... laid / <why>`, `coupled ... px along the rails`, `couple ...: no free
 end along the rails (by the straight line: ...)`, `turned car ...`, `turned round ... rail points the
-same`, `uncoupled ... every car's ends kept`), and the test step `D<x>:<y>` lists the trains near the
+same`, `uncoupled in front of / behind ... every car's place and ends kept`), and the test step `D<x>:<y>` lists the trains near the
 point with each car's direction, flag and rail points (`D0:0` every train). Checked in the game on a
 copy of POLIGON: R on the double track of the bottom line (two tracks 50 px apart) and beside its
 junction; U; C on the same track (coupled, 2 px) and with the only other train on the parallel track

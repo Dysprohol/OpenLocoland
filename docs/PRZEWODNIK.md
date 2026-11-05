@@ -530,7 +530,7 @@ ona może wtedy strzelać do nich. W panelu uzbrojonego neutralnego obiektu **ST
   pod kursorem (gdy blisko są dwa tory - na bliższym); postawiony przy końcu pociągu na tym torze
   dołącza się do niego. Zrób pociąg wroga: wybierz **WROG**
   w wierszu **ARMIA** palety (albo `A` przy stawianiu, albo `A` na postawionym pociągu), potem
-  lokomotywa i działo. `U` odczepia wagon, `C` doczepia do pociągu spotkanego wzdłuż tego samego toru
+  lokomotywa i działo. `U` odczepia przed zaznaczonym wagonem, `Shift+U` za nim (nic się nie przesuwa), `C` doczepia do pociągu spotkanego wzdłuż tego samego toru
   (nie do pociągu na torze obok), `R` zawraca pociąg, `E` obraca jeden wagon w jego miejscu
   (lokomotywa tyłem w środku pociągu, działo na końcu), przeciąganie kładzie pociąg na torze pod
   kursorem - gdy się tam nie mieści (za krótki ślepy tor, inny pociąg), zostaje, a wiersz stanu mówi
@@ -673,7 +673,7 @@ rzadziej stawiane rzeczy, na końcu dwa panele.
 | L / Shift+L | linia przy zaznaczonym semaforze: wpuszcza / zatrzymuje |
 | Del / Shift+Del | usuń / cały pociąg albo odcinek |
 | Ctrl+Z / Ctrl+Y | cofnij / ponów |
-| U / C | odczep / doczep wagon (do pociągu na jego torze) |
+| U / Shift+U / C | odczep przed wagonem / za nim, doczep go (do pociągu na jego torze) |
 | `[` `]` | następny obiekt rzędu nad paskiem, tekstura |
 | `<` `>` | odstęp dekoracji |
 | kółko, `+` `-` | rozmiar pędzla (Wysokosc terenu, Dekoracje, Malowanie, Woda) |

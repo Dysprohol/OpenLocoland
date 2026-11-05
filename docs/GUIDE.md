@@ -535,7 +535,7 @@ AGAINST ALL SIDES**). A map of the editor plays so; the campaign's missions keep
   cursor (where two tracks are near, the nearer one); next to a train's end on that track it is coupled
   to it. Make the enemy's train: choose **ENEMY** in the
   palette's **ARMY** row (or `A` while placing, or `A` on the placed train), then a locomotive and a
-  gun car. `U` uncouples a car, `C` couples to the train met along the same track (not one on a parallel
+  gun car. `U` uncouples in front of the selected car, `Shift+U` behind it (nothing moves), `C` couples to the train met along the same track (not one on a parallel
   track), `R` turns the train round, `E` turns one car round in its place (a locomotive backwards in the
   middle, a gun car at the end), a drag lays the train on the track under the cursor - when it does not
   fit there (a dead end too short, another train) it stays and the status line says why. A train needs a
@@ -678,7 +678,7 @@ tools, the rarer things placed, the two panels last.
 | L / Shift+L | a line at the selected semaphore: lets in / keeps out |
 | Del / Shift+Del | delete / a whole train or section |
 | Ctrl+Z / Ctrl+Y | undo / redo |
-| U / C | uncouple / couple a car (to the train along its track) |
+| U / Shift+U / C | uncouple in front of / behind the car, couple it (to the train along its track) |
 | `[` `]` | the next object of the row above the bar, the texture |
 | `<` `>` | the decals' spacing |
 | wheel, `+` `-` | the brush's size (Ground height, Decals, Paint, Water) |
