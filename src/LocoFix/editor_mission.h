@@ -29,7 +29,18 @@ struct TrainPatrol {
     int to_z = 0;                // the point's height (a drive)
     int army = 0;
     int from_x = 0, from_y = 0;  // the first car's rail point, screen (the enemy's patrol's other end)
+    // the train stands on a one-way line that pushes (push_flag 1): the line takes it to its end at the
+    // start, and from_x, from_y (screen), from_z are that end - the runner gives the order there
+    bool from_line = false;
+    int from_z = 0;
     std::vector<int> cars;       // the train's cars, the first one first (the enemy's train type)
+    int from_z_dot = 0;          // the height of the first car's rail point (from_x, from_y)
+    // built again in a factory when lost (REBUILT WHEN LOST): 0 no, n times, -1 always; `rebuild_wait`
+    // s after the loss; the factory of its army at fx, fy (the enemy's: the AI's)
+    int rebuild = 0, rebuild_wait = 30;
+    int fx = 0, fy = 0;
+    int target = 0;   // TASK_TARGET: the VID of the object at to_x, to_y (screen) and to_z (its height)
+    int wait = 0;     // the order starts `wait` s after the level starts
 };
 // An enemy train of the script's start (start_trains*: the AI makes it when the level starts) or of
 // Mission settings' queue as the dialog reads it.
@@ -87,6 +98,7 @@ enum ArrivalTask : int {
     TASK_GUARD,        // the enemy: ATA_STANDn, the point
     TASK_PATROL,       // the enemy: ATA_PATROLn, the point and the second point
     TASK_DRIVE,        // ours, the neutrals, the pirates: drive to the point (ACT_MOVE)
+    TASK_TARGET,       // a train of the map, any army: attack the object (VID `target`) at the point (ACT_ATTACK)
 };
 enum ArrivalIf : int {
     IF_NONE = 0,
@@ -156,12 +168,14 @@ enum PlanWhen : int {
     WHEN_AT = 0,   // `time` s from the start
     WHEN_AFTER,    // `time` s after the previous entry's first train was built (the first entry: from the start)
     WHEN_IF,       // while the condition holds, not before `time` s
+    WHEN_LOST_TRAIN,   // written only: a train of the map (its order) is the first wave, built again when lost
 };
 struct FactoryTrain {
     int time = 60;                    // s (WHEN_AT, WHEN_AFTER, WHEN_IF's earliest)
     int when = WHEN_AT;
     int cond = IF_NO_TRAIN, cond_n = 0;   // WHEN_IF: the condition (Condition)
     int times = 1, every = 120;       // waves: 1 once, n, 0 without end; the next one `every` s after the previous was built
+    bool renew = false;               // ... or `every` s after the previous one was lost (its locomotive destroyed or taken)
     std::vector<int> cars{5, 20, 20}; // the train as it leaves the factory, its first car first
     int type = -1;                    // the type it was read with, -1 none (the writer makes a type of the cars)
     std::vector<int> type_cars;
@@ -175,7 +189,7 @@ struct FactoryTrain {
     int fx = 0, fy = 0;
     bool operator==(const FactoryTrain& o) const {
         return time == o.time && when == o.when && cond == o.cond && cond_n == o.cond_n && times == o.times && every == o.every &&
-               cars == o.cars && type == o.type && task == o.task && tx == o.tx && ty == o.ty && tz == o.tz && tx2 == o.tx2 &&
+               renew == o.renew && cars == o.cars && type == o.type && task == o.task && tx == o.tx && ty == o.ty && tz == o.tz && tx2 == o.tx2 &&
                ty2 == o.ty2 && factory == o.factory && fx == o.fx && fy == o.fy;
     }
 };
@@ -189,9 +203,16 @@ struct AiKnobs {
     int renew = -1;        // start_trains_renew of every start train: -1 each its own, 0 no, 1 yes
     int raid = -1;         // start_trains_random_task: -1 each its own, 0 none, else every n s (+- 15)
     int clever = 1;        // SetCleverEnemyAttack: the engine's attack that counts with the weapons' range
+    // PASS_RED_LIGHTS (red_lights.cpp): the armies whose trains pass the one-way lines (bit n: army n;
+    // the editor sets 4, the neutrals, and 8, the pirates - a train's panel, one rule for the army)
+    int red_lights = 0;
+    // NEUTRAL_TRAINS: the enemy's guns take neutral trains as targets (script SetEnemyCanAttackNeutralTrains,
+    // World flags 2 - Object_FindTarget, factions.cpp may_target); 0: only once a neutral answers them
+    int neutral_trains = 0;
     bool operator==(const AiKnobs& o) const {
         return limit == o.limit && renew_wait == o.renew_wait && raid_length == o.raid_length && raids_from == o.raids_from &&
-               all_attack == o.all_attack && renew == o.renew && raid == o.raid && clever == o.clever;
+               all_attack == o.all_attack && renew == o.renew && raid == o.raid && clever == o.clever && red_lights == o.red_lights &&
+               neutral_trains == o.neutral_trains;
     }
 };
 struct UnitLimit {   // AddUnitLimit: the army has at most `max` of the VID on the map

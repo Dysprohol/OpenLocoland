@@ -2171,13 +2171,55 @@ PATROL... for ours, the neutrals' and the pirates' trains, NONE, ATTACK, GUARD..
 enemy's (its AI: `ATA_FIGHT`, `ATA_STANDn`, `ATA_PATROLn` between where it stands and the point, with a
 train type of its cars); in an older map the patrol alone, as `PatrolEngine` lines in `main()`. The
 block's arrays `ORDERS`, `order_vid/x/y[]` (the first car, as it stands), `order_task[]` (-2 drive, -3
-patrol, an `ATA_` task), `order_type[]`, `order_to_x/y/z[]`; `OrdersTact` runs once at the start (after
-the AI's own start trains took their slots), finds each train with `FindNearestSprite` and logs `ORDER n
-task t train 1 slot k`. A train the AI gets must be armed: a bare locomotive is made a ram (`ATA_CLASH`)
+patrol, an `ATA_` task), `order_type[]`, `order_to_x/y/z[]`, `order_from_x/y/z[]` (below) and the runner's
+`order_unit/state[]`; `OrdersFind` runs on the level's first frame and finds each train with
+`FindNearestSprite` (20 px), `OrdersTact` once a second gives each found train its order and logs `ORDER n
+task t train 1 slot k at <s> s at <x,y>` (`train 0: none at x,y` for one not found).
+**A train placed on a light's line did nothing** (the maintainer's report, reproduced on a POLIGON copy):
+before 2026-11-05 the runner looked for the trains at its first 1-second tick, and a train standing on a
+line that pushes (push_flag 1 - a factory's exit, a repair point's leg, an editor post's line) had been
+pushed on by then - `ORDER 1 task -3 train 0`, the train at the line's end with no order. Now it is found
+on the first frame, and the editor writes the end of such a line as the order's start (`order_from`,
+`edit_train_patrols` / `pushed_to_end`): the order waits until the train has stopped there (within its
+length and 40 px, `ACT_GET_SPEED` 0; at most 30 s), so a patrol runs between that end and its point (a
+patrol from a point inside a factory's spur could never come back into it: the line forbids it) and the
+enemy's AI patrol gets that end as its first point. The second way a train "does nothing": an order whose
+point lies past a one-way line the train may not enter (`RailDot_CanPass`) - the engine drives to the point
+nearest to the goal it can reach and stops at the line. The editor walks the network as the lines allow
+(`reachable`, every link both ways but against a line, the red lights of `PASS_RED_LIGHTS` counted; a
+reversal's room is not) and says it when the order is given and in the ORDERS row's tip ("319,1000 cannot
+be reached: the one-way line 319,936 -> 319,1061 is in the way - the train stops at it"; the line named is
+the one without which the point would be reached), and "it stands on the line ..., which pushes it to ...
+first". Checked in play: a neutral train on the player's repair point line with a patrol - found, ordered at
+1 s, two rounds of the loop in 60 s; one in the player's factory spur with a patrol to the main line - found,
+pushed out, ordered at 3 s past the spur's end, three rounds in 65 s (with the old runner: `train 0`, it
+stood at the line's end); one ordered into the factory spur - the warning above, and in play it stopped
+at 319,1184, below the line's end. A train the AI gets must be armed: a bare locomotive is made a ram (`ATA_CLASH`)
 and waits. Checked in play: the enemy's trains with a gun car went to their post and stayed, patrolled
 between their two points and drove at the player's train to attack it; ours drove to its point and
 patrolled. Test mode: `order: vid x y drive|patrol|attack|guard [to_x to_y to_z]` lines of `M<file>`.
 
+**A target and a start** (2026-11-05). What else the engine does for a train cheaply, and the scripts
+can tell it: `Action(train, ACT_ATTACK, object)` (the player's own attack command: COM_ENGINE_ATTACK, the
+train drives to shooting distance of the object and its turrets fire at it - for any army, outside the AI)
+and simply waiting. A train's panel (a map that runs arrivals) has TARGET: PICK... - the next click takes a
+unit or building of another army, a fort's or a mining plant's first gun for the host (the host has no hit
+points) - which replaces its other order (`TASK_TARGET`, `order_task` -4, the object found at the start by
+its VID `order_tvid` and place, 30 px): `OrderTry` gives ACT_ATTACK and `OrderTarget` watches it (state
+3) until the object is gone, then the enemy's train goes to its AI to attack (`ATA_FIGHT`), the others'
+stays; and STARTS: AT ONCE / AFTER n S (`order_wait`, steps of 10 s) for any order: the train stands until
+then. A train with a target is not rebuilt (the AI's queue has no such task). Checked in play on a POLIGON
+copy: a neutral train 5,20 stood until 20 s, drove to the enemy fort and destroyed the gun it was told to
+(hp 40, 30, 15, 5, gone at 55 s, `ORDER n target gone`), then stood; the enemy's patrolling train told to
+attack the player's factory drove round to the factory's spur and fired at it. Per army, beside the red
+lights and the AI's knobs: the enemy factory's AI screen has NEUTRAL TRAINS: FIRES AT THEM / ONLY WHEN HIT
+(`AiKnobs.neutral_trains`, `#define NEUTRAL_TRAINS 1`, the runner calls `SetEnemyCanAttackNeutralTrains(1)`
+- World flags 2, which `Object_FindTarget` and `factions.cpp`'s `may_target` read): with it the neutral
+train above was shot from 250 to 0 hp by the enemy on its way, without it not once. Not offered: "hold
+until something happens" beyond the start time (each would be a condition of `MissionIf` on a train;
+cheap to add per condition when wanted), the AI's aggressiveness beyond CLEVER ATTACK and LIMIT_ATACKERS
+(the tactics scripts read no other per-army value), the pirates' and neutrals' own AI (they have none:
+their trains do only what the orders and the arrivals tell them).
 **The templates** (TEMPLATE... in the Arrivals panel and in the enemy factory's queue) are the authors'
 trains exactly, read from the game's own scripts when the list is first shown
 (`mission_author_trains`, `editor_mission.cpp`): every `int this_trainNN[]={...}` of
@@ -2334,6 +2376,33 @@ its time; the panel offers no more there). Mission settings shows the number of 
 and opens an enemy factory's panel (Plan...); a test file's `queue:` lines still give the enemy's
 entries (each once), and `plan:` lines (`plan_of_line`: `cars= when=at|after|if first= if= n=
 times= every= task= to= to2= factory=x,y`) the whole plan.
+**Rebuilt when lost** (2026-11-05; the runner's `PlanLoco`, `PlanMade`, `PlanWatch`, `PlanAdopt`). How the
+authors rebuild: `start_trains_renew[i]` of a start train - `DepoFree` (`ai_events.lgc`) builds it again,
+`RENEW_TIMEOUT` +- half at random after it misses a train with its task (`start_trains_task[i]`), while the
+enemy has fewer units than its start trains need (4 each, + `REBUILD_ADDON` + 6 + its buildings) - only
+army 1's, only start trains; CONVERT makes those trains of the map, which had no such setting. Now: an entry
+of a factory of the enemy, the neutrals or the pirates with REPEAT n TIMES or WITHOUT END has, beside EVERY
+n s, AFTER THE LAST IS MADE (as before) or LOST (`FactoryTrain.renew`, `plan_renew[]`): the runner keeps the
+locomotive of the train it made (`plan_loco`, the first car of VID 5, 10 or 97 - `PlanLoco`) and the next wave
+is due `plan_every` s after that locomotive is destroyed or taken by another army (`plan_lost`; -1 while it
+is watched, as a variable of an object is 0 once the object is gone - a first try, testing the locomotive
+for 0, never saw a loss). A train of the map gets the same in its panel (an enemy's, a neutral's or a
+pirate's train with an order, in a map that runs arrivals): REBUILT: NO / ONCE / 3 TIMES / ALWAYS and REBUILT
+IN: n S AFTER THE LOSS (`Order.rebuild`, `rebuild_wait`, in the object's editor state, so undoable), written
+as one more plan entry of `plan_when` 3 (`WHEN_LOST_TRAIN`, never in the panel's list) whose `plan_order` is
+its order's number: `PlanAdopt` takes the train `OrdersFind` found as the entry's first wave, and a lost one
+is built again with the same cars and order - the enemy's through the AI's queue as any enemy entry, the
+others' car by car in the factory of its army nearest to the train at the save (`rebuild_factory`), driving
+to where the lost one stood when it patrolled. Read back, such an entry gives its order its REBUILT value
+(`read_orders`) and is left out of the factory's plan. The player's factory and trains are the player's:
+none of it is offered for army 0. A pirate train needs a locomotive 10: a VID 5 of army 3 is the authors'
+reinforcement marker, which `ReinforcementInit` takes away at the start (seen: `ORDER 1 ... train 0`).
+Checked in play on a POLIGON copy (the player's factory switched to the pirates, a pirate train 10,20 with
+a drive and ALWAYS, 10 s; the enemy's patrolling train 20,5,20 with ONCE, 10 s; a test script destroying
+the locomotives of armies 1 and 3 at 25 s and 90 s): both adopted as wave 1 at 1 s, both lost at 25 s, the
+pirates' factory ordered 10,20 at 35 s and made it at 131 s (it then stopped at a red post's line on its
+way east - the one-way rule), the enemy's queued at 35 s and taken by the AI at 95 s (the AI's own linker
+for the mortar train's wagons held the factory until then).
 **The AI's knobs** (the enemy factory's AI... screen, `AiKnobs`, written as the defines and arrays
 the scripts read): `LIMIT_ATACKERS` (the plan waits while that many attack), `start_trains_renew`
 and `RENEW_TIMEOUT` (a lost start train is built again, before the plan, after that many s +- half
@@ -3532,6 +3601,22 @@ mode above) are not tested in full screen.
       and every armed neutral that sees it, answer that army - and only it - to the end of the level,
       and that army may fire at them; the pirates may fire at the neutrals. On any other map
       `may_target` is the engine's test and nothing is noted, so the missions play as before,
+  35. the red lights for chosen armies (`red_lights.cpp`, MAP_RULES.md 5): on a map whose script has
+      `#define PASS_RED_LIGHTS <mask>` (bit n: army n; the editor writes 4, 8 or 12 from a neutral or
+      pirate train's panel, AT RED LIGHTS: DRIVES ON, kept in `AiKnobs.red_lights`, so a change is one
+      step of the history) a train of such an army runs along a one-way line against its way. The
+      engine tests a line in two places, both against the car's army bits: `RailDot_CanPass`'s last
+      test (0x433860: the far point's pushLink against the link's backLink, ebp the engine) - ours
+      gives a chosen army's train a value that never matches - and `Train_Update`'s stop of a car
+      heading into a line (0x40b60e, `cmp [edx+0xc],edi / je 0x40b636`: it stops the train, sounds
+      0x94, turns it round and, moving to a point, drops its command) - ours goes on as if no line
+      were there. A line's push is untouched: a train running along a push_flag 1 line is pushed,
+      one running against it is not (the push needs the car's link to be the line's). Per army, not
+      per train: the army is the one thing every car keeps and the map saves, while a train's cars
+      swap ends when it turns round and trains couple in play. Checked in play on a POLIGON copy: a
+      neutral train north of the player's repair point, ordered south against its line - with the
+      rule off it drove round the loop's other leg (937,864 at 5 s), with `PASS_RED_LIGHTS 4` straight
+      down the repair point's line (674,1164 at 5 s); both reached the point,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that

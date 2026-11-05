@@ -94,7 +94,7 @@ const char* const SETTINGS[][2] = {
 const char* const OWN[] = {"CUSTOM_MAP", "MONEY", "START_DAYNIGHT", "RAIN", "NUKE", "OBJECTIVES_FILE",
                            "WIN_FILE", "LOOSE_FILE", "BRIEF_LIST", "BRIEF_HEADER", "HISCORES_FILE",
                            "PLAYER_REINFORCEMENT", "LIMIT_ATACKERS", "ARRIVALS", "UNLOCKS", "UNIT_LIMITS", "ORDERS",
-                           "PLANS", "CLEVER_ATTACK", "PRICES", "FACTIONS"};
+                           "PLANS", "CLEVER_ATTACK", "PRICES", "FACTIONS", "PASS_RED_LIGHTS", "NEUTRAL_TRAINS"};
 constexpr int POSTS = 10;               // ATA_STAND0 ... ATA_STAND9
 
 // the train types of TrainsTactDeclares.lgc (ATT_<size>_<kind>)
@@ -784,6 +784,66 @@ const char* const ARRIVALS_RUNNER[] = {
     "// as BuildTrain swaps them back. The others' factory builds its train as PlanBuild says. The cars",
     "// planned and the cars made are logged (\"ARRIVAL F<n>\").",
     "int plan_queued=0;",
+    "// A train that is built again when it is lost (plan_renew): its locomotive (plan_loco) is watched",
+    "// (plan_lost -1) - a variable of an object is 0 once the object is gone -, and the train is lost",
+    "// when it is destroyed or taken by another army (plan_lost: the second, at least 1). A train of the",
+    "// map (plan_when 3, its order plan_order - 1) is the entry's first wave.",
+    "PlanLoco(int u)",
+    "{",
+    "  int c,v;",
+    "  for( c=Action(u,ACT_FIRST_ENGINE); c; c=Action(c,ACT_NEXT_ENGINE) )",
+    "  {",
+    "    v=GetUnitVid(c);",
+    "    if( v==5 || v==10 || v==97 )",
+    "      return c;",
+    "  }",
+    "  return u;",
+    "}",
+    "PlanMade(int i,int u,int t)",
+    "{",
+    "  if( !plan_renew[i] )",
+    "    return 0;",
+    "  plan_loco[i]=0;",
+    "  plan_lost[i]=t+1;",
+    "  if( u )",
+    "  {",
+    "    plan_loco[i]=PlanLoco(u);",
+    "    plan_lost[i]=-1;",
+    "  }",
+    "  return 1;",
+    "}",
+    "PlanWatch(int i,int t)",
+    "{",
+    "  if( !plan_renew[i] || plan_lost[i]!=-1 )",
+    "    return 0;",
+    "  if( plan_loco[i] )",
+    "    if( GetUnitVid(plan_loco[i]) )",
+    "      if( Action(plan_loco[i],act_getarmy,0,0)==plan_army[i] )",
+    "        return 0;",
+    "  plan_loco[i]=0;",
+    "  plan_lost[i]=t+1;",
+    "  Log(\"ARRIVAL F\"+itoa(i+1)+\" wave \"+itoa(plan_done[i])+\" lost at \"+itoa(t)+\" s: its locomotive destroyed or taken - again in \"+itoa(plan_every[i])+\" s\");",
+    "  return 1;",
+    "}",
+    "PlanAdopt(int i,int t)",
+    "{",
+    "  int o;",
+    "  o=plan_order[i]-1;",
+    "  if( o<0 || o>=ORDERS )",
+    "    return 0;",
+    "  if( order_state[o]!=2 )",
+    "    return 0;",
+    "  plan_done[i]=1;",
+    "  plan_last[i]=t;",
+    "  plan_since[i]=t;",
+    "  if( GetUnitVid(order_unit[o]) )",
+    "  {",
+    "    plan_loco[i]=PlanLoco(order_unit[o]);",
+    "    plan_lost[i]=-1;",
+    "  }",
+    "  Log(\"ARRIVAL F\"+itoa(i+1)+\" the map's train of order \"+itoa(o+1)+\" is wave 1, watched: \"+itoa(plan_loco[i]!=0));",
+    "  return 0;",
+    "}",
     "PlanTaken(int t)",
     "{",
     "  int i,j,k;",
@@ -822,6 +882,7 @@ const char* const ARRIVALS_RUNNER[] = {
     "  }",
     "  else",
     "    Log(\"ARRIVAL F\"+itoa(i+1)+\" wave \"+itoa(plan_done[i])+\" lost at \"+itoa(t)+\" s: the AI dropped its build\");",
+    "  PlanMade(i,u,t);",
     "  return 1;",
     "}",
     "// PlanPrice(v): what a car costs (price_*[], the factory's panel's prices).",
@@ -862,6 +923,7 @@ const char* const ARRIVALS_RUNNER[] = {
     "    plan_done[i]=plan_done[i]+1;",
     "    plan_last[i]=t;",
     "    Log(\"ARRIVAL F\"+itoa(i+1)+\" wave \"+itoa(plan_done[i])+\" lost at \"+itoa(t)+\" s: its factory is gone or not of army \"+itoa(plan_army[i]));",
+    "    PlanMade(i,0,t);",
     "    return 0;",
     "  }",
     "  arr_gettype(temp_array,plan_type[i]);",
@@ -884,10 +946,12 @@ const char* const ARRIVALS_RUNNER[] = {
     "    if( !u )",
     "    {",
     "      Log(\"ARRIVAL F\"+itoa(i+1)+\" wave \"+itoa(plan_done[i])+\" lost at \"+itoa(t)+\" s: no train at the factory\");",
+    "      PlanMade(i,0,t);",
     "      return 0;",
     "    }",
     "    MissionCars(u);",
     "    Log(\"ARRIVAL F\"+itoa(i+1)+\" wave \"+itoa(plan_done[i])+\" built at \"+itoa(t)+\" s army \"+itoa(plan_army[i])+\" made \"+mission_cars);",
+    "    PlanMade(i,u,t);",
     "    if( plan_task[i]==-2 || plan_task[i]==-3 )",
     "      Action(u,ACT_MOVE,plan_to_x[i],plan_to_y[i]+plan_to_z[i]);",
     "    if( plan_task[i]==-3 )",
@@ -932,7 +996,11 @@ const char* const ARRIVALS_RUNNER[] = {
     "  int go,n,f;",
     "  if( plan_times[i] && plan_done[i]>=plan_times[i] )",
     "    return 0;",
-    "  if( plan_done[i] )",
+    "  if( plan_when[i]==3 && !plan_done[i] )   // a train of the map: it is the first wave",
+    "    return PlanAdopt(i,t);",
+    "  if( plan_done[i] && plan_renew[i] )   // again once the last one is lost",
+    "    go=plan_lost[i]>0 && t+1-plan_lost[i]>=plan_every[i];",
+    "  else if( plan_done[i] )",
     "    go=t-plan_last[i]>=plan_every[i];",
     "  else if( plan_when[i]==1 && plan_prev[i]>=0 )",
     "  {",
@@ -962,6 +1030,7 @@ const char* const ARRIVALS_RUNNER[] = {
     "    plan_base[i]=strlen(GetCommands(f));",
     "    plan_next[i]=0;",
     "    plan_state[i]=3;",
+    "    plan_lost[i]=0;",
     "    MissionTypeCars(plan_type[i],0);",
     "    Log(\"ARRIVAL F\"+itoa(i+1)+\" wave \"+itoa(plan_done[i]+1)+\" ordered at \"+itoa(t)+\" s army \"+itoa(plan_army[i])+\" task \"+itoa(plan_task[i])+\" cars \"+mission_cars);",
     "    return 1;",
@@ -973,6 +1042,7 @@ const char* const ARRIVALS_RUNNER[] = {
     "  plan_fifo[n]=i;",
     "  plan_queued=n+1;",
     "  plan_state[i]=1;",
+    "  plan_lost[i]=0;",
     "  MissionTypeCars(plan_type[i],1);",
     "  Log(\"ARRIVAL F\"+itoa(i+1)+\" wave \"+itoa(plan_done[i]+1)+\" queued at \"+itoa(t)+\" s place \"+itoa(n)+\" type \"+itoa(plan_type[i])+\" task \"+itoa(plan_task[i])+\" cars \"+mission_cars);",
     "  return 1;",
@@ -990,6 +1060,7 @@ const char* const ARRIVALS_RUNNER[] = {
     "    plan_queued=n;",
     "  for( i=0; i<PLANS; i++ )",
     "  {",
+    "    PlanWatch(i,t);",
     "    PlanOnPoint(i);",
     "    if( plan_state[i]==2 )",
     "      PlanFollow(i,t);",
@@ -1039,36 +1110,124 @@ const char* const ARRIVALS_RUNNER[] = {
     "      }",
     "  }",
     "}",
-    "// OrdersTact(): the orders of the map's trains (order_*[]), once at the start: each train found by its",
-    "// first car's VID and place, then driven or patrolling (-2, -3), the enemy's given to the AI with its task.",
-    "OrdersTact()",
+    "// OrdersFind(), on the level's first frame, and OrdersTact(t), once a second: the orders of the map's",
+    "// trains (order_*[]). A train is found by its first car's VID and place before anything moves it - a",
+    "// one-way line that pushes (push_flag 1) takes a train standing on it to its end at once, and a train",
+    "// looked for a second later was not found -, and gets its order once it has stopped at order_from (the",
+    "// end of such a line; 0,0: where it stood) - within its length and 40 px, at most 30 s after the start:",
+    "// driven or patrolling (-2, -3), the enemy's given to the AI with its task.",
+    "OrdersFind()",
     "{",
-    "  int i,u,k;",
+    "  int i;",
     "  for( i=0; i<ORDERS; i++ )",
     "  {",
-    "    u=FindNearestSprite(GETSPRITE_VID+order_vid[i],order_x[i],order_y[i],20);",
-    "    k=-1;",
-    "    if( u && order_task[i]==-2 )",
-    "      Action(u,ACT_MOVE,order_to_x[i],order_to_y[i]+order_to_z[i]);",
-    "    if( u && order_task[i]==-3 )",
-    "      PatrolEngine(u,order_to_x[i],order_to_y[i]);",
-    "    if( u && order_task[i]>=0 )",
+    "    order_unit[i]=FindNearestSprite(GETSPRITE_VID+order_vid[i],order_x[i],order_y[i],20);",
+    "    order_state[i]=1;",
+    "    if( !order_unit[i] )",
     "    {",
-    "      k=find_num();",
-    "      if( k>=0 )",
-    "      {",
-    "        ai_trains[k]=u;",
-    "        ai_trains_type[k]=order_type[i];",
-    "        ai_trains_task[k]=order_task[i];",
-    "        ai_trains_task2[k]=ATA_NONE;",
-    "        ai_trains_task_backup[k]=ATA_NONE;",
-    "        ai_trains_behave[k]=0;",
-    "        ai_trains_time[k]=GetTime();",
-    "        ai_trains_random_task[k]=0;",
-    "      }",
+    "      order_state[i]=2;",
+    "      Log(\"ORDER \"+itoa(i+1)+\" task \"+itoa(order_task[i])+\" train 0: none at \"+itoa(order_x[i])+\",\"+itoa(order_y[i]));",
     "    }",
-    "    Log(\"ORDER \"+itoa(i+1)+\" task \"+itoa(order_task[i])+\" train \"+itoa(u!=0)+\" slot \"+itoa(k));",
     "  }",
+    "}",
+    "OrderTry(int i,int t)",
+    "{",
+    "  int u,k;",
+    "  u=order_unit[i];",
+    "  if( !GetUnitVid(u) )",
+    "  {",
+    "    order_state[i]=2;",
+    "    Log(\"ORDER \"+itoa(i+1)+\" task \"+itoa(order_task[i])+\": the train was lost before its order\");",
+    "    return 0;",
+    "  }",
+    "  if( t<order_wait[i] )   // it starts later",
+    "    return 0;",
+    "  if( (order_from_x[i] || order_from_y[i]) && t<30+order_wait[i] )   // pushed along a line first: stopped past its end",
+    "  {",
+    "    MissionCars(u);",
+    "    if( SizeTo(u,order_from_x[i],order_from_y[i]+order_from_z[i])>=40+48*mission_count || Action(u,ACT_GET_SPEED) )",
+    "      return 0;",
+    "  }",
+    "  if( order_task[i]==-4 )   // attack an object; the enemy's train goes to the AI once it is gone",
+    "  {",
+    "    order_target[i]=FindNearestSprite(GETSPRITE_VID+order_tvid[i],order_to_x[i],order_to_y[i]+order_to_z[i],30);",
+    "    order_state[i]=2;",
+    "    if( !order_target[i] )",
+    "    {",
+    "      Log(\"ORDER \"+itoa(i+1)+\" task -4: no VID \"+itoa(order_tvid[i])+\" at \"+itoa(order_to_x[i])+\",\"+itoa(order_to_y[i]));",
+    "      return 0;",
+    "    }",
+    "    Action(u,ACT_ATTACK,order_target[i]);",
+    "    order_state[i]=3;",
+    "    Log(\"ORDER \"+itoa(i+1)+\" task -4 train 1 attacks VID \"+itoa(order_tvid[i])+\" at \"+itoa(t)+\" s at \"+itoa(GetX(u))+\",\"+itoa(GetY(u)));",
+    "    return 1;",
+    "  }",
+    "  k=-1;",
+    "  if( order_task[i]==-2 )",
+    "    Action(u,ACT_MOVE,order_to_x[i],order_to_y[i]+order_to_z[i]);",
+    "  if( order_task[i]==-3 )",
+    "    PatrolEngine(u,order_to_x[i],order_to_y[i]);",
+    "  if( order_task[i]>=0 )",
+    "  {",
+    "    k=find_num();",
+    "    if( k>=0 )",
+    "    {",
+    "      ai_trains[k]=u;",
+    "      ai_trains_type[k]=order_type[i];",
+    "      ai_trains_task[k]=order_task[i];",
+    "      ai_trains_task2[k]=ATA_NONE;",
+    "      ai_trains_task_backup[k]=ATA_NONE;",
+    "      ai_trains_behave[k]=0;",
+    "      ai_trains_time[k]=GetTime();",
+    "      ai_trains_random_task[k]=0;",
+    "    }",
+    "  }",
+    "  order_state[i]=2;",
+    "  Log(\"ORDER \"+itoa(i+1)+\" task \"+itoa(order_task[i])+\" train 1 slot \"+itoa(k)+\" at \"+itoa(t)+\" s at \"+itoa(GetX(u))+\",\"+itoa(GetY(u)));",
+    "  return 1;",
+    "}",
+    "// OrderTarget(i,t): a train attacking its target (order_state 3) - the target's variable is 0 once it",
+    "// is gone; then the enemy's train goes to the AI to attack, the others' stays.",
+    "OrderTarget(int i,int t)",
+    "{",
+    "  int u,k;",
+    "  u=order_unit[i];",
+    "  if( !GetUnitVid(u) )",
+    "  {",
+    "    order_state[i]=2;",
+    "    return 0;",
+    "  }",
+    "  if( order_target[i] )",
+    "    if( GetUnitVid(order_target[i]) )",
+    "      return 0;",
+    "  order_state[i]=2;",
+    "  k=-1;",
+    "  if( Action(u,ACT_GET_ARMY)==1 )",
+    "  {",
+    "    k=find_num();",
+    "    if( k>=0 )",
+    "    {",
+    "      ai_trains[k]=u;",
+    "      ai_trains_type[k]=order_type[i];",
+    "      ai_trains_task[k]=ATA_FIGHT;",
+    "      ai_trains_task2[k]=ATA_NONE;",
+    "      ai_trains_task_backup[k]=ATA_NONE;",
+    "      ai_trains_behave[k]=0;",
+    "      ai_trains_time[k]=GetTime();",
+    "      ai_trains_random_task[k]=0;",
+    "    }",
+    "  }",
+    "  Log(\"ORDER \"+itoa(i+1)+\" target gone at \"+itoa(t)+\" s, AI slot \"+itoa(k));",
+    "  return 1;",
+    "}",
+    "OrdersTact(int t)",
+    "{",
+    "  int i;",
+    "  for( i=0; i<ORDERS; i++ )",
+    "    if( order_state[i]==1 )",
+    "      OrderTry(i,t);",
+    "    else if( order_state[i]==3 )",
+    "      OrderTarget(i,t);",
     "}",
     "// ArrivalOnPoint(i): a train of a patrol (-3) that reached its point patrols to the other end from there.",
     "ArrivalOnPoint(int i)",
@@ -1714,16 +1873,20 @@ const char* const ARRIVALS_RUNNER[] = {
     "{",
     "  int i,t;",
     "  PiecesTact();",
-    "  if( !OneTimeInSecond() )",
-    "    return 0;",
-    "  t=(GetTime()-time_game_total)/1000;",
     "  iff(1)",
     "  {",
-    "    OrdersTact();",
+    "    OrdersFind();",
     "#ifdef CLEVER_ATTACK",
     "    SetCleverEnemyAttack(CLEVER_ATTACK);",
     "#endif",
+    "#ifdef NEUTRAL_TRAINS",
+    "    SetEnemyCanAttackNeutralTrains(1);",
+    "#endif",
     "  }",
+    "  if( !OneTimeInSecond() )",
+    "    return 0;",
+    "  t=(GetTime()-time_game_total)/1000;",
+    "  OrdersTact(t);",
     "  FactoryTact(t);",
     "  PlanTact(t);",
     "  CaptureTact();",
@@ -1909,7 +2072,9 @@ void read_factories(const Parsed& p, FactoryState& f) {
             t.tx2 = column("plan_to2_x", i);
             t.ty2 = column("plan_to2_y", i);
         }
+        if (plans && column("plan_when", i) == WHEN_LOST_TRAIN) continue;   // a train of the map built again: read_orders
         if (plans) {
+            t.renew = column("plan_renew", i) != 0;
             t.when = (std::max)(0, (std::min)(2, column("plan_when", i)));
             t.every = column("plan_every", i);
             t.times = (std::max)(0, column("plan_times", i));
@@ -1957,9 +2122,19 @@ void read_orders(const Parsed& p, std::vector<TrainPatrol>& out) {
         TrainPatrol t{to_int(column("order_vid", i)), to_int(column("order_x", i)), to_int(column("order_y", i)),
                       to_int(column("order_to_x", i)), to_int(column("order_to_y", i))};
         t.to_z = to_int(column("order_to_z", i));
+        for (int k = 0; k < define_int("PLANS"); ++k)   // built again when lost: a plan entry of plan_when 3 names the order
+            if (to_int(column("plan_when", k)) == WHEN_LOST_TRAIN && to_int(column("plan_order", k)) == i + 1) {
+                const int times = to_int(column("plan_times", k));
+                t.rebuild = times ? (std::max)(1, times - 1) : -1;
+                t.rebuild_wait = to_int(column("plan_every", k));
+            }
         const int task = task_number(column("order_task", i));
         t.army = task >= 0 ? 1 : 0;
-        if (task == -2) t.task = TASK_DRIVE;
+        t.wait = to_int(column("order_wait", i));
+        if (task == -4) {
+            t.task = TASK_TARGET;
+            t.target = to_int(column("order_tvid", i));
+        } else if (task == -2) t.task = TASK_DRIVE;
         else if (task == -3) t.task = TASK_PATROL;
         else if (task == 10 || task == 11) t.task = TASK_ATTACK;
         else if (task >= 0 && task < POSTS) {
@@ -2085,6 +2260,8 @@ Mission read_mission(const Parsed& p, bool block, const std::string& map) {
     ai.raids_from = to_int(m.settings["FIRSTATTACKTIME"], 30);
     ai.all_attack = to_int(m.settings["STG_DESTROY_TIME"], 20);
     ai.clever = to_int(get("CLEVER_ATTACK", "1"), 1) != 0;
+    ai.red_lights = to_int(get("PASS_RED_LIGHTS", "0"), 0) & 15;
+    ai.neutral_trains = to_int(get("NEUTRAL_TRAINS", "0"), 0) != 0;
     ai.renew = ai.raid = -1;
     for (size_t i = 0; i < m.start.size(); ++i) {
         if (i == 0 || ai.renew == m.start[i].renew) ai.renew = m.start[i].renew;
@@ -2254,7 +2431,12 @@ std::vector<std::string> settings_block(const Mission& m, const ArrivalsState& a
     // those of a factory that is gone). A type of the cars - a template's or the map's own, never a
     // difficulty's (x5), so the train is the planned one: the enemy's with its first two cars swapped
     // (BuildTrain swaps them back), the others' as they are (the runner orders them car by car).
-    const std::vector<FactoryTrain>& q = m.factories.queue;
+    // A train of the map that is built again when lost (its panel's REBUILT WHEN LOST) is one more
+    // entry, of its factory's (the enemy's: the AI's), appended with the orders below: plan_when 3,
+    // plan_order its order's number, the train the entry's first wave.
+    std::vector<FactoryTrain> q = m.factories.queue;
+    std::vector<int> armies = m.plan_armies;
+    std::vector<int> plan_order(q.size(), 0);
     std::vector<std::string> plan_types, plan_tasks, price_vids, prices;
     for (size_t i = 0; i < q.size(); ++i) {
         const FactoryTrain& t = q[i];
@@ -2309,15 +2491,48 @@ std::vector<std::string> settings_block(const Mission& m, const ArrivalsState& a
             else if (o.army == 1 && o.task == TASK_PATROL) task = patrol(o.from_x, o.from_y, o.to_x, o.to_y);
             else if (o.army != 1 && o.task == TASK_DRIVE) task = "-2";
             else if (o.army != 1 && o.task == TASK_PATROL) task = "-3";
+            else if (o.task == TASK_TARGET && o.target) task = "-4";
             else continue;   // an order of another army (the train's army changed since)
             orders.push_back({o, task, o.army == 1 ? type_of(o.cars) : "0"});
+            if (o.rebuild && o.army && o.task != TASK_TARGET && (o.army == 1 || o.fx || o.fy)) {   // built again when lost
+                FactoryTrain t;
+                t.when = WHEN_LOST_TRAIN;
+                t.time = 0;
+                t.times = o.rebuild < 0 ? 0 : o.rebuild + 1;
+                t.every = o.rebuild_wait;
+                t.renew = true;
+                t.cars = o.cars;
+                t.fx = o.army == 1 ? 0 : o.fx;
+                t.fy = o.army == 1 ? 0 : o.fy;
+                if (o.army == 1) {
+                    plan_types.push_back(type_of(declared_order(o.cars)));
+                    plan_tasks.push_back(task);
+                    if (arrivals.on) {
+                        times.push_back("0");
+                        queue_types.push_back("-1");
+                        queue_tasks.push_back("0");
+                    }
+                } else {   // the rebuilt one drives to where the lost one stood, then as it was told
+                    t.task = o.task;
+                    t.tx = o.task == TASK_PATROL ? o.from_x : o.to_x;
+                    t.ty = o.task == TASK_PATROL ? o.from_y : o.to_y;
+                    t.tz = o.task == TASK_PATROL ? o.from_z_dot : o.to_z;
+                    t.tx2 = o.to_x;
+                    t.ty2 = o.to_y;
+                    plan_types.push_back(type_of(t.cars));
+                    plan_tasks.push_back(o.task == TASK_DRIVE ? "-2" : "-3");
+                }
+                q.push_back(t);
+                armies.push_back(o.army);
+                plan_order.push_back(static_cast<int>(orders.size()));
+            }
         }
         define("ORDERS", std::to_string(orders.size()));
         // the factories: units that come later, unit limits (FactoryTact of the runner)
         const FactoryState& f = m.factories;
         define("UNLOCKS", std::to_string(f.unlocks.size()));
         define("UNIT_LIMITS", std::to_string(f.limits.size()));
-        define("PLANS", std::to_string(f.queue.size()));
+        define("PLANS", std::to_string(q.size()));
         for (const FactoryTrain& t : q)   // the prices of the cars the runner orders (PlanPrice)
             if (t.fx || t.fy)
                 for (int c : t.cars)
@@ -2327,8 +2542,11 @@ std::vector<std::string> settings_block(const Mission& m, const ArrivalsState& a
                     }
         define("PRICES", std::to_string(prices.size()));
         define("CLEVER_ATTACK", std::to_string(ai.clever));
+        if (ai.neutral_trains) define("NEUTRAL_TRAINS", "1");   // SetEnemyCanAttackNeutralTrains(1), by the runner
     }
     define("FACTIONS", "1");   // the neutrals' and the pirates' rules, read as the level loads (factions.cpp)
+    if (m.factories.ai.red_lights)   // the armies whose trains pass the red lights, read as the level loads (red_lights.cpp)
+        define("PASS_RED_LIGHTS", std::to_string(m.factories.ai.red_lights));
     for (const auto& e : m.extra) define(e.first, e.second);
     out.push_back("#include \"maps\\script\\TrainsTactDeclares.lgc\"");
     types.push_back("-1");
@@ -2393,6 +2611,15 @@ std::vector<std::string> settings_block(const Mission& m, const ArrivalsState& a
         texts("order_to_x", [](const Ordered& o) { return std::to_string(o.order.to_x); });
         texts("order_to_y", [](const Ordered& o) { return std::to_string(o.order.to_y); });
         texts("order_to_z", [](const Ordered& o) { return std::to_string(o.order.to_z); });
+        // the end of the pushing line the train stands on (edit_train_patrols), where its order starts
+        texts("order_from_x", [](const Ordered& o) { return std::to_string(o.order.from_line ? o.order.from_x : 0); });
+        texts("order_from_y", [](const Ordered& o) { return std::to_string(o.order.from_line ? o.order.from_y : 0); });
+        texts("order_from_z", [](const Ordered& o) { return std::to_string(o.order.from_line ? o.order.from_z : 0); });
+        texts("order_tvid", [](const Ordered& o) { return std::to_string(o.order.task == TASK_TARGET ? o.order.target : 0); });
+        texts("order_wait", [](const Ordered& o) { return std::to_string(o.order.wait); });
+        texts("order_target", [](const Ordered&) { return std::string("0"); });
+        texts("order_unit", [](const Ordered&) { return std::string("0"); });
+        texts("order_state", [](const Ordered&) { return std::string("0"); });
         const FactoryState& f = m.factories;
         auto columns = [&](const char* name, size_t n, const std::function<int(size_t)>& of) {
             std::vector<std::string> items;
@@ -2430,7 +2657,9 @@ std::vector<std::string> settings_block(const Mission& m, const ArrivalsState& a
         });
         plan("plan_fx", [&](size_t i) { return std::to_string(q[i].fx); });
         plan("plan_fy", [&](size_t i) { return std::to_string(q[i].fy); });
-        plan("plan_army", [&](size_t i) { return std::to_string(i < m.plan_armies.size() ? m.plan_armies[i] : 1); });
+        plan("plan_army", [&](size_t i) { return std::to_string(i < armies.size() ? armies[i] : 1); });
+        plan("plan_renew", [&](size_t i) { return std::string(q[i].renew ? "1" : "0"); });
+        plan("plan_order", [&](size_t i) { return std::to_string(i < plan_order.size() ? plan_order[i] : 0); });
         auto built = [&](size_t i) { return q[i].fx || q[i].fy; };   // by the runner's orders: its point
         plan("plan_to_x", [&](size_t i) { return std::to_string(built(i) ? q[i].tx : 0); });
         plan("plan_to_y", [&](size_t i) { return std::to_string(built(i) ? q[i].ty : 0); });
@@ -2438,7 +2667,7 @@ std::vector<std::string> settings_block(const Mission& m, const ArrivalsState& a
         plan("plan_to2_x", [&](size_t i) { return std::to_string(built(i) && q[i].task == TASK_PATROL ? q[i].tx2 : 0); });
         plan("plan_to2_y", [&](size_t i) { return std::to_string(built(i) && q[i].task == TASK_PATROL ? q[i].ty2 : 0); });
         for (const char* name : {"plan_state", "plan_done", "plan_last", "plan_since", "plan_slot", "plan_fifo", "plan_next", "plan_base",
-                                 "plan_unit"})
+                                 "plan_unit", "plan_loco", "plan_lost"})
             plan(name, zero);
         price_vids.push_back("0");
         prices.push_back("0");
@@ -3492,6 +3721,8 @@ bool mission_settings_from_file(const std::string& path) {
     bool arrivals_given = false;
     FactoryState factories;   // the file's limits and later units replace the map's
     bool factories_given = false;
+    int red_lights = -1;   // the file's PASS_RED_LIGHTS, -1 the map's
+    int neutral_trains = -1;   // the file's NEUTRAL_TRAINS, -1 the map's
     bool orders_given = false;   // the file's orders replace the map's
     std::vector<FactoryTrain> plans;
     bool plans_given = false;
@@ -3499,11 +3730,11 @@ bool mission_settings_from_file(const std::string& path) {
         const size_t colon = line.find(':');
         if (colon == std::string::npos) continue;
         const std::string name = trim(line.substr(0, colon));
-        if (name == "order") {   // order: vid x y drive|patrol|attack|guard [to_x to_y to_z] (a car of the map)
+        if (name == "order") {   // order: vid x y drive|patrol|attack|guard|target [to_x to_y to_z [target vid]] [rebuild=n] [wait=s] [start=s] (a car of the map)
             const std::vector<std::string> w = words_of(line.substr(colon + 1));
-            static const char* const TASKS[] = {"", "attack", "", "guard", "patrol", "drive"};
+            static const char* const TASKS[] = {"", "attack", "", "guard", "patrol", "drive", "target"};
             int task = 0;
-            for (int k = 1; k < 6; ++k)
+            for (int k = 1; k < 7; ++k)
                 if (w.size() > 3 && w[3] == TASKS[k] && *TASKS[k]) task = k;
             if (w.size() < 4 || !task) {
                 patch::log("mission test: a wrong order line: %s", line.c_str());
@@ -3511,10 +3742,23 @@ bool mission_settings_from_file(const std::string& path) {
             }
             TrainPatrol t{to_int(w[0]), to_int(w[1]), to_int(w[2]), w.size() > 4 ? to_int(w[4]) : 0, w.size() > 5 ? to_int(w[5]) : 0};
             t.task = task;
-            t.to_z = w.size() > 6 ? to_int(w[6]) : 0;
+            t.to_z = w.size() > 6 && w[6].find('=') == std::string::npos ? to_int(w[6]) : 0;
+            if (task == TASK_TARGET) t.target = w.size() > 7 ? to_int(w[7]) : 0;   // target x y z vid
+            for (const std::string& k : w)   // rebuild=<n, -1 always> wait=<s>: built again when lost
+                if (k.rfind("rebuild=", 0) == 0) t.rebuild = to_int(k.substr(8));
+                else if (k.rfind("start=", 0) == 0) t.wait = to_int(k.substr(6));
+                else if (k.rfind("wait=", 0) == 0) t.rebuild_wait = to_int(k.substr(5));
             if (!orders_given) g_patrols.clear();
             orders_given = true;
             g_patrols.push_back(t);
+            continue;
+        }
+        if (name == "red_lights") {   // red_lights: <mask> (PASS_RED_LIGHTS: 4 the neutrals, 8 the pirates)
+            red_lights = to_int(trim(line.substr(colon + 1))) & 15;
+            continue;
+        }
+        if (name == "neutral_trains") {   // neutral_trains: 0|1 (NEUTRAL_TRAINS: the enemy fires at neutral trains)
+            neutral_trains = to_int(trim(line.substr(colon + 1))) != 0;
             continue;
         }
         if (name == "limit" || name == "unlock") {   // limit: army nvid max / unlock: x y nvid seconds
@@ -3583,6 +3827,8 @@ bool mission_settings_from_file(const std::string& path) {
         n.factories.limits = factories.limits;
         n.factories.unlocks = factories.unlocks;
     }
+    if (red_lights >= 0) n.factories.ai.red_lights = red_lights;
+    if (neutral_trains >= 0) n.factories.ai.neutral_trains = neutral_trains;
     if (plans_given) n.factories.queue = plans;   // the factories are found by their places (edit_level_held, a save)
     g_mission = n;
     g_arrivals = arrivals;

@@ -441,6 +441,28 @@ samej lokomotywy robi taran) **ATAK**, **PILNUJ...** punktu albo **PATROL...**. 
 ROZKAZY są tylko w mapie z przyjazdami; mapa ze starszej wersji ma sam **PATROL**, dopóki w panelu
 Przyjazdy nie wybierzesz **PRZESTAW NA PRZYJAZDY**.
 
+Pociąg stojący na linii, która pcha (wyjazd z fabryki, tor punktu naprawczego, linia semafora), na starcie
+poziomu jedzie do końca tej linii i tam zaczyna rozkaz. Punkt, do którego pociąg nie dojedzie - za linią
+jednokierunkową, na którą nie może wjechać - edytor podaje przy wydaniu rozkazu i w opisie wiersza ROZKAZY
+w pasku stanu: w grze taki pociąg dojeżdża do linii i staje.
+
+**Czerwone światła dla neutralnych i piratów**: panel pociągu neutralnych albo piratów ma **NA CZERWONYM:
+STAJE** (jak każdy pociąg) albo **JEDZIE** - wtedy każdy pociąg tej armii może jechać linią jednokierunkową
+pod prąd, tam gdzie twoje pociągi i pociągi wroga są zatrzymywane (wyjazd z poziomu wypuszcza go też poza
+mapę, na ukryty tor). Jedna zasada dla całej armii.
+
+**Cel i start**: **CEL: WSKAŻ...** i kliknięcie jednostki albo budynku innej armii (fort: jedno z jego dział)
+- pociąg atakuje go po starcie poziomu zamiast innego rozkazu; pociąg wroga przechodzi potem do swojego AI,
+pozostałe stają. **START: OD RAZU** albo **PO n S** wstrzymuje rozkaz do tego czasu. Ekran **AI...** fabryki
+wroga: **POCIĄGI NEUTR.: STRZELA DO NICH** (działa wroga strzelają do pociągów neutralnych) albo **GDY OBERWIE**.
+
+**Odbudowa po stracie**: pociąg wroga, neutralnych albo piratów z rozkazem ma **ODBUDOWA: NIE / RAZ / 3 RAZY
+/ ZAWSZE** i **ODBUDOWA ZA** (sekundy po stracie): gdy jego lokomotywa zostanie zniszczona albo przejęta, AI
+wroga (w pierwszej wolnej fabryce) albo najbliższa fabryka jego armii buduje ten sam pociąg i daje mu ten sam
+rozkaz. W planie fabryki pociąg powtarzany n razy albo bez końca przychodzi **PO ZROBIENIU OSTATNIEGO** albo po
+**STRACIE** ostatniego. Nie dla twojej fabryki i twoich pociągów; mapa z przyjazdami. Pociąg piratów potrzebuje
+lokomotywy 10: piracką lokomotywę 5 skrypty zabierają na starcie (oznacza posiłki).
+
 **Zdobywanie**: neutralna fabryka albo punkt naprawczy staje się twój, gdy podjedzie do niego twój pociąg
 (fort albo kopalnia - gdy nie ma już ich dział).
 

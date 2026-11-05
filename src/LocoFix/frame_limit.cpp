@@ -39,6 +39,7 @@ const char* editor_level_redirect(const char* map);
 void editor_level_loaded(void* world);
 void restart_level_loading(const char* map);   // restart.cpp
 void factions_level_loading(const char* map);  // factions.cpp
+void red_lights_level_loading(const char* map);  // red_lights.cpp
 const char* custom_maps_level_guard(const char* map);   // custom_maps.cpp: a map that is not there - the menu
 
 namespace {
@@ -164,6 +165,7 @@ int __fastcall LevelLoad_measured(void* world, void* edx, const char* name) {
     lstrcpynA(g_level, map ? map : "?", sizeof g_level);
     restart_level_loading(map);
     factions_level_loading(map);
+    red_lights_level_loading(map);
     editor_level_loading(world);
     const int result = g_level_load(world, edx, map);
     test_map_check(world);

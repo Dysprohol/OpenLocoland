@@ -151,7 +151,7 @@ constexpr int ACT_CHANGE_DIRECTION = 60;
 constexpr int VID_RAIL = 610;
 constexpr size_t V_DIR_HALF_STEP = 0x340;
 // Vid
-constexpr size_t V_NVID = 0x04, V_CLASS = 0x10, V_FLAGS = 0x14, V_SIZE_X = 0x1c, V_SIZE_Y = 0x20, V_SIZE_Z = 0x24;
+constexpr size_t V_NVID = 0x04, V_CLASS = 0x10, V_FLAGS = 0x14, V_SIZE_X = 0x1c, V_SIZE_Y = 0x20, V_SIZE_Z = 0x24, V_MAX_HP = 0x28;
 constexpr size_t V_ND_DIR = 0x64, V_ANIM_FRAMES = 0x68, V_MOVE_MASK = 0x18, V_FRAME_COUNT = 0x2a4;
 constexpr uint32_t VID_SCREEN = 0x800, VID_HIDDEN = 0x400;
 // classes (B_... of export.lgc)
@@ -364,6 +364,8 @@ struct State {
     uint8_t* rear_to = nullptr;    // point changes when a rail next to it is deleted or put back)
     bool patrol = false;   // an order (a patrol, a drive, the enemy's AI task)
     int patrol_x = 0, patrol_y = 0, patrol_z = 0, order = 0;
+    int rebuild = 0, rebuild_wait = 30;   // the order's REBUILT WHEN LOST
+    int target = 0, wait = 0;             // its target's VID, its start
     // a region: its size, flags, fog and what it turns explosions into (regions, below)
     bool region = false;
     float region_w = 0, region_h = 0;
@@ -467,6 +469,9 @@ void set_region_fog(uint8_t* o, int low, int high, uint32_t colour) {
 struct Order {
     int task = TASK_PATROL;
     int x = 0, y = 0, z = 0;
+    int rebuild = 0, rebuild_wait = 30;   // built again when lost: 0 no, n times, -1 always; s after the loss
+    int target = 0;   // TASK_TARGET: the VID of the object at x, y (screen), z its height
+    int wait = 0;     // it starts `wait` s after the level starts
 };
 std::map<uint8_t*, Order> g_patrols;
 
@@ -555,6 +560,10 @@ State state_of(uint8_t* o) {
         Order order;
         s.patrol = order_of(o, order);
         s.patrol_x = order.x, s.patrol_y = order.y, s.patrol_z = order.z, s.order = s.patrol ? order.task : 0;
+        s.rebuild = s.patrol ? order.rebuild : 0;
+        s.rebuild_wait = s.patrol ? order.rebuild_wait : 30;
+        s.target = s.patrol ? order.target : 0;
+        s.wait = s.patrol ? order.wait : 0;
     }
     if (is_region(o)) {
         s.region = true;
@@ -668,8 +677,10 @@ void restore_car(uint8_t* o, const State& s) {
     set_car_ends(o, s);
     Order now;
     const bool has = order_of(o, now);
-    if (has != s.patrol || now.x != s.patrol_x || now.y != s.patrol_y || now.z != s.patrol_z || (has && now.task != s.order))
-        set_order(o, s.patrol, {s.order, s.patrol_x, s.patrol_y, s.patrol_z});
+    if (has != s.patrol || now.x != s.patrol_x || now.y != s.patrol_y || now.z != s.patrol_z ||
+        (has && (now.task != s.order || now.rebuild != s.rebuild || now.rebuild_wait != s.rebuild_wait || now.target != s.target ||
+                 now.wait != s.wait)))
+        set_order(o, s.patrol, {s.order, s.patrol_x, s.patrol_y, s.patrol_z, s.rebuild, s.rebuild_wait, s.target, s.wait});
     uint8_t* front = at<uint8_t*>(o, E_FRONT_DOT);
     uint8_t* rear = at<uint8_t*>(o, E_REAR_DOT);
     if (link_dot(front, at<int>(o, E_FRONT_DOT + POS_LINK)) && link_dot(rear, at<int>(o, E_REAR_DOT + POS_LINK)))
@@ -2043,6 +2054,9 @@ bool move_train(uint8_t* c, float sx, float sy) {
     return true;
 }
 
+std::string order_problem(uint8_t* car, int task, int x, int y);   // the trains' orders and the one-way lines, below
+bool train_order(uint8_t* c, Order& out);   // below
+
 // The train's patrol: kept in its first car, to the rail point under the cursor.
 uint8_t* g_patrol_train = nullptr;   // a car whose train gets the next click's point
 int g_order_task = TASK_PATROL;      // and the order it gets
@@ -2051,7 +2065,18 @@ int g_order_task = TASK_PATROL;      // and the order it gets
 // screen point sx, sy.
 void set_train_order(uint8_t* c, int task, float sx, float sy) {
     Order order{task, 0, 0, 0};
-    if (task && task != TASK_ATTACK) {
+    if (task == TASK_TARGET) {   // the object under the cursor: a unit of another army (a host's first gun)
+        uint8_t* t = pick(sx, sy);
+        if (t && !guns_on(t).empty() && guns_on(t)[0]) t = guns_on(t)[0];
+        if (!t || at<int>(vid_of(t), V_MAX_HP) <= 0 || army_of(t) == army_of(c)) {
+            MESSAGE("MsgTargetNone", "target: click a unit or building of another army (a gun of a fort)");
+            return;
+        }
+        order.x = static_cast<int>(std::lround(at<float>(t, O_X)));
+        order.y = static_cast<int>(std::lround(at<float>(t, O_Y) - at<float>(t, O_Z)));
+        order.z = static_cast<int>(std::lround(at<float>(t, O_Z)));
+        order.target = nvid_of(t);
+    } else if (task && task != TASK_ATTACK) {
         const TrackSpot spot = track_spot(sx, sy, CAR_REACH);
         if (!spot.found || !spot.dot) {
             MESSAGE("MsgPatrolTrack", "patrol: click a point of the track");
@@ -2060,6 +2085,12 @@ void set_train_order(uint8_t* c, int task, float sx, float sy) {
         order.x = at<int>(spot.dot, DOT_X);
         order.y = at<int>(spot.dot, DOT_Y) - at<int>(spot.dot, DOT_Z);
         order.z = at<int>(spot.dot, DOT_Z);
+    }
+    Order old;
+    if (train_order(c, old)) {   // the new order keeps whether the train is built again, and its start
+        order.rebuild = old.rebuild;
+        order.rebuild_wait = old.rebuild_wait;
+        order.wait = old.wait;
     }
     const std::vector<uint8_t*> cars = all_cars();
     const std::vector<State> before = states(cars);
@@ -2071,7 +2102,14 @@ void set_train_order(uint8_t* c, int task, float sx, float sy) {
     else if (task == TASK_DRIVE) MESSAGE("MsgOrderDrive", "orders: the train drives to %d,%d at the start", order.x, order.y);
     else if (task == TASK_GUARD) MESSAGE("MsgOrderGuard", "orders: the enemy's AI keeps the train at %d,%d", order.x, order.y);
     else if (task == TASK_ATTACK) MESSAGE("MsgOrderAttack", "orders: the enemy's AI sends the train to attack");
+    else if (task == TASK_TARGET)
+        MESSAGE("MsgOrderTarget", "orders: the train attacks %s (VID %d) at %d,%d", object_name(order.target) ? object_name(order.target) : "",
+                order.target, order.x, order.y);
     else MESSAGE("MsgPatrolNone", "patrol: none");
+    if (task && task != TASK_TARGET) {
+        const std::string problem = order_problem(c, task, order.x, order.y);
+        if (!problem.empty()) MESSAGE("MsgOrderWarn", "orders: %s", problem.c_str());
+    }
     int patrols, posts, start, queue;
     mission_ai_use(patrols, posts, start, queue);
     if (army_of(c) == 1 && mission_arrivals().on &&
@@ -4609,6 +4647,135 @@ void log_push_lines() {
                        list == &mission_push_lines() ? "editor" : "script", t.error ? t.error : "ok",
                        static_cast<unsigned>(t.path.size()));
         }
+}
+
+// ---- the trains' orders and the one-way lines ----
+//
+// What the engine will do with a train of the map and its order (the runner's OrdersFind /
+// OrdersTact, Train_Update, RailDot_CanPass): a train standing on a line that pushes (push_flag 1) is
+// pushed along it to its end as the level starts - so its order begins there (`from_line`) - and no
+// train enters a line against its way (RailDot_CanPass: the far point's pushLink leads back), unless
+// its army passes the red lights (red_lights.cpp). The route the engine looks for ends at the point
+// nearest to the goal it can reach, so an order past such a line looks like a train that does nothing
+// but drive to the line and stop. The editor walks the rail network the way the lines allow - every
+// link both ways but against a line - to say so before the map is played. It does not count the room
+// a train needs to reverse at a switch: what it calls reachable may still need a dead end to turn in.
+
+struct LineWay {
+    PushLine line;
+    std::vector<uint8_t*> path;   // from the begin to the end
+};
+// The lines of the map as SetPushLine builds them: the editor's, then the script's.
+std::vector<LineWay> line_ways() {
+    std::vector<LineWay> out;
+    const std::vector<PushLine>* lists[] = {&mission_push_lines(), &mission_script_push_lines()};
+    for (const auto* list : lists)
+        for (const PushLine& l : *list) {
+            const Trace t = trace(l);
+            if (!t.error && t.path.size() > 1) out.push_back({l, t.path});
+        }
+    return out;
+}
+
+// The pushing line a car stands on (its front or rear rail point on the line's way, but its end):
+// the line's end, else nullptr.
+uint8_t* pushed_to_end(uint8_t* car, const std::vector<LineWay>& ways, PushLine* which = nullptr) {
+    uint8_t* dots[] = {at<uint8_t*>(car, E_FRONT_DOT), at<uint8_t*>(car, E_REAR_DOT)};
+    for (const LineWay& w : ways) {
+        if (!w.line.flag) continue;
+        for (uint8_t* d : dots)
+            if (d && d != w.path.back() && std::find(w.path.begin(), w.path.end(), d) != w.path.end()) {
+                if (which) *which = w.line;
+                return w.path.back();
+            }
+    }
+    return nullptr;
+}
+
+// Whether a train of `army` can drive from the rail point `from` to `goal`: a breadth-first walk over
+// the links, refusing a step against a line's way (from its point i + 1 back to i) - but the line
+// `skip`. `met` gets the lines that refused a step.
+bool reach_walk(uint8_t* from, uint8_t* goal, bool free, const std::vector<LineWay>& ways, size_t skip, std::set<size_t>* met) {
+    if (from == goal) return true;
+    std::map<std::pair<uint8_t*, uint8_t*>, size_t> against;   // (from, to) -> the line it goes against
+    if (!free)
+        for (size_t w = 0; w < ways.size(); ++w)
+            if (w != skip)
+                for (size_t i = 0; i + 1 < ways[w].path.size(); ++i) against[{ways[w].path[i + 1], ways[w].path[i]}] = w;
+    std::set<uint8_t*> seen{from};
+    std::vector<uint8_t*> queue{from};
+    for (size_t i = 0; i < queue.size(); ++i)
+        for (int k = 0; k < dot_links(queue[i]); ++k) {
+            uint8_t* o = dot_link(queue[i], k);
+            if (!o || seen.count(o)) continue;
+            const auto a = against.find({queue[i], o});
+            if (a != against.end()) {
+                if (met) met->insert(a->second);
+                continue;
+            }
+            if (o == goal) return true;
+            seen.insert(o);
+            queue.push_back(o);
+        }
+    return false;
+}
+
+// The same for a train of `army` (one that passes the red lights is refused nothing); when the goal is
+// not reached, `blocker` gets the line without which it would be (none: no track leads there, or
+// several lines together are in the way - then the first one met).
+bool reachable(uint8_t* from, uint8_t* goal, int army, const std::vector<LineWay>& ways, PushLine* blocker) {
+    if (!from || !goal) return false;
+    const bool free = army >= 0 && (mission_factories().ai.red_lights >> army) & 1;
+    std::set<size_t> met;
+    if (reach_walk(from, goal, free, ways, SIZE_MAX, &met)) return true;
+    if (blocker && !met.empty()) {
+        *blocker = ways[*met.begin()].line;
+        for (size_t w : met)
+            if (reach_walk(from, goal, free, ways, w, nullptr)) {
+                *blocker = ways[w].line;
+                break;
+            }
+    }
+    return false;
+}
+
+// The rail point a car stands nearest to (its front's), or the nearest point of the network.
+uint8_t* car_dot(uint8_t* car) {
+    if (uint8_t* d = at<uint8_t*>(car, E_FRONT_DOT)) return d;
+    return nearest_dot(static_cast<int>(std::lround(at<float>(car, O_X))),
+                       static_cast<int>(std::lround(at<float>(car, O_Y) - at<float>(car, O_Z))));
+}
+
+// What stands in the way of a train's order, in words for the status line ("" none): pushed along a
+// line first (the order starts at its end), a point it cannot reach past a one-way line.
+std::string order_problem(uint8_t* car, int task, int x, int y) {
+    const std::vector<LineWay> ways = line_ways();
+    std::string out;
+    uint8_t* start = car_dot(car);
+    PushLine on{};
+    for (uint8_t* k : train_of(car))
+        if (uint8_t* end = pushed_to_end(k, ways, &on)) {
+            start = end;
+            out = ui_printf(ui_format("MsgOrderPushed", "it stands on the line %d,%d -> %d,%d, which pushes it to %d,%d first - its order starts there"),
+                            on.bx, on.by, on.ex, on.ey, at<int>(end, DOT_X), screen_y(end));
+            break;
+        }
+    if (task && task != TASK_ATTACK && task != TASK_TARGET) {
+        uint8_t* goal = nearest_dot(x, y);
+        PushLine block{};
+        bool blocked = false;
+        if (goal && !reachable(start, goal, army_of(car), ways, &block)) blocked = true;
+        // a patrol comes back too
+        if (goal && !blocked && task == TASK_PATROL && !reachable(goal, start, army_of(car), ways, &block)) blocked = true;
+        if (blocked) {
+            if (!out.empty()) out += "; ";
+            out += block.bx || block.by || block.ex || block.ey
+                       ? ui_printf(ui_format("MsgOrderBlocked", "%d,%d cannot be reached: the one-way line %d,%d -> %d,%d is in the way - the train stops at it"),
+                                   x, y, block.bx, block.by, block.ex, block.ey)
+                       : ui_printf(ui_format("MsgOrderNoWay", "%d,%d cannot be reached: no track leads there from the train"), x, y);
+        }
+    }
+    return out;
 }
 
 bool push_lines_editable() {
@@ -7488,6 +7655,7 @@ struct Choice {
 struct ContextRow {
     UiText label;
     std::vector<Choice> choices;
+    UiText tip;   // what the row does, in the status line while the mouse is over it (none: nothing)
 };
 
 uint8_t* g_context = nullptr;   // the object of the open panel
@@ -7501,6 +7669,18 @@ struct Hit {
     int row, choice;
 };
 std::vector<Hit> g_context_hits;   // the choices where the last frame drew them
+struct RowTip {
+    float l, t, r, b;
+    std::string tip;
+};
+std::vector<RowTip> g_context_tips;   // the rows with a tip where the last frame drew them
+
+// The tip of the open panel's row under the mouse, for the status line.
+const char* context_tip(POINT m) {
+    for (const RowTip& t : g_context_tips)
+        if (m.x >= t.l && m.x < t.r && m.y >= t.t && m.y < t.b) return t.tip.c_str();
+    return nullptr;
+}
 constexpr int CONTEXT_FONT = 2, CONTEXT_LIT = 7, CONTEXT_STEP = 6;
 constexpr float CONTEXT_ROW = 41, CONTEXT_WIDTH = 409, CONTEXT_LABEL = 15;   // the label's characters
 
@@ -7574,6 +7754,141 @@ void faction_rows(uint8_t* o, std::vector<ContextRow>& rows) {
     const UiText back{"CtxFiresBack", "WHEN ATTACKED"}, never{"CtxFiresNever", "NEVER"};
     rows.push_back({{"CtxFires", "IT FIRES:"},
                     {{back, on, [o, back] { set_fires(o, true, back); }}, {never, !on, [o, never] { set_fires(o, false, never); }}}});
+}
+
+// The factory a train of the neutrals or the pirates is built again in: the nearest factory of its
+// army (the enemy's: the AI's first free one, no factory named), else nullptr.
+uint8_t* rebuild_factory(uint8_t* car) {
+    uint8_t* best = nullptr;
+    float best_d = 0;
+    const int army = army_of(car);
+    for_each_object([&](uint8_t* o) {
+        if (removed(o) || nvid_of(o) != VID_DEPOT || army_of(o) != army) return;
+        const float d = std::hypot(at<float>(o, O_X) - at<float>(car, O_X), at<float>(o, O_Y) - at<float>(car, O_Y));
+        if (!best || d < best_d) {
+            best = o;
+            best_d = d;
+        }
+    });
+    return best;
+}
+
+// A train's TARGET (any army, a map that runs arrivals): an object it attacks when the level starts (the
+// runner's ACT_ATTACK; the enemy's train goes to its AI once the target is gone) - it replaces the
+// train's other order; and its START: at once or n s after the level starts (order_wait).
+void target_rows(uint8_t* o, std::vector<ContextRow>& rows) {
+    Order order;
+    const bool has = train_order(o, order);
+    static std::string target_text;
+    target_text.clear();
+    if (has && order.task == TASK_TARGET)
+        target_text = ui_printf(ui_format("CtxTargetIs", "VID %d AT %d,%d"), order.target, order.x, order.y);
+    ContextRow target{{"CtxTarget", "TARGET:"},
+                      {{{"CtxTargetPick", "PICK..."}, g_patrol_train == o && g_order_task == TASK_TARGET, [o] {
+                            g_patrol_train = o;
+                            g_order_task = TASK_TARGET;
+                            g_context = nullptr;
+                            MESSAGE("MsgTargetPick", "target: click the unit or building the train attacks");
+                        }}},
+                      {"TipTarget", "Target: a unit or building the train attacks when the level starts, in place of its other order (the "
+                                    "enemy's train goes to its AI to attack once the target is gone; the others' stay)"}};
+    if (!target_text.empty()) target.choices.insert(target.choices.begin(), {{nullptr, target_text.c_str()}, true, [] {}});
+    rows.push_back(target);
+    if (!has) return;
+    auto set_wait = [o](int wait) {
+        const std::vector<uint8_t*> cars = all_cars();
+        const std::vector<State> before = states(cars);
+        for (uint8_t* k : train_of(o)) {
+            Order now;
+            if (!order_of(k, now)) continue;
+            now.wait = (std::max)(0, wait);
+            set_order(k, true, now);
+        }
+        commit_cars({"OpOrderStart", "order start"}, cars, before);
+    };
+    static std::string wait_text;
+    const int w = order.wait;
+    wait_text = ui_printf(ui_format("CtxStartAfter", "AFTER %d S"), w ? w : 10);
+    rows.push_back({{"CtxStart", "STARTS:"},
+                    {{{"CtxStartNow", "AT ONCE"}, w == 0, [set_wait] { set_wait(0); }},
+                     {{nullptr, "-"}, false, [set_wait, w] { set_wait(w > 10 ? w - 10 : 0); }},
+                     {{nullptr, wait_text.c_str()}, w > 0, [set_wait, w] { set_wait(w ? w : 10); }},
+                     {{nullptr, "+"}, false, [set_wait, w] { set_wait(w + 10); }}},
+                    {"TipStart", "Starts: the order begins at once or so many seconds after the level starts (steps of 10 s); until then the "
+                                 "train stands"}});
+}
+
+// A train of the enemy, the neutrals or the pirates with an order, in a map that runs arrivals: REBUILT
+// WHEN LOST - NO, ONCE, 3 TIMES, ALWAYS - and the wait after the loss (the runner's plan entry of
+// plan_when 3, editor_mission.cpp). The player's trains are the player's to build.
+void rebuild_row(uint8_t* o, std::vector<ContextRow>& rows) {
+    const int army = army_of(o);
+    Order order;
+    if (army == 0 || !mission_arrivals().on || !train_order(o, order) || order.task == TASK_TARGET) return;
+    auto set = [o](int rebuild, int wait) {
+        const std::vector<uint8_t*> cars = all_cars();
+        const std::vector<State> before = states(cars);
+        for (uint8_t* k : train_of(o)) {
+            Order now;
+            if (!order_of(k, now)) continue;
+            now.rebuild = rebuild;
+            now.rebuild_wait = (std::max)(10, wait);
+            set_order(k, true, now);
+        }
+        commit_cars({"OpRebuild", "rebuilt when lost"}, cars, before);
+    };
+    const int r = order.rebuild, w = order.rebuild_wait;
+    uint8_t* factory = army == 1 ? nullptr : rebuild_factory(o);
+    rows.push_back({{"CtxRebuild", "REBUILT:"},
+                    {{{"CtxRebuildNo", "NO"}, r == 0, [set, w] { set(0, w); }},
+                     {{"CtxRebuildOnce", "ONCE"}, r == 1, [set, w] { set(1, w); }},
+                     {{"CtxRebuild3", "3 TIMES"}, r == 3, [set, w] { set(3, w); }},
+                     {{"CtxRebuildAlways", "ALWAYS"}, r < 0, [set, w] { set(-1, w); }}},
+                    army == 1 ? UiText{"TipRebuildEnemy", "Rebuilt when lost: when its locomotive is destroyed or taken, the enemy's AI builds the same "
+                                                          "train in its first free factory and gives it the same order"}
+                    : factory ? UiText{"TipRebuildOwn", "Rebuilt when lost: when its locomotive is destroyed or taken, the nearest factory of its "
+                                                        "army builds the same train, car by car, paid by its army, and sends it to the same order"}
+                              : UiText{"TipRebuildNoFactory", "Rebuilt when lost: its army has no factory on the map - nothing would build it"}});
+    if (r != 0) {
+        static std::string wait_text;
+        wait_text = ui_printf(ui_format("CtxRebuildWait", "%d S AFTER THE LOSS"), w);
+        rows.push_back({{"CtxRebuildAfter", "REBUILT IN:"},
+                        {{{nullptr, "-"}, false, [set, r, w] { set(r, w - 10); }},
+                         {{nullptr, wait_text.c_str()}, true, [] {}},
+                         {{nullptr, "+"}, false, [set, r, w] { set(r, w + 10); }}},
+                        {"TipRebuildWait", "Rebuilt in: how long after the loss the factory starts the new train (steps of 10 s)"}});
+    }
+}
+
+// A neutral's or a pirates' train on an editor map: whether the trains of its army stop at the red
+// lights - a one-way line against their way - or drive through (red_lights.cpp, PASS_RED_LIGHTS in the
+// settings' block). One rule for the whole army: the engine tests the army bits of the car.
+void red_light_row(uint8_t* o, std::vector<ContextRow>& rows) {
+    const int army = army_of(o);
+    if ((army != 2 && army != 3) || !mission_managed()) return;
+    const int bit = 1 << army;
+    const bool on = (mission_factories().ai.red_lights & bit) != 0;
+    auto set = [bit, army](bool pass) {
+        const FactoryState before = mission_factories();
+        AiKnobs& ai = mission_factories().ai;
+        ai.red_lights = pass ? (ai.red_lights | bit) : (ai.red_lights & ~bit);
+        if (mission_factories() == before) return;
+        edit_commit_factories({"OpRedLights", "red lights"}, before);
+        if (pass)
+            MESSAGE("MsgRedPass", "red lights: the trains of army %d (%s) drive on along the one-way lines; the other armies' stop", army,
+                    army_name(army));
+        else
+            MESSAGE("MsgRedStop", "red lights: the trains of army %d (%s) stop at them, as every train does", army, army_name(army));
+    };
+    rows.push_back({{"CtxRedLights", "AT RED LIGHTS:"},
+                    {{{"CtxRedStops", "STOPS"}, !on, [set] { set(false); }},
+                     {{army == 2 ? "CtxRedPassNeutral" : "CtxRedPassPirates", army == 2 ? "DRIVES ON (ALL NEUTRALS)" : "DRIVES ON (ALL PIRATES)"},
+                      on, [set] { set(true); }}},
+                    {army == 2 ? "TipRedNeutral" : "TipRedPirates",
+                     army == 2 ? "Red lights: whether the neutrals' trains stop at a one-way line against their way, as every train does, or "
+                                 "drive on along it - one rule for every neutral train of the map"
+                               : "Red lights: whether the pirates' trains stop at a one-way line against their way, as every train does, or "
+                                 "drive on along it - one rule for every pirate train of the map"}});
 }
 
 // The gun `nvid` (0: none) into socket `i` of the host: the old one goes, the new one comes.
@@ -7804,7 +8119,18 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
             }
             orders.choices.push_back({{"CtxOrderPatrol", "PATROL..."}, current(TASK_PATROL), pick(TASK_PATROL)});
         }
+        static std::string order_tip;   // what stands in its way, else what the row does
+        order_tip = has ? order_problem(o, order.task, order.x, order.y) : std::string();
+        if (order_tip.empty())
+            order_tip = ui_text("TipOrders", "Orders: what the train does when the level starts - a click on a choice that needs a point, then "
+                                             "a click on the track");
+        else
+            order_tip = ui_printf(ui_format("TipOrderProblem", "Orders: %s"), order_tip.c_str());
+        orders.tip = {nullptr, order_tip.c_str()};
         rows.push_back(orders);
+        if (mission_arrivals().on) target_rows(o, rows);
+        rebuild_row(o, rows);
+        red_light_row(o, rows);
         rows.push_back({{"CtxDelete", "DELETE (DEL):"},
                         {{{"CtxDeleteCar", "CAR"}, false, [o] {
                               delete_objects({o});
@@ -7983,6 +8309,7 @@ std::vector<ContextRow> open_rows() {
 
 void draw_context() {
     g_context_hits.clear();
+    g_context_tips.clear();
     if (g_context && removed(g_context)) g_context = nullptr;
     if (g_context_line >= static_cast<int>(mission_push_lines().size())) g_context_line = -1;
     if (!g_context && g_context_line < 0) return;
@@ -8013,6 +8340,7 @@ void draw_context() {
             continue;
         }
         const ContextRow& row = rows[r - 1];
+        if (row.tip.key || *row.tip.english) g_context_tips.push_back({x, ry, x + CONTEXT_WIDTH, ry + CONTEXT_ROW, row.tip.get()});
         draw_text(CONTEXT_FONT, x + 10, ty, row.label.get(), false, CONTEXT_STEP + 1);
         float cx = x + 10 + CONTEXT_LABEL * cw;
         for (size_t c = 0; c < row.choices.size(); ++c) {
@@ -8136,8 +8464,10 @@ void draw_overlay() {
         Order o;
         train_order(g_selection[0], o);
         draw_text(FONT_TIPS, sx + 8, sy - 6,
-                  o.task == TASK_DRIVE ? ui_text("WordDrive", "drive") : o.task == TASK_GUARD ? ui_text("WordGuard", "guard")
-                                                                                         : ui_text("WordPatrol", "patrol"),
+                  o.task == TASK_DRIVE    ? ui_text("WordDrive", "drive")
+                  : o.task == TASK_GUARD  ? ui_text("WordGuard", "guard")
+                  : o.task == TASK_TARGET ? ui_text("WordTarget", "target")
+                                          : ui_text("WordPatrol", "patrol"),
                   false, 3);
     }
     if (g_patrol_train && !removed(g_patrol_train)) {   // picking it: the rail point under the cursor
@@ -8282,6 +8612,7 @@ void draw_overlay() {
     if (hover >= 0 && *shown.key) std::snprintf(tool_text + std::strlen(tool_text), sizeof tool_text - std::strlen(tool_text), " (%s)", shown.key);
     if (const char* tip = panel_tip(g_mouse)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // the Help or Menu button
     if (const char* tip = music_tip(g_mouse)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // the music player
+    if (const char* tip = context_tip(g_mouse)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // a row of an object's panel
     std::snprintf(status, sizeof status, ui_format("StatusLine", "EDITOR - %s - undo %u, redo %u%s   %s"), tool_text,
                   static_cast<unsigned>(g_undo.size()), static_cast<unsigned>(g_redo.size()),
                   g_dirty ? ui_text("StatusNotSaved", " - not saved") : "",
@@ -8784,6 +9115,7 @@ void edit_reset() {
 std::vector<TrainPatrol> edit_train_patrols() {
     std::vector<TrainPatrol> out;
     std::set<uint8_t*> done;
+    const std::vector<LineWay> ways = line_ways();
     for (const auto& p : g_patrols) {
         if (removed(p.first)) continue;
         uint8_t* first = train_of(p.first).front();
@@ -8797,6 +9129,25 @@ std::vector<TrainPatrol> edit_train_patrols() {
         uint8_t* dot = nearest_dot(t.x, static_cast<int>(std::lround(at<float>(first, O_Y) - at<float>(first, O_Z))));
         t.from_x = dot ? at<int>(dot, DOT_X) : t.x;
         t.from_y = dot ? screen_y(dot) : static_cast<int>(std::lround(at<float>(first, O_Y) - at<float>(first, O_Z)));
+        t.from_z_dot = dot ? at<int>(dot, DOT_Z) : 76;
+        t.rebuild = p.second.rebuild;
+        t.rebuild_wait = p.second.rebuild_wait;
+        t.target = p.second.target;
+        t.wait = p.second.wait;
+        if (t.rebuild && t.army != 1)
+            if (uint8_t* f = rebuild_factory(first)) {
+                t.fx = static_cast<int>(std::lround(at<float>(f, O_X)));
+                t.fy = static_cast<int>(std::lround(at<float>(f, O_Y)));
+            }
+        // standing on a line that pushes: the line takes it to its end at the start, the order starts there
+        for (uint8_t* k : train_of(first))
+            if (uint8_t* end = pushed_to_end(k, ways)) {
+                t.from_line = true;
+                t.from_x = at<int>(end, DOT_X);
+                t.from_y = screen_y(end);
+                t.from_z = at<int>(end, DOT_Z);
+                break;
+            }
         for (uint8_t* k : train_of(first)) t.cars.push_back(nvid_of(k));
         out.push_back(t);
     }
@@ -9146,7 +9497,7 @@ void edit_assign_orders() {
                 best = c;
             }
         }
-        if (best) g_patrols[best] = {p.task, p.to_x, p.to_y, p.to_z};
+        if (best) g_patrols[best] = {p.task, p.to_x, p.to_y, p.to_z, p.rebuild, p.rebuild_wait, p.target, p.wait};
         else patch::log("edit: no train of VID %d at %d,%d for its patrol", p.nvid, p.x, p.y);
     }
 }

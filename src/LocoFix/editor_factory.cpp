@@ -305,6 +305,8 @@ std::string when_words(const FactoryTrain& t, int index) {
     }
     if (t.times == 1) return w + ", " + ui_text("ArrOnce", "ONCE");
     const std::string every = seconds(t.every);
+    if (t.renew && t.times == 0) return w + ", " + ui_printf(ui_format("PlanListRenewEndless", "REBUILT WHEN LOST, %s AFTER"), every.c_str());
+    if (t.renew) return w + ", " + ui_printf(ui_format("PlanListRenewTimes", "%d IN ALL, REBUILT WHEN LOST"), t.times);
     if (t.times == 0) return w + ", " + ui_printf(ui_format("ArrListEndless", "WITHOUT END EVERY %s"), every.c_str());
     return w + ", " + ui_printf(ui_format("ArrListTimes", "%d TIMES EVERY %s"), t.times, every.c_str());
 }
@@ -581,7 +583,14 @@ float draw_repeat(const FactoryTrain& t, float y) {
         x = number(x, y, seconds(t.every), [](int by) {
             change({"OpPlanRepeat", "factory plan repeat"}, [by](FactoryTrain& r) { r.every = (std::max)(10, r.every + by * 10); });
         });
-        put(x, y, fit(ui_text("PlanEveryNote", "AFTER THE LAST"), x));
+        if (army() == 0) {   // the player's factory: the next one after the last one is made
+            put(x, y, fit(ui_text("PlanEveryNote", "AFTER THE LAST"), x));
+        } else {   // an AI army's: after the last one is made, or rebuilt once it is lost
+            x = put(x, y, ui_text("PlanAfterMade", "AFTER THE LAST IS MADE"), !t.renew,
+                    [] { change({"OpPlanRepeat", "factory plan repeat"}, [](FactoryTrain& r) { r.renew = false; }); });
+            put(x + g_cw, y, fit(ui_text("PlanAfterLost", "LOST"), x + g_cw), t.renew,
+                [] { change({"OpPlanRepeat", "factory plan repeat"}, [](FactoryTrain& r) { r.renew = true; }); });
+        }
         y += ROW;
     }
     return y;
@@ -716,6 +725,11 @@ void draw_ai() {
                          {ui_text("WordNo", "NO"), [] { change_ai([](AiKnobs& a) { a.clever = 0; }); }}},
                         ai.clever ? 0 : 1, runs() ? "AiCleverNote" : "AiCleverArrivals",
                         runs() ? "THE ENGINE'S, WITH THE WEAPONS' RANGE" : "ONLY IN A MAP WITH ARRIVALS");
+        y = knob_choice(y, "AiNeutralTrains", "NEUTRAL TRAINS:", "SETENEMYCANATTACKNEUTRALTRAINS",
+                        {{ui_text("AiNeutralHit", "FIRES AT THEM"), [] { change_ai([](AiKnobs& a) { a.neutral_trains = 1; }); }},
+                         {ui_text("AiNeutralSpare", "ONLY WHEN HIT"), [] { change_ai([](AiKnobs& a) { a.neutral_trains = 0; }); }}},
+                        ai.neutral_trains ? 0 : 1, runs() ? "AiNeutralNote" : "AiCleverArrivals",
+                        runs() ? "THE ENEMY'S GUNS TAKE NEUTRAL TRAINS AS TARGETS" : "ONLY IN A MAP WITH ARRIVALS");
         y = knob_number(y, "AiAllAttack", "ALL ATTACK:", "STG_DESTROY_TIME", ui_printf(ui_format("AiMinutes", "%d MIN"), ai.all_attack),
                         [](int by) { change_ai([by](AiKnobs& a) { a.all_attack = (std::max)(0, a.all_attack + by); }); }, "AiAllAttackNote",
                         "ONLY MISSION 2 READS IT: NO EFFECT HERE");

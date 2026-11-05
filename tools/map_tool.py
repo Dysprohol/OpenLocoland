@@ -881,6 +881,66 @@ ArrivalTry(int i,int t)
 // as BuildTrain swaps them back. The others' factory builds its train as PlanBuild says. The cars
 // planned and the cars made are logged ("ARRIVAL F<n>").
 int plan_queued=0;
+// A train that is built again when it is lost (plan_renew): its locomotive (plan_loco) is watched
+// (plan_lost -1) - a variable of an object is 0 once the object is gone -, and the train is lost
+// when it is destroyed or taken by another army (plan_lost: the second, at least 1). A train of the
+// map (plan_when 3, its order plan_order - 1) is the entry's first wave.
+PlanLoco(int u)
+{
+  int c,v;
+  for( c=Action(u,ACT_FIRST_ENGINE); c; c=Action(c,ACT_NEXT_ENGINE) )
+  {
+    v=GetUnitVid(c);
+    if( v==5 || v==10 || v==97 )
+      return c;
+  }
+  return u;
+}
+PlanMade(int i,int u,int t)
+{
+  if( !plan_renew[i] )
+    return 0;
+  plan_loco[i]=0;
+  plan_lost[i]=t+1;
+  if( u )
+  {
+    plan_loco[i]=PlanLoco(u);
+    plan_lost[i]=-1;
+  }
+  return 1;
+}
+PlanWatch(int i,int t)
+{
+  if( !plan_renew[i] || plan_lost[i]!=-1 )
+    return 0;
+  if( plan_loco[i] )
+    if( GetUnitVid(plan_loco[i]) )
+      if( Action(plan_loco[i],act_getarmy,0,0)==plan_army[i] )
+        return 0;
+  plan_loco[i]=0;
+  plan_lost[i]=t+1;
+  Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i])+" lost at "+itoa(t)+" s: its locomotive destroyed or taken - again in "+itoa(plan_every[i])+" s");
+  return 1;
+}
+PlanAdopt(int i,int t)
+{
+  int o;
+  o=plan_order[i]-1;
+  if( o<0 || o>=ORDERS )
+    return 0;
+  if( order_state[o]!=2 )
+    return 0;
+  plan_done[i]=1;
+  plan_last[i]=t;
+  plan_since[i]=t;
+  if( GetUnitVid(order_unit[o]) )
+  {
+    plan_loco[i]=PlanLoco(order_unit[o]);
+    plan_lost[i]=-1;
+  }
+  Log("ARRIVAL F"+itoa(i+1)+" the map's train of order "+itoa(o+1)+" is wave 1, watched: "+itoa(plan_loco[i]!=0));
+  return 0;
+}
 PlanTaken(int t)
 {
   int i,j,k;
@@ -919,6 +979,7 @@ PlanFollow(int i,int t)
   }
   else
     Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i])+" lost at "+itoa(t)+" s: the AI dropped its build");
+  PlanMade(i,u,t);
   return 1;
 }
 // PlanPrice(v): what a car costs (price_*[], the factory's panel's prices).
@@ -959,6 +1020,7 @@ PlanBuild(int i,int t)
     plan_done[i]=plan_done[i]+1;
     plan_last[i]=t;
     Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i])+" lost at "+itoa(t)+" s: its factory is gone or not of army "+itoa(plan_army[i]));
+    PlanMade(i,0,t);
     return 0;
   }
   arr_gettype(temp_array,plan_type[i]);
@@ -981,10 +1043,12 @@ PlanBuild(int i,int t)
     if( !u )
     {
       Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i])+" lost at "+itoa(t)+" s: no train at the factory");
+      PlanMade(i,0,t);
       return 0;
     }
     MissionCars(u);
     Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i])+" built at "+itoa(t)+" s army "+itoa(plan_army[i])+" made "+mission_cars);
+    PlanMade(i,u,t);
     if( plan_task[i]==-2 || plan_task[i]==-3 )
       Action(u,ACT_MOVE,plan_to_x[i],plan_to_y[i]+plan_to_z[i]);
     if( plan_task[i]==-3 )
@@ -1029,7 +1093,11 @@ PlanTry(int i,int t)
   int go,n,f;
   if( plan_times[i] && plan_done[i]>=plan_times[i] )
     return 0;
-  if( plan_done[i] )
+  if( plan_when[i]==3 && !plan_done[i] )   // a train of the map: it is the first wave
+    return PlanAdopt(i,t);
+  if( plan_done[i] && plan_renew[i] )   // again once the last one is lost
+    go=plan_lost[i]>0 && t+1-plan_lost[i]>=plan_every[i];
+  else if( plan_done[i] )
     go=t-plan_last[i]>=plan_every[i];
   else if( plan_when[i]==1 && plan_prev[i]>=0 )
   {
@@ -1059,6 +1127,7 @@ PlanTry(int i,int t)
     plan_base[i]=strlen(GetCommands(f));
     plan_next[i]=0;
     plan_state[i]=3;
+    plan_lost[i]=0;
     MissionTypeCars(plan_type[i],0);
     Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i]+1)+" ordered at "+itoa(t)+" s army "+itoa(plan_army[i])+" task "+itoa(plan_task[i])+" cars "+mission_cars);
     return 1;
@@ -1070,6 +1139,7 @@ PlanTry(int i,int t)
   plan_fifo[n]=i;
   plan_queued=n+1;
   plan_state[i]=1;
+  plan_lost[i]=0;
   MissionTypeCars(plan_type[i],1);
   Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i]+1)+" queued at "+itoa(t)+" s place "+itoa(n)+" type "+itoa(plan_type[i])+" task "+itoa(plan_task[i])+" cars "+mission_cars);
   return 1;
@@ -1087,6 +1157,7 @@ PlanTact(int t)
     plan_queued=n;
   for( i=0; i<PLANS; i++ )
   {
+    PlanWatch(i,t);
     PlanOnPoint(i);
     if( plan_state[i]==2 )
       PlanFollow(i,t);
@@ -1136,36 +1207,124 @@ CaptureTact()
       }
   }
 }
-// OrdersTact(): the orders of the map's trains (order_*[]), once at the start: each train found by its
-// first car's VID and place, then driven or patrolling (-2, -3), the enemy's given to the AI with its task.
-OrdersTact()
+// OrdersFind(), on the level's first frame, and OrdersTact(t), once a second: the orders of the map's
+// trains (order_*[]). A train is found by its first car's VID and place before anything moves it - a
+// one-way line that pushes (push_flag 1) takes a train standing on it to its end at once, and a train
+// looked for a second later was not found -, and gets its order once it has stopped at order_from (the
+// end of such a line; 0,0: where it stood) - within its length and 40 px, at most 30 s after the start:
+// driven or patrolling (-2, -3), the enemy's given to the AI with its task.
+OrdersFind()
 {
-  int i,u,k;
+  int i;
   for( i=0; i<ORDERS; i++ )
   {
-    u=FindNearestSprite(GETSPRITE_VID+order_vid[i],order_x[i],order_y[i],20);
-    k=-1;
-    if( u && order_task[i]==-2 )
-      Action(u,ACT_MOVE,order_to_x[i],order_to_y[i]+order_to_z[i]);
-    if( u && order_task[i]==-3 )
-      PatrolEngine(u,order_to_x[i],order_to_y[i]);
-    if( u && order_task[i]>=0 )
+    order_unit[i]=FindNearestSprite(GETSPRITE_VID+order_vid[i],order_x[i],order_y[i],20);
+    order_state[i]=1;
+    if( !order_unit[i] )
     {
-      k=find_num();
-      if( k>=0 )
-      {
-        ai_trains[k]=u;
-        ai_trains_type[k]=order_type[i];
-        ai_trains_task[k]=order_task[i];
-        ai_trains_task2[k]=ATA_NONE;
-        ai_trains_task_backup[k]=ATA_NONE;
-        ai_trains_behave[k]=0;
-        ai_trains_time[k]=GetTime();
-        ai_trains_random_task[k]=0;
-      }
+      order_state[i]=2;
+      Log("ORDER "+itoa(i+1)+" task "+itoa(order_task[i])+" train 0: none at "+itoa(order_x[i])+","+itoa(order_y[i]));
     }
-    Log("ORDER "+itoa(i+1)+" task "+itoa(order_task[i])+" train "+itoa(u!=0)+" slot "+itoa(k));
   }
+}
+OrderTry(int i,int t)
+{
+  int u,k;
+  u=order_unit[i];
+  if( !GetUnitVid(u) )
+  {
+    order_state[i]=2;
+    Log("ORDER "+itoa(i+1)+" task "+itoa(order_task[i])+": the train was lost before its order");
+    return 0;
+  }
+  if( t<order_wait[i] )   // it starts later
+    return 0;
+  if( (order_from_x[i] || order_from_y[i]) && t<30+order_wait[i] )   // pushed along a line first: stopped past its end
+  {
+    MissionCars(u);
+    if( SizeTo(u,order_from_x[i],order_from_y[i]+order_from_z[i])>=40+48*mission_count || Action(u,ACT_GET_SPEED) )
+      return 0;
+  }
+  if( order_task[i]==-4 )   // attack an object; the enemy's train goes to the AI once it is gone
+  {
+    order_target[i]=FindNearestSprite(GETSPRITE_VID+order_tvid[i],order_to_x[i],order_to_y[i]+order_to_z[i],30);
+    order_state[i]=2;
+    if( !order_target[i] )
+    {
+      Log("ORDER "+itoa(i+1)+" task -4: no VID "+itoa(order_tvid[i])+" at "+itoa(order_to_x[i])+","+itoa(order_to_y[i]));
+      return 0;
+    }
+    Action(u,ACT_ATTACK,order_target[i]);
+    order_state[i]=3;
+    Log("ORDER "+itoa(i+1)+" task -4 train 1 attacks VID "+itoa(order_tvid[i])+" at "+itoa(t)+" s at "+itoa(GetX(u))+","+itoa(GetY(u)));
+    return 1;
+  }
+  k=-1;
+  if( order_task[i]==-2 )
+    Action(u,ACT_MOVE,order_to_x[i],order_to_y[i]+order_to_z[i]);
+  if( order_task[i]==-3 )
+    PatrolEngine(u,order_to_x[i],order_to_y[i]);
+  if( order_task[i]>=0 )
+  {
+    k=find_num();
+    if( k>=0 )
+    {
+      ai_trains[k]=u;
+      ai_trains_type[k]=order_type[i];
+      ai_trains_task[k]=order_task[i];
+      ai_trains_task2[k]=ATA_NONE;
+      ai_trains_task_backup[k]=ATA_NONE;
+      ai_trains_behave[k]=0;
+      ai_trains_time[k]=GetTime();
+      ai_trains_random_task[k]=0;
+    }
+  }
+  order_state[i]=2;
+  Log("ORDER "+itoa(i+1)+" task "+itoa(order_task[i])+" train 1 slot "+itoa(k)+" at "+itoa(t)+" s at "+itoa(GetX(u))+","+itoa(GetY(u)));
+  return 1;
+}
+// OrderTarget(i,t): a train attacking its target (order_state 3) - the target's variable is 0 once it
+// is gone; then the enemy's train goes to the AI to attack, the others' stays.
+OrderTarget(int i,int t)
+{
+  int u,k;
+  u=order_unit[i];
+  if( !GetUnitVid(u) )
+  {
+    order_state[i]=2;
+    return 0;
+  }
+  if( order_target[i] )
+    if( GetUnitVid(order_target[i]) )
+      return 0;
+  order_state[i]=2;
+  k=-1;
+  if( Action(u,ACT_GET_ARMY)==1 )
+  {
+    k=find_num();
+    if( k>=0 )
+    {
+      ai_trains[k]=u;
+      ai_trains_type[k]=order_type[i];
+      ai_trains_task[k]=ATA_FIGHT;
+      ai_trains_task2[k]=ATA_NONE;
+      ai_trains_task_backup[k]=ATA_NONE;
+      ai_trains_behave[k]=0;
+      ai_trains_time[k]=GetTime();
+      ai_trains_random_task[k]=0;
+    }
+  }
+  Log("ORDER "+itoa(i+1)+" target gone at "+itoa(t)+" s, AI slot "+itoa(k));
+  return 1;
+}
+OrdersTact(int t)
+{
+  int i;
+  for( i=0; i<ORDERS; i++ )
+    if( order_state[i]==1 )
+      OrderTry(i,t);
+    else if( order_state[i]==3 )
+      OrderTarget(i,t);
 }
 // ArrivalOnPoint(i): a train of a patrol (-3) that reached its point patrols to the other end from there.
 ArrivalOnPoint(int i)
@@ -1811,16 +1970,20 @@ ArrivalsTact()
 {
   int i,t;
   PiecesTact();
-  if( !OneTimeInSecond() )
-    return 0;
-  t=(GetTime()-time_game_total)/1000;
   iff(1)
   {
-    OrdersTact();
+    OrdersFind();
 #ifdef CLEVER_ATTACK
     SetCleverEnemyAttack(CLEVER_ATTACK);
 #endif
+#ifdef NEUTRAL_TRAINS
+    SetEnemyCanAttackNeutralTrains(1);
+#endif
   }
+  if( !OneTimeInSecond() )
+    return 0;
+  t=(GetTime()-time_game_total)/1000;
+  OrdersTact(t);
   FactoryTact(t);
   PlanTact(t);
   CaptureTact();
@@ -1933,6 +2096,14 @@ int order_type[]={0};
 int order_to_x[]={0};
 int order_to_y[]={0};
 int order_to_z[]={0};
+int order_from_x[]={0};
+int order_from_y[]={0};
+int order_from_z[]={0};
+int order_tvid[]={0};
+int order_wait[]={0};
+int order_target[]={0};
+int order_unit[]={0};
+int order_state[]={0};
 int unlock_x[]={0};
 int unlock_y[]={0};
 int unlock_vid[]={0};
@@ -1952,6 +2123,8 @@ int plan_prev[]={0};
 int plan_fx[]={0};
 int plan_fy[]={0};
 int plan_army[]={0};
+int plan_renew[]={0};
+int plan_order[]={0};
 int plan_to_x[]={0};
 int plan_to_y[]={0};
 int plan_to_z[]={0};
@@ -1966,6 +2139,8 @@ int plan_fifo[]={0};
 int plan_next[]={0};
 int plan_base[]={0};
 int plan_unit[]={0};
+int plan_loco[]={0};
+int plan_lost[]={0};
 int price_vid[]={0};
 int price_of[]={0};
 // </editor>

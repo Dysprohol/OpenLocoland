@@ -444,6 +444,29 @@ its AI makes a bare locomotive a ram) **ATTACK**, **GUARD...** a point or **PATR
 on the track. ORDERS are there only in a map that runs arrivals; a map made with an older version has
 **PATROL** only, until **CONVERT TO ARRIVALS** in the Arrivals panel.
 
+A train standing on a line that pushes (a factory's exit, a repair point's leg, a post's line) is pushed to
+the line's end when the level starts, and its order begins there. A point the train cannot reach - past a
+one-way line it may not enter - is named when the order is given and in the ORDERS row's text in the
+status line: in play such a train drives up to the line and stops.
+
+**Red lights for the neutrals and the pirates**: a neutral or a pirate train's panel has **AT RED
+LIGHTS: STOPS** (as every train) or **DRIVES ON** - then every train of that army may run along a one-way
+line against its arrow, where your and the enemy's trains are held (the level's exit lets them off the map
+too, onto the hidden track). One rule for the whole army.
+
+**Target and start**: **TARGET: PICK...** and a click on a unit or building of another army (a fort: one of
+its guns) - the train attacks it when the level starts, in place of its other order; the enemy's train then
+goes to its AI, the others' stay. **STARTS: AT ONCE** or **AFTER n S** holds the order until then. The enemy
+factory's **AI...** screen: **NEUTRAL TRAINS: FIRES AT THEM** (the enemy's guns fire at neutral trains) or
+**ONLY WHEN HIT**.
+
+**Rebuilt when lost**: an enemy, neutral or pirate train with an order has **REBUILT: NO / ONCE / 3 TIMES /
+ALWAYS** and **REBUILT IN** (seconds after the loss): when its locomotive is destroyed or taken, the enemy's
+AI (in its first free factory) or the nearest factory of its army builds the same train again and gives it
+the same order. In a factory's plan a train repeated n times or without end comes **AFTER THE LAST IS MADE**
+or when the last one is **LOST**. Not for your own factory and trains; a map that runs arrivals. A pirate train
+needs the locomotive 10: the scripts take a pirate locomotive 5 away at the start (it marks the reinforcement).
+
 **Capturing**: a neutral factory or repair point becomes yours when one of your trains comes close to it
 (a fort or a mining plant once its guns are gone).
 

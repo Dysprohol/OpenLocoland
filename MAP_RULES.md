@@ -200,6 +200,13 @@ does (the nearest points with links, a begin with a link, a way between them - n
 SetPushLine" or "Can't PushLineFindDot"); T switches push_flag, R turns the line round. The lines
 are kept in the editor's block of `main()` (8).
 
+**[editor]** A line holds every army's trains - the engine tests it against the army bits of the
+car, in `RailDot_CanPass` (the route) and `Train_Update` (a train heading into it stops and turns
+round). On an editor map the neutrals' or the pirates' trains may pass them (`#define
+PASS_RED_LIGHTS <mask>`, bit n army n: 4 the neutrals, 8 the pirates; a neutral or pirate train's
+panel, AT RED LIGHTS: DRIVES ON; LocoFix `red_lights.cpp`). One rule per army: the engine keeps nothing
+per train that would survive a train turning round or coupling.
+
 ## 6. Buildings
 
 The factory, the repair point, the fort and the mining plant are nDir 8: the direction is chosen,
@@ -292,6 +299,10 @@ moves or deletes its line and posts.
   U / C uncouple and couple, R turns a train round, a drag moves it along the track, the panel sets
   a patrol: `PatrolEngine(FindNearestSprite(GETSPRITE_VID + <first car's VID>, x, y, 20), to_x,
   to_y)` in main()'s editor block of the script. The saved cars are the missions' 40-byte records.
+- **[editor] A train on a line that pushes** (push_flag 1) is pushed to the line's end as the level
+  starts: the runner finds the map's trains on the first frame and gives the order once the train has
+  stopped at that end (`order_from`); an order's point past a one-way line the train may not enter is
+  reached only up to that line - the editor says so.
 
 ## 6b. Creatures and mines
 
