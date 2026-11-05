@@ -202,7 +202,7 @@ What you see:
 
 | Action | How |
 |---|---|
-| select | click an object (the smallest under the cursor); the circle marks it |
+| select | click an object (a car or unit before any other object, those before the rails; the smallest of them under the cursor); the circle marks it |
 | move | drag it |
 | turn | R / E or the mouse wheel |
 | raise / lower it | PgUp / PgDn by 4 (with Shift by 16), or Shift+wheel; Home puts it back on the ground - the status line shows its height above the ground |
@@ -532,11 +532,14 @@ AGAINST ALL SIDES**). A map of the editor plays so; the campaign's missions keep
   (ammunition, repair car, tankers), civil cars, obstacles; the row above the bar shows all of them, group
   after group (its arrows turn the pages, `[` `]` step through them, its label names the chosen car's
   group and its number, e.g. COMBAT CARS 5 / 23). A car goes on the track under the
-  cursor; placed at a train's end it is coupled to it. Make the enemy's train: choose **ENEMY** in the
+  cursor (where two tracks are near, the nearer one); next to a train's end on that track it is coupled
+  to it. Make the enemy's train: choose **ENEMY** in the
   palette's **ARMY** row (or `A` while placing, or `A` on the placed train), then a locomotive and a
-  gun car. `U` uncouples a car, `C` couples to another train,
-  `R` turns the train round, a drag moves it along the track. A train needs a **locomotive** to
-  move.
+  gun car. `U` uncouples a car, `C` couples to the train met along the same track (not one on a parallel
+  track), `R` turns the train round, `E` turns one car round in its place (a locomotive backwards in the
+  middle, a gun car at the end), a drag lays the train on the track under the cursor - when it does not
+  fit there (a dead end too short, another train) it stays and the status line says why. A train needs a
+  **locomotive** to move.
 - **A patrol**: the train's panel (right button) → ORDERS: **PATROL...**, then click the far end on
   the track. The train drives to and fro between where it stands and that point.
 - More enemy trains: more trains on the map with their orders, the enemy's arrivals (step 5) and the
@@ -669,13 +672,13 @@ tools, the rarer things placed, the two panels last.
 
 | Key | |
 |---|---|
-| R / E, wheel | turn: a step of the object's directions (R right, E left); turn round a train, a wreck on the track, a semaphore beside the track and, in the Push line tool, the line; a factory and a repair point follow their track (help page 15) |
+| R / E, wheel | turn: a step of the object's directions (R right, E left); turn round a train (E: only the selected car), a wreck on the track, a semaphore beside the track and, in the Push line tool, the line; a factory and a repair point follow their track (help page 15) |
 | A | next army; while placing: the army of the next object |
 | T | semaphore red / green; on a line: pushing on / off |
 | L / Shift+L | a line at the selected semaphore: lets in / keeps out |
 | Del / Shift+Del | delete / a whole train or section |
 | Ctrl+Z / Ctrl+Y | undo / redo |
-| U / C | uncouple / couple a car |
+| U / C | uncouple / couple a car (to the train along its track) |
 | `[` `]` | the next object of the row above the bar, the texture |
 | `<` `>` | the decals' spacing |
 | wheel, `+` `-` | the brush's size (Ground height, Decals, Paint, Water) |

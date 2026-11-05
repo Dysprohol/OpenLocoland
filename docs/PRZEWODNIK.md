@@ -203,7 +203,7 @@ Co widać:
 
 | Czynność | Jak |
 |---|---|
-| zaznaczenie | kliknij obiekt (najmniejszy pod kursorem); oznacza go kółko |
+| zaznaczenie | kliknij obiekt (wagon lub jednostka przed każdym innym obiektem, one przed szynami; najmniejszy z nich pod kursorem); oznacza go kółko |
 | przesunięcie | przeciągnij go |
 | obrót | R / E albo kółko myszy |
 | wyżej / niżej | PgUp / PgDn o 4 (z Shift o 16) albo Shift+kółko; Home stawia z powrotem na ziemi - wiersz stanu pokazuje wysokość nad ziemią |
@@ -527,10 +527,14 @@ ona może wtedy strzelać do nich. W panelu uzbrojonego neutralnego obiektu **ST
   (wóz z amunicją, pojazd naprawczy, cysterny), wagony cywilne, przeszkody; rząd nad paskiem pokazuje
   je wszystkie, grupa po grupie (strzałki przewracają strony, `[` `]` przechodzą po kolei, napis podaje
   grupę wybranego wagonu i jego numer, np. WAGONY BOJOWE 5 / 23). Wagon staje na torze
-  pod kursorem; postawiony na końcu pociągu dołącza się do niego. Zrób pociąg wroga: wybierz **WROG**
+  pod kursorem (gdy blisko są dwa tory - na bliższym); postawiony przy końcu pociągu na tym torze
+  dołącza się do niego. Zrób pociąg wroga: wybierz **WROG**
   w wierszu **ARMIA** palety (albo `A` przy stawianiu, albo `A` na postawionym pociągu), potem
-  lokomotywa i działo. `U` odczepia wagon, `C` doczepia do innego pociągu, `R`
-  odwraca pociąg, przeciąganie przesuwa go po torze. Pociąg bez **lokomotywy** nie pojedzie.
+  lokomotywa i działo. `U` odczepia wagon, `C` doczepia do pociągu spotkanego wzdłuż tego samego toru
+  (nie do pociągu na torze obok), `R` zawraca pociąg, `E` obraca jeden wagon w jego miejscu
+  (lokomotywa tyłem w środku pociągu, działo na końcu), przeciąganie kładzie pociąg na torze pod
+  kursorem - gdy się tam nie mieści (za krótki ślepy tor, inny pociąg), zostaje, a wiersz stanu mówi
+  dlaczego. Pociąg bez **lokomotywy** nie pojedzie.
 - **Patrol**: panel pociągu (prawy przycisk) → ROZKAZY: **PATROL...**, potem kliknij drugi koniec na
   torze. Pociąg jeździ tam i z powrotem między miejscem, gdzie stoi, a tym punktem.
 - Więcej pociągów wroga: kolejne pociągi na mapie z rozkazami, przyjazdy wroga (krok 5) i pociągi,
@@ -663,13 +667,13 @@ rzadziej stawiane rzeczy, na końcu dwa panele.
 
 | Klawisz | |
 |---|---|
-| R / E, kółko | obrót: o krok kierunków obiektu (R w prawo, E w lewo); zawrócenie pociągu, wraku na torze, semafora przy torze, a w narzędziu Linia jednokierunkowa linii; fabrykę i punkt naprawczy obraca ich tor (strona pomocy 15) |
+| R / E, kółko | obrót: o krok kierunków obiektu (R w prawo, E w lewo); zawrócenie pociągu (E: tylko zaznaczonego wagonu), wraku na torze, semafora przy torze, a w narzędziu Linia jednokierunkowa linii; fabrykę i punkt naprawczy obraca ich tor (strona pomocy 15) |
 | A | następna armia; przy stawianiu: armia następnego obiektu |
 | T | semafor czerwony / zielony; na linii: pchanie tak / nie |
 | L / Shift+L | linia przy zaznaczonym semaforze: wpuszcza / zatrzymuje |
 | Del / Shift+Del | usuń / cały pociąg albo odcinek |
 | Ctrl+Z / Ctrl+Y | cofnij / ponów |
-| U / C | odczep / doczep wagon |
+| U / C | odczep / doczep wagon (do pociągu na jego torze) |
 | `[` `]` | następny obiekt rzędu nad paskiem, tekstura |
 | `<` `>` | odstęp dekoracji |
 | kółko, `+` `-` | rozmiar pędzla (Wysokosc terenu, Dekoracje, Malowanie, Woda) |

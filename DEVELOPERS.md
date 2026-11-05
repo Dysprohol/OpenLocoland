@@ -1705,7 +1705,7 @@ with the engine's own pieces (scripts and object updates are off, so nothing els
 
 | Action | Keys and mouse | How |
 |---|---|---|
-| select | a click on an object (the smallest one under the cursor; rails only when nothing else is there, a region inside its rectangle only when not even a rail is - on its frame as any object; since 2026-11-05, before only the frame took it, so a region was hard to pick or delete; the Delete tool's click and sweep and the Region tool's right button, which opens its panel, the same) | the selection circle VID 460 ("Select Unit Circle", its outline frame) is drawn under it and the guns in its sockets |
+| select | a click on an object (by class, `pick_class`: the train cars and units - every Unit class, the guns of the sockets and their hosts - before any other object, those before the rails, a region's inside last; within a class the smallest box under the cursor, so a small decoration beside or under a car no longer takes its click - since 2026-11-05, before the smallest box of all won; a gun in a socket still gives its host; a region inside its rectangle only when not even a rail is - on its frame as any object; since 2026-11-05, before only the frame took it, so a region was hard to pick or delete; the Delete tool's click and sweep and the Region tool's right button, which opens its panel, the same) | the selection circle VID 460 ("Select Unit Circle", its outline frame) is drawn under it and the guns in its sockets |
 | its panel | the right button on an object (Select tool) | the object's panel (below): army, turn, delete, a semaphore's colour and line, the gun in each socket |
 | move | drag a selected object | `Object_MoveTo` (what `ACT_CHANGE_COOR` 63 calls); the height follows the ground (`World_GetGroundZForVid`), keeping the object's own height above it |
 | height | PgUp / PgDn by 4 (Shift: 16) or Shift+wheel, Home back on the ground; HEIGHT: LOWER / RAISE / ON THE GROUND in its panel | the object and its guns `Object_MoveTo` by the change of its height above the ground (z less `World_GetGroundZForVid` under it), -32 to 400; shown in the status line ("height above the ground: N") and after "selected"; saved as its SPR z ("The relief and the heights of objects" below) |
@@ -3042,22 +3042,33 @@ railway killer 99) - named by the game's `[Units]` (27 and 99, without one, by `
 icons the state bar's (`iconFrame` of the turret's weapon, else of the car's; the stone's frame 29
 is a flat cell, so it gets its own sprite); All objects leaves these groups out. A car is placed
 on the track: the rail link nearest to the cursor within 40 px (`g_railMap`, the screen position
-y - z), facing along it - R turns the preview the other way -, created there so that
-`Engine_Construct` (`Engine_PutOnRails`) puts its two ends on the rails; at a train's free end
-(within 70 px) it is coupled behind it (`Engine_AttachToTrain`) and takes its army, on a car in
-the middle of a train it is refused. The selected car's train: U uncouples the car from the car in
-front, C couples an end car to the nearest free end of another train (the other train is laid
-behind it car by car and takes its army), R / E turn the train round - `Train_Reverse` swaps its
-head and toggles every car's "stands backwards" flag (engineFlags bit 0), which keeps each car facing
-the way it was (nothing turned on the screen, a lone car neither); the editor toggles the flags back,
-so every car faces the other way and the train's order is reversed (a car must not be left with the
-flag set: the flag is not saved with the map, so after a load such a car looked turned and R did nothing
-- CONVERT's start trains swap such a car's ends and clear it); a gun cart's turret (its linked object,
-`link` +0x40, made with the car and not kept in the map; at rest it faces along its car) turns half a turn
-with it, in the same step of the history -, a drag
-moves the whole train along the track (the car to where it is dropped, the others before and
-behind it in their order), Del deletes the car and Shift+Del (the Delete tool with Shift) the
-train, A sets the army of the train. Its panel (the right button) has the army, TRAIN: turn round /
+y - z; where two tracks are within reach, the nearer one), facing along it - R turns the preview the
+other way -, created there so that `Engine_Construct` (`Engine_PutOnRails`) puts its two ends on the
+rails (`keep_on_spot`: PutOnRails takes the rail point nearest in 3D, which beside a crossing may be
+the other track's - then the car is put again nearer the spot's point); next to a train's free end met
+along the rails within 70 px it is coupled behind it (`Engine_AttachToTrain`) and takes its army, on
+a car in the middle of a train on the same link it is refused. The selected car's train: U uncouples
+the car from the car in front (nothing is laid again: every car keeps its ends), C couples an end car
+to the free end of another train met along the rails (the other train is laid behind it car by car,
+keeping each car's look, and takes its army), R turns the train round - `Train_Reverse` swaps its head
+and every car's ends and toggles every car's "stands backwards" flag (engineFlags bit 0), which keeps
+each car facing the way it was (nothing turned on the screen, a lone car neither); the editor toggles
+the flags back, so every car faces the other way and the train's order is reversed, every car on its
+rails -, E turns only the selected car round in its place of the train (its flag toggled,
+`Engine_UpdatePosition` turns it; between the same neighbours, on the same rails; a lone car is its
+train, E = R); a gun cart's turret (its linked object, `link` +0x40, made with the car and not kept in
+the map; at rest it faces along its car) turns half a turn with its car, in the same step of the
+history. The map keeps no flag: the load sets it again (Engine `ACT_RESTORE`) only for a car whose
+saved direction is exactly opposite its front end's link (the smaller of the two differences over 127,
+as `Engine_AttachToTrain` decides it), while `Engine_UpdatePosition` gives a car a direction a step or
+two off its link's (193 on a link of 192) - so before every save (`edit_before_save`, from `save_map`)
+a car standing backwards gets exactly that direction (a 256th of a turn: nothing to see), and a turned
+car comes back from a save and a load turned (checked: a locomotive turned in the middle of a train and
+a mortar at its end, saved, loaded, and in Run the level driven both ways by the enemy's AI, coupled,
+each car's look kept through the AI's turns). A drag lays the whole train again with the dragged car at
+the spot under the cursor and the others before and behind it in their order, each with its way in the
+train, Del deletes the car and Shift+Del (the Delete tool with Shift) the train, A sets the army of the
+train. Its panel (the right button) has the army, TRAIN: turn round / turn car (with a neighbour) /
 uncouple / couple, PATROL: none / to a point... (the next click on the track is the far end) and
 DELETE: car / train. Every change keeps the couplings, both ends (`RailPos`), the turned-round flag
 and the patrol of every car of the map before and after it, so undo puts every train back
@@ -3070,7 +3081,45 @@ stands to that point and back); a loaded map gives the block's patrols to the tr
 A train needs a locomotive to drive (a tub alone stays: the missions' civil trains are a locomotive
 with tubs). Saved, a car's SPRD is the missions' 40 bytes - both `RailPos` and the ids of the cars in
 front and behind -, its couplings the same both ways as in all 20 missions (checked over the 197
-cars). Checked in the game in Polish and English: a player's train of a locomotive and two gun cars
+cars).
+
+**On the train's own track** (2026-11-05). What the editor does to a train never takes a car onto a
+neighbouring track. R, E and U lay nothing again (the log says "rail points the same" / "ends kept").
+C and a placed car find their partner by walking the rail links (`rail_walk`) from the car's free end -
+the end farther from its neighbour, on from the farther of its end's two points - up to 70 px: a walk
+goes on through a point only on a link that turns at most 0x30 from the way it came (a train turns
+sharper only by reversing), so from a junction's stem it takes either branch but never one branch back
+into the other, and it keeps to its line at a crossing; the first car met is the partner, and a train
+on a parallel track or across, however near by the straight line, is not (the log names what the
+straight line would have taken). The editor's track has no switch state: the engine's route search
+chooses the branch when a train drives. A drag and a placed car go onto the link nearest the cursor
+(`track_spot`, its distance and the next link apart in the log); the cars are laid from the spot along
+the links by the engine's coupling, and the result is checked (`lay_problem`) before it is kept: every
+car on the rails, none folded back on itself or over another car of its train - the engine turns the
+rails back at a dead end (`RailDot_LinkTowards` at a point of one link), so a train too long for the
+track from there folds -, none over a car of another train, none (for a drag) on a point the walk from
+the spot does not reach; on a problem every car is put back where it was and the status line says why
+("the train stays where it was: the track from there is too short for the train (a dead end)").
+Engine_PutOnRails also couples to a car standing at the spot (`Engine_FindAdjacentCar`, by the points'
+occupant): the cars leave their points first and `occupy_all` sets every car's points again after each
+operation. The engine's chain has each car's front end toward the car in front (`Engine_AttachToTrain`,
+`Train_MoveCars`), as the campaign's trains are laid (all but 4 of their couplings); POLIGON's two
+trains have every car the other way round - in play the engine logs `rail 1` / `zmdots5` for them -, so
+R, E, C and a placed car first give such a train's cars their ends swapped and their flag toggled
+(`normalize_chain`: the same place and look). The `edit:` lines of `LocoFix.log` give each decision
+(`move train ... to the link ... laid / <why>`, `coupled ... px along the rails`, `couple ...: no free
+end along the rails (by the straight line: ...)`, `turned car ...`, `turned round ... rail points the
+same`, `uncoupled ... every car's ends kept`), and the test step `D<x>:<y>` lists the trains near the
+point with each car's direction, flag and rail points (`D0:0` every train). Checked in the game on a
+copy of POLIGON: R on the double track of the bottom line (two tracks 50 px apart) and beside its
+junction; U; C on the same track (coupled, 2 px) and with the only other train on the parallel track
+(none - 54 px by the straight line); a 3-car train dropped on the near track of the double track (the
+cursor between the two), on the junction (laid through it into the loop), with its middle car at the
+end of the factory spur (refused: a dead end) and in the spur's middle (laid); a car placed between the
+two tracks, nearer the upper one (on it, alone) and nearer the lower one (on it, coupled 38 px along the
+rails).
+
+Checked in the game in Polish and English: a player's train of a locomotive and two gun cars
 placed and coupled, uncoupled and coupled again, undone and redone; an enemy train (locomotive and
 mortar, army set to the enemy), the big stone on the rails, a neutral locomotive with a tub on a
 patrol; saved and loaded; played: the player's train driven with the mouse to the enemy, the enemy

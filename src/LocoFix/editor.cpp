@@ -85,6 +85,7 @@ void edit_restore_selection();
 void edit_keep_history();
 void edit_restore_history();
 void edit_saved();
+void edit_before_save();   // the cars standing backwards keep it over the save
 void edit_message_saved(const std::string& map);
 void panel_saved(const std::string& file);   // editor_panel.cpp: the SAVED notice
 void edit_message_line(const std::string& text);
@@ -569,6 +570,7 @@ bool save_map(const std::string& path) {
     if (!name) return false;
     std::memcpy(name, path.c_str(), path.size() + 1);
     const auto save = *reinterpret_cast<SaveLevel_t*>(*reinterpret_cast<uint8_t**>(w) + WORLD_VTABLE_SAVE_LEVEL);
+    edit_before_save();
     save(w, nullptr, name);   // Level_Save frees the name
     if (!level_save_succeeded()) return false;
     g_current = path;

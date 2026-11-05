@@ -1333,40 +1333,43 @@ bool on_region_frame(uint8_t* o, float x, float y) {
 
 uint8_t* host_of(uint8_t* gun);
 
-// The object at a point of the map (screen coordinates plus the camera): the smallest box that
-// holds the point, the rails only when nothing else is there; a gun in a socket is its host's part
-// (its panel sets the gun).
-// A region is picked on its frame as any object, and inside its rectangle only when nothing else is
-// there - the last fallback, after the rails (the smallest region holding the point): so a click or the
-// Delete tool takes it anywhere inside, while a region over the whole map or a big marker region does
-// not swallow the objects in it (before 2026-11-05 only its thin frame took a click).
+// The class of what a click takes first (pick): 0 the train cars and the units - every Unit class,
+// the guns of the sockets and their hosts (a fort is a static object, its guns are the units) -, 1
+// every other object (a decoration, a decal, a region's frame), 2 the rails, 3 a region's inside.
+int pick_class(uint8_t* o, float x, float y) {
+    if (is_region(o) && !on_region_frame(o, x, y)) return 3;
+    const int c = class_of(o), nvid = nvid_of(o);
+    if (is_car(o) || is_unit_class(c) || is_gun(nvid) || !sockets_of(nvid, 0).empty() || !pieces_of_kind(nvid, 0).empty())
+        return 0;
+    return c == B_RAIL ? 2 : 1;
+}
+
+// The object at a point of the map (screen coordinates plus the camera), by class (pick_class): a
+// car or unit before any other object, those before the rails, a region's inside last; within a class
+// the smallest box that holds the point. A gun in a socket is its host's part (its panel sets the gun).
+// So a small decoration under or beside a car no longer takes the click (2026-11-05: the smallest box
+// of all won, a bush by the track took the car's click). A region is picked on its frame as any
+// object, and inside its rectangle only when nothing else is there (the smallest region holding the
+// point): a click or the Delete tool takes it anywhere inside, while a region over the whole map does
+// not swallow the objects in it. Select, the Delete tool (click and sweep), a drag, the right button's
+// panel and the hover cursor all ask this.
 uint8_t* pick(float x, float y) {
     uint8_t* best = nullptr;
     float best_area = 0;
-    bool best_rail = true;
-    uint8_t* inside = nullptr;   // the smallest region whose inside holds the point
-    float inside_area = 0;
+    int best_class = 4;
     for_each_object([&](uint8_t* o) {
         if (!pickable(o)) return;
         const Box b = box_of(o);
         if (!b.contains(x, y)) return;
-        if (is_region(o) && !on_region_frame(o, x, y)) {
-            const float area = (b.r - b.l) * (b.b - b.t);
-            if (!inside || area < inside_area) {
-                inside = o;
-                inside_area = area;
-            }
-            return;
-        }
-        const bool rail = class_of(o) == B_RAIL;
+        const int k = pick_class(o, x, y);
         const float area = (b.r - b.l) * (b.b - b.t);
-        if (!best || (best_rail && !rail) || (rail == best_rail && area < best_area)) {
+        if (!best || k < best_class || (k == best_class && area < best_area)) {
             best = o;
             best_area = area;
-            best_rail = rail;
+            best_class = k;
         }
     });
-    if (!best) return inside;
+    if (!best) return nullptr;
     if (uint8_t* host = host_of(best)) return host;
     return best;
 }
@@ -1745,11 +1748,24 @@ struct TrackSpot {
     float x = 0, y = 0, z = 0;
     int direction = 0;
     uint8_t* dot = nullptr;   // the nearer end of the link
+    uint8_t* from = nullptr;  // the link: from this point (link `link` of it) to `to`, the spot `t` along it
+    uint8_t* to = nullptr;
+    int link = 0;
+    float t = 0;
+    float gap = 0;            // the screen point's distance from the spot
+    float next = 1e9f;        // the nearest link that touches neither of its points (the next track or
+                              // further along this one), from the screen point - for the log
 };
 
 TrackSpot track_spot(float sx, float sy, float reach) {
     TrackSpot best;
     float best_d = reach;
+    struct Seen {
+        uint8_t* a;
+        uint8_t* b;
+        float d;
+    };
+    std::vector<Seen> seen;   // every link near the screen point, for `next`
     uint8_t* map = reinterpret_cast<uint8_t*>(G_RAIL_MAP);
     const int count = at<int>(map, RAIL_MAP_COUNT);
     uint8_t** dots = at<uint8_t**>(map, RAIL_MAP_ITEMS);
@@ -1771,6 +1787,7 @@ TrackSpot track_spot(float sx, float sy, float reach) {
             t = (std::max)(0.0f, (std::min)(1.0f, t));
             const float px = ax + ux * t, py = (ay - az) + uy * t;
             const float dist = std::hypot(sx - px, sy - py);
+            if (dist < 3 * reach) seen.push_back({d, o, dist});
             if (dist < best_d) {
                 best_d = dist;
                 best.found = true;
@@ -1779,10 +1796,265 @@ TrackSpot track_spot(float sx, float sy, float reach) {
                 best.z = az + (bz - az) * t;
                 best.direction = at<uint8_t>(l, LINK_DIRECTION);
                 best.dot = t < 0.5f ? d : o;
+                best.from = d;
+                best.to = o;
+                best.link = k;
+                best.t = t;
+                best.gap = dist;
             }
         }
     }
+    for (const Seen& s : seen)
+        if (best.found && s.a != best.from && s.a != best.to && s.b != best.from && s.b != best.to && s.d < best.next) best.next = s.d;
     return best;
+}
+
+// ---- along the track ----
+//
+// What the editor does to a train stays on the train's own track. A car's neighbour is the one met
+// walking the rail links from its free end (rail_walk), never the nearest by the straight line, which
+// may stand on a parallel track or one across. A walk goes on through a point only on a link that turns
+// at most WALK_TURN from the way it came: a train turns sharper only by reversing, which neither a
+// coupling nor a laid train does - so from a junction's stem it goes into either branch, but never from
+// one branch back into the other, and at a crossing it keeps to its own line. (The editor's track has
+// no switch state to follow: the engine's route search picks the branch when a train drives.) Placing,
+// dragging and coupling lay the cars with the engine's own coupling (Engine_AttachToTrain: each car
+// from the rear of the one before, along the links); before such a step is kept, lay_problem checks the
+// result - every car on the rails, none folded back on itself or over another car (a dead end too short
+// for the train: the engine turns the rails back there), none on a point the walk did not reach - and
+// on a problem everything is put back as it was, with the reason in the status line.
+constexpr int WALK_TURN = 0x30;
+constexpr float CAR_FOLDED = 20, CAR_OVER = 24;   // a car's ends nearer than this: folded back; two cars' middles: one over the other
+
+int angle_diff(int a, int b) {
+    const int d = (a - b) & 255;
+    return d > 128 ? 256 - d : d;
+}
+
+uint8_t* link_at(uint8_t* dot, int k) { return dot + DOT_LINKS + k * DOT_LINK_SIZE; }
+int links_of(uint8_t* dot) { return dot ? (std::min)(6, at<int>(dot, DOT_LINK_COUNT)) : 0; }
+
+// The rail points of a car: each end's point and the point its link leads to.
+std::vector<uint8_t*> car_dots(uint8_t* c) {
+    std::vector<uint8_t*> out;
+    for (size_t e : {E_FRONT_DOT, E_REAR_DOT})
+        if (uint8_t* d = at<uint8_t*>(c, e)) {
+            out.push_back(d);
+            if (uint8_t* t = link_dot(d, at<int>(c, e + POS_LINK))) out.push_back(t);
+        }
+    return out;
+}
+
+std::string dot_name(uint8_t* d) {
+    return d ? ui_printf("%d,%d,%d", at<int>(d, DOT_X), at<int>(d, DOT_Y), at<int>(d, DOT_Z)) : std::string("-");
+}
+
+std::string car_dots_text(uint8_t* c) {
+    std::string s;
+    for (uint8_t* d : car_dots(c)) s += (s.empty() ? "" : " ") + dot_name(d);
+    return s;
+}
+
+struct WalkStart {
+    uint8_t* dot;   // the point reached
+    int heading;    // the way the walk goes on from it
+    float cost;     // the distance behind (in the links' measure, y 1.5 times)
+};
+
+struct WalkHit {
+    uint8_t* car = nullptr;           // the nearest car of `others` met, nullptr none within reach
+    float cost = 0;
+    std::vector<uint8_t*> path;       // the points from the start to it
+    std::vector<uint8_t*> walked;     // every point reached
+};
+
+// Walks the rails from the starts up to `reach`: the first car of `others` met (one of its points,
+// car_dots), the nearest of all ways; a way stops at a car.
+WalkHit rail_walk(const std::vector<WalkStart>& starts, float reach, const std::vector<uint8_t*>& others) {
+    WalkHit hit;
+    std::vector<std::pair<uint8_t*, uint8_t*>> owner;   // point -> car
+    for (uint8_t* c : others)
+        for (uint8_t* d : car_dots(c)) owner.push_back({d, c});
+    auto car_at = [&](uint8_t* d) -> uint8_t* {
+        for (const auto& p : owner)
+            if (p.first == d) return p.second;
+        return nullptr;
+    };
+    struct Node {
+        uint8_t* dot;
+        int heading;
+        float cost;
+        int parent;
+    };
+    std::vector<Node> nodes;
+    std::vector<int> open;
+    for (const WalkStart& s : starts)
+        if (s.dot && s.cost <= reach) {
+            nodes.push_back({s.dot, s.heading, s.cost, -1});
+            open.push_back(static_cast<int>(nodes.size()) - 1);
+        }
+    std::vector<std::pair<uint8_t*, int>> done;   // (point, heading) reached
+    while (!open.empty()) {
+        auto it = std::min_element(open.begin(), open.end(), [&](int a, int b) { return nodes[a].cost < nodes[b].cost; });
+        const int n = *it;
+        open.erase(it);
+        const Node node = nodes[n];
+        if (std::find(done.begin(), done.end(), std::make_pair(node.dot, node.heading)) != done.end()) continue;
+        done.push_back({node.dot, node.heading});
+        if (std::find(hit.walked.begin(), hit.walked.end(), node.dot) == hit.walked.end()) hit.walked.push_back(node.dot);
+        if (uint8_t* c = car_at(node.dot)) {
+            if (!hit.car) {
+                hit.car = c;
+                hit.cost = node.cost;
+                for (int k = n; k >= 0; k = nodes[k].parent) hit.path.insert(hit.path.begin(), nodes[k].dot);
+            }
+            continue;   // nothing past a car
+        }
+        for (int k = 0; k < links_of(node.dot); ++k) {
+            uint8_t* l = link_at(node.dot, k);
+            uint8_t* next = at<uint8_t*>(l, LINK_DOT);
+            const int heading = at<uint8_t>(l, LINK_DIRECTION);
+            const float cost = node.cost + static_cast<float>(at<int>(l, LINK_LENGTH));
+            if (!next || angle_diff(heading, node.heading) > WALK_TURN || cost > reach) continue;
+            nodes.push_back({next, heading, cost, n});
+            open.push_back(static_cast<int>(nodes.size()) - 1);
+        }
+        if (nodes.size() > 4000) break;   // a guard: a walk of a few links
+    }
+    return hit;
+}
+
+// The two ways from a spot on a link: on through its `to` point and back through its `from` point.
+std::vector<WalkStart> spot_starts(const TrackSpot& s) {
+    if (!s.found || !s.from || !s.to) return {};
+    uint8_t* l = link_at(s.from, s.link);
+    const float length = static_cast<float>(at<int>(l, LINK_LENGTH));
+    const int back = at<int>(l, 0x8);   // RailLink.backLink
+    const int back_heading = back >= 0 && back < links_of(s.to) ? at<uint8_t>(link_at(s.to, back), LINK_DIRECTION)
+                                                                 : (at<uint8_t>(l, LINK_DIRECTION) + 128) & 255;
+    return {{s.to, at<uint8_t>(l, LINK_DIRECTION), (1 - s.t) * length}, {s.from, back_heading, s.t * length}};
+}
+
+// The way out of a car's free end, found by the places, not by which end is called front: the free end
+// is the one farther from its neighbour in the train (a lone car: both, its front end first), and the
+// walk goes on from the one of that end's two points (RailPos: the point and the one its link leads to)
+// farther from the car's middle. (The engine's chain has each car's front end toward the car in front,
+// Engine_AttachToTrain and Train_MoveCars, and the campaign's trains are laid so - but POLIGON's two
+// trains have their cars the other way round, normalize_chain.) `front`: the train's head side (no car
+// in front of it), for a lone car its front end.
+struct EndStart {
+    WalkStart start;
+    bool front;
+};
+
+bool end_point(uint8_t* c, bool front, float& x, float& y, float& z) { return pos_point(c + (front ? E_FRONT_DOT : E_REAR_DOT), x, y, z); }
+
+std::vector<EndStart> end_starts(uint8_t* c) {
+    std::vector<EndStart> out;
+    if (car_prev(c) && car_next(c)) return out;   // a car in the middle has no free end
+    uint8_t* neighbour = car_next(c) ? car_next(c) : car_prev(c);
+    float fx, fy, fz, rx, ry, rz;
+    if (!end_point(c, true, fx, fy, fz) || !end_point(c, false, rx, ry, rz)) return out;
+    const bool front_free = !neighbour || std::hypot(fx - at<float>(neighbour, O_X), fy - at<float>(neighbour, O_Y)) >
+                                              std::hypot(rx - at<float>(neighbour, O_X), ry - at<float>(neighbour, O_Y));
+    for (const bool front : {true, false}) {
+        if (neighbour && front != front_free) continue;   // the end toward its neighbour
+        uint8_t* pos = c + (front ? E_FRONT_DOT : E_REAR_DOT);
+        uint8_t* d = at<uint8_t*>(pos, POS_DOT);
+        const int k = at<int>(pos, POS_LINK);
+        if (!d || k < 0 || k >= links_of(d)) continue;
+        uint8_t* l = link_at(d, k);
+        uint8_t* q = at<uint8_t*>(l, LINK_DOT);
+        if (!q) continue;
+        const float cx = at<float>(c, O_X), cy = at<float>(c, O_Y);
+        const float to_d = std::hypot(at<int>(d, DOT_X) - cx, at<int>(d, DOT_Y) - cy);
+        const float to_q = std::hypot(at<int>(q, DOT_X) - cx, at<int>(q, DOT_Y) - cy);
+        const float length = static_cast<float>(at<int>(l, LINK_LENGTH)), distance = static_cast<float>(at<int>(pos, POS_DISTANCE));
+        const bool head = neighbour ? car_prev(c) == nullptr : front;
+        if (to_q >= to_d) {
+            out.push_back({{q, at<uint8_t>(l, LINK_DIRECTION), (std::max)(0.0f, length - distance)}, head});
+        } else {
+            const int back = at<int>(l, 0x8);   // RailLink.backLink: from q back to d
+            const int heading = back >= 0 && back < links_of(q) ? at<uint8_t>(link_at(q, back), LINK_DIRECTION)
+                                                                : (at<uint8_t>(l, LINK_DIRECTION) + 128) & 255;
+            out.push_back({{d, heading, (std::max)(0.0f, distance)}, head});
+        }
+    }
+    return out;
+}
+
+// The engine's chain for every car of a train: a car whose front end is toward the car behind it (or
+// its rear end toward the car in front) - POLIGON's trains are laid so - gets its two ends swapped and
+// its "stands backwards" bit toggled: it stands and looks as before, and the engine's coupling
+// (Engine_AttachToTrain: behind the last car's rear end) and driving (Train_MoveCars: each car's front
+// at the rear of the one in front) find it as they expect. Before 2026-11-05 a car coupled to such a
+// train was laid over its own cars. True when a car was changed.
+bool normalize_chain(uint8_t* any) {
+    bool changed = false;
+    for (uint8_t* k : train_of(any)) {
+        float fx, fy, fz, rx, ry, rz;
+        if (!end_point(k, true, fx, fy, fz) || !end_point(k, false, rx, ry, rz)) continue;
+        uint8_t* n = car_next(k) ? car_next(k) : car_prev(k);
+        if (!n) continue;
+        const float to_front = std::hypot(fx - at<float>(n, O_X), fy - at<float>(n, O_Y));
+        const float to_rear = std::hypot(rx - at<float>(n, O_X), ry - at<float>(n, O_Y));
+        const bool wrong = car_next(k) ? to_front < to_rear : to_rear < to_front;
+        if (!wrong) continue;
+        uint8_t ends[16];
+        std::memcpy(ends, k + E_FRONT_DOT, sizeof ends);
+        std::memcpy(k + E_FRONT_DOT, k + E_REAR_DOT, sizeof ends);
+        std::memcpy(k + E_REAR_DOT, ends, sizeof ends);
+        at<uint32_t>(k, E_FLAGS) ^= 1;
+        car_call(ENGINE_UPDATE_POSITION, k);
+        changed = true;
+    }
+    if (changed) patch::log("edit: the train of VID %d had cars the other way round in its chain - ends swapped, the looks kept", nvid_of(any));
+    return changed;
+}
+
+// A car laid again near where it stood (coupled): facing the way it did, by its "stands backwards" bit.
+void keep_facing(uint8_t* c, int direction) {
+    car_call(ENGINE_UPDATE_POSITION, c);
+    if (angle_diff(at<int>(c, O_DIRECTION), direction) > 64) {
+        at<uint32_t>(c, E_FLAGS) ^= 1;
+        car_call(ENGINE_UPDATE_POSITION, c);
+    }
+}
+
+float center_distance(uint8_t* a, uint8_t* b) {
+    return std::hypot(at<float>(a, O_X) - at<float>(b, O_X), at<float>(a, O_Y) - at<float>(b, O_Y));
+}
+
+// Why the cars of `train`, just laid, cannot stay so (an empty text: they can): a car off the rails, a car
+// folded back on itself or standing over another of its train (the track from there too short: a dead
+// end), over a car of another train, or on a point outside `allowed` (when it is not empty: the points
+// the walk along the track reached).
+UiText lay_problem(const std::vector<uint8_t*>& train, const std::vector<uint8_t*>& allowed) {
+    for (size_t i = 0; i < train.size(); ++i) {
+        uint8_t* c = train[i];
+        float fx, fy, fz, rx, ry, rz;
+        if (!link_dot(at<uint8_t*>(c, E_FRONT_DOT), at<int>(c, E_FRONT_DOT + POS_LINK)) ||
+            !link_dot(at<uint8_t*>(c, E_REAR_DOT), at<int>(c, E_REAR_DOT + POS_LINK)) || !pos_point(c + E_FRONT_DOT, fx, fy, fz) ||
+            !pos_point(c + E_REAR_DOT, rx, ry, rz))
+            return {"WhyLayOff", "a car would stand off the rails"};
+        if (std::hypot(std::hypot(fx - rx, fy - ry), fz - rz) < CAR_FOLDED)
+            return {"WhyLayShort", "the track from there is too short for the train (a dead end)"};
+        for (size_t j = 0; j < i; ++j)
+            if (center_distance(c, train[j]) < CAR_OVER) return {"WhyLayShort", "the track from there is too short for the train (a dead end)"};
+        if (!allowed.empty())
+            for (uint8_t* d : car_dots(c))
+                if (std::find(allowed.begin(), allowed.end(), d) == allowed.end())
+                    return {"WhyLayBranch", "a car would go onto another track or branch"};
+    }
+    for (uint8_t* k : all_cars())
+        if (std::find(train.begin(), train.end(), k) == train.end())
+            for (uint8_t* c : train)
+                if (center_distance(c, k) < CAR_OVER) return {"WhyLayTaken", "another train stands there"};
+    return {};
+}
+
+void restore_states(const std::vector<uint8_t*>& objects, const std::vector<State>& before) {
+    for (size_t i = 0; i < objects.size(); ++i) apply(objects[i], before[i]);
 }
 
 int turn_toward(int direction, int toward) {   // direction or its opposite, whichever is nearer to `toward`
@@ -1799,8 +2071,15 @@ struct CarPlan {
     TrackSpot spot;
     int direction = 0;
     uint8_t* couple_to = nullptr;
+    float couple_cost = 0;             // along the rails
+    std::vector<uint8_t*> path;        // the points from the spot to it
 };
 
+// The car under the cursor goes onto the link nearest to it (track_spot) - where two tracks are within
+// reach, the nearer one -, and couples to the free end of the train met first along the rails from
+// there either way within COUPLE_REACH (rail_walk; before 2026-11-05 the nearest end by the straight
+// line, which could be a train on a parallel track: the new car was then laid over there). A car of a
+// train standing on the same link (its points) in the way refuses the spot; one on another track does not.
 CarPlan plan_car(POINT mouse) {
     CarPlan p;
     uint8_t* w = world();
@@ -1814,20 +2093,58 @@ CarPlan plan_car(POINT mouse) {
         p.why = {"PlaceDoor", "the factory's door - the factory deletes what stands there when it builds a unit"};
         return p;
     }
-    float best = COUPLE_REACH;
-    for (uint8_t* c : all_cars()) {
+    const std::vector<uint8_t*> cars = all_cars();
+    for (uint8_t* c : cars) {
         const float d = std::hypot(at<float>(c, O_X) - p.spot.x, at<float>(c, O_Y) - p.spot.y);
-        if (d < CAR_OVERLAP && !is_end(c)) {
+        const std::vector<uint8_t*> dots = car_dots(c);
+        const bool same_link = std::find(dots.begin(), dots.end(), p.spot.from) != dots.end() ||
+                               std::find(dots.begin(), dots.end(), p.spot.to) != dots.end();
+        if (d < CAR_OVERLAP && same_link && !is_end(c)) {
             p.why = {"WhyCarTaken", "a car of a train stands here"};
             return p;
         }
-        if (d < best && is_end(c)) {
-            best = d;
-            p.couple_to = c;
-        }
+    }
+    const WalkHit hit = rail_walk(spot_starts(p.spot), COUPLE_REACH, cars);
+    if (hit.car && is_end(hit.car)) {
+        p.couple_to = hit.car;
+        p.couple_cost = hit.cost;
+        p.path = hit.path;
     }
     p.ok = true;
     return p;
+}
+
+void unlink_car(uint8_t* c);
+
+// A car just made or moved onto a spot of the track (Engine_PutOnRails takes the rail point nearest to
+// it in 3D, which beside a crossing or a close parallel track may be the other track's): on the spot's
+// track, else put again nearer to the spot's nearer point. False when it does not get there.
+bool keep_on_spot(uint8_t* c, const TrackSpot& s, int direction) {
+    std::vector<uint8_t*> around = rail_walk(spot_starts(s), 80, {}).walked;
+    around.push_back(s.from);
+    around.push_back(s.to);
+    auto on_spot = [&] {
+        for (uint8_t* d : car_dots(c))
+            if (std::find(around.begin(), around.end(), d) == around.end()) return false;
+        return !car_dots(c).empty();
+    };
+    if (on_spot()) return true;
+    patch::log("edit: VID %d put on the rails at %s, off the spot's track (%s - %s) - put again", nvid_of(c), car_dots_text(c).c_str(),
+               dot_name(s.from).c_str(), dot_name(s.to).c_str());
+    for (const float toward : {0.25f, 0.1f, 0.02f}) {   // nearer and nearer to the spot's nearer point
+        const float k = s.t < 0.5f ? toward : 1 - toward;
+        const float x = at<int>(s.from, DOT_X) + (at<int>(s.to, DOT_X) - at<int>(s.from, DOT_X)) * k;
+        const float y = at<int>(s.from, DOT_Y) + (at<int>(s.to, DOT_Y) - at<int>(s.from, DOT_Y)) * k;
+        const float z = at<int>(s.from, DOT_Z) + (at<int>(s.to, DOT_Z) - at<int>(s.from, DOT_Z)) * k;
+        car_call(ENGINE_LEAVE_DOTS, c);
+        reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(c, nullptr, x, y, z);
+        set_direction(c, direction);
+        car_call(ENGINE_PUT_ON_RAILS, c);
+        unlink_car(c);
+        if (on_spot()) return true;
+    }
+    patch::log("edit: VID %d stays off the spot's track (%s)", nvid_of(c), car_dots_text(c).c_str());
+    return false;
 }
 
 // ---- wrecks on the track ----
@@ -1925,7 +2242,21 @@ void place_car(POINT mouse) {
         return;
     }
     unlink_car(o);
+    if (!keep_on_spot(o, p.spot, p.direction)) {
+        car_call(ENGINE_LEAVE_DOTS, o);
+        act(o, ACT_UNDO_REMOVE);   // taken away as a deletion does it, not kept in the history
+        occupy_all();
+        MESSAGE("MsgCarOffTrack", "%s: the car does not stay on this track here (a crossing too close) - not placed", place_label());
+        return;
+    }
+    patch::log("edit: car VID %d placed on the link %s - %s (%.1f px from the cursor, the next link apart %.1f px): %s", nvid,
+               dot_name(p.spot.from).c_str(), dot_name(p.spot.to).c_str(), p.spot.gap, p.spot.next, car_dots_text(o).c_str());
+    UiText refused;
     if (p.couple_to) {
+        const std::vector<uint8_t*> others = train_of(p.couple_to);
+        const std::vector<State> was = states(others);
+        const State alone = state_of(o);
+        normalize_chain(p.couple_to);
         const std::vector<uint8_t*> train = train_of(p.couple_to);
         const bool at_front = p.couple_to == train.front() &&
                               (train.size() > 1 || [&] {   // a single car: the end of it nearer to the new one
@@ -1935,16 +2266,38 @@ void place_car(POINT mouse) {
                                          std::hypot(fx - p.spot.x, fy - p.spot.y) < std::hypot(rx - p.spot.x, ry - p.spot.y);
                               }());
         attach_car(o, p.couple_to, at_front);
-        if (army_of(o) != army_of(p.couple_to)) act(o, ACT_SET_ARMY, army_of(p.couple_to));
+        keep_facing(o, p.direction);
+        std::vector<uint8_t*> allowed = p.path;
+        for (uint8_t* k : others)
+            for (uint8_t* d : car_dots(k)) allowed.push_back(d);
+        for (uint8_t* d : rail_walk(spot_starts(p.spot), 80, {}).walked) allowed.push_back(d);
+        allowed.push_back(p.spot.from);
+        allowed.push_back(p.spot.to);
+        const UiText why = lay_problem(train_of(o), allowed);
+        if (why.english[0]) {   // left standing where it was put, alone
+            patch::log("edit: car VID %d not coupled to VID %d (%.0f px along the rails): %s", nvid, nvid_of(p.couple_to), p.couple_cost,
+                       why.english);
+            restore_states(others, was);
+            apply(o, alone);
+            refused = why;
+        } else {
+            patch::log("edit: car VID %d coupled to VID %d, %.0f px along the rails: %s", nvid, nvid_of(p.couple_to), p.couple_cost,
+                       car_dots_text(o).c_str());
+            if (army_of(o) != army_of(p.couple_to)) act(o, ACT_SET_ARMY, army_of(p.couple_to));
+        }
     }
     occupy_all();
     commit_cars({"OpCar", "car"}, cars, before, o);
     g_selection = group_of(o);
     const size_t length = train_of(o).size();
-    MESSAGE("MsgCarPlaced", "placed VID %d at %.0f,%.0f direction %d army %d - a train of %u", nvid, at<float>(o, O_X),
-            at<float>(o, O_Y), at<int>(o, O_DIRECTION), army_of(o), static_cast<unsigned>(length));
+    if (refused.english[0]) MESSAGE("MsgCarNotCoupled", "placed VID %d alone - not coupled: %s", nvid, refused.get());
+    else
+        MESSAGE("MsgCarPlaced", "placed VID %d at %.0f,%.0f direction %d army %d - a train of %u", nvid, at<float>(o, O_X),
+                at<float>(o, O_Y), at<int>(o, O_DIRECTION), army_of(o), static_cast<unsigned>(length));
 }
 
+// U: the car and the cars behind it become a train of their own; nothing is laid again - every car
+// keeps its ends on the rails where they are.
 void uncouple(uint8_t* c) {
     if (!is_car(c) || !car_prev(c)) {
         MESSAGE("MsgUncoupleFirst", "U uncouples a car from the car in front - this one is the first of its train");
@@ -1955,33 +2308,70 @@ void uncouple(uint8_t* c) {
     uint8_t* p = car_prev(c);
     car_next(p) = nullptr;
     car_prev(c) = nullptr;
+    occupy_all();
     commit_cars({"OpUncouple", "uncouple"}, cars, before);
     g_selection = group_of(c);
+    bool kept = true;
+    for (size_t i = 0; i < cars.size(); ++i)
+        kept &= std::memcmp(cars[i] + E_FRONT_DOT, before[i].front, sizeof before[i].front) == 0 &&
+                std::memcmp(cars[i] + E_REAR_DOT, before[i].rear, sizeof before[i].rear) == 0;
+    patch::log("edit: uncoupled VID %d from VID %d: trains of %u and %u cars, every car's ends %s", nvid_of(c), nvid_of(p),
+               static_cast<unsigned>(train_of(p).size()), static_cast<unsigned>(train_of(c).size()), kept ? "kept" : "MOVED");
     MESSAGE("MsgUncoupled", "uncoupled: trains of %u and %u cars", static_cast<unsigned>(train_of(p).size()),
             static_cast<unsigned>(train_of(c).size()));
 }
 
-// The free end of another train nearest to a car at an end of its own train (within reach).
-uint8_t* coupling_partner(uint8_t* c) {
+// The other train C couples to: the free end met first walking the rails from a free end of the car
+// within COUPLE_REACH (rail_walk) - a train on a parallel track or across is not reached; nullptr when
+// none is. `front`: met from the car's front end; `path`: the points walked to it.
+uint8_t* coupling_partner(uint8_t* c, bool* front, float* cost, std::vector<uint8_t*>* path) {
     if (!is_car(c) || !is_end(c)) return nullptr;
     const std::vector<uint8_t*> own = train_of(c);
+    std::vector<uint8_t*> others;
+    for (uint8_t* k : all_cars())
+        if (std::find(own.begin(), own.end(), k) == own.end()) others.push_back(k);
     uint8_t* best = nullptr;
-    float best_d = COUPLE_REACH;
-    for (uint8_t* k : all_cars()) {
-        if (!is_end(k) || std::find(own.begin(), own.end(), k) != own.end()) continue;
-        const float d = std::hypot(at<float>(k, O_X) - at<float>(c, O_X), at<float>(k, O_Y) - at<float>(c, O_Y));
-        if (d < best_d) {
-            best_d = d;
-            best = k;
+    float best_cost = 0;
+    for (const EndStart& st : end_starts(c)) {
+        const WalkHit hit = rail_walk({st.start}, COUPLE_REACH, others);
+        if (hit.car && is_end(hit.car) && (!best || hit.cost < best_cost)) {
+            best = hit.car;
+            best_cost = hit.cost;
+            if (front) *front = st.front;
+            if (cost) *cost = hit.cost;
+            if (path) *path = hit.path;
         }
     }
     return best;
 }
 
+uint8_t* coupling_partner(uint8_t* c) { return coupling_partner(c, nullptr, nullptr, nullptr); }
+
+// The nearest free end of another train by the straight line (only for the log: what the old rule
+// would have coupled).
+uint8_t* nearest_end_by_line(uint8_t* c, float& d) {
+    const std::vector<uint8_t*> own = train_of(c);
+    uint8_t* best = nullptr;
+    d = 1e9f;
+    for (uint8_t* k : all_cars())
+        if (is_end(k) && std::find(own.begin(), own.end(), k) == own.end() && center_distance(k, c) < d) {
+            d = center_distance(k, c);
+            best = k;
+        }
+    return best;
+}
+
 void couple(uint8_t* c) {
-    uint8_t* e = coupling_partner(c);
+    bool from_front = false;
+    float cost = 0;
+    std::vector<uint8_t*> path;
+    uint8_t* e = coupling_partner(c, &from_front, &cost, &path);
     if (!e) {
-        MESSAGE("MsgNoPartner", "C couples an end car to the end of another train within %d px - none here",
+        float d = 0;
+        uint8_t* line = is_car(c) ? nearest_end_by_line(c, d) : nullptr;
+        patch::log("edit: couple VID %d: no free end along the rails within %d px (by the straight line: %s %.0f px)", nvid_of(c),
+                   static_cast<int>(COUPLE_REACH), line ? ui_printf("VID %d", nvid_of(line)).c_str() : "none", line ? d : 0.0f);
+        MESSAGE("MsgNoPartner", "C couples an end car to the end of another train along the track within %d px - none here",
                 static_cast<int>(COUPLE_REACH));
         return;
     }
@@ -1990,26 +2380,53 @@ void couple(uint8_t* c) {
     std::vector<uint8_t*> other = train_of(e);
     if (other.front() != e) std::reverse(other.begin(), other.end());   // from the end that couples
     const std::vector<uint8_t*> own = train_of(c);
-    const bool at_front = c == own.front() && (own.size() > 1 || [&] {
-                              float fx, fy, fz, rx, ry, rz;
-                              return pos_point(c + E_FRONT_DOT, fx, fy, fz) && pos_point(c + E_REAR_DOT, rx, ry, rz) &&
-                                     std::hypot(fx - at<float>(e, O_X), fy - at<float>(e, O_Y)) <
-                                         std::hypot(rx - at<float>(e, O_X), ry - at<float>(e, O_Y));
-                          }());
-    for (uint8_t* k : other) {
-        car_call(ENGINE_LEAVE_DOTS, k);
-        car_prev(k) = car_next(k) = nullptr;
-    }
+    std::vector<uint8_t*> allowed = path;   // the points the other train may take: the way to it, its own, ours
+    for (uint8_t* k : cars)
+        for (uint8_t* d : car_dots(k)) allowed.push_back(d);
+    const bool at_front = c == own.front() && from_front;
+    normalize_chain(c);
+    std::vector<int> facing;
+    for (uint8_t* k : other) facing.push_back(at<int>(k, O_DIRECTION));
+    for (uint8_t* k : cars) car_call(ENGINE_LEAVE_DOTS, k);
+    for (uint8_t* k : other) car_prev(k) = car_next(k) = nullptr;
     for (size_t i = 0; i < other.size(); ++i) {
         attach_car(other[i], c, i == 0 && at_front);
-        if (army_of(other[i]) != army_of(c)) act(other[i], ACT_SET_ARMY, army_of(c));
+        keep_facing(other[i], facing[i]);
     }
+    const UiText why = lay_problem(train_of(c), allowed);
+    if (why.english[0]) {
+        restore_states(cars, before);
+        occupy_all();
+        patch::log("edit: couple VID %d to VID %d (%.0f px along the rails) refused: %s", nvid_of(c), nvid_of(e), cost, why.english);
+        MESSAGE("MsgCoupleRefused", "C: the trains are not coupled - %s", why.get());
+        return;
+    }
+    for (uint8_t* k : other)
+        if (army_of(k) != army_of(c)) act(k, ACT_SET_ARMY, army_of(c));
     occupy_all();
     commit_cars({"OpCouple", "couple"}, cars, before);
     g_selection = group_of(c);
+    std::string laid;
+    for (uint8_t* k : other) laid += ui_printf(" [%d: %s]", nvid_of(k), car_dots_text(k).c_str());
+    patch::log("edit: coupled VID %d (its %s end) to VID %d, %.0f px along the rails: a train of %u;%s", nvid_of(c),
+               from_front ? "front" : "rear", nvid_of(e), cost, static_cast<unsigned>(train_of(c).size()), laid.c_str());
     MESSAGE("MsgCoupled", "coupled: a train of %u cars", static_cast<unsigned>(train_of(c).size()));
 }
 
+// The rail points every car of a train stands on, for the log ("the same" after a turn).
+std::string train_dots(uint8_t* c) {
+    std::vector<std::string> all;
+    for (uint8_t* k : train_of(c))
+        for (uint8_t* d : car_dots(k)) all.push_back(dot_name(d));
+    std::sort(all.begin(), all.end());
+    all.erase(std::unique(all.begin(), all.end()), all.end());
+    std::string s;
+    for (const std::string& d : all) s += (s.empty() ? "" : " ") + d;
+    return s;
+}
+
+// R: the train turns round where it stands - Train_Reverse swaps every car's ends (and the chain), so no
+// car leaves its rails: nothing is laid again, a double track or a junction beside it is not touched.
 void reverse_train(uint8_t* c) {
     // the cars and their guns (a gun cart's turret is its linked object, made with it: not in the map),
     // so one step of the history turns them back too
@@ -2020,6 +2437,8 @@ void reverse_train(uint8_t* c) {
             if (!removed(g)) guns.push_back(g);
     cars.insert(cars.end(), guns.begin(), guns.end());
     const std::vector<State> before = states(cars);
+    const std::string dots_before = train_dots(c);
+    normalize_chain(c);
     car_call(ENGINE_LEAVE_DOTS, c);
     // Train_Reverse only swaps the train's head: it toggles each car's "stands backwards" flag, so
     // every car still faces the way it did - taken back, the cars really turn round (a lone car too)
@@ -2036,27 +2455,103 @@ void reverse_train(uint8_t* c) {
         uint8_t* g = at<uint8_t*>(k, O_LINK);
         turned += ui_printf(" %d:%d", nvid_of(k), at<int>(k, O_DIRECTION)) + (g ? ui_printf("/gun %d", at<int>(g, O_DIRECTION)) : "");
     }
-    patch::log("edit: turned round -%s", turned.c_str());
+    const std::string dots_after = train_dots(c);
+    patch::log("edit: turned round -%s; rail points %s (%s)", turned.c_str(), dots_after == dots_before ? "the same" : "CHANGED",
+               dots_after.c_str());
     MESSAGE("MsgReversed", "the train is turned round: VID %d first", nvid_of(train_of(c).front()));
 }
 
-// The train of `c` laid again along the track with `c` at a spot: the cars behind it after it,
-// the ones in front of it before it, in their order. False (nothing changed) off the track.
-bool move_train(uint8_t* c, float sx, float sy) {
+// E: one car turns round in its place of the train - coupled between the same neighbours, its ends on
+// the same rails (the chain's order is the engine's: each car's front at the rear of the one in front,
+// Train_MoveCars), only facing the other way: its "stands backwards" bit (Engine.engineFlags bit 0, as
+// Engine_AttachToTrain sets it for a car coupled facing the other way) toggled and Engine_UpdatePosition
+// turning it; its gun half a turn with it. A map keeps it: the car's direction is saved, and the load
+// sets the bit again from it (Engine ACT_RESTORE: the direction against its front link's). A lone car
+// is its whole train: E turns it as R does.
+void turn_car(uint8_t* c) {
+    if (!car_prev(c) && !car_next(c)) {
+        reverse_train(c);
+        return;
+    }
+    std::vector<uint8_t*> cars = all_cars();
+    uint8_t* g = at<uint8_t*>(c, O_LINK);
+    if (g && removed(g)) g = nullptr;
+    if (g) cars.push_back(g);
+    const std::vector<State> before = states(cars);
+    const std::string dots_before = train_dots(c);
+    normalize_chain(c);
+    const int was = at<int>(c, O_DIRECTION);
+    at<uint32_t>(c, E_FLAGS) ^= 1;
+    car_call(ENGINE_UPDATE_POSITION, c);
+    if (g) reinterpret_cast<SetInt_t>(OBJECT_SET_DIRECTION)(g, nullptr, (at<int>(g, O_DIRECTION) + 128) & 255);
+    occupy_all();
+    commit_cars({"OpTurnCar", "turn car"}, cars, before);
+    g_selection = group_of(c);
+    const std::vector<uint8_t*> train = train_of(c);
+    const size_t place = std::find(train.begin(), train.end(), c) - train.begin() + 1;
+    patch::log("edit: turned car VID %d, %u of %u (between %d and %d): direction %d -> %d, backwards %u%s; rail points %s", nvid_of(c),
+               static_cast<unsigned>(place), static_cast<unsigned>(train.size()), car_prev(c) ? nvid_of(car_prev(c)) : -1,
+               car_next(c) ? nvid_of(car_next(c)) : -1, was, at<int>(c, O_DIRECTION), at<uint32_t>(c, E_FLAGS) & 1,
+               g ? ui_printf(", gun %d", at<int>(g, O_DIRECTION)).c_str() : "", train_dots(c) == dots_before ? "the same" : "CHANGED");
+    MESSAGE("MsgCarTurned", "the car is turned round in its train: VID %d, car %u of %u", nvid_of(c), static_cast<unsigned>(place),
+            static_cast<unsigned>(train.size()));
+}
+
+// The train of `c` laid again along the track with `c` at the spot under the screen point (track_spot:
+// the link nearest to it - where two tracks are within reach, the nearer one), the cars behind it after
+// it and the ones in front of it before it, in their order, each facing as it did in the train. The
+// cars are laid from `c` along the links (Engine_AttachToTrain), so the train keeps to the spot's track;
+// it is kept only when lay_problem finds nothing (every car on a point the walk from the spot reaches,
+// none folded back at a dead end, none over another train), else every car is put back where it was and
+// `why` says why. False (nothing changed) then and off the track.
+bool move_train(uint8_t* c, float sx, float sy, UiText* why = nullptr) {
     const TrackSpot spot = track_spot(sx, sy, CAR_REACH);
-    if (!spot.found) return false;
+    if (!spot.found) {
+        if (why) *why = {"WhyLayNoTrack", "no track where the car was dropped"};
+        return false;
+    }
+    const std::vector<uint8_t*> cars = all_cars();
+    const std::vector<State> before = states(cars);
     const std::vector<uint8_t*> train = train_of(c);
     const size_t k = std::find(train.begin(), train.end(), c) - train.begin();
-    for (uint8_t* t : train) car_call(ENGINE_LEAVE_DOTS, t);
-    for (uint8_t* t : train) car_prev(t) = car_next(t) = nullptr;
+    std::vector<uint32_t> backwards;   // each car's way in the train
+    for (uint8_t* t : train) backwards.push_back(at<uint32_t>(t, E_FLAGS) & 1);
+    // the way along the train at `c` (its facing, less its own backwards bit)
+    const int along = (at<int>(c, O_DIRECTION) + (backwards[k] ? 128 : 0)) & 255;
+    for (uint8_t* t : cars) car_call(ENGINE_LEAVE_DOTS, t);   // Engine_PutOnRails couples to no car standing there
+    for (uint8_t* t : train) {
+        car_prev(t) = car_next(t) = nullptr;
+        at<uint32_t>(t, E_FLAGS) &= ~1u;
+    }
+    const int direction = turn_toward(spot.direction, along);
     reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(c, nullptr, spot.x, spot.y, spot.z);
-    set_direction(c, turn_toward(spot.direction, at<int>(c, O_DIRECTION)));
+    set_direction(c, direction);
     car_call(ENGINE_PUT_ON_RAILS, c);
     unlink_car(c);   // not coupled to whatever stands there
-    for (size_t i = k + 1; i < train.size(); ++i) attach_car(train[i], c, false);
-    for (size_t i = k; i-- > 0;) attach_car(train[i], c, i + 1 == k);   // the first one at the front, then behind
-    if (train_of(c).front() != train.front()) car_call(TRAIN_REVERSE, c);   // the order it had
-    for (uint8_t* t : train_of(c)) car_call(ENGINE_UPDATE_POSITION, t);
+    UiText problem;
+    if (!keep_on_spot(c, spot, direction)) problem = {"WhyLayOff", "a car would stand off the rails"};
+    if (!problem.english[0]) {
+        for (size_t i = k + 1; i < train.size(); ++i) attach_car(train[i], c, false);
+        for (size_t i = k; i-- > 0;) attach_car(train[i], c, i + 1 == k);   // the first one at the front, then behind
+        if (train_of(c).front() != train.front()) car_call(TRAIN_REVERSE, c);   // the order it had
+        for (size_t i = 0; i < train.size(); ++i) at<uint32_t>(train[i], E_FLAGS) = (at<uint32_t>(train[i], E_FLAGS) & ~1u) | backwards[i];
+        for (uint8_t* t : train_of(c)) car_call(ENGINE_UPDATE_POSITION, t);
+        std::vector<uint8_t*> allowed = rail_walk(spot_starts(spot), 60.0f * static_cast<float>(train.size()) + 80, {}).walked;
+        allowed.push_back(spot.from);
+        allowed.push_back(spot.to);
+        problem = train_of(c).size() != train.size() ? UiText{"WhyLayOff", "a car would stand off the rails"} : lay_problem(train, allowed);
+    }
+    std::string laid;
+    for (uint8_t* t : train) laid += ui_printf(" [%d: %s]", nvid_of(t), car_dots_text(t).c_str());
+    patch::log("edit: move train of %u (VID %d, car %u) to the link %s - %s, %.1f px from the cursor (the next link apart %.1f px): %s;%s",
+               static_cast<unsigned>(train.size()), nvid_of(c), static_cast<unsigned>(k + 1), dot_name(spot.from).c_str(),
+               dot_name(spot.to).c_str(), spot.gap, spot.next, problem.english[0] ? problem.english : "laid", laid.c_str());
+    if (problem.english[0]) {
+        restore_states(cars, before);
+        occupy_all();
+        if (why) *why = problem;
+        return false;
+    }
     occupy_all();
     return true;
 }
@@ -2194,16 +2689,18 @@ void continue_drag(POINT p) {
 void end_drag() {
     if (g_drag.active && g_drag.moved && is_car(g_drag.objects[0])) {   // a train, along the track
         uint8_t* c = g_drag.objects[0];
-        const float sx = at<float>(c, O_X), sy = at<float>(c, O_Y) - at<float>(c, O_Z);   // where it was dropped
+        float sx, sy;   // where it was dropped: the track under the cursor
+        mouse_on_map(sx, sy);
         for (size_t i = 0; i < g_drag.objects.size(); ++i) apply(g_drag.objects[i], g_drag.before[i]);
         const std::vector<uint8_t*> cars = all_cars();
         const std::vector<State> before = states(cars);
-        if (move_train(c, sx, sy)) {
+        UiText why;
+        if (move_train(c, sx, sy, &why)) {
             commit_cars({"OpMoveTrain", "move train"}, cars, before);
             MESSAGE("MsgTrainMoved", "the train of %u cars moved: VID %d at %.0f,%.0f", static_cast<unsigned>(train_of(c).size()),
                     nvid_of(c), at<float>(c, O_X), at<float>(c, O_Y));
         } else {
-            MESSAGE("MsgTrainStays", "no track where the car was dropped - the train stays");
+            MESSAGE("MsgTrainStays", "the train stays where it was: %s", why.get());
         }
         g_selection = group_of(c);
         g_drag = Drag();
@@ -2425,8 +2922,9 @@ void turn(int steps) {
         MESSAGE("MsgTurnRail", "a rail is not turned - lay it again with the Track tool");
         return;
     }
-    if (is_car(o)) {   // a train turns round
-        reverse_train(o);
+    if (is_car(o)) {   // R: the train turns round, E: the car alone in its place of the train
+        if (steps < 0) turn_car(o);
+        else reverse_train(o);
         return;
     }
     if (nvid_of(o) == VID_WORKSHOP) {   // round along its leg, its line and posts with it
@@ -8176,6 +8674,7 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
     if (is_car(o)) {   // its train: the army's rules (above, and the red lights), the train, its orders, delete
         red_light_row(o, rows);
         ContextRow train{{"CtxTrain", "TRAIN:"}, {{{"CtxReverse", "TURN ROUND (R)"}, false, [o] { reverse_train(o); }}}};
+        if (car_prev(o) || car_next(o)) train.choices.push_back({{"CtxTurnCar", "TURN CAR (E)"}, false, [o] { turn_car(o); }});
         if (car_prev(o)) train.choices.push_back({{"CtxUncouple", "UNCOUPLE (U)"}, false, [o] { uncouple(o); }});
         if (coupling_partner(o)) train.choices.push_back({{"CtxCouple", "COUPLE (C)"}, false, [o] { couple(o); }});
         rows.push_back(train);
@@ -8405,7 +8904,7 @@ const LabelTip LABEL_TIPS[] = {
     {"CtxArmy", "TipCtxArmy", "Army: whose it is - ours, the enemy's, the neutrals' or the pirates' (A)"},
     {"CtxNeutralFight", "TipCtxFight", "In a fight: whom it fights by the rules of the map"},
     {"CtxFires", "TipCtxFires", "It fires: whether its guns fire on their own"},
-    {"CtxTrain", "TipCtxTrain", "Train: turn it round (R), uncouple this car from the one in front (U), couple it to the nearest train (C)"},
+    {"CtxTrain", "TipCtxTrain", "Train: turn it round (R), turn this car alone (E), uncouple it from the one in front (U), couple to the train along the track (C)"},
     {"CtxDelete", "TipCtxDelete", "Delete: this object (Del) - a car, or its whole train (Shift+Del)"},
     {"CtxTurn", "TipCtxTurn", "Turn: R / E or the mouse wheel"},
     {"CtxPostFor", "TipCtxPostFor", "For trains: the way the trains this post is for go - the other way turns it round"},
@@ -9077,6 +9576,8 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             set_ramp(GET_WHEEL_DELTA_WPARAM(w) > 0 ? (std::min)(1, g_ramp + 1) : (std::max)(-1, g_ramp - 1));
         else if (shift_down() && !g_selection.empty() && tool() != Tool::Place && tool() != Tool::Track)
             lift(GET_WHEEL_DELTA_WPARAM(w) > 0 ? LIFT_STEP : -LIFT_STEP, false);   // Shift: the object's height
+        else if (tool() != Tool::Place && !g_selection.empty() && is_car(g_selection[0]))
+            turn(1);   // a car: the wheel turns its train round either way (E alone turns the one car)
         else
             turn(GET_WHEEL_DELTA_WPARAM(w) > 0 ? 1 : -1);
         return true;
@@ -9327,6 +9828,23 @@ void edit_log_rail_points(float x, float y) {
         text += ")";
     }
     patch::log("edit test: %d rail points of %d near %.0f,%.0f:%s", near_dots, count, x, y, text.c_str());
+    // and the trains with a car near it: each car's VID, place, direction, "stands backwards" bit and points
+    std::vector<uint8_t*> firsts;
+    for (uint8_t* c : all_cars())
+        if ((x == 0 && y == 0) || (std::fabs(at<float>(c, O_X) - x) <= 120 && std::fabs(at<float>(c, O_Y) - y) <= 120)) {   // 0,0: all
+            uint8_t* f = train_of(c).front();
+            if (std::find(firsts.begin(), firsts.end(), f) == firsts.end()) firsts.push_back(f);
+        }
+    for (uint8_t* f : firsts) {
+        std::string cars;
+        for (uint8_t* k : train_of(f)) {
+            uint8_t* g = at<uint8_t*>(k, O_LINK);
+            cars += ui_printf(" [%d at %.0f,%.0f dir %d back %u%s: %s]", nvid_of(k), at<float>(k, O_X), at<float>(k, O_Y),
+                              at<int>(k, O_DIRECTION), at<uint32_t>(k, E_FLAGS) & 1,
+                              g && !removed(g) ? ui_printf(" gun %d", at<int>(g, O_DIRECTION)).c_str() : "", car_dots_text(k).c_str());
+        }
+        patch::log("edit test: train of %u near %.0f,%.0f:%s", static_cast<unsigned>(train_of(f).size()), x, y, cars.c_str());
+    }
 }
 
 bool edit_dirty() { return g_dirty; }
@@ -9352,6 +9870,26 @@ void edit_bar_box(float& l, float& t, float& r, float& b) {
     l = v.l, t = v.t, r = v.r, b = v.b;
 }
 void edit_saved() { g_dirty = false; }
+
+// Before Level_Save: a car that stands backwards in its train (engineFlags bit 0 - E turned it, or a
+// train coupled facing the other way) gets the direction exactly opposite its front end's link. The map
+// keeps no bit: the load sets it again only for a car whose direction is exactly that (Engine
+// ACT_RESTORE and Engine_AttachToTrain: the smaller of the two differences over 127), and the direction
+// Engine_UpdatePosition gives a car is a step or two off its link's (a car at 193 on a link of 192) - so
+// a turned car came back from a save looking the other way. The look does not change (a step of 256).
+void edit_before_save() {
+    unsigned kept = 0;
+    for (uint8_t* c : all_cars()) {
+        if (!(at<uint32_t>(c, E_FLAGS) & 1)) continue;
+        uint8_t* d = at<uint8_t*>(c, E_FRONT_DOT);
+        const int k = at<int>(c, E_FRONT_DOT + POS_LINK);
+        if (!link_dot(d, k)) continue;
+        const int direction = (at<uint8_t>(link_at(d, k), LINK_DIRECTION) + 128) & 255;
+        if (at<int>(c, O_DIRECTION) != direction) set_direction(c, direction);
+        ++kept;
+    }
+    if (kept) patch::log("edit: %u cars standing backwards in their trains - each one's direction set opposite its front link for the save", kept);
+}
 
 // editor.cpp's Run the level: the chosen object, found again by its VID and place once the level is
 // loaded again (held); the tool stays as it is.
@@ -9977,17 +10515,8 @@ std::vector<uint8_t*> place_start_train(const EnemyTrain& t) {
         car_next(train[i]) = i + 1 < train.size() ? train[i + 1] : nullptr;
     }
     if (!train.empty()) move_train(train.front(), static_cast<float>(t.x1), static_cast<float>(t.y1));
-    // a car the laying left "standing backwards" (engineFlags bit 0) faces the same way with its own
-    // ends swapped and the bit clear - the state a map keeps over a save, so R turns it after a load too
-    for (uint8_t* k : train.empty() ? std::vector<uint8_t*>() : train_of(train.front()))
-        if (at<uint32_t>(k, E_FLAGS) & 1) {
-            uint8_t ends[16];
-            std::memcpy(ends, k + E_FRONT_DOT, sizeof ends);
-            std::memcpy(k + E_FRONT_DOT, k + E_REAR_DOT, sizeof ends);
-            std::memcpy(k + E_REAR_DOT, ends, sizeof ends);
-            at<uint32_t>(k, E_FLAGS) &= ~1u;
-            car_call(ENGINE_UPDATE_POSITION, k);
-        }
+    // move_train keeps each car's way in the train (here: none stands backwards), and the engine's
+    // chain - before 2026-11-05 such a car got its ends swapped here, the other way round in the chain
     occupy_all();
     if (train.empty()) return train;
     Order order{t.patrol ? TASK_PATROL : TASK_ATTACK, 0, 0, 0};
