@@ -3453,6 +3453,35 @@ did not open (fix 6 below), and in full screen it pushed the game area down by i
 picture stayed at the top, so every click landed below the cursor. The commands and menu sections
 above still name the File / Edit / Options items they were - the ids are the same. The dialogs (GDI
 mode above) are not tested in full screen.
+
+**The frame and the profiler** (`src/LocoFix/profile.cpp`, `profile.h`). `LOCOFIX_PROFILE=1` in the
+environment (`$env:LOCOFIX_PROFILE = "1"` before `test_game.ps1`) or the DWORD `EditorProfile` = 1 next
+to `FrameLimit` turns on a per-frame profiler for the run, in the editor and in play; off it costs one
+bool test per measuring point. It hooks `World_DrawLayer` (the layers 0-1 ground, 2-4 software
+sprites, 5-10 Direct3D), the call of `Graphics_DrawScene` in `GameWorld_Run` (the rest of the scene:
+locks, the depth copy, shadows, weather) and `Surface_Lock`; the overlay's parts (`prof::Lap` in
+`draw_overlay`: heights, marks, regions, push lines, enemy trains, arrivals, tool, bar, rows, status,
+panels), the present and the frame limiter's wait add their own, and the rest of the frame is
+"other". Every ~2 s `LocoFix.log` gets a `profile:` line: fps, avg/max ms of every part, the time in
+locks, the objects listed and drawn (and drawn only by the engine's "below the view" rule), the objects
+the editor walked, the locks a frame and the locks by part. What it found on The Factory (1889
+objects, 17 push lines, 23 posts, 3 mines; 2026-11-06, Polish, a 2560 x 1440 screen): the editor ran
+at 42-55 fps at 1024 x 768 in a window and 23-33 fps at 1920 x 1080 in full screen (play: 55-58).
+The decals drawn as sprites were not the cost (layers 2-4 took 2.3-3.9 ms against 2.3 in play, where
+they are baked) and neither was `pick` (under 0.1 ms); the cost was the overlay: (1) the push lines
+searched every line's way and every post's rail point again each frame - 8.8 ms, now kept while the
+rail network is the same (`RailMemo`, a hash of its points and links), 0.5 ms; (2) every character of
+a text locked the back and the depth buffer for itself (`SoftwareLock`), and with dgVoodoo a lock after
+Direct3D drawing reads the picture back - 190-310 locks a frame, 12-25 ms in full screen; now one lock
+a text, one for all the status lines, the mines' labels after their squares under one lock, the rows
+above the bar in three passes (strips, Direct3D, software) - 17-23 locks; (3) the arrows' triangles
+were a FillRect a row of pixels, ~3000 calls a frame - now one fan each (`fill_triangle`), and the
+heights' contours one list of triangles (`FillBatch`); (4) `track_cells` (the Ground height tool's
+brush) is kept for the same rails. Now: 60 fps at 1024 x 768 with ~8 ms to spare, and at 1920 x 1080
+in full screen 58-60 fps with Select, Paint and Ground height (0-1.5 ms to spare). What is left is the
+locks themselves, ~8 ms at 1920 x 1080: the engine's own three and the overlay's mines' labels, bar,
+status lines and rows, each a sync with the GPU of 1-2 ms there; fewer would need the overlay's
+software pictures drawn together, which changes what is drawn over what.
 ## Changes from the original
 
 - Language packs with a choice in the launcher: `lang/pl`, `lang/en`, `lang/de`, `lang/hu`,
