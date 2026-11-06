@@ -57,6 +57,8 @@ The [trailer](https://www.youtube.com/watch?v=04BeRSnfL6o) and more videos of th
 |---|---|
 | ![A battle](docs/img/battle.jpg) | ![The custom maps page](docs/img/custom-maps-en.jpg) |
 | A battle over the lava at 1920 x 1080 | Custom maps: POLIGON, your own maps and the editor |
+| ![The Factory in play](docs/img/thefactory-play-en.jpg) | ![The Factory in the editor](docs/img/thefactory-editor-en.jpg) |
+| The Factory - a map made in the editor (Dysprohol) | The Factory in the editor: the enemy's base |
 | ![The map editor](docs/img/editor-factory-en.jpg) | ![The train arrivals](docs/img/arrivals-en.jpg) |
 | The editor on POLIGON: the two factories | The trains that come during the mission |
 | ![A train's panel](docs/img/train-panel-en.jpg) | ![A train guarding an area](docs/img/area-watch-en.jpg) |
