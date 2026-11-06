@@ -5,8 +5,11 @@ of the game when it is assembled (build.py). Two kinds of change files:
 
 <file>.patch          a unified diff against the original <file> (scripts, menus). Made
                       and applied byte for byte: the game files are CP1250/CP1251 with CRLF
-                      line endings, which the patch keeps. The original must match exactly,
-                      otherwise applying fails and says where.
+                      line endings, which the patch keeps. Each change (hunk) is placed by
+                      its lines, byte for byte: at its line number, or where they occur once
+                      in the file (an original with other lines added or changed elsewhere,
+                      as another language's Steam depot has); otherwise applying fails and
+                      says which change could not be placed.
 <name>.override.ini   values for <name>.ini (strings.ini): only the keys we change, so the
                       file reads like a translation and holds nothing of the original.
 
@@ -27,6 +30,7 @@ Override syntax (bytes are copied as they are - write it in the encoding of the 
     python tools\patch_text.py diff <original> <changed> <file.patch>
     python tools\patch_text.py apply <original> <file.patch> <output>
     python tools\patch_text.py merge <original.ini> <override.ini> <output>
+    python tools\patch_text.py test        (the placement's own tests)
 """
 import difflib
 import os
@@ -59,10 +63,28 @@ def make_patch(original, changed, name, context=1):
     return b"".join(out) if len(out) > 1 else b""
 
 
-def apply_patch(original, patch, name="file"):
-    """Applies a patch from make_patch (or diff -u). Raises ValueError when the original
-    differs from the one the patch was made for."""
-    src = _lines(original)
+class PatchError(ValueError):
+    """A change (hunk) of a patch that cannot be placed in the file: `hunk` is its number (from
+    1) of `hunks`, `line` the line of its first changed line in the original the patch was made
+    for (from 1), `found` how many times its lines occur in the file (0, more than once, or once
+    but before the hunk ahead of it), `text` that changed line (shortened)."""
+    def __init__(self, name, hunk, hunks, line, found, text):
+        self.name, self.hunk, self.hunks, self.line, self.found, self.text = \
+            name, hunk, hunks, line, found, text
+        where = "not found" if found == 0 else f"found {found} times" if found > 1 else \
+            "found before the change ahead of it"
+        super().__init__(f"{name}: change {hunk} of {hunks} (line {line}: {text}) - its lines "
+                         f"{where} in the file")
+
+    def short(self):
+        """'change 2 of 4 (line 57: ...): not found' - for a message that names the file."""
+        where = "not found" if self.found == 0 else f"found {self.found} times" \
+            if self.found > 1 else "out of order"
+        return f"change {self.hunk} of {self.hunks} (line {self.line}: {self.text}): {where}"
+
+
+def _hunks(patch):
+    """The hunks of a patch: (start in the original, from 0; [[sign, line], ...])."""
     hunks, rows = [], None
     for line in _lines(patch):
         m = re.match(rb"@@ -(\d+)(?:,(\d+))? \+\d+(?:,\d+)? @@", line)
@@ -74,24 +96,74 @@ def apply_patch(original, patch, name="file"):
             rows.append([line[:1], line[1:]])
         elif rows is not None and line.startswith(b"\\"):   # "\ No newline at end of file"
             rows[-1][1] = rows[-1][1][:-1]
+    return hunks
+
+
+def apply_patch(original, patch, name="file"):
+    """Applies a patch from make_patch (or diff -u). Each hunk is placed by its lines: at its line
+    number when the file has its "before" lines (the removed and context ones, byte for byte)
+    there, else where they occur exactly once in the file - an original with lines added, removed
+    or changed elsewhere (another language's Steam depot) takes the patch too. Raises PatchError
+    (a ValueError) when a hunk's lines occur nowhere, more than once, or before the hunk ahead of
+    it."""
+    src = _lines(original)
+    hunks = _hunks(patch)
     out, pos = [], 0
-    for start, rows in hunks:
-        if start < pos:
-            raise ValueError(f"{name}: overlapping hunks")
+    for number, (start, rows) in enumerate(hunks, 1):
+        before = [text for sign, text in rows if sign != b"+"]
+        n = len(before)
+        if not (start >= pos and src[start:start + n] == before):
+            found = [i for i in range(len(src) - n + 1) if src[i:i + n] == before] if n else []
+            if len(found) != 1 or found[0] < pos:
+                first = next((i for i, (sign, _) in enumerate(rows) if sign != b" "), 0)
+                text = rows[first][1].strip().decode("latin-1") if rows else ""
+                raise PatchError(name, number, len(hunks), start + first + 1, len(found),
+                                 text[:40] + ("..." if len(text) > 40 else ""))
+            start = found[0]
         out += src[pos:start]
         pos = start
         for sign, text in rows:
-            if sign == b"+":
+            if sign != b"-":
                 out.append(text)
-                continue
-            if pos >= len(src) or src[pos] != text:
-                raise ValueError(f"{name}: line {pos + 1} differs from the original the patch "
-                                 f"was made for")
-            if sign == b" ":
-                out.append(text)
-            pos += 1
+            if sign != b"+":
+                pos += 1
     out += src[pos:]
     return b"".join(out)
+
+
+def tests():
+    """Checks apply_patch's placement; raises AssertionError on a failure."""
+    original = b"".join(b"line %d\r\n" % i for i in range(1, 21))
+    changed = original.replace(b"line 5\r\n", b"line 5\r\nnew a\r\n").replace(b"line 15\r\n", b"LINE 15\r\n")
+    patch = make_patch(original, changed, "t.txt")
+    assert apply_patch(original, patch) == changed                      # at its line numbers
+    shifted = b"added 1\r\nadded 2\r\n" + original
+    assert apply_patch(shifted, patch) == b"added 1\r\nadded 2\r\n" + changed
+    middle = original.replace(b"line 10\r\n", b"line 10\r\nmore\r\nmore\r\nmore\r\n")
+    assert apply_patch(middle, patch) == changed.replace(b"line 10\r\n", b"line 10\r\nmore\r\nmore\r\nmore\r\n")
+    assert apply_patch(original.replace(b"\r\n", b"\n"), patch.replace(b"\r\n", b"\n")) == \
+        changed.replace(b"\r\n", b"\n")                                  # line endings kept as they are
+    cp = b"\xe8\xf9\xe0\r\n" + original                                  # bytes of a code page
+    assert apply_patch(cp, patch) == b"\xe8\xf9\xe0\r\n" + changed
+    for broken, found in [(original.replace(b"line 15\r\n", b"line 15 \r\n"), 0),   # changed
+                          (original.replace(b"line 16\r\n", b""), 0),               # missing
+                          (shifted.replace(b"added 1\r\n", b"line 14\r\nline 15\r\nline 16\r\n"), 2)]:
+        try:
+            apply_patch(broken, patch, "t.txt")
+        except PatchError as e:
+            assert (e.hunk, e.hunks, e.found, e.line) == (2, 2, found, 15), (e.hunk, e.found, e.line)
+        else:
+            raise AssertionError("a patch placed where its lines are not, or twice")
+    # the lines of the second hunk found only before the first one: out of order
+    swapped = original.replace(b"line 14\r\nline 15\r\nline 16\r\n", b"").replace(
+        b"line 1\r\n", b"line 1\r\nline 14\r\nline 15\r\nline 16\r\n", 1)
+    try:
+        apply_patch(b"x\r\n" + swapped, patch)
+    except PatchError as e:
+        assert e.found == 1 and e.hunk == 2
+    else:
+        raise AssertionError("hunks placed out of order")
+    print("patch_text: placement tests passed")
 
 
 # --------------------------------------------------------------- override -----
@@ -224,5 +296,7 @@ if __name__ == "__main__":
         open(sys.argv[4], "wb").write(apply_patch(read(sys.argv[2]), read(sys.argv[3]), sys.argv[3]))
     elif len(sys.argv) == 5 and sys.argv[1] == "merge":
         open(sys.argv[4], "wb").write(merge_ini(read(sys.argv[2]), read(sys.argv[3]), sys.argv[3]))
+    elif sys.argv[1:] == ["test"]:
+        tests()
     else:
         sys.exit(__doc__)
