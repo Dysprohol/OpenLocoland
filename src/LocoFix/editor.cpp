@@ -86,6 +86,7 @@ void edit_keep_history();
 void edit_restore_history();
 void edit_saved();
 void edit_before_save();   // the cars standing backwards keep it over the save
+void edit_end_strokes(const char* why);   // editor_edit.cpp: a stroke of the brushes under way ends
 void edit_message_saved(const std::string& map);
 void panel_saved(const std::string& file);   // editor_panel.cpp: the SAVED notice
 void edit_message_line(const std::string& text);
@@ -386,6 +387,7 @@ void update_cursor() {
 class DialogScope {
 public:
     DialogScope() {
+        if (g_held) edit_end_strokes("a dialog opened");   // the dialog takes the mouse
         editor_feed_sound(true);
         GetCurrentDirectoryA(MAX_PATH, dir_);
         if (graphics()) reinterpret_cast<GdiMode_t>(ENTER_GDI_MODE)(graphics(), nullptr);

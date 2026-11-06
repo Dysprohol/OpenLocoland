@@ -861,8 +861,13 @@ void lines_into_step(const std::vector<PushLine>& before);
 const char* post_line_text(uint8_t* o);
 void give_post_line(uint8_t* o);
 std::vector<int> lines_going_with(const std::vector<uint8_t*>& objects);
+void end_strokes(const char* why = nullptr);   // the mouse, below
 
 void undo(bool redo) {
+    // a stroke under way is a step of its own first: what it keeps of the ground before it is the
+    // ground as it is now, so an undo in its middle (Ctrl+Z with the button held) took back the step
+    // before it, and the stroke's own undo later brought that step back with nothing left to undo
+    end_strokes(redo ? "redo" : "undo");
     auto& from = redo ? g_redo : g_undo;
     auto& to = redo ? g_undo : g_redo;
     if (from.empty()) {
@@ -1534,15 +1539,13 @@ bool on_bar(float x, float y) {
 
 void close_context();   // the context panel, below
 
-void end_strokes();   // a stroke under way ends first (the mouse, below)
-
 void choose_entry(int i) {
     if (i < 0 || i >= ENTRY_COUNT || ENTRIES[i].icon < 0) return;
     if (ENTRIES[i].tool == Tool::Arrivals) {   // a panel, not a tool
         panel_open_arrivals();
         return;
     }
-    end_strokes();
+    end_strokes("the tool changed");
     end_line();
     g_push_started = false;
     const bool again = g_entry == i;
@@ -1565,7 +1568,7 @@ void choose_entry(int i) {
 void take_palette_entry(int which) {
     const int nvid = which ? VEHICLES_NVID : PALETTE_NVID;
     if (entry().nvid == nvid) return;
-    end_strokes();
+    end_strokes("the tool changed");
     end_line();
     g_push_started = false;
     for (int i = 0; i < ENTRY_COUNT; ++i)
@@ -1596,6 +1599,7 @@ bool g_ctrl = false, g_shift = false;
 bool shift_down() { return g_shift || GetKeyState(VK_SHIFT) < 0; }
 bool g_alt = false;
 bool alt_down() { return g_alt || GetKeyState(VK_MENU) < 0; }
+bool g_tracking_leave = false;   // TrackMouseEvent asked for the cursor's leaving the window
 
 struct Drag {
     bool active = false;
@@ -4517,6 +4521,7 @@ struct GroundStroke {
     bool active = false, water = false, erase = false;
     bool gap = false;                        // the cursor went over the bar or the rows: no dabs from there
     int level = 0, bed = 0;                  // Water: the water's level, its bed (GRID levels)
+    int kind = 0;                            // Water: its kind (W during the stroke is for the next one)
     std::map<rail::Cell, short> grid_before;
     std::set<std::pair<int, int>> tiles;     // Water: the 128 squares with a tile of the kind
     std::set<std::pair<int, int>> others;    // ... and with a tile of another kind (left to it)
@@ -4657,6 +4662,7 @@ void start_ground_stroke(bool water, bool erase = false) {
     g_gstroke.erase = erase || shift_down();
     if (!water && g_paint_bed) start_bed(g_gstroke.erase);
     if (water) {
+        g_gstroke.kind = g_water_kind;
         const WaterKind& k = WATER_KINDS[g_water_kind];
         float x, y, z;
         map_point(g_mouse, vid_by_number(VID_SEMAPHORE), x, y, z);
@@ -4718,7 +4724,7 @@ void ground_dab(float sx, float sy, bool first) {
         ground_paint(sx, sy, r, g_texture, g_gstroke.erase, g_paint_strength / static_cast<float>(MAX_STRENGTH), g_paint_hard);
         return;
     }
-    const WaterKind& k = WATER_KINDS[g_water_kind];
+    const WaterKind& k = WATER_KINDS[g_gstroke.kind];
     ground_lower(sx, sy, r, g_gstroke.bed, g_gstroke.erase ? -1 : k.bed_texture, g_gstroke.erase);
     // the GRID cells whose ground shows in the brush (their screen place: y - z)
     static std::set<rail::Cell> track;
@@ -4788,7 +4794,7 @@ void end_ground_stroke() {
     }
     unsigned effects = 0, gone = 0;
     if (g_gstroke.water) {
-        const WaterKind& k = WATER_KINDS[g_water_kind];
+        const WaterKind& k = WATER_KINDS[g_gstroke.kind];
         const int level = g_gstroke.level;
         auto add = [&](uint8_t* o) {
             if (!o) return;
@@ -4887,7 +4893,7 @@ void end_ground_stroke() {
     for (const auto& c : g_gstroke.grid_before)
         op.grid.push_back({c.first.first, c.first.second, c.second, ground_cell(c.first.first, c.first.second)});
     if (g_gstroke.water)
-        MESSAGE("MsgWater", "%s: level %d, %u tiles, %u effects, %u cells of ground, %u taken away", ui_text(WATER_KINDS[g_water_kind].key, WATER_KINDS[g_water_kind].english),
+        MESSAGE("MsgWater", "%s: level %d, %u tiles, %u effects, %u cells of ground, %u taken away", ui_text(WATER_KINDS[g_gstroke.kind].key, WATER_KINDS[g_gstroke.kind].english),
                 g_gstroke.level, static_cast<unsigned>(g_gstroke.made.size()), effects, static_cast<unsigned>(g_gstroke.grid_before.size()), gone);
     else if (g_gstroke.gravel)
         MESSAGE("MsgBedLaid", "gravel bed (%s): %u rails, %s, %u decals laid, %u taken away",
@@ -6458,7 +6464,39 @@ void end_sweep() {
     MESSAGE("MsgDeletedSweep", "deleted %u objects in one sweep (one step of the history)", s.objects);
 }
 
-void end_strokes() {
+// The button that holds the stroke, the drag or the sweep under way (VK_LBUTTON / VK_RBUTTON, 0 none):
+// the other one does nothing until it is let go - a right click in a left stroke began a new stroke
+// over it, and the first one's changes stayed on the map without a step of the history.
+int g_held_button = 0;
+
+bool stroke_under_way() { return g_stroke.active || g_gstroke.active || g_drag.active || g_sweep.active || g_region_drag; }
+
+const char* stroke_kind() {
+    return g_stroke.active && tool() == Tool::Height ? "ground height" : g_stroke.active ? "decals"
+         : g_gstroke.active ? (g_gstroke.water ? "water" : g_gstroke.gravel ? "gravel bed" : "paint")
+         : g_drag.active ? "drag" : g_sweep.active ? "delete sweep" : "region";
+}
+
+// The cursor is over the game's view (always in test mode, whose mouse is the messages' own).
+bool cursor_in_window(HWND window) {
+    if (g_test) return true;
+    POINT p;
+    RECT r;
+    if (!window || !GetCursorPos(&p) || !ScreenToClient(window, &p) || !GetClientRect(window, &r)) return true;
+    return GetForegroundWindow() == window && PtInRect(&r, p);
+}
+
+HWND g_view_window = nullptr;   // the window the mouse's messages come to
+
+void end_strokes(const char* why) {
+    // ReleaseCapture (end_drag, below) sends WM_CAPTURECHANGED at once, which ends the strokes too:
+    // the stroke under way is closed by this call alone
+    static bool ending = false;
+    if (ending) return;
+    ending = true;
+    if (stroke_under_way())
+        patch::log("edit: stroke: %s ended - %s", stroke_kind(), why ? why : "ended by the editor");
+    g_held_button = 0;
     if (g_window) KillTimer(g_window, HEIGHT_TIMER);
     end_drag();
     end_sweep();
@@ -6474,6 +6512,9 @@ void end_strokes() {
         finish_region(sx, sy);
     }
     if (!g_test && GetCapture()) ReleaseCapture();
+    // let go outside the window: the brush's outline does not stay where the cursor left it
+    if (g_view_window && !cursor_in_window(g_view_window)) g_mouse = {-1, -1};
+    ending = false;
 }
 
 // ---- the size of the brushes ----
@@ -9364,22 +9405,45 @@ void __fastcall DrawScene_editor(void* g, void* edx, int draw) {
 
 // A message of the editor window while the level is held; true when it was handled here.
 bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
+    g_view_window = window;
     if (m >= WM_MOUSEFIRST && m <= WM_MOUSELAST && m != WM_MOUSEWHEEL) g_mouse = logical(l);
-    // the button let go ends a stroke or a drag whoever takes the message: a panel opened during a
-    // stroke (F1) took it, and a Paint stroke - which has no repeat timer to notice - went on painting
-    // under the panel and after it, with no button held, until the next click
-    if ((m == WM_LBUTTONUP || m == WM_RBUTTONUP) && (g_stroke.active || g_gstroke.active || g_drag.active || g_sweep.active) && panel_open())
-        end_strokes();
+    // a panel open (F1, the Help or Menu button during a right-button stroke) ends a stroke: the
+    // Ground height's repeat timer went on raising the ground unseen under it, and a Paint stroke
+    // painted after it with no button held until the next click
+    if (panel_open() && stroke_under_way()) end_strokes("a panel opened");
     if (m == WM_LBUTTONDOWN && music_click(logical(l))) return true;   // the music player, also over an open panel
-    if (panel_message(window, m, w, g_mouse)) return true;   // the Help and Menu buttons, an open panel
+    if (panel_message(window, m, w, g_mouse)) {   // the Help and Menu buttons, an open panel
+        if (panel_open() && stroke_under_way()) end_strokes("a panel opened");
+        return true;
+    }
+    // the other button during a stroke does nothing (the stroke goes on to its own button's release);
+    // a stroke whose button is no longer down (its release lost) ends first
+    if ((m == WM_LBUTTONDOWN || m == WM_RBUTTONDOWN) && stroke_under_way()) {
+        const int pressed = m == WM_LBUTTONDOWN ? VK_LBUTTON : VK_RBUTTON;
+        if (g_held_button && g_held_button != pressed && (g_test || GetKeyState(g_held_button) < 0)) {
+            patch::log("edit: stroke: %s goes on - the %s button ignored", stroke_kind(), pressed == VK_LBUTTON ? "left" : "right");
+            return true;
+        }
+        end_strokes("its button was no longer held");
+    }
     switch (m) {
+    case WM_MOUSELEAVE:   // the cursor out of the window: no brush's outline left at its edge
+        g_tracking_leave = false;
+        if (!stroke_under_way()) g_mouse = {-1, -1};
+        return false;
     case WM_MOUSEMOVE:
         g_mouse = logical(l);
+        if (!g_test && !g_tracking_leave) {
+            TRACKMOUSEEVENT t = {sizeof(t), TME_LEAVE, window, 0};
+            g_tracking_leave = TrackMouseEvent(&t) != FALSE;
+        }
         if (g_drag.active) continue_drag(g_mouse);
         if (panel_open() || on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)) ||
-            on_options(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
-            // nothing is painted or raised unseen under a panel, the bar or the rows; the stroke goes on
-            // where the cursor comes out (not along the way under them)
+            on_options(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)) ||
+            !view().contains(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
+            // nothing is painted or raised unseen under a panel, the bar or the rows, nor out of the
+            // window (the mouse captured: a drag out of it painted and raised the map beyond the view
+            // along the way); the stroke goes on where the cursor comes back (not along the way)
             g_stroke.gap = g_gstroke.gap = g_sweep.gap = true;
             return false;
         }
@@ -9442,6 +9506,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             g_window = window;
             SetTimer(window, HEIGHT_TIMER, HEIGHT_REPEAT, nullptr);
             if (!g_test) SetCapture(window);
+            patch::log("edit: stroke: ground height (%s) begun at %ld,%ld", BRUSH_NAMES[static_cast<int>(g_stroke.brush)], g_mouse.x, g_mouse.y);
         } else if (tool() == Tool::Decals) {
             g_stroke = Stroke();
             g_stroke.active = true;
@@ -9451,6 +9516,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             start_ground_stroke(tool() == Tool::Water);
             ground_step(true);
             if (!g_test) SetCapture(window);
+            if (g_gstroke.active) patch::log("edit: stroke: %s begun at %ld,%ld", stroke_kind(), g_mouse.x, g_mouse.y);
         } else if (tool() == Tool::Region) {
             float sx, sy;
             mouse_on_map(sx, sy);
@@ -9479,24 +9545,36 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
                 if (g_drag.active && !g_test) SetCapture(window);
             }
         }
+        if (stroke_under_way()) g_held_button = VK_LBUTTON;
         return true;
     }
     case WM_TIMER:
         if (w != HEIGHT_TIMER) return false;
         // the button let go where its message did not come (outside the window, the capture lost):
         // the stroke ends as with the button up
-        if (!g_test && GetKeyState(g_stroke.right ? VK_RBUTTON : VK_LBUTTON) >= 0) end_strokes();
-        else if (g_stroke.active && tool() == Tool::Height && GetTickCount() - g_stroke.time >= HEIGHT_REPEAT) height_step(true);
+        if (!g_test && GetKeyState(g_stroke.right ? VK_RBUTTON : VK_LBUTTON) >= 0) end_strokes("the button let go out of sight (the repeat timer)");
+        else if (g_stroke.active && tool() == Tool::Height && GetTickCount() - g_stroke.time >= HEIGHT_REPEAT && !g_stroke.gap)
+            height_step(true);   // held still - not over the bar, the rows or out of the window (gap)
         else if (!g_stroke.active) KillTimer(window, HEIGHT_TIMER);
         return true;
     case WM_LBUTTONUP:
-        end_strokes();
+        if (g_held_button != VK_RBUTTON) end_strokes("the button let go");
         return true;
     case WM_CAPTURECHANGED:   // the mouse taken by another window (a message box, Alt+Tab)
-        if (!g_test && reinterpret_cast<HWND>(l) != window) end_strokes();
+        if (!g_test && reinterpret_cast<HWND>(l) != window) end_strokes("the mouse taken by another window");
+        return false;
+    case WM_ENTERMENULOOP:   // the window's menu (Alt, F10): the mouse is its own until it closes
+        end_strokes("the menu opened");
         return false;
     case WM_ACTIVATE:
-        if (LOWORD(w) == WA_INACTIVE) end_strokes();
+        if (LOWORD(w) == WA_INACTIVE) {
+            end_strokes("the game left (Alt+Tab)");
+            g_mouse = {-1, -1};
+        }
+        // the keys held when the game was left or came back were let go in another window: Alt stayed
+        // down for the editor after Alt+Tab, and the next click in Ground height or Paint was the
+        // pipette instead of a stroke (the keys still held are read from the keyboard)
+        g_alt = g_ctrl = g_shift = false;
         return false;
     case WM_RBUTTONDOWN:
         if (g_arrival_pick != ArrivalPick::None) {   // no point for the panel after all
@@ -9527,11 +9605,14 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
                 g_window = window;
                 SetTimer(window, HEIGHT_TIMER, HEIGHT_REPEAT, nullptr);
                 if (!g_test) SetCapture(window);
+                patch::log("edit: stroke: ground height (%s, the right button) begun at %ld,%ld", BRUSH_NAMES[static_cast<int>(g_stroke.brush)], g_mouse.x, g_mouse.y);
             } else if (tool() != Tool::Height) {
                 start_ground_stroke(tool() == Tool::Water, true);
                 ground_step(true);
                 if (!g_test) SetCapture(window);
+                if (g_gstroke.active) patch::log("edit: stroke: %s (the right button: the original) begun at %ld,%ld", stroke_kind(), g_mouse.x, g_mouse.y);
             }
+            if (stroke_under_way()) g_held_button = VK_RBUTTON;
             return true;
         }
         if (tool() == Tool::Region && !on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)) &&
@@ -9570,7 +9651,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         select(nullptr);
         return true;
     case WM_RBUTTONUP:
-        end_strokes();
+        if (g_held_button != VK_LBUTTON) end_strokes("the button let go");
         return true;
     case WM_MBUTTONDOWN:   // the middle button pans the map (mouse_pan.cpp); a click of it in the Track tool
         g_middle_down = g_mouse;   // deletes the rail under the cursor
@@ -9888,7 +9969,10 @@ void edit_saved() { g_dirty = false; }
 // ACT_RESTORE and Engine_AttachToTrain: the smaller of the two differences over 127), and the direction
 // Engine_UpdatePosition gives a car is a step or two off its link's (a car at 193 on a link of 192) - so
 // a turned car came back from a save looking the other way. The look does not change (a step of 256).
+void edit_end_strokes(const char* why) { end_strokes(why); }
+
 void edit_before_save() {
+    end_strokes("the map saved");   // the saved map has no half of a stroke
     unsigned kept = 0;
     for (uint8_t* c : all_cars()) {
         if (!(at<uint32_t>(c, E_FLAGS) & 1)) continue;

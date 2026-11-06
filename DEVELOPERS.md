@@ -2638,7 +2638,25 @@ and the tester's "how do I change an object's height" had no answer either. Now:
   to notice, went on painting under the panel and after it with no button held. Checked in the game
   (POLIGON, radius 0): the drag raised 101 cells in a band; a Paint stroke with Help opened and the
   button let go over it ended there ("231x81 px"), and one dragged down over the rows and back painted
-  nothing under them (test steps `j` / `J`: the left button only pressed / let go). Flatten's level is the cell where the stroke
+  nothing under them (test steps `j` / `J`: the left button only pressed / let go). How a stroke
+  ends (`end_strokes(why)`, each end logged "edit: stroke: <kind> ended - <why>", each begin "edit:
+  stroke: <kind> begun at x,y"): its own button let go (anywhere - the mouse is captured), a tool
+  changed (Esc, a number key, the bar), a panel opened (F1, the Help / Menu button: the Height timer
+  had gone on raising the ground unseen under Help - 15 steps in 3 s), the window's menu or a dialog,
+  the game left (Alt+Tab, `WM_ACTIVATE`) or the capture lost, a save, and Ctrl+Z / Ctrl+Y - the undo
+  closes the stroke as its own step first (in its middle it had taken back the step before, and the
+  stroke, which kept the cells as they were before the undo, brought it back on its own undo with
+  nothing left to undo). The other button during a stroke is ignored (`g_held_button`, "goes on - the
+  right button ignored"): a right click in a left Raise or Paint stroke began a new stroke over it,
+  and the first one's ground stayed changed without a step of the history. Out of the window (the
+  drag captured) nothing is raised or painted, as over the bar, and the Height timer waits there (a
+  drag out to the corner had raised 655 cells beyond the view); the brush's outline goes when the
+  cursor leaves the window (`WM_MOUSELEAVE`, the game left, a stroke let go outside). Alt, Ctrl and
+  Shift are let go for the editor when the game is left or comes back: after Alt+Tab, Alt stayed down
+  for it and the next click in Ground height or Paint was the pipette. The Water stroke keeps its
+  kind (W during it is for the next one). Checked in the game: every case above in test mode (the
+  log lines, one step each, undo to "nothing to undo"), and with the real mouse a stroke dragged out
+  of the window and let go there, and the outline gone when the cursor leaves. Flatten's level is the cell where the stroke
   begins, now named in the status line ("flatten to level 92"): begun on the track it gives a plateau
   at the track's level - the way to put a line and its factory on a hill: lay the line up its ramps
   (Track tool PgUp, 11 levels each), raise the ground around the top, flatten it starting on the track.
