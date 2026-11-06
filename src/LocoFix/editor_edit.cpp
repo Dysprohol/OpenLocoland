@@ -93,6 +93,8 @@ void editor_mission_settings();     // editor.cpp: File > Mission settings...
 void panel_draw(POINT mouse);
 void panel_draw_saved();
 const char* panel_tip(POINT mouse);
+bool panel_on_help(POINT mouse);   // the bar's Help and Menu buttons under the mouse
+bool panel_on_menu(POINT mouse);
 const char* arrivals_tip(POINT mouse);   // editor_arrivals.cpp: the row under the mouse
 const char* factory_tip(POINT mouse);    // editor_factory.cpp
 bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse);
@@ -8050,6 +8052,18 @@ const char* music_tip(POINT m) {
     return on_music(static_cast<float>(m.x), static_cast<float>(m.y)) ? ui_text("TipMusic", "Music while you edit") : nullptr;
 }
 
+// The hint of the player's part under the mouse (shorter than its status line), or nullptr.
+const char* music_hint(POINT m) {
+    for (const MusicHit& h : g_music_hits)
+        if (m.x >= h.l && m.x < h.r && m.y >= h.t && m.y < h.b)
+            return h.what < 0 ? ui_text("HintMusicPrevious", "the music file before")
+                 : h.what == 1 ? ui_text("HintMusicNext", "the next music file")
+                 : g_music.on ? ui_text("HintMusicStop", "stop the music")
+                              : ui_text("HintMusicPlay", "play the music while you edit");
+    return on_music(static_cast<float>(m.x), static_cast<float>(m.y))
+               ? ui_text("HintMusicName", "music while you edit (the map's own: Mission settings)") : nullptr;
+}
+
 // A click on the player: true when it was its.
 bool music_click(POINT m) {
     if (!on_music(static_cast<float>(m.x), static_cast<float>(m.y))) return false;
@@ -8072,7 +8086,9 @@ bool music_click(POINT m) {
 
 bool on_options(float x, float y);   // the rows, below
 float rows_top();                    // the top of the highest row above the bar (the view's bottom with none)
-constexpr DWORD HINT_DELAY = 700;   // ms the cursor rests before the hint
+// ms the cursor rests before the hint: 700 until 2026-11-06, which a tester found too long; any move
+// takes it away and starts the rest anew, so it never shows while the cursor goes across a row
+constexpr DWORD HINT_DELAY = 350;
 bool g_hints_loaded = false, g_hints = true;
 POINT g_hint_mouse = {-1, -1};
 DWORD g_hint_rest = 0;   // when the cursor came to rest
@@ -8134,9 +8150,14 @@ void draw_hint() {
         return;
     const float mx = static_cast<float>(g_mouse.x), my = static_cast<float>(g_mouse.y);
     const int entry_under = bar_entry_at(mx, my);
-    if (entry_under < 0 && (on_bar(mx, my) || on_options(mx, my))) return;   // the plates, the rows, the music
+    // the buttons that are not tools: the music player at the top right, the bar's Help and Menu
+    const char* button = music_hint(g_mouse);
+    if (!button && panel_on_help(g_mouse)) button = ui_text("HintHelpButton", "the editor's help pages (F1)");
+    if (!button && panel_on_menu(g_mouse)) button = ui_text("HintMenuButton", "new, load, save, export, quick test, exit");
+    if (!button && entry_under < 0 && (on_bar(mx, my) || on_options(mx, my))) return;   // the plates, the rows
     const Entry& hinted = entry_under >= 0 ? ENTRIES[entry_under] : entry();
-    const char* text = nothing_picked(hinted) && (entry_under >= 0 || tool() == Tool::Place)
+    const char* text = button ? button
+                       : nothing_picked(hinted) && (entry_under >= 0 || tool() == Tool::Place)
                            ? ui_text("HintChoose", "click: choose an object in the palette")
                            : hint_of(entry_under >= 0 ? ENTRIES[entry_under].tool : tool());
     uint8_t* font = vid_by_number(FONT_TIPS);
@@ -8146,7 +8167,7 @@ void draw_hint() {
     const Box v = view();
     float x = mx + 14, y = my + 22;   // below right of the arrow, as the game's tips
     if (x + w > v.r - 2) x = (std::max)(v.l + 2, v.r - 2 - w);
-    if (y + LINE_HEIGHT > v.b - 2 || entry_under >= 0) y = my - 22 - LINE_HEIGHT;   // above the bar
+    if (y + LINE_HEIGHT > v.b - 2 || entry_under >= 0 || (button && my > v.b - 80)) y = my - 22 - LINE_HEIGHT;   // above the bar
     if (y + LINE_HEIGHT > rows_top() - 2) y = rows_top() - 2 - LINE_HEIGHT;   // and above the rows standing on it
     draw_text(FONT_TIPS, x, y, shown.c_str());
 }

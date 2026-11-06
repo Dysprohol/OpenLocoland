@@ -798,6 +798,9 @@ void panel_draw(POINT m) {
 
 // The name of the button under the mouse for the status line, or nullptr; in the Menu panel, what the
 // two ways of trying the map do (Options > Run the level and File > Play the map).
+bool panel_on_help(POINT m) { return on_circle(m, help_button(), HELP_R); }
+bool panel_on_menu(POINT m) { return on_circle(m, menu_button(), MENU_R); }
+
 const char* panel_tip(POINT m) {
     if (on_circle(m, help_button(), HELP_R)) return ui_text("ButtonHelp", "Help (F1)");
     if (on_circle(m, menu_button(), MENU_R)) return ui_text("ButtonMenu", "Menu");

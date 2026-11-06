@@ -203,9 +203,15 @@ the cars' couplings and rail positions and the later units' factories point at t
 the tool; a hint is a few words beside the cursor - the keys of the tool on the map, or of the bar's
 entry under the cursor (`hint_of`: `HintSelect` ... `HintRegion`, the Paint tool's gravel bed mode
 `HintBed`) - in the mouse tips' font, 14 px right of and 22 below the cursor (above it over the bar,
-kept inside the view), shown when the cursor has rested 700 ms and gone with its next move; never
-while a button is held, a stroke or a drag is under way, a panel is open or the cursor is on the
-rows or the music player. The Menu panel's line in the strip above its title, HINTS UNDER THE
+kept inside the view), shown when the cursor has rested 350 ms (700 until 2026-11-06, which a tester
+found too long) and gone with its next move - any move starts the rest anew, so none shows while the
+cursor goes across a row; never while a button is held, a stroke or a drag is under way, a panel is
+open or the cursor is on the rows. The buttons that are not tools have theirs too since then (the
+tester found none on the two at the top right): the music player's name, |<, || / > and >|
+(`HintMusicName`, `...Previous`, `...Stop` / `...Play`, `...Next`) and the bar's Help and Menu buttons
+(`HintHelpButton`, `HintMenuButton`; `panel_on_help` / `panel_on_menu`). The rows' buttons are their own
+words and the strip's icons have their name above them at once (`draw_row_tip`), so they have none.
+Checked in Polish: each of the four parts of the player and the two buttons, the hint after a rest. The Menu panel's line in the strip above its title, HINTS UNDER THE
 CURSOR: ON / OFF (`PanelHintsOn` / `Off`, its tip `TipHints`), turns them off and on; `EditorHints`
 (DWORD, next to `FrameLimit`, on when missing) keeps it. Checked in Polish and English: the Track
 tool's hint after a rest, the Decals entry's above the bar, the Paint tool's at the view's right edge
