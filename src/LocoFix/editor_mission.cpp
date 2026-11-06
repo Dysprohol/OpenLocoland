@@ -3578,7 +3578,7 @@ bool mission_dialog(HWND owner, bool* open_arrivals, bool* open_plan) {
            -1, label, cx, 260, cw, 24);
     if (g_arrivals.on) {   // the trains that arrive: the Arrivals panel
         t.item(STATIC,
-               ui_wide(ui_printf(ui_format("MissionArrivals", "Train arrivals: %u - set in the Arrivals panel (key 0 of the bar)"),
+               ui_wide(ui_printf(ui_format("MissionArrivals", "Train arrivals: %u - set in the Arrivals panel (the row above the bar)"),
                                  static_cast<unsigned>(g_arrivals.list.size())))
                    .c_str(),
                -1, label, 8, 44, 300, 8);
