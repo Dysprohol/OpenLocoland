@@ -1,0 +1,44 @@
+# Builds LocoFix.dll and runs the tests that need no copy of the game.
+# The tests that need Steam.exe or the game's files (test_script_value.py, check_lang.py,
+# test_missions.ps1, test_game.ps1) stay local: see docs/dev/working.md.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: LocoFix (MSVC x86) and tests
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: tools/requirements.txt
+
+      - name: Install Python packages
+        run: python -m pip install -r tools/requirements.txt
+
+      - name: Python tools compile
+        run: python -m compileall -q tools
+
+      - name: Build LocoFix.dll
+        run: python tools/build_locofix.py
+
+      - name: Rail rules (editor C++ against map_tool.py)
+        run: python tools/test_rail_rules.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LocoFix
+          path: build/LocoFix/LocoFix.dll
