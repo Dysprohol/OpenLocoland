@@ -8165,14 +8165,15 @@ void draw_options() {
                 const int icon = palette_icon(i.object);
                 if (icon >= 0 && vid_by_number(VID_PALETTE_ICONS)) picture(VID_PALETTE_ICONS, icon, mx, cy);
                 else if (uint8_t* dv = vid_by_number(i.object)) picture(i.object, frame_for(dv, 0), mx, cy + DECAL_ICON / 4);
-            } else if (i.swatch >= 0) {
-                if (pass != 1) return;
-                const std::vector<GroundTexture>& t = ground_textures();
-                const uint16_t c = t[i.swatch].mean;
-                const uint32_t rgb = ((c >> 11) << 19) | (((c >> 5) & 63) << 10) | ((c & 31) << 3);
-                const float l = x + 2, t0 = cy - SWATCH / 2;
-                if (i.lit || hover) fill(graphics(), nullptr, l - 2, t0 - 2, l + SWATCH + 2, t0 + SWATCH + 2, i.lit ? 0xfff0e080 : 0xc0f0e080);
-                fill(graphics(), nullptr, l, t0, l + SWATCH, t0 + SWATCH, 0xff000000 | rgb);
+            } else if (i.swatch >= 0) {   // its mean colour (pass 1); its click box below, in pass 2 like every button's
+                if (pass == 1) {
+                    const std::vector<GroundTexture>& t = ground_textures();
+                    const uint16_t c = t[i.swatch].mean;
+                    const uint32_t rgb = ((c >> 11) << 19) | (((c >> 5) & 63) << 10) | ((c & 31) << 3);
+                    const float l = x + 2, t0 = cy - SWATCH / 2;
+                    if (i.lit || hover) fill(graphics(), nullptr, l - 2, t0 - 2, l + SWATCH + 2, t0 + SWATCH + 2, i.lit ? 0xfff0e080 : 0xc0f0e080);
+                    fill(graphics(), nullptr, l, t0, l + SWATCH, t0 + SWATCH, 0xff000000 | rgb);
+                }
             } else {
                 const char* text = i.value.empty() ? i.text.get() : i.value.c_str();
                 if (pass == 2) draw_text(i.lit || hover ? CONTEXT_FONT_LIT : CONTEXT_FONT_VID, x + (i.button ? 0 : 0), cy - ch / 2, text, false, OPTION_STEP);
