@@ -2170,7 +2170,7 @@ MISSION_SCRIPT = r"""// Mission script of a map: the map, its ground image and t
 // title: @TITLE@
 #define LEVEL 0
 #define CUSTOM_MAP "maps\\@NAME@\\@NAME@.map"
-#define MONEY 0
+#define MONEY 1000
 #define START_DAYNIGHT 1
 #define RAIN 0
 #define NUKE 0

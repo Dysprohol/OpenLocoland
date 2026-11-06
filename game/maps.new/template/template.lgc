@@ -10,7 +10,7 @@
 // title: TEMPLATE
 #define LEVEL 0
 #define CUSTOM_MAP "maps\\template\\template.map"
-#define MONEY 0
+#define MONEY 1000
 #define START_DAYNIGHT 1
 #define RAIN 0
 #define NUKE 0
