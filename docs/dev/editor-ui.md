@@ -144,8 +144,19 @@ command, the panel posts the same `WM_COMMAND` ids, and the game's accelerators 
 Alt+F10) stay. Testers found the bar both broken and in the way: in a window bigger than the map it
 did not open (fix 6 below), and in full screen it pushed the game area down by its height while the
 picture stayed at the top, so every click landed below the cursor. The commands and menu sections
-above still name the File / Edit / Options items they were - the ids are the same. The dialogs (GDI
-mode above) are not tested in full screen.
+above still name the File / Edit / Options items they were - the ids are the same.
+
+**Full screen, 1920 x 1080** (2026-11-06, Polish, a copy of POLIGON on a 2560 x 1440 screen; `-SetFull 1`,
+the registry's ScreenX / ScreenY / FullScreen put back after). Seen with nothing cut off or off the
+screen: the bar and its strip, Help (the contents and a page), the Menu panel, the palette (also the
+long title JEDNOSTKI, ISTOTY, which the to-do list had outside the frame - it fits), the rows of the Place
+tool with the placing helps (beside the strip on one row at this width), of Paint, Ground height and
+Track, an object's panel, an enemy factory's panel, the Arrivals panel, and the dialogs Load, Mission
+settings, New map and Map size (opened from the Menu panel, closed with Cancel; the editor draws again
+after each). Not clean but not broken: while a dialog is open the game's window goes to the taskbar and
+comes back when it closes; an object's panel on a rail is titled "(VID 610)" without a name; the
+palette's list of categories starts right under its title and ends close to the bottom strip; the
+grid's points of the placing helps are faint on bright ground. 2560 x 1440 is not checked.
 
 **The frame and the profiler** (`src/LocoFix/profile.cpp`, `profile.h`). `LOCOFIX_PROFILE=1` in the
 environment (`$env:LOCOFIX_PROFILE = "1"` before `test_game.ps1`) or the DWORD `EditorProfile` = 1 next

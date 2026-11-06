@@ -97,7 +97,7 @@ Paragraphs: Ground, gravel bed, decals; The relief and the heights of objects; A
 
 Sections: "Editor mode" (continued).
 
-Paragraphs: Map exchange; The texts of the editor; The Help and Menu buttons; Ctrl+R; No window menu; The frame and the profiler.
+Paragraphs: Map exchange; The texts of the editor; The Help and Menu buttons; Ctrl+R; No window menu; Full screen, 1920 x 1080; The frame and the profiler.
 
 ### [changes.md](docs/dev/changes.md) (~39 KB)
 
