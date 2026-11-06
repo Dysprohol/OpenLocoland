@@ -4456,8 +4456,11 @@ std::set<rail::Cell> track_cells() {
     return cells;
 }
 
-bool follows_ground(uint8_t* o) {   // objects that stand on the ground (not rails, cars, screen objects)
-    return pickable(o) && class_of(o) != B_RAIL && class_of(o) != B_ENGINE;
+// Objects that stand on the ground: not rails, cars, screen objects - nor regions, whose z is their
+// water's or fog's level (a sheet's splash region went down with the ground of a pit dug under it,
+// 30 levels below its lava, until 2026-11-06).
+bool follows_ground(uint8_t* o) {
+    return pickable(o) && class_of(o) != B_RAIL && class_of(o) != B_ENGINE && !is_region(o);
 }
 
 bool in_grid(const rail::Cell& c) { return c.first >= 0 && c.first < grid_width() && c.second >= 0 && c.second < grid_height(); }
@@ -5410,11 +5413,19 @@ const char* ground_texture_name(int i) {
 
 POINT g_region_start = {-1, -1};   // the Region tool's drag (screen coordinates of the map)
 bool g_region_drag = false;
+// The Region tool's MAKES (its row): 0 a region as before, 1 ... a sheet of WATER_KINDS[k - 1] (sheets, below).
+int g_region_kind = 0;
+
+void lay_sheet(float l, float t, float r, float b, bool away);   // below
 
 void finish_region(float sx, float sy) {
     g_region_drag = false;
     const float l = (std::min)(sx, static_cast<float>(g_region_start.x)), r = (std::max)(sx, static_cast<float>(g_region_start.x));
     const float t = (std::min)(sy, static_cast<float>(g_region_start.y)), b = (std::max)(sy, static_cast<float>(g_region_start.y));
+    if (g_region_kind > 0) {   // a sheet of water or lava over the rectangle (the missions' way)
+        lay_sheet(l, t, r, b, shift_down());
+        return;
+    }
     if (r - l < 16 || b - t < 16) {
         MESSAGE("MsgRegionSmall", "a region: drag its rectangle (16 px at least)");
         return;
@@ -5432,6 +5443,204 @@ void finish_region(float sx, float sy) {
     g_selection = {o};
     open_context(o);
     MESSAGE("MsgRegion", "region %.0f x %.0f at %.0f,%.0f, level %d", r - l, b - t, at<float>(o, O_X), at<float>(o, O_Y), level);
+}
+
+// ---- sheets of water and lava (the Region tool's MAKES) ----
+//
+// The missions' water and lava are not regions: they are sheets of the kind's 128 px tiles (199 dark
+// water, 204 light, 205 and 229 swamp, 293 lava - SPRITE objects on the 128 grid, at 64 + 128 i, 64 + 128
+// j, all at one level) drawn with the depth test, so the water shows wherever the ground's picture is
+// lower than the level - l13's 432 lava tiles at 5 cover the whole map, l15's 430 light-water tiles at
+// 21, l06's 208 swamp tiles at 17, l12's 44 lava tiles only round its pits -, and with them one small
+// region flagged THE WHOLE MAP 1-7 levels above the sheet with the kind's splash pairs (308 / 309 ->
+// 338 on water, 528 on lava): a 752 (rain circles) over light water and swamp (l06, l09, l15), a 751
+// over lava and dark water (l12, l13, l11, l17); l13 has the lava's glow fog over the whole view too
+// (7-20 over lava at 5), which is not laid here: it tints all ground below its low level, and l13's
+// ground stands above it - over a sheet laid on flat ground it turned the whole view orange (the
+// region's panel has it: FOG: GLOW). A sheet is raised and lowered whole: l15's flood moves its tiles and its 752
+// with ChangeZUnit(204, z) and ChangeZUnit(752, z + 1) over 80 s. The Region tool lays such sheets:
+// MAKES: a kind, then a drag lays the kind's tiles over the squares of the rectangle (not where a tile
+// of another kind is: a tile shows wherever the picture is below its level, so two kinds in one
+// square would show each other), at the map's level of that kind, else WATER_SHEET above the highest
+// ground in the rectangle (a flat sheet over the ground, as the palette's light water region) - and the
+// splash region of the kind where the map has none; THE WHOLE MAP lays it over every square (a new
+// kind 5 below the map's lowest ground: it shows where the ground is lowered under it); LEVEL - and +
+// move the kind's tiles and its region a level, as the flood does (one step of the history each);
+// Shift+drag takes the kind's tiles in the rectangle away (and its region with the last of them). Unlike
+// the Water and lava tool it lowers no ground and paints no bed: a lake is the sheet over ground lowered
+// with the Ground height tool, or the sheet raised over the ground.
+void merge_steps(unsigned n, const UiText& what);   // the Delete tool's sweep, below
+
+const WaterKind* sheet_kind() { return g_region_kind > 0 && g_region_kind <= WATER_KIND_COUNT ? &WATER_KINDS[g_region_kind - 1] : nullptr; }
+int sheet_region_vid(const WaterKind& k) { return k.nvid == 204 || k.nvid == 205 || k.nvid == 229 ? VID_REGION_RAIN : VID_REGION; }
+
+// The kind's splash region (its VID, its pairs, over the whole map), or nullptr.
+uint8_t* sheet_region(const WaterKind& k) {
+    uint8_t* found = nullptr;
+    for_each_object([&](uint8_t* o) {
+        if (!found && !removed(o) && is_region(o) && nvid_of(o) == sheet_region_vid(k) && region_splash(o) == k.splash &&
+            (at<uint32_t>(o, RG_FLAGS) & 8u))
+            found = o;
+    });
+    return found;
+}
+
+std::vector<uint8_t*> sheet_tiles(int nvid) {
+    std::vector<uint8_t*> out;
+    for_each_object([&](uint8_t* o) {
+        if (!removed(o) && nvid_of(o) == nvid) out.push_back(o);
+    });
+    return out;
+}
+
+void lay_sheet(float l, float t, float r, float b, bool away) {
+    const WaterKind* k = sheet_kind();
+    if (!k || !grid()) return;
+    std::vector<uint8_t*> objects;
+    std::vector<State> before;
+    int level = water_level_of(k->nvid);
+    const bool fresh = level < 0;
+    if (fresh && away) return;
+    if (fresh) {   // a flat sheet over the highest ground under the rectangle
+        int high = 0;
+        const int x0 = (std::max)(0, static_cast<int>(l / 8)), x1 = (std::min)(grid_width() - 1, static_cast<int>(r / 8));
+        const int y0 = (std::max)(0, static_cast<int>(t / 8)), y1 = (std::min)(grid_height() - 1, static_cast<int>((b + 400) / 8));
+        for (int cy = y0; cy <= y1; ++cy)
+            for (int cx = x0; cx <= x1; ++cx) {
+                const int g = ground_cell(cx, cy);
+                if (cy * 8 + 4 - g >= t && cy * 8 + 4 - g <= b) high = (std::max)(high, g);
+            }
+        level = high + WATER_SHEET;
+    }
+    const auto a = tile_square(l, t, level), z = tile_square(r, b, level);
+    std::set<std::pair<int, int>> mine, others;
+    std::map<std::pair<int, int>, uint8_t*> mine_at;
+    for_each_object([&](uint8_t* o) {
+        if (removed(o) || !is_water_tile(nvid_of(o))) return;
+        const std::pair<int, int> q{static_cast<int>(std::floor(at<float>(o, O_X) / 128)), static_cast<int>(std::floor(at<float>(o, O_Y) / 128))};
+        if (nvid_of(o) == k->nvid) mine_at[q] = o;
+        (nvid_of(o) == k->nvid ? mine : others).insert(q);
+    });
+    const int qw = (grid_width() * 8 + 127) / 128, qh = (grid_height() * 8 + 127) / 128;
+    unsigned made = 0, gone = 0;
+    for (int j = (std::max)(0, a.second); j <= (std::min)(qh - 1, z.second); ++j)
+        for (int i = (std::max)(0, a.first); i <= (std::min)(qw - 1, z.first); ++i) {
+            if (away) {
+                const auto it = mine_at.find({i, j});
+                if (it == mine_at.end()) continue;
+                objects.push_back(it->second);
+                before.push_back(state_of(it->second));
+                State st = before.back();
+                st.present = false;
+                apply(it->second, st);
+                ++gone;
+                continue;
+            }
+            if (mine.count({i, j}) || others.count({i, j})) continue;
+            if (uint8_t* o = create(k->nvid, 64.0f + 128 * i, 64.0f + 128 * j, static_cast<float>(level), 0, 0)) {
+                objects.push_back(o);
+                State none = state_of(o);
+                none.present = false;
+                before.push_back(none);
+                ++made;
+            }
+        }
+    uint8_t* region = sheet_region(*k);
+    if (!away && made && !region) {   // the kind's splash region, as the missions have it
+        const float cx = (l + r) / 2, cy = (t + b) / 2;
+        if ((region = create(sheet_region_vid(*k), cx, cy + level + 1, static_cast<float>(level + 1), 0, 0)) != nullptr) {
+            at<float>(region, RG_WIDTH) = 32;
+            at<float>(region, RG_HEIGHT) = 32;
+            at<uint32_t>(region, RG_FLAGS) |= 8u;
+            set_region_splash(region, k->splash);
+            objects.push_back(region);
+            State none = state_of(region);
+            none.present = false;
+            before.push_back(none);
+        }
+    }
+    if (away && region && sheet_tiles(k->nvid).empty()) {   // the last tiles gone: the region with them
+        objects.push_back(region);
+        before.push_back(state_of(region));
+        State st = before.back();
+        st.present = false;
+        apply(region, st);
+    }
+    if (objects.empty()) {
+        MESSAGE("MsgSheetNothing", "%s: nothing to %s in the rectangle", ui_text(k->key, k->english), away ? ui_text("WordTakeAway", "take away") : ui_text("WordLay", "lay"));
+        return;
+    }
+    commit(away ? UiText{"OpSheetAway", "water away"} : UiText{"OpSheet", "sheet of water"}, objects, before);
+    if (away)
+        MESSAGE("MsgSheetAway", "%s: %u tiles taken away", ui_text(k->key, k->english), gone);
+    else
+        MESSAGE("MsgSheet", "%s: %u tiles at level %d%s - it shows where the ground is lower than %d (LEVEL - + in the row)",
+                ui_text(k->key, k->english), made, level, fresh ? ui_text("MsgSheetNew", ", a new sheet over the ground") : "", level);
+}
+
+// THE WHOLE MAP: the sheet over every square of the map.
+void sheet_whole_map() {
+    const WaterKind* k = sheet_kind();
+    if (!k || !grid()) return;
+    const size_t steps = g_undo.size();
+    if (water_level_of(k->nvid) < 0) {   // a new one 5 below the lowest ground: it shows where the ground is lowered
+        int low = 1 << 20;
+        for (int cy = 0; cy < grid_height(); ++cy)
+            for (int cx = 0; cx < grid_width(); ++cx) low = (std::min)(low, static_cast<int>(ground_cell(cx, cy)));
+        // 5 below: within ~4 levels under the ground the held editor shows the tiles now and then (their
+        // picture's own depth against the ground's; in a run they stay hidden - a sheet 2 under the ground
+        // flickered in the editor and not in Run the level)
+        const int level = (std::max)(0, low - 5);
+        if (uint8_t* first = create(k->nvid, 64, 64, static_cast<float>(level), 0, 0)) {   // the level for lay_sheet
+            State none = state_of(first);
+            none.present = false;
+            commit({"OpSheet", "sheet of water"}, {first}, {none});
+        }
+    }
+    const int level = water_level_of(k->nvid);
+    lay_sheet(0, -static_cast<float>(level), grid_width() * 8.0f - 1, grid_height() * 8.0f - level - 1, false);
+    if (g_undo.size() == steps + 2) merge_steps(2, {"OpSheet", "sheet of water"});   // the first tile and the rest: one step
+}
+
+// LEVEL - / +: the kind's sheet a level higher or lower, as l15's flood moves it (ChangeZUnit). Its tiles
+// are laid again at the new level rather than moved: a tile moved with Object_MoveTo on the held level
+// was drawn at its old level now and then for some seconds (the whole sheet showing over the ground
+// after it was lowered under it), which tiles made at their level never were. Its region is moved.
+void sheet_level(int by) {
+    const WaterKind* k = sheet_kind();
+    if (!k) return;
+    const std::vector<uint8_t*> tiles = sheet_tiles(k->nvid);
+    if (tiles.empty()) {
+        MESSAGE("MsgSheetNone", "%s: the map has none yet - drag a rectangle, or THE WHOLE MAP", ui_text(k->key, k->english));
+        return;
+    }
+    const int level = water_level_of(k->nvid);
+    if (level + by < 0 || level + by > MAX_Z) return;
+    uint8_t* region = sheet_region(*k);
+    std::vector<uint8_t*> objects = tiles;
+    std::vector<State> before = states(tiles);
+    for (size_t i = 0; i < tiles.size(); ++i) {
+        State gone = before[i];
+        gone.present = false;
+        apply(tiles[i], gone);
+    }
+    for (size_t i = 0; i < tiles.size(); ++i)
+        if (uint8_t* o = create(k->nvid, before[i].x, before[i].y, before[i].z + by, before[i].direction, 0)) {
+            objects.push_back(o);
+            State none = state_of(o);
+            none.present = false;
+            before.push_back(none);
+        }
+    if (region) {
+        objects.push_back(region);
+        before.push_back(state_of(region));
+        reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(region, nullptr, at<float>(region, O_X), at<float>(region, O_Y) + by, at<float>(region, O_Z) + by);
+        if (at<int>(region, RG_HIGH) > at<int>(region, RG_LOW))   // its fog with it
+            set_region_fog(region, at<int>(region, RG_LOW) + by, at<int>(region, RG_HIGH) + by, at<uint32_t>(region, RG_COLOUR));
+    }
+    commit({"OpSheetLevel", "level of the water"}, objects, before);
+    MESSAGE("MsgSheetLevel", "%s: level %d (%u tiles%s)", ui_text(k->key, k->english), level + by, static_cast<unsigned>(tiles.size()),
+            region ? ui_text("MsgSheetWithRegion", " and its region") : "");
 }
 
 // A change of a region as one step of the history.
@@ -5492,10 +5701,12 @@ void draw_regions() {
         mouse_on_map(sx, sy);
         const float l = (std::min)(sx, static_cast<float>(g_region_start.x)) - cam_x, r = (std::max)(sx, static_cast<float>(g_region_start.x)) - cam_x;
         const float t = (std::min)(sy, static_cast<float>(g_region_start.y)) - cam_y, b = (std::max)(sy, static_cast<float>(g_region_start.y)) - cam_y;
-        fill(graphics(), nullptr, l, t, r, t + 1, 0xf0ffffff);
-        fill(graphics(), nullptr, l, b - 1, r, b, 0xf0ffffff);
-        fill(graphics(), nullptr, l, t, l + 1, b, 0xf0ffffff);
-        fill(graphics(), nullptr, r - 1, t, r, b, 0xf0ffffff);
+        const WaterKind* k = sheet_kind();
+        const uint32_t c = !k ? 0xf0ffffff : shift_down() ? 0xf0ff4040 : k->splash == 2 ? 0xf0f08020 : 0xf04080c0;
+        fill(graphics(), nullptr, l, t, r, t + 1, c);
+        fill(graphics(), nullptr, l, b - 1, r, b, c);
+        fill(graphics(), nullptr, l, t, l + 1, b, c);
+        fill(graphics(), nullptr, r - 1, t, r, b, c);
     }
 }
 
@@ -8133,7 +8344,9 @@ const char* hint_of(Tool t) {
         return g_paint_bed ? ui_text("HintBed", "drag along the rails: gravel bed, right: original back")
                            : ui_text("HintPaint", "drag: paint, right: original back, Alt+click: pipette");
     case Tool::Water: return ui_text("HintWater", "drag: water, Shift: take away, W: kind");
-    case Tool::Region: return ui_text("HintRegion", "drag: its rectangle, right on it: its panel");
+    case Tool::Region:
+        return g_region_kind ? ui_text("HintSheet", "drag: the sheet's tiles there, Shift+drag: away, LEVEL - +")
+                             : ui_text("HintRegion", "drag: its rectangle, right on it: its panel");
     default: return nullptr;
     }
 }
@@ -8242,7 +8455,7 @@ constexpr int OPTION_STEP = 3, CONTEXT_FONT_VID = 2, CONTEXT_FONT_LIT = 7;   // 
 constexpr float SWATCH = 15;
 
 bool strip_tool() { return tool() == Tool::Decals || (tool() == Tool::Place && is_palette(entry())); }
-bool options_tool() { return tool() == Tool::Height || tool() == Tool::Paint || tool() == Tool::Track || strip_tool(); }
+bool options_tool() { return tool() == Tool::Height || tool() == Tool::Paint || tool() == Tool::Track || tool() == Tool::Region || strip_tool(); }
 constexpr float RAIL_ICON = 71;   // a straight rail across (VID 610 ... 71 x 50)
 constexpr float DECAL_ICON = 40;  // a palette icon (VID 944)
 int g_strip_page = 0;             // the page of the strip above the bar
@@ -8444,6 +8657,34 @@ std::vector<OptionGroup> option_groups() {
                           option_button({"OptRaiseOff", "AS IT IS"}, g_raise_ground == Raise::Off, raise(Raise::Off)),
                           option_button({"OptRaiseSoft", "SOFT"}, g_raise_ground == Raise::Soft, raise(Raise::Soft)),
                           option_button({"OptRaiseHard", "HARD"}, g_raise_ground == Raise::Hard, raise(Raise::Hard))});
+        return groups;
+    }
+    if (tool() == Tool::Region) {   // MAKES: a region, or a sheet of water or lava (sheets, above)
+        OptionGroup makes{option_label({"OptMakes", "MAKES:"}),
+                          option_button({"OptMakesRegion", "REGION"}, g_region_kind == 0, [] {
+                              g_region_kind = 0;
+                              MESSAGE("MsgMakesRegion", "Region tool: a region (its panel sets the rest)");
+                          })};
+        const UiText KINDS[] = {{"OptSheetLight", "LIGHT WATER"}, {"OptSheetDark", "DARK WATER"}, {"OptSheetSwamp", "SWAMP"},
+                                {"OptSheetSwamp2", "SWAMP 2"}, {"OptSheetLava", "LAVA"}};
+        for (int k = 1; k <= WATER_KIND_COUNT; ++k)
+            makes.push_back(option_button(KINDS[k - 1], g_region_kind == k, [k] {
+                g_region_kind = k;
+                const int level = water_level_of(WATER_KINDS[k - 1].nvid);
+                MESSAGE("MsgMakesSheet", "Region tool: a sheet of %s (VID %d)%s", ui_text(WATER_KINDS[k - 1].key, WATER_KINDS[k - 1].english),
+                        WATER_KINDS[k - 1].nvid, level >= 0 ? ui_printf(ui_format("MsgSheetAt", ", the map's at level %d"), level).c_str() : "");
+            }));
+        groups.push_back(makes);
+        if (const WaterKind* k = sheet_kind()) {
+            const int level = water_level_of(k->nvid);
+            OptionGroup lv{option_label({"OptLevel", "LEVEL:"}), option_button({nullptr, "-"}, false, [] { sheet_level(-1); })};
+            OptionItem value;
+            value.value = level >= 0 ? std::to_string(level) : ui_text("WordNewSheet", "NEW");
+            lv.push_back(value);
+            lv.push_back(option_button({nullptr, "+"}, false, [] { sheet_level(1); }));
+            groups.push_back(lv);
+            groups.push_back({option_button({"OptSheetWhole", "THE WHOLE MAP"}, false, [] { sheet_whole_map(); })});
+        }
         return groups;
     }
     if (tool() == Tool::Height) {
@@ -10115,9 +10356,15 @@ void draw_overlay() {
     } else if (tool() == Tool::Height || tool() == Tool::Decals || tool() == Tool::Paint || tool() == Tool::Water) {
         status_line(v.l, v.t + LINE_HEIGHT, g_ground_status.c_str());
     }
-    if (tool() == Tool::Region)
+    if (tool() == Tool::Region && !sheet_kind())
         status_line(v.l, v.t + LINE_HEIGHT,
                     ui_text("StatusRegion", "Region: drag its rectangle on the map; the right button on a region opens its panel (Select and Delete take one by a click inside)"));
+    if (const WaterKind* k = tool() == Tool::Region ? sheet_kind() : nullptr) {
+        const int level = water_level_of(k->nvid);
+        status_line(v.l, v.t + LINE_HEIGHT,
+                    ui_printf(ui_format("StatusSheet", "Region - a sheet of %s: drag lays its tiles there (Shift+drag: away), level %s (LEVEL - +); it shows where the ground is lower than its level"),
+                              ui_text(k->key, k->english), level >= 0 ? std::to_string(level).c_str() : ui_text("WordNewSheetLong", "new: just over the ground under it")).c_str());
+    }
     if (tool() == Tool::Delete)
         status_line(v.l, v.t + LINE_HEIGHT,
                     ui_text("StatusDelete", "Delete: a click or a drag deletes the objects under the cursor; Shift+click on a rail deletes its section, up to a junction or an end"));

@@ -769,3 +769,47 @@ read in the editor (the log line of a selected region: size, flags, fog, image, 
 of a run (golems do not walk by themselves - l13's stand at its script's places), so the creature area
 rests on the engine's code and the missions' dragons, not on a run; the pairs on the code path only
 (an explosion inside a splash region was not provoked).
+
+**Sheets of water and lava** (the Region tool's MAKES; `editor_edit.cpp` "sheets of water and lava";
+issue #5, paulevsGitch: regions of water and lava like the vanilla maps', which can be raised and
+lowered). The vanilla water and lava are not regions - `objects.res` has three region VIDs, 750 light
+water, 751 empty and 752 empty with rain circles, and none of lava -: they are sheets of the kind's
+128 px tiles (199 dark water, 204 light, 205 and 229 swamp, 293 lava; SPRITE objects on the 128 grid at
+64 + 128 i, 64 + 128 j, all at one level), drawn with the depth test, so the water shows wherever the
+ground's picture is lower than the level: l13's 432 lava tiles at 5 and l15's 430 light-water tiles at 21
+cover the whole map, l06 has 208 swamp tiles at 17, l12 44 lava tiles round its pits. With each sheet the
+missions have one small region (29-35 px) flagged THE WHOLE MAP 1-7 levels above it with the kind's
+pairs (308 / 309 -> 338 over water, 528 over lava): a 752 over light water and swamp (l06, l09, l15),
+a 751 over lava and dark water (l11, l12, l13, l17); l13 has a glow fog besides (7-20 over its lava at
+5, over the whole view). l15's flood raises its sheet over 80 s with `ChangeZUnit(204, z)` and
+`ChangeZUnit(752, z + 1)` - extern 156, which is `Object_MoveTo` for every object of the VID. The Region
+tool's row MAKES: REGION (as before) / LIGHT WATER / DARK WATER / SWAMP / SWAMP 2 / LAVA lays such
+sheets: a drag lays the kind's tiles over the squares of its rectangle (not where another kind's tile is:
+a tile shows wherever the picture is below its level, so two kinds in one square would show each
+other) at the map's level of the kind - one level a kind, as the engine moves them together -, a new
+kind `WATER_SHEET` (2) above the highest ground in the rectangle (a flat sheet over the ground, as the
+palette's light-water region), and the kind's splash region where the map has none (32 x 32, flag 8,
+the pairs, 1 above the sheet); Shift+drag takes the kind's tiles in the rectangle away (the region
+with the last of them); THE WHOLE MAP lays the sheet over every square - a new kind 5 below the map's
+lowest ground, so it shows where the ground is lowered under it -; LEVEL - / + put the whole sheet a
+level lower or higher with its region (and a fog of it), one step of the history each. A lake is then
+the sheet over ground lowered with the Ground height tool, or the sheet raised over the ground - no
+ground is lowered and no bed painted, unlike the Water and lava tool, which stays as it was. l13's glow
+fog is not laid: it tints all ground below its low level, and l13's ground stands above it; over a
+sheet laid on flat ground it turned the whole view orange (the region's panel has it, FOG: GLOW).
+Two things found on the way: a sheet a level or two under the ground showed now and then in the held
+editor for a second or two (the tiles' own depth against the ground's: at 2 under the ground 2 of 8
+screenshots a second apart showed it, at 5 under none; in Run the level the same sheet at 2 under
+stayed hidden in all 8), so LEVEL lays the tiles again at the new level instead of moving them - a
+moved tile was suspected first and was not the cause, the depth is -, and keep a sheet 5 or more under
+the ground where it must not show; and a Ground height stroke took regions along with the ground under
+them (`follows_ground`: a sheet's region went 30 levels down into a pit dug under it) - a region's z is
+its water's or fog's level, so regions stay now. What a map's script can do with a sheet today: move it
+the way l15 floods, `ChangeZUnit(<the kind's VID>, z)` and `ChangeZUnit(<its region's VID>, z + 1)` in
+its loop - code outside the editor's blocks stays in the script when the map is saved ("Mission
+settings and push lines", `editor-mission.md`); the editor adds no script for it. Checked in the game on
+a copy of POLIGON (flat, ground 70): LAVA dragged over 300 x 200 px - 6 tiles at 72 and a 751 at 73
+(flag 8, 308 / 309 -> 528), shown over the ground; LEVEL - three times to 69 - hidden; a pit dug with
+the Ground height tool's right button - lava in it; Shift+drag took 3 tiles, undone; saved: the 6 tiles
+293 at 69 on the 128 grid and the 751 at 70; loaded again - only the pits show lava; THE WHOLE MAP on a
+new sheet: 191 tiles under the ground.

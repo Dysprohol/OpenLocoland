@@ -289,6 +289,14 @@ ground; placed over a light-water lake of the Water tool it takes that lake's le
 Its size goes by whole tiles of the water (128 px). Which to use: a lake, a river or lava with a
 shore - the Water and lava tool; a flat sheet of light water - the region.
 
+The third way is the missions' own (help page 32): the **Region** tool's row **MAKES** - light water,
+dark water, swamp, swamp 2 or lava. A drag lays a sheet of that water over the rectangle at one level
+(a new one just over the ground), Shift+drag takes it away, **THE WHOLE MAP** lays it everywhere under
+the ground, and **LEVEL** `-` `+` raise or lower the whole sheet. It shows only where the ground is lower
+than its level: lower the ground under it with Ground height for a lake or a lava pit (keep it 5 levels
+or more under the ground where it must not show), or raise the sheet to flood. A map's script can
+raise and lower it during the game as mission 15's flood does; the editor does not write that for you.
+
 The **Ground height** tool shapes the ground with its row of buttons above the bar: the mode -
 **RAISE/LOWER** (the left button raises, the right one lowers), **FLATTEN**, **SMOOTH**, **RAMP** (drag
 from one point to another: an even slope between their levels, for a driveway up to a plateau) and

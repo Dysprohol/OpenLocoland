@@ -289,6 +289,15 @@ nad jeziorem jasnej wody z narzędzia wody bierze poziom tego jeziora (jedna taf
 zmienia się o całe kafle wody (128 px). Co wybrać: jezioro, rzeka albo lawa z brzegiem - narzędzie
 Woda i lawa; płaska tafla jasnej wody - region.
 
+Trzeci sposób jest taki jak w misjach (strona pomocy 32): rząd **TWORZY** narzędzia **Region** - jasna
+woda, ciemna woda, bagno, bagno 2 albo lawa. Przeciągnięcie kładzie taflę tej wody na prostokącie na
+jednym poziomie (nową tuż nad terenem), Shift+przeciągnięcie ją zabiera, **CALA MAPA** kładzie ją wszędzie
+pod terenem, a **POZIOM** `-` `+` podnoszą albo obniżają całą taflę. Widać ją tylko tam, gdzie teren jest
+niżej niż jej poziom: obniż teren pod nią Wysokością terenu, żeby zrobić jezioro albo jamę z lawą
+(trzymaj ją 5 poziomów albo więcej pod terenem tam, gdzie ma jej nie być widać), albo podnieś taflę,
+żeby zalać teren. Skrypt mapy może ją podnosić i obniżać w czasie gry, jak powódź w misji 15; edytor
+sam tego nie dopisuje.
+
 Narzędzie **Wysokosc terenu** kształtuje teren swoim rzędem przycisków nad paskiem: tryb -
 **PODNIES/OBNIZ** (lewy przycisk podnosi, prawy obniża), **WYROWNAJ**, **WYGLADZ**, **RAMPA** (przeciągnij
 z jednego punktu do drugiego: równy spadek między ich poziomami, np. podjazd na płaskowyż) i
