@@ -1038,6 +1038,37 @@ per frame. Movies (`PlayMovie`) play through DirectShow in a 640x480 child windo
 game; while one plays the frame is not presented. Debug overlays use `Graphics_DrawLine` /
 `Graphics_DrawRect` (2x2 points in the back buffer) and `Graphics_Printf` (GDI text).
 
+**Lost surfaces** (`src/LocoFix/lost_surfaces.cpp`, `BUGS.md` F22). DirectDraw takes the surfaces
+away whenever a full-screen game is not the window in front - Alt+Tab, a window or a notification
+over it, the lock screen; in a window a display mode change does it - and dgVoodoo reports it as
+the real DirectDraw does: `IsLost`, `Lock`, `Flip`, `Blt` and the Direct3D calls return
+`DDERR_SURFACELOST` (0x887601C2), and `RestoreAllSurfaces` fails with `DDERR_NOEXCLUSIVEMODE`
+(0x887600E1) until the game is in front again. The engine's only answer is in
+`Graphics_BeginScene`: front or back buffer lost -> "Restore surface", `RestoreAllSurfaces`,
+`Graphics_ReloadPalettes`, and the frame goes on whatever the result. On surfaces it could not
+restore, the Direct3D calls fail ("3dBeginScene for PreTact", a "DrawPrimitive" error per call) and
+the lazy software locks (`Graphics_LockBackBuffer`, `Graphics_LockDepthBuffer` and the copies of
+them inlined in `SpriteVid_Draw` and the other software drawing: lock when `backBufferBits` /
+`depthBits` is 0) log "Couldn't lock", leave the pointer 0 and draw through it: an access violation
+in `SpriteVid_Draw` (0x4516B9, 0x451D74), "EXCEPTION!" in `error.log`, and the engine's exception
+filter (0x419820) faults on top of it. LocoFix now:
+- checks the front, back and depth buffer before every frame (its own call of `Graphics_BeginScene`
+  in `GameWorld_Run`, 0x4236b8): when one is lost it calls `RestoreAllSurfaces` and
+  `Graphics_ReloadPalettes` itself, and while that fails it returns 1, which `GameWorld_Run`
+  already takes as "no frame" (the original never returned it): nothing is drawn or updated, the
+  game time is held as the engine holds it for an inactive game (`g_gameTime = g_prevGameTime`) and
+  the loop sleeps 10 ms. The frame after a successful restore draws the whole picture again (the
+  textures keep their pictures under dgVoodoo; nothing reloads them);
+- guards `Lock` and `Unlock` of the surfaces' `IDirectDrawSurface7` vtable (dgVoodoo's, found from
+  `g_graphics`' surfaces at the first loading frame): a lock from the game's code or LocoFix's that
+  fails - a surface lost in the middle of a frame - gets a stand-in buffer of the surface's size and
+  `DD_OK`, so that frame's software drawing goes into it, and its `Unlock` ends the stand-in; the next
+  frame restores the surfaces. Any other caller gets the real result.
+`LocoFix.log` has one line when the surfaces are lost and one when they are back ("restored (N frames
+skipped, ms, locks given a stand-in)"); `error.log` gets none of the failed frames' errors.
+Test mode (`LOCOFIX_TEST`) keeps the game active behind other windows, so a full-screen test game
+that is not in front skips its frames until it is.
+
 Worth knowing when changing it: `Graphics_Init` always clears the flags 0x10 (Windows
 cursor drawn with GDI), 0x20 (software device) and 0x40 (triple buffering), so those paths
 are dead code. Effects 4 (`OPEN_WINDOW`) and 8 (`SCALE_WINDOW`) have no drawing code;
@@ -3908,6 +3939,16 @@ software pictures drawn together, which changes what is drawn over what.
       neutral train north of the player's repair point, ordered south against its line - with the
       rule off it drove round the loop's other leg (937,864 at 5 s), with `PASS_RED_LIGHTS 4` straight
       down the repair point's line (674,1164 at 5 s); both reached the point,
+  36. lost surfaces (`lost_surfaces.cpp`, `BUGS.md` F22, "Rendering"): a frame waits until lost
+      surfaces can be restored, and a lock that fails in the middle of a frame gets a stand-in
+      buffer instead of the null pointer the software sprites drew through - Alt+Tab in full screen
+      no longer crashes the game,
+  37. the crash log (`crash_log.cpp`): a vectored exception handler writes an exception that is a bug
+      (access violation, division by zero, illegal instruction, stack overflow ...) to `LocoFix.log`
+      first chance - the code, the address as module+offset, the address read or written, the
+      registers and the top 24 words of the stack, each pointer into a module's code named the same
+      way - at most 4 a run; it handles nothing (the engine's filter still writes "EXCEPTION!" to
+      `error.log` and ends the game),
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
