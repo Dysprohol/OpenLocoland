@@ -21,7 +21,8 @@ depot's differ in four of them, or a player changed it - is fine when every patc
 can be placed (patch_text.apply_patch places a change by its lines; logged once per file), and
 stops the build naming the file and the change that cannot be placed otherwise. With
 --skip-verify (Setup's "Skip verification of the game files - install as it is") such a file is left as the player's, with a
-warning naming what of ours it would carry (FEATURES), and the build goes on. One edit players
+warning naming what of ours it would carry (FEATURES), and the build goes on; a Steam.exe of
+another version is installed as it is, with none of our changes (build_as_is, AS_IS). One edit players
 made is undone first: a `#define KEYS_ENABLE` line added to maps\script\constants.lgc to turn on
 the developer keys (the launcher's Cheats option now). Only the
 game's own files and folders of the Steam folder's root are used: anything else there (a
@@ -172,6 +173,24 @@ MODIFIED_STEAM = ("Steam.exe in {path} is not the original file of the game (it 
                   "Restore the original in Steam: Locoland > Properties > Installed Files > Verify integrity "
                   "of game files, then build again.")
 DGVOODOO = ["DDraw.dll", "D3DImm.dll"]  # the game only uses DirectDraw/Direct3D 7
+# A Steam.exe of another version (skip_verify: the English beta/demo, the Italian CD) is installed
+# as it is (build_as_is): our exe patches and LocoFix fit only the Steam exe, and the rest of ours
+# needs LocoFix - the script patches call its externs (the custom maps page, the editor's entry) or
+# include its option files (cheats.lgc), the added VIDs and their pictures are drawn by it, the new
+# maps are reached only through its custom maps page or --test-map, the packs of lang\ are read
+# only through it (language.cpp), the editor's help pages and data are its editor's. What goes in:
+# the game's own files unchanged (its intros, its own language, objects.res without the sound fix),
+# dgVoodoo2 with dgVoodoo.conf, Locoland.cfg (the name the exe reads as Locoland.exe) and logs\.
+AS_IS = "Steam.exe is not the Steam version of 2003-10-07: installed as it is"
+AS_IS_NOTE = (AS_IS + " - no fixes, launcher options, editor, custom maps page. Left out (they need LocoFix, "
+              "which runs only with the Steam exe): LocoFix.dll, the script patches of game/ and of the language "
+              "packs, the launcher's option scripts and notice, game/objects.override and the pictures made for "
+              "it, the new maps of game/maps.new (reached only through the custom maps page or --test-map), the "
+              "language packs (lang\\, read only through LocoFix), the editor's help pages and data, the editor "
+              "shortcut; and the data fixes (objects.res's sounds, the fort cannon, mission 11's rail) - the game's "
+              "own files as they are, with its intros and its own language, dgVoodoo2, Locoland.cfg and logs\\")
+AS_IS_GAME = ["Locoland.cfg", "dgVoodoo.conf"]   # of game/: what works on any exe
+AS_IS_SKIPPED = {"steam.exe", "steam.cfg", "steam_appid.txt"}   # Steam.exe goes in as Locoland.exe
 # The clean-up after the build (clean_up; DEVELOPERS.md "Updating"). Files earlier versions put
 # into the target that no build writes now: the Steam launcher's files (0.1 copied them), the DLLs
 # of older dgVoodoo set-ups, the Steam intros of video\ (0.1 copied the folder) and the logo clip
@@ -317,6 +336,12 @@ def identify_version(steam):
         if info["exe_sha256"] == sha:
             return key, info
     return None, None
+
+
+def foreign_exe(steam, version=None):
+    """Whether the folder's Steam.exe is there and not the known one: a game installed as it is
+    (build_as_is, with skip_verify; without it build() stops)."""
+    return os.path.isfile(os.path.join(steam, "Steam.exe")) and not steam_exe_original(steam, version)
 
 
 def steam_exe_original(steam, version=None, skip_verify=False):
@@ -597,6 +622,51 @@ def copy(src, dst, counter):
     counter[0] += 1
 
 
+def build_as_is(steam, target, done, previous=(), clean=True):
+    """The game of a Steam.exe of another version, as it is (AS_IS): the game's own files of the
+    folder's root (GAME_ROOT_FILES and GAME_ROOT_DIRS, video\\ too - its intros play), Steam.exe as
+    Locoland.exe unchanged, AS_IS_GAME of game/, dgVoodoo2 and logs\\; then clean_up. Returns the
+    files written, relative (sorted)."""
+    print(AS_IS_NOTE)
+    foreign = foreign_root_entries(steam)
+    if foreign:
+        print(f"Steam folder: not the game's, not used: {', '.join(foreign)}")
+    copied = [0]
+    WRITTEN.clear()
+    steam_files = sum(len(files) for _, _, files in os.walk(steam)) or 1
+    seen = 0
+    for directory, subdirs, files in os.walk(steam):
+        rel = safe_relpath(directory, steam)
+        if rel == ".":
+            subdirs[:] = [d for d in subdirs if d.lower() in GAME_ROOT_DIRS]
+        for f in files:
+            seen += 1
+            done(0.9 * seen / steam_files)
+            path = os.path.normpath(os.path.join(rel, f))
+            if rel == "." and (f.lower() in AS_IS_SKIPPED or f.lower() not in GAME_ROOT_FILES):
+                continue
+            dst = os.path.join(target, path)
+            if player_data(path) and os.path.exists(dst):
+                continue
+            copy(os.path.join(directory, f), dst, copied)
+    copy(os.path.join(steam, "Steam.exe"), os.path.join(target, OUTPUT_EXE), copied)
+    game = os.path.join(REPO, "game")
+    for f in AS_IS_GAME:
+        copy(os.path.join(game, f), os.path.join(target, f), copied)
+    for f in DGVOODOO:
+        copy(os.path.join(REPO, "external", "dgVoodoo2", f), os.path.join(target, f), copied)
+    os.makedirs(os.path.join(target, LOGS), exist_ok=True)
+    removed = []
+    if clean:
+        ours = DGVOODOO + ["LocoFix.dll", OUTPUT_EXE] + os.listdir(game)
+        removed = clean_up(target, steam, previous, False, foreign, ours)
+    else:
+        print("clean-up skipped (--no-clean): nothing of earlier versions removed")
+    done(1.0)
+    print(f"Done: {target} ({copied[0]} files copied, {len(removed)} of earlier versions removed)")
+    return sorted(written_files(target))
+
+
 def build(steam, target, locofix=None, captured=None, progress=None, version=None, skip_verify=False, dev=False,
           previous=(), clean=True):
     """Assembles the game from `steam` into `target`. `locofix` is a prebuilt LocoFix.dll
@@ -626,6 +696,8 @@ def build(steam, target, locofix=None, captured=None, progress=None, version=Non
             sys.exit(MODIFIED_STEAM.format(path=a.steam))
     if has_locoland and has_steam:
         sys.exit(MODIFIED_STEAM.format(path=a.steam) + " (both Steam.exe and Locoland.exe present)")
+    if foreign_exe(a.steam, version):   # skip_verify (stopped above otherwise): nothing of ours fits
+        return build_as_is(a.steam, a.target, done, previous, clean)
     modified = modified_steam_files(a.steam)
     if modified and not skip_verify:
         sys.exit(MODIFIED_FILES.format(path=a.steam, files=describe_modified(modified)))
@@ -726,13 +798,7 @@ def build(steam, target, locofix=None, captured=None, progress=None, version=Non
     steam_exe = os.path.join(a.steam, "Steam.exe")
     locoland_exe = os.path.join(a.steam, "Locoland.exe")
     target_exe = os.path.join(a.target, OUTPUT_EXE)
-    if os.path.isfile(steam_exe) and not steam_exe_original(a.steam, version):
-        # another exe (skip_verify: a CD or the beta/demo): our patches fit only the Steam one, so it
-        # is copied as it is - LocoFix is not loaded and the game runs as the original, dgVoodoo2 kept
-        print(f"Warning: Steam.exe is not the Steam version of 2003-10-07 - copied as {OUTPUT_EXE} unchanged: "
-              "LocoFix is not loaded, the game runs as the original (no fixes, launcher options or editor)")
-        copy(steam_exe, target_exe, copied)
-    elif os.path.isfile(steam_exe):
+    if os.path.isfile(steam_exe):   # the Steam one: another went to build_as_is
         generate(copied, lambda path: patch_exe.build(steam_exe, path), target_exe)
     elif os.path.isfile(locoland_exe):
         copy(locoland_exe, target_exe, copied)   # an already patched copy of the game

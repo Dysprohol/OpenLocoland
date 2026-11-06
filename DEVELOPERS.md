@@ -118,11 +118,25 @@ change (`build.modified_steam_files`, the one decision for both; Setup's `modifi
 asks to verify the game files in Steam). Setup's "Skip verification of the game files - install as it is" box (`--skip-verify`
 of `build.py` and Setup) goes on instead: such a file is left as the player's, and the log and the
 window say which of our features it carries will be missing (`build.FEATURES`; Setup's
-`feature_*` texts), and a `Steam.exe` of another version (the Italian CD's, wrapped by a copy
-protection, or the English beta/demo's) is copied as `Locoland.exe` unchanged - our exe patches
-and LocoFix fit only the Steam exe, so that game runs as the original, with dgVoodoo2 (LocoFix,
-loaded by a patched exe only, also checks the exe's build date and image size and does nothing
-on another) - so a player with the game's files can always install. An old way to turn on the developer keys was
+`feature_*` texts). A `Steam.exe` of another version (the Italian CD's, wrapped by a copy
+protection, or the English beta/demo's) is installed as it is (`build.build_as_is`): our exe
+patches and LocoFix fit only the Steam exe (LocoFix, loaded by a patched exe only, also checks the
+exe's build date and image size and does nothing on another), and everything else of ours needs
+LocoFix - the patched scripts call its externs 200-206 (the custom maps page, the editor's entry:
+on the beta they filled `error.log` with thousands of "Unknown extern" and "couldn't open
+maps\custom.lst" lines) or include its option files (`cheats.lgc`), the added VIDs of
+`game/objects.override` and their pictures are drawn by it, the new maps of `game/maps.new` are
+reached only through its custom maps page or `--test-map`, the packs of `lang\` are read only
+through it (`language.cpp`), and the editor's help pages, data and shortcut are its editor's. So
+such a game gets the copy's own files unchanged - its intros (`video\`), its own language at the
+root (not the English capture), its `objects.res` and `vid\110.vid` without our data fixes, the
+scripts and maps as they are - with `Steam.exe` as `Locoland.exe`, dgVoodoo2 with `dgVoodoo.conf`,
+`Locoland.cfg` and `logs\`; nothing is captured, Setup writes none of LocoFix's settings (the
+options, the game's language) and makes only the game's shortcut. The log says it once
+("Steam.exe is not the Steam version of 2003-10-07: installed as it is - no fixes, launcher
+options, editor, custom maps page", and what was left out; `build.AS_IS`), and Setup's window
+ends with the same line in its language (`as_is`). So a player with the game's files can always
+install. An old way to turn on the developer keys was
 to edit `maps\script\constants.lgc` in the Steam folder, and the patch then stopped Setup with a
 Python error: a `#define KEYS_ENABLE` line there is left out by itself - the launcher's Cheats
 option does that job now. Of the Steam folder's root only the game's own

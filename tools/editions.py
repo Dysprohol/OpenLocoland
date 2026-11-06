@@ -358,9 +358,26 @@ def run_test(game, name, args):
     return output, text("error.log"), text("LocoFix.log")
 
 
+ERROR_LINE = re.compile(r"!!!ERROR[^!]*!!!\s*(.*)")
+# what an install as it is must not log: our scripts calling LocoFix's externs, the custom maps' list
+AS_IS_ERRORS = ("Unknown extern", "custom.lst")
+
+
+def error_kinds(log):
+    """The `!!!ERROR` lines of an error.log: (count, [(n, kind)] most common first) - a kind is the
+    message with its quoted names and numbers left out."""
+    kinds = {}
+    for line in log.splitlines():
+        m = ERROR_LINE.search(line)
+        if m:
+            kind = re.sub(r"\d+", "N", re.sub(r"'[^']*'", "'.'", m.group(1).strip()))[:70]
+            kinds[kind] = kinds.get(kind, 0) + 1
+    return sum(kinds.values()), sorted(((n, k) for k, n in kinds.items()), reverse=True)
+
+
 def check(selected, run, captured, store=STORE):
     all_codes = codes()
-    rows = [("edition", "exe", "patches", "build", "menu", "POLIGON", "LOGIC")]
+    rows = [("edition", "exe", "patches", "build", "menu", "POLIGON", "LOGIC", "errors")]
     for code in selected or all_codes:
         if code not in all_codes:
             print(f"== {code}: no manifest (capture it first)")
@@ -390,8 +407,12 @@ def check(selected, run, captured, store=STORE):
                 log.flush()
                 result = subprocess.run(cmd + ["--skip-verify"], stdout=log, stderr=subprocess.STDOUT)
                 build_state = "skip-verify" if result.returncode == 0 else "FAILED"
+        # a foreign exe is installed as it is (build.AS_IS): none of the patches goes in
+        if getattr(build, "AS_IS", None) and build.AS_IS in open(os.path.join(work, "build.log"), encoding="utf-8",
+                                                               errors="replace").read():
+            summary = "as is"
         print(f"  patches: {summary}; build: {build_state} (log: {os.path.relpath(os.path.join(work, 'build.log'), REPO)})")
-        menu = poligon = logic = "-"
+        menu = poligon = logic = errors = "-"
         if run and build_state != "FAILED":
             out, error_log, locofix_log = run_test(game, "menu", ["-WaitFor", r"menu\.map"])
             steam_exe = bool(exe_of(files)) and exe_of(files)[1] == build.STEAM_EXE_SHA256
@@ -409,12 +430,17 @@ def check(selected, run, captured, store=STORE):
             else:
                 poligon = "n/a (no LocoFix)" if inactive else "LocoFix active?!"
             logic = "none" if not logic_lines else f"{len(logic_lines)}: {logic_lines[0][:60]}"
-            print(f"  menu: {menu}, POLIGON: {poligon}, LOGIC: {logic}")
-        rows.append((code, exe_text(files), summary, build_state, menu, poligon, logic))
+            count, kinds = error_kinds(error_log)
+            ours = {s: error_log.count(s) for s in AS_IS_ERRORS if s in error_log}
+            errors = str(count) + (" (" + ", ".join(f"{s} {n}" for s, n in ours.items()) + ")" if ours else "")
+            print(f"  menu: {menu}, POLIGON: {poligon}, LOGIC: {logic}, !!!ERROR lines of the menu's run: {errors}")
+            for n, kind in kinds[:5]:
+                print(f"    {n:5d}  {kind}")
+        rows.append((code, exe_text(files), summary, build_state, menu, poligon, logic, errors))
     print()
     table(rows)
     return 1 if any(r[3] == "FAILED" or r[4] == "no menu" or r[5] == "FAILED" or r[6] not in ("none", "-")
-                    for r in rows[1:]) else 0
+                    or "(" in r[7] for r in rows[1:]) else 0
 
 
 def main():

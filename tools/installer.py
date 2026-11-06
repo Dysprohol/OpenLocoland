@@ -132,6 +132,7 @@ TEXTS = {
         "feature_cheats": "the Cheats option",
         "feature_dev_texts": "the translated texts of the developer mode",
         "feature_other": "our changes of it",
+        "as_is": "Steam.exe is not the Steam version of 2003-10-07: installed as it is - no fixes, launcher options, editor or custom maps page",
         "not_empty": "The folder is not empty and has no OpenLocoland install:\n{path}\n\n"
                      "Install there anyway? Its other files are left alone.",
         "running": "OpenLocoland is running from this folder. Close the game first.",
@@ -195,6 +196,7 @@ TEXTS = {
         "feature_cheats": "die Option Cheats",
         "feature_dev_texts": "die übersetzten Texte des Entwicklermodus",
         "feature_other": "unsere Änderungen daran",
+        "as_is": "Steam.exe ist nicht die Steam-Version vom 2003-10-07: so installiert, wie es ist - ohne Korrekturen, Launcher-Optionen, Editor und Seite der eigenen Karten",
         "not_empty": "Der Ordner ist nicht leer und enthält keine OpenLocoland-Installation:\n{path}\n\n"
                      "Trotzdem dort installieren? Seine anderen Dateien bleiben unberührt.",
         "running": "OpenLocoland läuft aus diesem Ordner. Beende zuerst das Spiel.",
@@ -257,6 +259,7 @@ TEXTS = {
         "feature_cheats": "a Csalások beállítás",
         "feature_dev_texts": "a fejlesztői mód lefordított szövegei",
         "feature_other": "a változtatásaink benne",
+        "as_is": "A Steam.exe nem a 2003-10-07-i Steam-változat: úgy települt, ahogy van - javítások, indítóbeállítások, szerkesztő és a saját térképek oldala nélkül",
         "not_empty": "A mappa nem üres, és nincs benne OpenLocoland:\n{path}\n\n"
                      "Mégis ide telepítsem? A többi fájlja érintetlen marad.",
         "running": "Az OpenLocoland ebből a mappából fut. Előbb zárd be a játékot.",
@@ -319,6 +322,7 @@ TEXTS = {
         "feature_cheats": "opcji Kody",
         "feature_dev_texts": "przetłumaczonych tekstów trybu twórców",
         "feature_other": "naszych zmian w nim",
+        "as_is": "Steam.exe nie jest wersją Steam z 2003-10-07: zainstalowano jak jest - bez poprawek, opcji launchera, edytora i strony własnych map",
         "not_empty": "Folder nie jest pusty i nie ma w nim OpenLocoland:\n{path}\n\n"
                      "Zainstalować mimo to? Pozostałe pliki zostaną nietknięte.",
         "running": "OpenLocoland jest uruchomiony z tego folderu. Najpierw zamknij grę.",
@@ -381,6 +385,7 @@ TEXTS = {
         "feature_cheats": "a opção Batotas",
         "feature_dev_texts": "os textos traduzidos do modo de programador",
         "feature_other": "as nossas alterações nele",
+        "as_is": "O Steam.exe não é a versão Steam de 2003-10-07: instalado como está - sem correções, opções do lançador, editor nem página dos mapas próprios",
         "not_empty": "A pasta não está vazia e não tem uma instalação do OpenLocoland:\n{path}\n\n"
                      "Instalar mesmo assim? Os outros ficheiros ficam intactos.",
         "running": "O OpenLocoland está a correr a partir desta pasta. Fecha primeiro o jogo.",
@@ -443,6 +448,7 @@ TEXTS = {
         "feature_cheats": "опции Читы",
         "feature_dev_texts": "переведённых текстов режима разработчика",
         "feature_other": "наших изменений в нём",
+        "as_is": "Steam.exe - не версия Steam от 2003-10-07: установлено как есть - без исправлений, настроек лаунчера, редактора и страницы своих карт",
         "not_empty": "Папка не пуста, и в ней нет OpenLocoland:\n{path}\n\n"
                      "Всё равно установить туда? Остальные файлы останутся нетронутыми.",
         "running": "OpenLocoland запущена из этой папки. Сначала закройте игру.",
@@ -505,6 +511,7 @@ TEXTS = {
         "feature_cheats": "volba Cheaty",
         "feature_dev_texts": "přeložené texty vývojářského režimu",
         "feature_other": "naše změny v něm",
+        "as_is": "Steam.exe není verze ze Steamu z 2003-10-07: nainstalováno, jak je - bez oprav, voleb spouštěče, editoru a stránky vlastních map",
         "not_empty": "Složka není prázdná a není v ní OpenLocoland:\n{path}\n\n"
                      "Přesto do ní instalovat? Ostatní soubory zůstanou nedotčené.",
         "running": "OpenLocoland běží z této složky. Nejdřív hru ukonči.",
@@ -854,9 +861,15 @@ def install(steam, target, choices, ver, progress=None, skip_verify=False):
             print(f"Warning: Steam.exe in {steam} does not match a known version (continuing with --skip-verify)")
         else:
             sys.exit(TEXTS[choices["lang"]]["modified_steam"].format(path=steam))
-    stop, warnings = steam_files_check(steam, choices["lang"], skip_verify)
-    if stop:
-        sys.exit(stop)
+    # another exe (skip_verify): the game goes in as it is - none of our changes, which need
+    # LocoFix and so the Steam exe (build.AS_IS); its warning instead of those of single files
+    as_is = skip_verify and build.foreign_exe(steam)
+    if as_is:
+        warnings = [TEXTS[choices["lang"]]["as_is"]]
+    else:
+        stop, warnings = steam_files_check(steam, choices["lang"], skip_verify)
+        if stop:
+            sys.exit(stop)
     if game_running(target):
         sys.exit("Locoland is running from the install folder - close it first")
     locofix = os.path.join(BUNDLE, "LocoFix.dll") if BUNDLE else None
@@ -865,14 +878,17 @@ def install(steam, target, choices, ver, progress=None, skip_verify=False):
     manifest = read_manifest(target)
     files = build.build(steam, target, locofix=locofix, captured=CAPTURED, progress=progress, skip_verify=skip_verify,
                         previous=(manifest or {}).get("files", []), clean=choices.get("clean", True))
-    write_setting("Cheats", choices["cheats"])
-    write_setting("UnlockMissions", choices["unlock"])
-    print(f"Options: Cheats {int(choices['cheats'])}, UnlockMissions {int(choices['unlock'])}")
-    if choices.get("game_language"):
-        write_setting("Language", choices["game_language"])
-        print(f"Game language: {choices['game_language']}")
+    if as_is:   # LocoFix's settings: nothing reads them in a game installed as it is
+        print("Options and game language: not written (installed as it is - no LocoFix to read them)")
+    else:
+        write_setting("Cheats", choices["cheats"])
+        write_setting("UnlockMissions", choices["unlock"])
+        print(f"Options: Cheats {int(choices['cheats'])}, UnlockMissions {int(choices['unlock'])}")
+        if choices.get("game_language"):
+            write_setting("Language", choices["game_language"])
+            print(f"Game language: {choices['game_language']}")
     remove_shortcuts(manifest)
-    shortcuts = make_shortcuts(target, choices, ver)
+    shortcuts = make_shortcuts(target, choices, ver, editor=not as_is)
     with open(os.path.join(target, MANIFEST), "w", encoding="utf-8") as f:
         json.dump({"version": ver, "steam": steam, "captured": CAPTURED, "shortcuts": shortcuts, "files": files}, f,
                   indent=2)
@@ -881,7 +897,9 @@ def install(steam, target, choices, ver, progress=None, skip_verify=False):
     return warnings
 
 
-def make_shortcuts(target, choices, ver):
+def make_shortcuts(target, choices, ver, editor=True):
+    """The game's shortcut and, with `editor` (LocoFix: not in a game installed as it is), the
+    editor's in the folders chosen; returns their paths."""
     texts = TEXTS[choices["lang"]]
     exe = os.path.join(target, "Locoland.exe")   # actual exe name (for config/registry)
     folders = []
@@ -893,9 +911,11 @@ def make_shortcuts(target, choices, ver):
     for folder in folders:
         game = os.path.join(folder, texts["game_name"] + ".lnk")
         make_shortcut(game, exe, "", target, exe, APP + " " + ver)
-        editor = os.path.join(folder, texts["editor_name"] + ".lnk")
-        make_shortcut(editor, exe, EDITOR_ARGUMENTS, target, exe, texts["editor_desc"])
-        made += [game, editor]
+        made.append(game)
+        if editor:
+            path = os.path.join(folder, texts["editor_name"] + ".lnk")
+            make_shortcut(path, exe, EDITOR_ARGUMENTS, target, exe, texts["editor_desc"])
+            made.append(path)
         print("Shortcuts: " + folder)
     return made
 
