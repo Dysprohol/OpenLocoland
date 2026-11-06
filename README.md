@@ -70,6 +70,12 @@ The [trailer](https://www.youtube.com/watch?v=04BeRSnfL6o) and more videos of th
    two extras there.
 3. Start **Locoland** or **Locoland - map editor** from the desktop or the Start menu.
 
+**Which copies of the game work:** the Steam version in every language it comes in (English,
+German, Hungarian, Polish, Portuguese, Russian), and the CD editions built from the same program
+(the Polish and the Czech ones). A CD edition with another program file - the Italian one, the
+English beta/demo - can be installed "as it is" (a box in Setup): the game runs as the original with
+its intros, without our fixes, the launcher's options or the editor. Support for those is planned.
+
 Running a newer `Setup.exe` updates the game and keeps your maps, scores and progress; **Check for
 updates** in the launcher finds a newer release and downloads its `Setup.exe` for you. The
 player's guide tells the rest, the editor with a step-by-step first mission included:
