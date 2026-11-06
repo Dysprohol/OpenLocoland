@@ -4889,7 +4889,8 @@ struct GroundStroke {
     int kind = 0;                            // Water: its kind (W during the stroke is for the next one)
     std::map<rail::Cell, short> grid_before;
     std::set<std::pair<int, int>> tiles;     // Water: the 128 squares with a tile of the kind
-    std::set<std::pair<int, int>> others;    // ... and with a tile of another kind (left to it)
+    std::set<std::pair<int, int>> others;    // ... and with a tile of another kind (replaced by this one where the brush goes)
+    std::map<int, int> levels;               // Water: each kind's level on the map at the start (its tiles' VID -> level, -1 none)
     std::vector<uint8_t*> made;              // Water: the tiles made; the bed: the decals laid
     bool gravel = false, decals = false;     // the gravel bed's band; laid as decals (a campaign terrain)
     float reach = 0;                         // the Decals strip's bed brush: its circle (0: the Paint tool's brush)
@@ -5103,8 +5104,33 @@ void start_ground_stroke(bool water, bool erase = false) {
             const std::pair<int, int> s{static_cast<int>(std::floor(at<float>(o, O_X) / 128)), static_cast<int>(std::floor(at<float>(o, O_Y) / 128))};
             (nvid_of(o) == k.nvid ? g_gstroke.tiles : g_gstroke.others).insert(s);
         });
+        for (const WaterKind& other : WATER_KINDS) g_gstroke.levels[other.nvid] = other.nvid == k.nvid ? g_gstroke.level : water_level_of(other.nvid);
     }
     ground_stroke_begin();
+}
+
+// The water of a 128 px square taken away (kept in the stroke for the history): the tiles of every
+// kind but `keep`, and the generators standing over them (a kind's effect VIDs a level above its
+// water; light and dark water share theirs, so the level tells whose). Painting one water over
+// another replaces it this way, and the right button or Shift takes any water away.
+void take_water_in_square(int i, int j, const WaterKind* keep) {
+    for_each_object([&](uint8_t* o) {
+        if (removed(o)) return;
+        const int n = nvid_of(o);
+        if (static_cast<int>(std::floor(at<float>(o, O_X) / 128)) != i || static_cast<int>(std::floor(at<float>(o, O_Y) / 128)) != j) return;
+        bool goes = is_water_tile(n) && (!keep || n != keep->nvid);
+        if (!goes)
+            for (const WaterKind& w : WATER_KINDS) {
+                if (keep && w.nvid == keep->nvid) continue;
+                const int l = g_gstroke.levels.count(w.nvid) ? g_gstroke.levels[w.nvid] : -1;
+                if (l >= 0 && (n == w.effect || (w.second && n == w.second)) && std::fabs(at<float>(o, O_Z) - l - 1) < 3) goes = true;
+            }
+        if (!goes) return;
+        State s = state_of(o);
+        g_gstroke.taken.push_back({o, s});
+        s.present = false;
+        apply(o, s);
+    });
 }
 
 void ground_dab(float sx, float sy, bool first);
@@ -5169,16 +5195,27 @@ void ground_dab(float sx, float sy, bool first) {
             g_gstroke.grid_before.emplace(c, now);
             set_ground_cell(cx, cy, want);
         }
-    if (g_gstroke.erase) return;
-    // the tiles of the kind over the brush, where missing
     const auto a = tile_square(sx - r, sy - r, g_gstroke.level), b = tile_square(sx + r, sy + r, g_gstroke.level);
+    if (g_gstroke.erase) {   // the right button or Shift: the water of every kind in the squares the brush touches goes
+        for (int j = a.second; j <= b.second; ++j)
+            for (int i = a.first; i <= b.first; ++i)
+                if (i >= 0 && j >= 0 && i * 128 < grid_width() * 8 && j * 128 < grid_height() * 8) {
+                    take_water_in_square(i, j, nullptr);
+                    g_gstroke.tiles.erase({i, j});
+                    g_gstroke.others.erase({i, j});
+                }
+        return;
+    }
+    // the tiles of the kind over the brush, where missing; a square with another kind's tile loses it
+    // (two kinds in one square would show each other: a tile shows wherever the picture is below its
+    // level), so painting one water over another replaces it
     for (int j = a.second; j <= b.second; ++j)
         for (int i = a.first; i <= b.first; ++i) {
-            // a square with another kind's tile keeps it: a tile shows wherever the picture is below
-            // its level, so two kinds in one square would show each other
-            if (i < 0 || j < 0 || i * 128 >= grid_width() * 8 || j * 128 >= grid_height() * 8 || g_gstroke.tiles.count({i, j}) ||
-                g_gstroke.others.count({i, j}))
-                continue;
+            if (i < 0 || j < 0 || i * 128 >= grid_width() * 8 || j * 128 >= grid_height() * 8 || g_gstroke.tiles.count({i, j})) continue;
+            if (g_gstroke.others.count({i, j})) {
+                take_water_in_square(i, j, &k);
+                g_gstroke.others.erase({i, j});
+            }
             if (uint8_t* t = create(k.nvid, 64.0f + 128 * i, 64.0f + 128 * j, static_cast<float>(g_gstroke.level), 0, 0)) {
                 g_gstroke.made.push_back(t);
                 g_gstroke.tiles.insert({i, j});
@@ -5214,7 +5251,7 @@ void end_ground_stroke() {
         objects.push_back(t.first);
         before.push_back(t.second);
     }
-    unsigned effects = 0, gone = 0;
+    unsigned effects = 0, gone = g_gstroke.water ? static_cast<unsigned>(g_gstroke.taken.size()) : 0;   // the tiles and generators the dabs took
     if (g_gstroke.water) {
         const WaterKind& k = WATER_KINDS[g_gstroke.kind];
         const int level = g_gstroke.level;
@@ -5286,23 +5323,34 @@ void end_ground_stroke() {
                 at<float>(region, RG_HEIGHT) = b - t;
             }
         } else {
-            // the tiles and generators no longer over water go
+            // the generators of the kind no longer over its water go (the tiles went with their squares)
             std::vector<uint8_t*> dry;
             for_each_object([&](uint8_t* o) {
                 if (removed(o)) return;
                 const int n = nvid_of(o);
                 const float sx = at<float>(o, O_X), sy = at<float>(o, O_Y) - at<float>(o, O_Z);
                 if (sx < g_gstroke.x0 - 128 || sx > g_gstroke.x1 + 128 || sy < g_gstroke.y0 - 128 || sy > g_gstroke.y1 + 128) return;
-                if (n == k.nvid) {
-                    if (!square_wet(static_cast<int>(std::floor(at<float>(o, O_X) / 128)), static_cast<int>(std::floor(at<float>(o, O_Y) / 128)),
-                                    level))
-                        dry.push_back(o);
-                } else if ((n == k.effect || (k.second && n == k.second)) && std::fabs(at<float>(o, O_Z) - level - 1) < 3 &&
-                           !under_water(sx, sy, level)) {
+                if ((n == k.effect || (k.second && n == k.second)) && std::fabs(at<float>(o, O_Z) - level - 1) < 3 && !under_water(sx, sy, level))
                     dry.push_back(o);
-                }
             });
             for (uint8_t* o : dry) take(o);
+        }
+        // a kind with no tile left on the map loses its splash region (the one the tool made at its level)
+        for (const WaterKind& w : WATER_KINDS) {
+            const int l = g_gstroke.levels.count(w.nvid) ? g_gstroke.levels[w.nvid] : -1;
+            if (l < 0) continue;
+            bool left = false;
+            for_each_object([&](uint8_t* o) {
+                if (!left && !removed(o) && nvid_of(o) == w.nvid) left = true;
+            });
+            if (left) continue;
+            std::vector<uint8_t*> regions;
+            for_each_object([&](uint8_t* o) {
+                if (!removed(o) && is_region(o) && (nvid_of(o) == VID_REGION || nvid_of(o) == VID_REGION_RAIN) && region_splash(o) == w.splash &&
+                    std::fabs(at<float>(o, O_Z) - l) < 2)
+                    regions.push_back(o);
+            });
+            for (uint8_t* o : regions) take(o);
         }
     }
     if (!paint && objects.empty() && g_gstroke.grid_before.empty()) return;
