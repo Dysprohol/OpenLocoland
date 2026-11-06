@@ -20,6 +20,7 @@
 // LocoFix.log gets the measured frame rate of every level with the game clock against
 // the real time (the game's own "Average fps" in error.log comes out as 0 for missions).
 #include "patch.h"
+#include "profile.h"
 #include <ddraw.h>
 #include <mmsystem.h>
 #include <cwchar>
@@ -174,9 +175,13 @@ int __fastcall LevelLoad_measured(void* world, void* edx, const char* name) {
 }
 
 void __fastcall EndScene_limited(uint8_t* g, void* edx, int present) {
+    prof::Lap lap;
     g_end_scene(g, edx, present);
+    lap.to(prof::PRESENT);
     if (g_period) wait_for_next_frame();
+    lap.to(prof::WAIT);
     count_frame();
+    prof::frame_end();
 }
 
 // ---- settings ----

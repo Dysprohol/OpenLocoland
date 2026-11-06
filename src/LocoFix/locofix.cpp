@@ -16,6 +16,7 @@ void install_test_mode();
 void install_resolutions();
 void install_camera();
 void install_view_culling();
+void install_profile();
 void install_birth_animation();
 void install_adopt_command();
 void install_shadow_leak();
@@ -124,6 +125,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         install_resolutions();
         install_camera();
         install_view_culling();
+        install_profile();
         install_birth_animation();
         install_adopt_command();
         install_shadow_leak();

@@ -17,6 +17,7 @@
 // Up to 1024x768 nothing changes. Drawing more is safe - the drawing code clips to the
 // view itself; the box only saves time.
 #include "patch.h"
+#include "profile.h"
 
 namespace {
 
@@ -58,7 +59,34 @@ bool in_box(const uint8_t* object, const Box& box) {
     return dy >= half_y;
 }
 
-int __cdecl object_visible(const uint8_t* object) { return in_box(object, OBJECTS); }
+// in_box without the "below the view" rule (the profiler's count of what that rule adds)
+bool in_view_box(const uint8_t* object, const Box& box) {
+    const auto* g = *reinterpret_cast<uint8_t* const*>(G_GRAPHICS);
+    const auto* world = *reinterpret_cast<uint8_t* const*>(G_WORLD);
+    const float screen_w = *reinterpret_cast<const float*>(g + 0x20c);
+    const float screen_h = *reinterpret_cast<const float*>(g + 0x210);
+    const int centre_x = static_cast<int>(screen_w * 0.5f + *reinterpret_cast<const float*>(world + 0x44));
+    const int centre_y = static_cast<int>(screen_h * 0.5f + *reinterpret_cast<const float*>(world + 0x48));
+    const int half_x = max_int(box.half_x, static_cast<int>(screen_w) / 2 + box.margin_x);
+    const int half_y = max_int(box.half_y, static_cast<int>(screen_h) / 2 + box.margin_y);
+    const float* position = reinterpret_cast<const float*>(object + 0x30);
+    const int dx = static_cast<int>(position[0]) - centre_x;
+    const int dyz = static_cast<int>(position[1] - position[2]) - centre_y;
+    return dx >= -half_x && dx < half_x && dyz >= -half_y && dyz < half_y;
+}
+
+int __cdecl object_visible(const uint8_t* object) {
+    const bool visible = in_box(object, OBJECTS);
+    if (prof::on() && visible) {
+        prof::count(prof::DRAWN_ALL, 1);
+        const int layer = prof::current_layer();
+        if (layer >= 2 && layer <= 4) {
+            prof::count(prof::DRAWN_2_4, 1);
+            if (!in_view_box(object, OBJECTS)) prof::count(prof::BELOW_2_4, 1);
+        }
+    }
+    return visible;
+}
 int __cdecl shadow_visible(const uint8_t* object) { return in_box(object, SHADOWS); }
 
 uintptr_t g_layer_draw = LAYER_DRAW, g_layer_skip = LAYER_SKIP;
