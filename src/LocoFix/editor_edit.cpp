@@ -4875,7 +4875,8 @@ int g_water_kind = 0;           // Water: WATER_KINDS (W)
 int g_paint_radius = 40;        // px, + and -
 int g_paint_strength = 5;       // Paint: how much of the texture a pass lays (1-5: a fifth to all of it)
 bool g_paint_hard = false;      // Paint: the brush's edge soft or hard
-bool g_paint_bed = false;       // Paint: the gravel bed's band along the track instead of a texture
+bool g_paint_bed = false;       // Paint: the gravel bed along the track instead of a texture
+bool g_paint_objects = true;    // Paint, GRAVEL BED: LAYS: OBJECTS - the game's bed objects swapped under the rails (true) - or BAND, painted into the picture
 int g_bed_kind = 0;             // its kind (BEDS' order) - the same as the bed of new track (B)
 int g_bed_width = BED_WIDTH;    // the band's width (px)
 constexpr int MIN_PAINT_RADIUS = 8, MAX_PAINT_RADIUS = 200, PAINT_STEP = 8, WATER_BED = 25;
@@ -5076,6 +5077,14 @@ std::pair<int, int> tile_square(float sx, float sy, int level) {   // the tile o
 }
 
 void start_ground_stroke(bool water, bool erase = false) {
+    if (!water && g_paint_bed && g_paint_objects) {   // LAYS: OBJECTS - the bed objects swapped, the picture untouched
+        g_gstroke = GroundStroke();
+        g_gstroke.active = true;
+        stroke_timing_begin();
+        g_gstroke.erase = erase || shift_down();
+        start_bed(g_gstroke.erase, true);
+        return;
+    }
     if (!ground_paintable(false)) return;
     g_gstroke = GroundStroke();
     g_gstroke.active = true;
@@ -5165,7 +5174,7 @@ void ground_dab(float sx, float sy, bool first) {
     g_gstroke.y1 = (std::max)(g_gstroke.y1, sy + r);
     if (g_gstroke.gravel) {
         bed_dab(sx, sy, r);
-        if (g_gstroke.erase && g_gstroke.reach > 0) take_beds_near(sx, sy, r);   // loose beds too
+        if (g_gstroke.erase && g_gstroke.decals) take_beds_near(sx, sy, r);   // loose beds too
         return;
     }
     if (!g_gstroke.water) {
@@ -5421,6 +5430,18 @@ bool on_bed_band(float x, float y) {
 
 // UNDER THE WHOLE TRACK: the bed under every plain rail of the map, one step of the history.
 void bed_whole_track() {
+    if (g_paint_objects) {   // the bed object of the kind under every plain rail
+        g_gstroke = GroundStroke();
+        g_gstroke.active = true;
+        stroke_timing_begin();
+        start_bed(false, true);
+        for (uint8_t* o : g_gstroke.rails) {
+            g_gstroke.bedded.insert(o);
+            lay_bed(o);
+        }
+        end_ground_stroke();
+        return;
+    }
     if (!ground_paintable(false)) return;
     g_gstroke = GroundStroke();
     g_gstroke.active = true;
@@ -7917,7 +7938,7 @@ void draw_paint_tool() {
                       ui_format("StatusBed", "Paint - GRAVEL BED (dotted: where it goes): %s ([ ]), width %d px, brush %d px (wheel), strength %d, edge %s - %s; the right button puts the original back"),
                       bed_kind_name(g_bed_kind), g_bed_width, g_paint_radius, g_paint_strength,
                       g_paint_hard ? ui_text("WordHard", "hard") : ui_text("WordSoft", "soft"),
-                      ui_text("WordBedPainted", "painted into the picture"));
+                      g_paint_objects ? ui_text("WordBedDecals", "decals under the rails") : ui_text("WordBedPainted", "painted into the picture"));
     } else if (tool() == Tool::Paint) {
         const std::vector<GroundTexture>& t = ground_textures();
         if (g_texture < static_cast<int>(t.size())) {
@@ -8808,25 +8829,44 @@ std::vector<OptionGroup> option_groups() {
             groups.push_back(textures);
         }
         if (g_paint_bed) {
+            // the game's bed objects (the four beds as their pictures, the chosen one framed - the same
+            // kind the Track tool's row and B give new track) or the band painted into the picture
+            groups.push_back({option_label({"OptBedLays", "LAYS:"}),
+                              option_button({"OptBedObjects", "OBJECTS"}, g_paint_objects, [] {
+                                  g_paint_objects = true;
+                                  MESSAGE("MsgBedObjects", "paint: the bed objects of the game (%s) swapped under the rails the brush goes over", bed_kind_name(g_bed_kind));
+                              }),
+                              option_button({"OptBedBand", "BAND"}, !g_paint_objects, [] {
+                                  g_paint_objects = false;
+                                  MESSAGE("MsgBedBand", "paint: a band of gravel (%s) painted into the picture under the rails the brush goes over", bed_kind_name(g_bed_kind));
+                              })});
             OptionGroup kinds{option_label({"OptBedKind", "KIND:"})};
             const UiText NAMES[BED_KINDS] = {{"OptBedMeadow", "MEADOW"}, {"OptBedIce", "ICE"}, {"OptBedVolcanic", "VOLCANIC"},
                                              {"OptBedDesert", "DESERT"}};
             for (int k = 0; k < BED_KINDS; ++k) {
-                if (!ground_bed_kinds()[k].available) continue;
-                kinds.push_back(option_button(NAMES[k], g_bed_kind == k, [k] {
+                if (!g_paint_objects && !ground_bed_kinds()[k].available) continue;
+                OptionItem i = option_button(NAMES[k], g_bed_kind == k, [k] {
                     set_bed_kind(k);
                     MESSAGE("MsgBedKind", "gravel bed: %s (VID %d, also under new track)", bed_kind_name(k), BEDS[k]);
-                }));
+                });
+                if (g_paint_objects) {   // its own picture instead of the name
+                    i.text = UiText{nullptr, ""};
+                    i.object = BEDS[k];
+                }
+                kinds.push_back(i);
             }
             groups.push_back(kinds);
-            groups.push_back(option_number({"OptBedWidth", "WIDTH:"}, g_bed_width, MIN_BED_WIDTH, MAX_BED_WIDTH, BED_WIDTH_STEP,
-                                           "MsgBedWidth", "gravel bed: %d px wide"));
+            if (!g_paint_objects)
+                groups.push_back(option_number({"OptBedWidth", "WIDTH:"}, g_bed_width, MIN_BED_WIDTH, MAX_BED_WIDTH, BED_WIDTH_STEP,
+                                               "MsgBedWidth", "gravel bed: %d px wide"));
         }
         groups.push_back(option_number({"OptSize", "SIZE:"}, g_paint_radius, MIN_PAINT_RADIUS, MAX_PAINT_RADIUS, PAINT_STEP,
                                        "MsgBrushSize", "brush %d px"));
-        groups.push_back(option_number({"OptStrength", "STRENGTH:"}, g_paint_strength, MIN_STRENGTH, MAX_STRENGTH, 1, "MsgStrength",
-                                       "strength %d"));
-        groups.push_back(option_edge(g_paint_hard));
+        if (!(g_paint_bed && g_paint_objects)) {   // the objects have no strength or edge
+            groups.push_back(option_number({"OptStrength", "STRENGTH:"}, g_paint_strength, MIN_STRENGTH, MAX_STRENGTH, 1, "MsgStrength",
+                                           "strength %d"));
+            groups.push_back(option_edge(g_paint_hard));
+        }
         if (g_paint_bed) groups.push_back({option_button({"OptBedWhole", "UNDER THE WHOLE TRACK"}, false, [] { bed_whole_track(); })});
     }
     return groups;

@@ -353,18 +353,19 @@ or the Delete tool removes a rail; Shift+click with the Delete tool removes a wh
 **The gravel bed.** The bed is an object of the game under each rail, as most missions have it.
 New track gets the bed chosen in the Track tool's row, **GRAVEL BED** (meadow, ice, volcanic, desert
 or none; `B` cycles them). To swap the bed of track already laid - the meadow one for the volcanic,
-say - pick one of the four gravel beds of the **Decorations** theme, then click or drag on the track:
-the rails in the brush's circle get that bed instead of the one they had, and Shift takes their beds
-away (also a loose bed left by an older version of the editor). Nothing is dropped loose on the
-ground, and the picture is not touched.
+say - **Paint the ground** -> **MODE: GRAVEL BED** -> **LAYS: OBJECTS**: pick a bed picture in the
+row, then drag along the rails - dots show which rails the brush reaches - and they get that bed
+instead of the one they had; the right button or Shift takes their beds away (also a loose bed left
+by an older version of the editor), **UNDER THE WHOLE TRACK** swaps every rail's at once. Nothing is
+dropped loose on the ground, and the picture is not touched. (The four gravel beds of the
+**Decorations** theme do the same swap from the Decals brush.)
 
-**Paint the ground** -> **MODE: GRAVEL BED** is a different thing: it paints a band of gravel into
-the ground's picture under the rails the brush goes over, as three missions did instead of laying
-objects - dots along the rails show where it goes: **KIND**, **WIDTH** (28 px, as the missions have
-it), **SIZE**, **STRENGTH**, **EDGE**; the band follows curves, switches and ramps. It leaves the
-rails' bed objects alone (take them away with Shift from the Decorations beds if you want the band
-alone). The right button puts the original picture back, Alt+click takes the kind, **UNDER THE
-WHOLE TRACK** paints it under every rail of the map at once. A stroke is one undo.
+**LAYS: BAND** is a different thing: it paints a band of gravel into the ground's picture under
+the rails the brush goes over, as three missions did instead of laying objects: **KIND**, **WIDTH**
+(28 px, as the missions have it), **SIZE**, **STRENGTH**, **EDGE**; the band follows curves,
+switches and ramps and leaves the rails' bed objects alone. The right button puts the original
+picture back, Alt+click takes the kind, **UNDER THE WHOLE TRACK** paints it under every rail of the
+map at once. A stroke is one undo.
 
 ![The gravel bed under a junction](img/paint-bed-en.jpg)
 
