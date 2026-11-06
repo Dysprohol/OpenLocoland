@@ -1,7 +1,6 @@
 # OpenLocoland - przewodnik gracza
 
-Wersja 0.2 - pierwsze regularne wydanie; edytor map jest wciąż w budowie. [English version:
-GUIDE.md](GUIDE.md)
+Wersja 0.2.5; edytor map jest wciąż w budowie. [English version: GUIDE.md](GUIDE.md)
 
 **OpenLocoland** to nieoficjalna, fanowska nowa edycja gry **Locoland** (Gromada / ESDigital
 Games, 2003): oryginalna gra działa z poprawkami dla dzisiejszego Windowsa, kilkoma ulepszeniami,
@@ -171,7 +170,12 @@ Co widać:
   skrypt nie działa. Poza mapą jest przyciemniona siatka, a krawędź mapy ma ramkę (można przewinąć
   300 px poza krawędź: tory biegną tam dalej).
 - **Pasek** na dole w wyglądzie paska stanu gry: narzędzia 1 - 0 w jego gniazdach, kolejne na
-  **listwie** nad nim. Wybrane jest w ramce.
+  **listwie** nad nim. Wybrane jest w ramce. Nad listwą wybrane narzędzie ma swój **rząd** ustawień:
+  rodzaj szyny i rampę dla Torów, tekstury albo podsypkę dla Malowania terenu, listę wagonów dla
+  Pojazdów, obiekty tematu dla Wszystkich obiektów.
+
+  ![Rząd narzędzia Tory nad paskiem](img/track-row-pl.jpg)
+
 - **Wiersz stanu** u góry: narzędzie (albo to pod myszą), liczba kroków do cofnięcia i ponowienia,
   „nie zapisano” i ostatni komunikat - dlaczego czegoś nie da się zrobić, zawsze jest napisane tutaj.
 - **Podpowiedzi**: gdy kursor chwilę stoi, kilka słów obok niego podaje klawisze narzędzia (albo
@@ -179,13 +183,13 @@ Co widać:
   ruch je zabiera. **PODPOWIEDZI POD KURSOREM** na górze panelu Menu je wyłącza i włącza.
 - **Muzyka** w prawym górnym rogu: nazwa pliku, `|<` poprzedni, `>` gra go podczas edycji (`||`
   zatrzymuje), `>|` następny - żeby przesłuchać muzykę gry i wybrać muzykę mapy w Ustawieniach misji. Na
-  początku wyłączona; edytor pamięta, czy grała i który plik. Szybki test i Zagraj w mapę grają własną
-  muzykę mapy.
+  początku wyłączona; edytor pamięta, czy grała i który plik. **TEST BEZ ZAPISU** i **ZAGRAJ
+  ZAPISANA MAPE** grają własną muzykę mapy.
 - **Przyciski ? i menu** na lewym końcu paska (tam, gdzie gra ma przycisk pauzy). **?** (albo F1)
-  otwiera pomoc: dwadzieścia stron z tym, co jest w tym rozdziale, w skrócie. Zaczyna się od **spisu
-  treści**: kategorie (PODSTAWY, TORY I POCIĄGI, OBIEKTY, MISJA I ZAPIS, TEREN, PRZYJAZDY I FABRYKI)
+  otwiera pomoc: 29 stron z tym, co jest w tym rozdziale, w skrócie. Zaczyna się od **spisu
+  treści**: kategorie (PODSTAWY, TORY I POCIAGI, OBIEKTY, MISJA I ZAPIS, TEREN, PRZYJAZDY I FABRYKI)
   po lewej, strony tej pod myszą po prawej - kliknięcie otwiera stronę. Strona ma swoją kategorię za
-  tytuł i swój numer (13 / 20); strzałki, Page Up / Down i kółko zmieniają strony, a **SPIS TRESCI**,
+  tytuł i swój numer (5 / 29); strzałki, Page Up / Down i kółko zmieniają strony, a **SPIS TRESCI**,
   `Esc` albo prawy przycisk wracają do spisu.
 
   ![Spis treści pomocy](img/help-contents-pl.jpg)
@@ -195,7 +199,8 @@ Co widać:
   **Przycisk menu** otwiera menu edytora ze wszystkimi poleceniami - **NOWA MAPA**, **WCZYTAJ MAPE**,
   **ZAPISZ MAPE**, **EKSPORT MAPY**, **IMPORT MAPY**, **ZMIEN NAZWE / USUN**, **USTAWIENIA MISJI**, **ROZMIAR MAPY**, **ZAGRAJ
   ZAPISANA MAPE**, **COFNIJ**, **PONOW**, **TEST BEZ ZAPISU**, **POWROT DO MENU**, **WYJDZ Z GRY**;
-  wiersz stanu mówi, co robi to pod myszą.
+  wiersz stanu mówi, co robi to pod myszą. Otwiera je też `Esc`, gdy żaden panel nie jest otwarty i
+  nic nie jest w toku.
 
   ![Menu edytora](img/editor-menu-pl.jpg)
 
@@ -227,7 +232,8 @@ flagę masztu, Shift+R / E flagę dworca.
 **Panel obiektu** (prawy przycisk) ma jego armię, obrót, wysokość (niżej, wyżej, na ziemi) i usuwanie, kolor semafora i linię przy
 nim, a dla fortyfikacji, kopalni i cytadeli - działo w każdym gnieździe (puste, działo albo
 rakiety; gdy panel jest otwarty, gniazda są ponumerowane na murze, a kliknięcie działa otwiera panel
-jego budowli). Prawy przycisk gdzie indziej albo Esc go zamyka.
+jego budowli). Prawy przycisk gdzie indziej albo Esc go zamyka. W każdym panelu - obiektu,
+przyjazdów, fabryki - wiersz stanu u góry mówi, co robi wiersz panelu pod myszą.
 
 ![Panel fortyfikacji](img/editor-fort-panel-pl.jpg)
 
@@ -245,7 +251,9 @@ rozmiaru: przycisk menu → **NOWA MAPA**:
 
 ![Okno Nowa mapa](img/new-map-pl.jpg)
 
-- **Folder** - nazwa mapy: małe litery, cyfry i `_` (np. `most_1`). Mapa to `maps\most_1\most_1.map`.
+- **Nazwa** - nazwa mapy, która jest też jej folderem w `maps\` (np. `most_1`: mapa to
+  `maps\most_1\most_1.map`). Do 64 liter angielskich, cyfr, spacji i znaków dozwolonych w nazwach
+  plików Windows.
 - **Teren** - *pusta mapa* z jednej tekstury (trawa, piasek, śnieg, skała ... - płaska i goła, do
   malowania), *łąka* albo teren jednej z map kampanii.
 - **Rozmiar** - dla pustej mapy albo łąki: od 512 do 4096 px w każdą stronę co 256 (`-` i `+`) albo
@@ -358,7 +366,9 @@ W przyjeździe każdy wiersz to jedna rzecz (nowy to pociąg naszych, który jed
 - **KTO** - nasi, wróg, neutralni albo piraci;
 - **SKLAD** - w kolejności pociągu: **+ WAGON** dodaje na koniec z palety Pojazdy, **SZABLON...**
   pokazuje listę składów autorów z nazwami; kliknięcie wagonu go wybiera - **<** i **>** go przesuwają,
-  **USUN** go zabiera. Lokomotywa może stać w dowolnym miejscu składu;
+  **USUN** go zabiera. Przytrzymaj wagon (albo **+ WAGON**), a nad nim otworzą się jednostki: puść
+  na jednej, by wstawić ją w miejsce tego wagonu (albo dodać). Lokomotywa może stać w dowolnym miejscu
+  składu;
 - **WJAZD** - **WSKAZ**, potem kliknij główną linię **za zachodnią krawędzią**: tam powstaje
   pociąg;
 - **KIEDY** - **NA POCZATKU**, **PO** czasie, **GDY GRACZ NIE MA POCIAGU** albo **GDY GRACZ ZAPLACI**
@@ -434,71 +444,16 @@ skrypt mapy każe jej zbudować. Ich lista i ekran każdego, jak w panelu przyja
 wagony po kolei - lokomotywa gdziekolwiek -, **+ WAGON**, **SZABLON...** pociągi autorów), **KIEDY**
 (**O CZASIE**, **PO INNYM** - tyle po zrobieniu pociągu przed nim na liście - albo **GDY** zachodzi
 warunek, np. gracz ma mniej pociągów niż n, nie przed czasem), **POWTORZ** (raz, n razy albo bez końca,
-co tyle po ostatnim) i **POTEM** (wroga atakuje, pilnuje punktu albo patroluje; pozostałych stoi, jedzie
+co tyle - **PO ZROBIENIU OSTATNIEGO** albo **PO STRACIE**) i **POTEM** (wroga atakuje, pilnuje punktu albo patroluje; pozostałych stoi, jedzie
 do punktu albo patroluje). Pociąg twój, neutralnych albo piratów powstaje wagon po wagonie, gdy fabryka
 jest wolna, a jego strona ma pieniądze na następny wagon (cena pod każdym), niezależnie od listy fabryki;
 wróg buduje po jednym, gdy atakuje mniej jego pociągów, niż pozwala **AI...**. **AI...** ma pozostałe
 ustawienia wroga od autorów, każde z linijką opisu: czy stracony pociąg startowy jest budowany na nowo i
-po jakim czasie, wypady pociągów startowych, od kiedy są wypady i ile trwają, mądry atak. Wszystko poza
+po jakim czasie, wypady pociągów startowych, od kiedy są wypady i ile trwają, mądry atak oraz to, czy
+jego działa strzelają do pociągów neutralnych (**POCIAGI NEUTR.: STRZELA DO NICH** albo **GDY OBERWIE**). Wszystko poza
 pociągiem raz o czasie wymaga mapy z przyjazdami (starsze mapy: PRZESTAW w panelu przyjazdów).
 
 ![Plan fabryki wroga](img/factory-plan-pl.jpg)
-
-**Rozkazy pociągu**: prawy przycisk na pociągu, **ROZKAZY**: twoje, neutralne i pirackie **JEDZ DO...**
-punktu albo **PATROL...** między miejscem, gdzie stoją, a punktem; wroga (z wagonem z działem - jego AI z
-samej lokomotywy robi taran) **ATAK**, **PILNUJ...** punktu albo **PATROL...**. Punkt to kliknięcie na torze.
-ROZKAZY są tylko w mapie z przyjazdami; mapa ze starszej wersji ma sam **PATROL**, dopóki w panelu
-Przyjazdy nie wybierzesz **PRZESTAW NA PRZYJAZDY**.
-
-Pociąg stojący na linii, która pcha (wyjazd z fabryki, tor punktu naprawczego, linia semafora), na starcie
-poziomu jedzie do końca tej linii i tam zaczyna rozkaz. Punkt, do którego pociąg nie dojedzie - za linią
-jednokierunkową, na którą nie może wjechać - edytor podaje przy wydaniu rozkazu i w opisie wiersza ROZKAZY
-w pasku stanu: w grze taki pociąg dojeżdża do linii i staje.
-
-**Zasady walki armii**: panel jednostki neutralnych albo piratów ma **W WALCE: ODPOWIADA NAPASTNIKOM** (zwyczaj
-neutralnych: strzelają tylko do tego, kto ich trafił) albo **WSZYSCY** (zwyczaj piratów) - dla całej armii.
-**STRZELA** jest przy każdej uzbrojonej jednostce: samo albo na rozkaz (neutralna: w odpowiedzi albo nigdy).
-
-**Czerwone światła**: panel każdego pociągu ma **NA CZERWONYM:
-STAJE** (jak każdy pociąg) albo **JEDZIE** - wtedy każdy pociąg tej armii może jechać linią jednokierunkową
-pod prąd, tam gdzie twoje pociągi i pociągi wroga są zatrzymywane (wyjazd z poziomu wypuszcza go też poza
-mapę, na ukryty tor). Jedna zasada dla całej armii.
-
-**Co robi wiersz**: w panelu pociągu albo budynku, w panelu przyjazdów i w panelu fabryki pasek stanu u góry
-mówi, co robi wiersz pod myszą (a przy ROZKAZACH - czemu rozkaz nie może być wykonany). **Przytrzymanie**:
-przytrzymaj wagon przyjazdu albo pociągu fabryki (albo **+ WAGON**) - nad nim otwierają się jednostki; puść na
-jednej, by wstawić ją w miejsce wagonu (albo dodać). Krótkie kliknięcie działa jak dotąd.
-
-**Rozkazy dla każdej armii**: pociąg każdej armii ma **ROZKAZY: JEDZ DO... / PATROL...** i **WALKA: ATAK /
-PILNUJ... / OBSZAR...**. ATAK, PILNUJ i PATROL wroga to zadania jego AI, jak dotąd; u pozostałych ATAK poluje na
-najbliższy wrogi pociąg, jeden po drugim, a PILNUJ jedzie na punkt i go trzyma (bierze wrogi pociąg w promieniu
-150 px). **OBSZAR...** jest inny: pociąg nie jedzie nigdzie - stoi tam, gdzie stoi, i broni strefy wokół
-klikniętego punktu (gdziekolwiek na mapie, także z dala od pociągu). Gdy wrogi pociąg wjedzie do strefy albo
-zbliży się do niej na 120 px, pociąg rusza i atakuje najbliższego; wiersz **OBSZAR** ustawia promień
-(- 300 PX +) i **WRACA** (na swoje miejsce, gdy cel zginie albo odjedzie 240 px za strefę) albo **SCIGA** (za
-celem, aż zginie, potem na swoje miejsce). Zaznaczony pociąg pokazuje swoją strefę jako okrąg i kropkowaną
-linię od siebie do jej środka. Wrogi - według zasad mapy: neutralni nie zaczynają walki.
-
-**Cel i start**: **CEL: WSKAŻ...** i kliknięcie jednostki albo budynku innej armii (fort: jedno z jego dział)
-- pociąg atakuje go po starcie poziomu zamiast innego rozkazu; pociąg wroga przechodzi potem do swojego AI,
-pozostałe stają. **START: OD RAZU** albo **PO n S** wstrzymuje rozkaz do tego czasu. Ekran **AI...** fabryki
-wroga: **POCIĄGI NEUTR.: STRZELA DO NICH** (działa wroga strzelają do pociągów neutralnych) albo **GDY OBERWIE**.
-
-**Odbudowa po stracie**: pociąg wroga, neutralnych albo piratów z rozkazem ma **ODBUDOWA: NIE / RAZ / 3 RAZY
-/ ZAWSZE** i **ODBUDOWA ZA** (sekundy po stracie): gdy jego lokomotywa zostanie zniszczona albo przejęta, AI
-wroga (w pierwszej wolnej fabryce) albo najbliższa fabryka jego armii buduje ten sam pociąg i daje mu ten sam
-rozkaz. W planie fabryki pociąg powtarzany n razy albo bez końca przychodzi **PO ZROBIENIU OSTATNIEGO** albo po
-**STRACIE** ostatniego. Nie dla twojej fabryki i twoich pociągów; mapa z przyjazdami. Pociąg piratów potrzebuje
-lokomotywy 10: piracką lokomotywę 5 skrypty zabierają na starcie (oznacza posiłki).
-
-**Zdobywanie**: neutralna fabryka albo punkt naprawczy staje się twój, gdy podjedzie do niego twój pociąg
-(fort albo kopalnia - gdy nie ma już ich dział).
-
-**Neutralni i piraci**: neutralni (armia 2) nigdy nie strzelają pierwsi. Gdy ktoś trafi neutralne działo,
-fort albo pociąg, ono i neutralni, którzy to widzą, odpowiadają tylko tej stronie - do końca misji, a
-ona może wtedy strzelać do nich. W panelu uzbrojonego neutralnego obiektu **STRZELA: W ODPOWIEDZI**
-(tak jest od początku) albo **NIGDY**. Piraci (armia 3) walczą ze wszystkimi stronami, a wszyscy z nimi
-(**W WALCE: PRZECIW WSZYSTKIM**). Tak gra mapa edytora; misje kampanii mają dawne zasady gry.
 
 ### 7. Wróg
 
@@ -544,12 +499,64 @@ ona może wtedy strzelać do nich. W panelu uzbrojonego neutralnego obiektu **ST
   (lokomotywa tyłem w środku pociągu, działo na końcu), przeciąganie kładzie pociąg na torze pod
   kursorem - gdy się tam nie mieści (za krótki ślepy tor, inny pociąg), zostaje, a wiersz stanu mówi
   dlaczego. Pociąg bez **lokomotywy** nie pojedzie.
+
+  ![Rząd Pojazdów nad paskiem](img/vehicles-strip-pl.jpg)
+
 - **Patrol**: panel pociągu (prawy przycisk) → ROZKAZY: **PATROL...**, potem kliknij drugi koniec na
-  torze. Pociąg jeździ tam i z powrotem między miejscem, gdzie stoi, a tym punktem.
+  torze. Pociąg jeździ tam i z powrotem między miejscem, gdzie stoi, a tym punktem. Wskaż go w mapie:
+  za wjazd na mapę, na którego linię jednokierunkową żaden pociąg nie wjedzie pod prąd, pociąg nie
+  pojedzie - wiersz stanu to mówi.
 - Więcej pociągów wroga: kolejne pociągi na mapie z rozkazami, przyjazdy wroga (krok 5) i pociągi,
   które buduje jego fabryka - jej plan (krok 6). Do tych ostatnich wróg potrzebuje fabryki: postaw ją
   (klawisz 5) na własnym ślepym końcu i `A` na wroga.
 - **Skrzynka z pieniedzmi** (listwa) leży na torze: jednostka gracza, która ją zbierze, dostaje 100.
+
+**Panel pociągu** (prawy przycisk na jednym z jego wagonów) - poza armią, obrotem, odczepianiem i
+usuwaniem mapa z przyjazdami daje mu te wiersze (mapa ze starszej wersji ma sam **PATROL**, dopóki w
+panelu Przyjazdy nie wybierzesz **PRZESTAW NA PRZYJAZDY**):
+
+- **ROZKAZY: JEDZ DO...** punktu albo **PATROL...** między miejscem, gdzie pociąg stoi, a punktem, i
+  **WALKA: ATAK**, **PILNUJ...** punktu albo **OBSZAR...** - dla pociągu każdej armii; punkt to
+  kliknięcie na torze. ATAK, PILNUJ i PATROL wroga to zadania jego AI (z wagonem z działem - jego AI z
+  samej lokomotywy robi taran); u pozostałych ATAK poluje na najbliższy wrogi pociąg, jeden po drugim,
+  a PILNUJ jedzie na punkt i go trzyma (bierze wrogi pociąg w promieniu 150 px).
+- **OBSZAR...** jest inny: pociąg nie jedzie nigdzie - stoi tam, gdzie stoi, i broni strefy wokół
+  klikniętego punktu (gdziekolwiek na mapie, także z dala od pociągu). Gdy wrogi pociąg wjedzie do
+  strefy albo zbliży się do niej na 120 px, pociąg rusza i atakuje najbliższego; wiersz **OBSZAR**
+  ustawia promień (- 300 PX +) i **WRACA** (na swoje miejsce, gdy cel zginie albo odjedzie 240 px za
+  strefę) albo **SCIGA** (za celem, aż zginie, potem na swoje miejsce). Zaznaczony pociąg pokazuje swoją
+  strefę jako okrąg i kropkowaną linię od siebie do jej środka. Wrogi - według zasad mapy: neutralni nie
+  zaczynają walki.
+- **CEL: WSKAZ...** i kliknięcie jednostki albo budynku innej armii (fortyfikacja: jedno z jej dział) -
+  pociąg atakuje go po starcie poziomu zamiast innego rozkazu; pociąg wroga przechodzi potem do swojego
+  AI, pozostałe stają. **START: OD RAZU** albo **PO n S** wstrzymuje rozkaz do tego czasu.
+- **ODBUDOWA: NIE / RAZ / 3 RAZY / ZAWSZE** i **ODBUDOWA ZA** (sekundy po stracie), dla pociągu wroga,
+  neutralnych albo piratów z rozkazem: gdy jego lokomotywa zostanie zniszczona albo przejęta, AI wroga
+  (w pierwszej wolnej fabryce) albo najbliższa fabryka jego armii buduje ten sam pociąg i daje mu ten
+  sam rozkaz. Nie dla twoich pociągów. Pociąg piratów potrzebuje lokomotywy 10: piracką lokomotywę 5
+  skrypty zabierają na starcie (oznacza posiłki).
+- **NA CZERWONYM: STAJE** (jak każdy pociąg) albo **JEDZIE** - wtedy każdy pociąg tej armii może jechać
+  linią jednokierunkową pod prąd, tam gdzie twoje pociągi i pociągi wroga są zatrzymywane (wyjazd z
+  poziomu wypuszcza go też poza mapę, na ukryty tor). Jedna zasada dla całej armii.
+- **STRZELA: SAMO** albo **NA ROZKAZ** - ten wiersz ma każda uzbrojona jednostka (neutralna: **W
+  ODPOWIEDZI** albo **NIGDY**).
+
+![Panel pociągu](img/train-panel-pl.jpg)
+
+![Pociąg pilnujący obszaru](img/area-watch-pl.jpg)
+
+Pociąg stojący na linii, która pcha (wyjazd z fabryki, tor punktu naprawczego, linia semafora), na
+starcie poziomu jedzie do końca tej linii i tam zaczyna rozkaz. Punkt, do którego pociąg nie dojedzie -
+za linią jednokierunkową, na którą nie może wjechać - edytor podaje przy wydaniu rozkazu i w opisie
+wiersza ROZKAZY w wierszu stanu: w grze taki pociąg dojeżdża do linii i staje.
+
+**Armie.** Na mapie edytora neutralni (armia 2) nigdy nie strzelają pierwsi: gdy ktoś trafi neutralne
+działo, fortyfikację albo pociąg, ono i neutralni, którzy to widzą, odpowiadają tylko tej stronie - do
+końca misji, a ona może wtedy strzelać do nich. Piraci (armia 3) walczą ze wszystkimi stronami, a
+wszyscy z nimi. Panel jednostki neutralnych albo piratów zmienia to dla całej jej armii: **W WALCE:
+ODPOWIADA NAPASTNIKOM** (zwyczaj neutralnych) albo **WSZYSCY** (zwyczaj piratów). Misje kampanii mają
+dawne zasady gry. Neutralna fabryka albo punkt naprawczy staje się twój, gdy podjedzie do niego twój
+pociąg (fortyfikacja albo kopalnia - gdy nie ma już ich dział).
 
 Pamiętaj o zasadzie gry: fabryka, punkt naprawczy i fortyfikacja stoją **na torze albo tuż przy
 nim**.
@@ -574,7 +581,7 @@ staje - gdy padną wieże jego armii, albo nigdy. **Scylla** (bagno) na ukośnym
 15 sekund. Gdy padną wieże piratów, świdry się łamią. **Region** (listwa): przeciągnij jego prostokąt; jego panel ustawia mgłę (mgła, pył,
 opar, poświata) i rozpryski, nad nim albo nad całą mapą; stworzenie postawione w środku trzyma się go. Klik w środku regionu, gdzie nic innego nie stoi, zaznacza go (narzędzie Usun i `Del` go usuwają, prawy przycisk otwiera jego panel).
 Mgła (wiersz **NAD** osobno) jest najgęstsza nisko, obiekty z niej wystają: nad regionem przybiera
-kształt zagłębienia (dna jeziora), na płaskim terenie to zabarwiony prostokąt; **NAD: CAŁĄ MAPĄ** robi z
+kształt zagłębienia (dna jeziora), na płaskim terenie to zabarwiony prostokąt; **NAD: CALA MAPA** robi z
 niej mgiełkę nad całym widokiem, jak w misjach 7, 13 i 18 (zamienia też wybuchy regionu w pluski na całej
 mapie). Temat **Efekty** we Wszystkich obiektach ma region
 jasnej wody i region z kręgami w deszczu; wodę widać tylko tam, gdzie teren pod nią jest niżej niż
@@ -582,19 +589,21 @@ region, więc region jasnej wody stawia się nad terenem (zob. 3. Woda, bagno, l
 
 ### 9. Zobacz, jak działa
 
-Menu → **TEST BEZ ZAPISU** (albo `Ctrl+R`; szybki test tutaj): mapa działa w edytorze taka, jaka jest teraz, zapisana czy
+Menu → **TEST BEZ ZAPISU** (albo `Ctrl+R`): mapa działa w edytorze taka, jaka jest teraz, zapisana czy
 nie, tak jak w grze - pociągi jeżdżą, działa strzelają, przyjeżdżają pociągi z panelu Przyjazdy. Nic
 nie pyta: twoja mapa zapisuje się najpierw, a POLIGON, szablon, mapa kampanii i nowa mapa bez nazwy
 działają z ukrytej kopii, więc zostają, jakie były. `Ctrl+R` wraca do edytora z mapą taką, jak przed
 uruchomieniem - niezapisane zmiany dalej niezapisane, `Ctrl+Z` cofa je jak przedtem -, tak samo menu gry
-pod `Esc` (WYJDŹ Z GRY → WRÓĆ DO EDYTORA albo TAK) i koniec poziomu (wygrana albo przegrana).
+pod `Esc` (WYJDZ Z GRY → WROC DO EDYTORA albo TAK) i koniec poziomu (wygrana albo przegrana).
 
 ### 10. Ustawienia misji i teksty
 
 Menu → **USTAWIENIA MISJI** (albo zębatka na listwie):
 
-- **Tytuł** na stronie własnych map i **nagłówek odprawy**;
-- **pieniądze na początku**; **pora dnia na początku** (dzień, wieczór, noc, ranek - potem płynie dalej,
+- **Tytuł** na stronie własnych map i **nagłówek odprawy** (na początku nazwa mapy wielkimi
+  literami);
+- **pieniądze na początku** - nowa mapa zaczyna z 0: daj graczowi trochę (np. 1000), inaczej fabryka
+  niczego nie zbuduje; **pora dnia na początku** (dzień, wieczór, noc, ranek - potem płynie dalej,
   po 5 minut);
 - **pogoda** - deszcz, śnieg, chmury, chmury burzowe albo meteoryty - i **jak często**: nigdy, od czasu
   do czasu (przychodzi i odchodzi, mniej więcej co pół minuty) albo cały czas;
@@ -686,7 +695,7 @@ rzadziej stawiane rzeczy, na końcu dwa panele.
 | `[` `]` | następny obiekt rzędu nad paskiem, tekstura |
 | `<` `>` | odstęp dekoracji |
 | kółko, `+` `-` | rozmiar pędzla (Wysokosc terenu, Dekoracje, Malowanie, Woda) |
-| M | pędzel terenu: podnieś, obniż, wyrównaj, wygładź |
+| M | Wysokosc terenu: następny tryb (podnieś/obniż, wyrównaj, wygładź, rampa, nierówności) |
 | H | wysokości terenu (poziomice) przy każdym narzędziu |
 | B | podsypka nowych torów |
 | V | rodzaj nowych szyn |
@@ -695,7 +704,7 @@ rzadziej stawiane rzeczy, na końcu dwa panele.
 | W | woda, bagno albo lawa |
 | S | semafory zaznaczonej linii (narzędzie Linia jednokierunkowa) |
 | Shift (z pędzlem) | usuwanie |
-| Esc, prawy przycisk | powrót do Zaznacz; koniec linii toru |
+| Esc, prawy przycisk | powrót do Zaznacz; anulowanie zaczętego odcinka toru; zamknięcie panelu. Esc, gdy nic nie jest w toku: menu edytora |
 | środkowy przycisk | przeciąganie mapy; w narzędziu Tory kliknięcie usuwa szynę pod kursorem (także na rozjeździe) |
 | Ctrl+R | TEST BEZ ZAPISU: uruchom mapę tutaj / wróć do edytora |
 | F1 | pomoc, od spisu treści |

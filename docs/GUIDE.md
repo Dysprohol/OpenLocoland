@@ -1,7 +1,6 @@
 # OpenLocoland - player's guide
 
-Version 0.2 - the first regular release; the map editor is still work in progress. [Polish version:
-PRZEWODNIK.md](PRZEWODNIK.md)
+Version 0.2.5; the map editor is still work in progress. [Polish version: PRZEWODNIK.md](PRZEWODNIK.md)
 
 **OpenLocoland** is an unofficial, fan-made new edition of **Locoland** (Gromada / ESDigital
 Games, 2003): the original game runs with fixes for today's Windows, a few improvements, a page
@@ -170,7 +169,12 @@ What you see:
   Outside the map there is a dim grid and the map's edge has a frame (you can scroll 300 px past
   the edge: the track goes on out there).
 - **The bar** at the bottom in the look of the game's state bar: tools 1 - 0 in its slots, more
-  tools in the **strip** above it. The chosen one is framed.
+  tools in the **strip** above it. The chosen one is framed. Above the strip, the chosen tool has a
+  **row** of its own settings: the kind of rail and its ramp for Track, the textures or the gravel bed
+  for Paint the ground, the list of cars for Vehicles, the theme's objects for All objects.
+
+  ![The Track tool's row above the bar](img/track-row-en.jpg)
+
 - **The status line** at the top: the tool (or the one under the mouse), the undo and redo counts,
   "not saved" and the last message - why something could not be done is always written there.
 - **Hints**: when the cursor rests a moment, a few words beside it give the keys of the tool (or of the
@@ -178,13 +182,13 @@ What you see:
   takes them away. **HINTS UNDER THE CURSOR** at the top of the Menu panel turns them off and on.
 - **Music** in the top right corner: the file's name, `|<` the one before, `>` plays it while you edit
   (`||` stops it), `>|` the next - to listen through the game's music and pick the map's in Mission
-  settings. Off at first; the editor remembers whether it played and which file. Quick test and Play
-  the map play the map's own music.
+  settings. Off at first; the editor remembers whether it played and which file. **QUICK TEST, NO
+  SAVE** and **PLAY THE SAVED MAP** play the map's own music.
 - **The ? and menu buttons** at the left end of the bar (where the game has its pause button).
-  **?** (or F1) opens the help: twenty pages with everything of this chapter in short. It starts on
+  **?** (or F1) opens the help: 29 pages with everything of this chapter in short. It starts on
   its **contents**: the categories - BASICS; TRACK AND TRAINS; OBJECTS; MISSION, SAVING; GROUND;
   ARRIVALS, FACTORIES - on the left, the pages of the one under the mouse on the right - a click opens
-  one. A page has its category for the title and its number (13 / 20); the arrows, Page Up / Down and
+  one. A page has its category for the title and its number (5 / 29); the arrows, Page Up / Down and
   the wheel turn the pages, and **CONTENTS**, `Esc` or the right button go back to the contents.
 
   ![The help's contents](img/help-contents-en.jpg)
@@ -194,7 +198,8 @@ What you see:
   The **menu button** opens the editor's menu with every command - **NEW MAP**, **LOAD MAP**, **SAVE
   MAP**, **EXPORT MAP**, **IMPORT MAP**, **RENAME OR DELETE**, **MISSION SETTINGS**, **MAP SIZE**, **PLAY THE SAVED MAP**,
   **UNDO**, **REDO**, **QUICK TEST, NO SAVE**, **BACK TO THE MENU**, **EXIT THE GAME**; the status line
-  says what the one under the mouse does.
+  says what the one under the mouse does. `Esc` opens it too, when no panel is open and nothing is
+  under way.
 
   ![The editor's menu](img/editor-menu-en.jpg)
 
@@ -226,7 +231,9 @@ replacing the flag there. R / E turn a pole's flag, Shift+R / E a station's.
 The **object's panel** (right button) has its army, turning, its height (lower, raise, on the ground) and delete, a semaphore's colour and
 its line, and - for a fort, a mining plant or a citadel - the gun in each of its sockets (empty, a
 cannon or missiles; while the panel is open the sockets are numbered on the wall, and a click on a
-gun opens its host's panel). The right button elsewhere or Esc closes it.
+gun opens its host's panel). The right button elsewhere or Esc closes it. In every panel - an
+object's, the Arrivals panel, a factory's - the status line at the top says what the row under the
+mouse does.
 
 ![A fort's panel](img/editor-fort-panel-en.jpg)
 
@@ -244,8 +251,9 @@ ground or size, Menu button → **NEW MAP**:
 
 ![The New map dialog](img/new-map-en.jpg)
 
-- **Folder** - the map's name: small letters, digits and `_` (e.g. `bridge_1`). The map is
-  `maps\bridge_1\bridge_1.map`.
+- **Name** - the map's name, which is also its folder in `maps\` (e.g. `bridge_1`: the map is
+  `maps\bridge_1\bridge_1.map`). Up to 64 English letters, digits, spaces and the signs Windows allows
+  in file names.
 - **Ground** - *an empty map* of one texture (grass, sand, snow, rock ... - flat and bare, to paint
   on), *a meadow*, or the terrain of one of the campaign's maps.
 - **Size** - for an empty map or a meadow: from 512 to 4096 px each way in steps of 256 (`-` and
@@ -358,7 +366,8 @@ An arrival has one thing a row (a new one comes as a train of ours that drives t
 - **WHO** - ours, the enemy, the neutrals or the pirates;
 - **CARS** - in the train's order: **+ CAR** adds one at the end from the Vehicles palette,
   **TEMPLATE...** lists the authors' trains by name; a click on a car chooses it - **<** and **>** move
-  it, **REMOVE** takes it away. The locomotive may stand anywhere in the train;
+  it, **REMOVE** takes it away. Hold a car (or **+ CAR**) down and the units open above it: let go on
+  one to put it in that car's place (or add it). The locomotive may stand anywhere in the train;
 - **ENTRY** - **PICK**, then click the main line **past the west edge**: the train is made
   there;
 - **WHEN** - **AT THE START**, **AFTER** a time, **WHEN THE PLAYER HAS NO TRAIN** or **WHEN THE PLAYER
@@ -435,75 +444,18 @@ pirate one the trains the map's script orders it to build. A list of them, and a
 like the Arrivals panel: the **TRAIN** (its cars in order - the locomotive anywhere -, **+ CAR**,
 **TEMPLATE...** the authors' trains), **WHEN** (**AT** a time, **AFTER ANOTHER** - so long after the
 train before it in the list is made -, or **WHILE** a condition holds, e.g. the player has fewer
-trains than n, not before a time), **REPEAT** (once, n times or without end, every so long after the
-last one) and **THEN** (the enemy's attacks, guards a point or patrols; the others' stay, drive to a
-point or patrol). A train of yours, the neutrals' or the pirates' is built car by car when the factory
-is free and its side has the money for the next car (the price under each), whatever the factory's
-list; the enemy builds one at a time while fewer of its trains attack than **AI...** allows. **AI...**
-has the authors' other settings of the enemy, a line on each: whether a lost start train is built
-again and after how long, the start trains' raids, when raids begin and how long they last, the clever
-attack. Everything except a train at a time once needs a map that runs arrivals (older maps: CONVERT
-in the Arrivals panel).
+trains than n, not before a time), **REPEAT** (once, n times or without end, every so long - **AFTER
+THE LAST IS MADE** or after **ITS LOSS**) and **THEN** (the enemy's attacks, guards a point
+or patrols; the others' stay, drive to a point or patrol). A train of yours, the neutrals' or the
+pirates' is built car by car when the factory is free and its side has the money for the next car (the
+price under each), whatever the factory's list; the enemy builds one at a time while fewer of its trains
+attack than **AI...** allows. **AI...** has the authors' other settings of the enemy, a line on each:
+whether a lost start train is built again and after how long, the start trains' raids, when raids begin
+and how long they last, the clever attack, and whether its guns fire at neutral trains (**NEUTRAL
+TRAINS: FIRES AT THEM** or **ONLY WHEN HIT**). Everything except a train at a time once needs a map
+that runs arrivals (older maps: CONVERT in the Arrivals panel).
 
 ![The enemy factory's plan](img/factory-plan-en.jpg)
-
-**Orders of a train**: the right button on a train, **ORDERS**: yours, the neutrals' and the pirates'
-**DRIVE TO...** a point or **PATROL...** between where they stand and a point; the enemy's (with a gun car -
-its AI makes a bare locomotive a ram) **ATTACK**, **GUARD...** a point or **PATROL...**. The point is a click
-on the track. ORDERS are there only in a map that runs arrivals; a map made with an older version has
-**PATROL** only, until **CONVERT TO ARRIVALS** in the Arrivals panel.
-
-A train standing on a line that pushes (a factory's exit, a repair point's leg, a post's line) is pushed to
-the line's end when the level starts, and its order begins there. A point the train cannot reach - past a
-one-way line it may not enter - is named when the order is given and in the ORDERS row's text in the
-status line: in play such a train drives up to the line and stops.
-
-**Fight rules of the armies**: a neutral's or a pirate's panel has **IN A FIGHT: ANSWERS ATTACKERS** (the neutrals'
-way: they fire only at whoever hit them) or **ALL SIDES** (the pirates' way) - for the whole army. **IT FIRES** is
-there for every armed unit: on its own or only when told (a neutral: when attacked or never).
-
-**Red lights**: every train's panel has **AT RED
-LIGHTS: STOPS** (as every train) or **DRIVES ON** - then every train of that army may run along a one-way
-line against its arrow, where your and the enemy's trains are held (the level's exit lets them off the map
-too, onto the hidden track). One rule for the whole army.
-
-**What a row does**: in a train's or building's panel, the Arrivals panel and a factory's panel the status line
-at the top says what the row under the mouse does (and, for ORDERS, why the order cannot be carried out).
-**Click-and-hold**: hold a car of an arrival or of a factory's train (or **+ CAR**) down - the units open above
-it; let go on one to put it in that car's place (or add it). A short click works as before.
-
-**Orders for every army**: a train of any army has **ORDERS: DRIVE TO... / PATROL...** and **FIGHTS: ATTACK /
-GUARD... / AREA...**. The enemy's ATTACK, GUARD and PATROL are its AI's, as before; for the others ATTACK hunts
-the nearest hostile train, one after another, and GUARD goes to a point and holds it (takes a hostile train
-within 150 px). **AREA...** is different: the train goes nowhere - it stays where it stands and defends the area
-round the point clicked (anywhere on the map, far from the train too). When a hostile train enters the area or
-comes within 120 px of it, the train sets off and attacks the nearest one; the **AREA** row sets the radius
-(- 300 PX +) and **RETURNS** (back to its own place once the target is gone or 240 px out of the area) or
-**CHASES** (after the target until it is gone, then back to its place). The selected train shows its area as a
-ring and a dotted line from the train to its middle. Hostile means by the map's rules: the neutrals start no
-fight.
-
-**Target and start**: **TARGET: PICK...** and a click on a unit or building of another army (a fort: one of
-its guns) - the train attacks it when the level starts, in place of its other order; the enemy's train then
-goes to its AI, the others' stay. **STARTS: AT ONCE** or **AFTER n S** holds the order until then. The enemy
-factory's **AI...** screen: **NEUTRAL TRAINS: FIRES AT THEM** (the enemy's guns fire at neutral trains) or
-**ONLY WHEN HIT**.
-
-**Rebuilt when lost**: an enemy, neutral or pirate train with an order has **REBUILT: NO / ONCE / 3 TIMES /
-ALWAYS** and **REBUILT IN** (seconds after the loss): when its locomotive is destroyed or taken, the enemy's
-AI (in its first free factory) or the nearest factory of its army builds the same train again and gives it
-the same order. In a factory's plan a train repeated n times or without end comes **AFTER THE LAST IS MADE**
-or when the last one is **LOST**. Not for your own factory and trains; a map that runs arrivals. A pirate train
-needs the locomotive 10: the scripts take a pirate locomotive 5 away at the start (it marks the reinforcement).
-
-**Capturing**: a neutral factory or repair point becomes yours when one of your trains comes close to it
-(a fort or a mining plant once its guns are gone).
-
-**Neutrals and pirates**: the neutrals (army 2) never fire first. When a side hits a neutral gun, fort
-or train, it and the neutrals that see it answer that side only - to the end of the mission, and that
-side may fire at them then. The panel of an armed neutral object has **IT FIRES: WHEN ATTACKED** (as it
-starts) or **NEVER**. The pirates (army 3) fight every side, and every side fights them (**IN A FIGHT:
-AGAINST ALL SIDES**). A map of the editor plays so; the campaign's missions keep the game's old rules.
 
 ### 7. The enemy
 
@@ -549,12 +501,64 @@ AGAINST ALL SIDES**). A map of the editor plays so; the campaign's missions keep
   middle, a gun car at the end), a drag lays the train on the track under the cursor - when it does not
   fit there (a dead end too short, another train) it stays and the status line says why. A train needs a
   **locomotive** to move.
+
+  ![The Vehicles row above the bar](img/vehicles-strip-en.jpg)
+
 - **A patrol**: the train's panel (right button) → ORDERS: **PATROL...**, then click the far end on
-  the track. The train drives to and fro between where it stands and that point.
+  the track. The train drives to and fro between where it stands and that point. Pick it inside the
+  map: past the map's entry, whose one-way line no train may enter against its arrow, the train cannot
+  go - the status line says so.
 - More enemy trains: more trains on the map with their orders, the enemy's arrivals (step 5) and the
   trains the enemy's factory builds - its plan (step 6). For those the enemy needs a factory: put one
   (key 5) at a dead end of its own and `A` to the enemy.
 - A **money crate** (strip) lies on the track: a unit of the player that takes it gets 100.
+
+**A train's panel** (the right button on one of its cars) - besides its army, turning, uncoupling and
+delete, a map that runs arrivals gives it these rows (a map made with an older version has **PATROL**
+only, until **CONVERT TO ARRIVALS** in the Arrivals panel):
+
+- **ORDERS: DRIVE TO...** a point or **PATROL...** between where the train stands and a point, and
+  **FIGHTS: ATTACK**, **GUARD...** a point or **AREA...** - for a train of any army; a point is a click
+  on the track. The enemy's ATTACK, GUARD and PATROL are its AI's (with a gun car - its AI makes a
+  bare locomotive a ram); for the others ATTACK hunts the nearest hostile train, one after another, and
+  GUARD goes to the point and holds it (it takes a hostile train within 150 px).
+- **AREA...** is different: the train goes nowhere - it stays where it stands and defends the area
+  round the point clicked (anywhere on the map, far from the train too). When a hostile train enters
+  the area or comes within 120 px of it, the train sets off and attacks the nearest one; the **AREA**
+  row sets the radius (- 300 PX +) and **RETURNS** (back to its own place once the target is gone or
+  240 px out of the area) or **CHASES** (after the target until it is gone, then back to its place).
+  The selected train shows its area as a ring and a dotted line from the train to its middle. Hostile
+  means by the map's rules: the neutrals start no fight.
+- **TARGET: PICK...** and a click on a unit or building of another army (a fort: one of its guns) -
+  the train attacks it when the level starts, in place of its other order; the enemy's train then goes
+  to its AI, the others' stay. **STARTS: AT ONCE** or **AFTER n S** holds the order until then.
+- **REBUILT: NO / ONCE / 3 TIMES / ALWAYS** and **REBUILT IN** (seconds after the loss), for an enemy,
+  neutral or pirate train with an order: when its locomotive is destroyed or taken, the enemy's AI (in
+  its first free factory) or the nearest factory of its army builds the same train again and gives it
+  the same order. Not for your own trains. A pirate train needs the locomotive 10: the scripts take a
+  pirate locomotive 5 away at the start (it marks the reinforcement).
+- **AT RED LIGHTS: STOPS** (as every train) or **DRIVES ON** - then every train of that army may run
+  along a one-way line against its arrow, where your and the enemy's trains are held (the level's exit
+  lets them off the map too, onto the hidden track). One rule for the whole army.
+- **IT FIRES: ON ITS OWN** or **ONLY WHEN TOLD** - every armed unit has this row (a neutral one:
+  **WHEN ATTACKED** or **NEVER**).
+
+![A train's panel](img/train-panel-en.jpg)
+
+![A train guarding an area](img/area-watch-en.jpg)
+
+A train standing on a line that pushes (a factory's exit, a repair point's leg, a post's line) is pushed
+to the line's end when the level starts, and its order begins there. A point the train cannot reach -
+past a one-way line it may not enter - is named when the order is given and in the ORDERS row's text in
+the status line: in play such a train drives up to the line and stops.
+
+**The armies.** On a map of the editor the neutrals (army 2) never fire first: when a side hits a
+neutral gun, fort or train, it and the neutrals that see it answer that side only - to the end of the
+mission, and that side may fire at them then. The pirates (army 3) fight every side, and every side
+fights them. A neutral's or a pirate's panel changes that for its whole army: **IN A FIGHT: ANSWERS
+ATTACKERS** (the neutrals' way) or **ALL SIDES** (the pirates' way). The campaign's missions keep the
+game's old rules. A neutral factory or repair point becomes yours when one of your trains comes close
+to it (a fort or a mining plant once its guns are gone).
 
 Remember the rule of the game: the factory, the repair point and the fort stand **on the track or
 right next to it**.
@@ -597,8 +601,10 @@ menu (ABORT GAME → BACK TO THE EDITOR or YES) and the end of the level (won or
 
 Menu → **MISSION SETTINGS** (or the gear in the strip):
 
-- **Title** on the custom maps page and the **briefing's header**;
-- **Money at the start**; the **time of day at the start** (day, evening, night, morning - then it
+- **Title** on the custom maps page and the **briefing's header** (at first the map's name in
+  capitals);
+- **Money at the start** - a new map starts with 0: give the player some (e.g. 1000), or the factory
+  cannot build anything; the **time of day at the start** (day, evening, night, morning - then it
   goes on, 5 minutes each);
 - **Weather** - rain, snow, clouds, storm clouds or meteorites - and **how often**: never, now and
   then (it comes and goes, about half a minute each) or all the time;
@@ -691,7 +697,7 @@ tools, the rarer things placed, the two panels last.
 | `[` `]` | the next object of the row above the bar, the texture |
 | `<` `>` | the decals' spacing |
 | wheel, `+` `-` | the brush's size (Ground height, Decals, Paint, Water) |
-| M | the ground brush: raise, lower, flatten, smooth |
+| M | Ground height: the next mode (raise/lower, flatten, smooth, ramp, rough) |
 | H | the ground's heights (contour lines) with any tool |
 | B | the gravel bed of new track |
 | V | the kind of new rails |
@@ -700,7 +706,7 @@ tools, the rarer things placed, the two panels last.
 | W | water, swamp or lava |
 | S | the selected line's semaphores (Push line tool) |
 | Shift (with a brush) | take away |
-| Esc, right button | back to Select; end a line of track |
+| Esc, right button | back to Select; cancel a section of track started; close a panel. Esc with nothing under way: the editor's menu |
 | middle button | drag the map; in the Track tool a click deletes the rail under the cursor (at a junction too) |
 | Ctrl+R | QUICK TEST, NO SAVE: run the map here / back to the editor |
 | F1 | help, opening on its contents |
