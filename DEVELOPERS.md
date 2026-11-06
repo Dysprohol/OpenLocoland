@@ -3248,10 +3248,21 @@ d43e850; in this build it shows in the run - the rectangle at 4 s and on through
 `i2_long`), and with THE WHOLE MAP the tint over the whole view (`i2_w`: the ground's colour outside
 the rectangle 112,149,61 against 112,134,27 without the fog). A region of light water (750)
 shows only its frame where the ground's picture is not lower than its z: its water tiles are drawn with
-the depth test, so a 750 at the ground's own level (as the palette places it) is hidden under the
-ground, held or running, and the missions' lie over a lowered bed; lowered with the Ground height tool
-under it, its water shows at once in the held editor (`i2_lower`) - the "cause still to be found" of
-the review before this. The regions' frames (`draw_regions` of the overlay, and the engine's
+the depth test, so a 750 at the ground's own level (as the palette placed it) was hidden under the
+ground, held or running, and the missions' lie over a lowered bed - l05's river is its 750 at level 40
+over a bed at 0-27 (the map has no water tiles), l01's dust region a 750 at 60 over a hollow down to
+10; lowered with the Ground height tool under it, its water shows at once in the held editor
+(`i2_lower`). The palette now places it above the ground (`lift_water_region`): over a light-water
+lake of the Water tool (a tile of VID 204 in its rectangle) at that water's level, one surface with it;
+elsewhere `WATER_SHEET` (2) levels above the highest ground under its rectangle, a flat sheet of water
+over the ground; the rectangle stays where it was put and the status line names the level and why
+("light water region at level 72, 2 above the highest ground under it (70)"). Its picture is tiled in
+whole 128 px tiles from the rectangle's top-left corner, so its default 192 px width drew 256 px of
+water, 64 past its frame: a 750 starts 256 x 128 and its panel's size goes by 128 (other regions by
+32). The Water and lava tool is the other way - a basin with a shore, the tiles, the effects and a
+splash region; the guides (3. Water, swamp, lava) and help page 11 say which is for what. Checked in
+the game (POLIGON): the sheet at level 72 and a 750 over a Water tool lake at its level 50 both shown
+in the editor and in Run the level, the frames only in the editor (`water750b_10`, `_14`). The regions' frames (`draw_regions` of the overlay, and the engine's
 `Region_DrawDebug`, vtable slot 6, only with World flag 0x8000 - the debug key O) were not seen in a
 run or in Play the map (`i2_w_12`, `_18`, `_19`). Checked in the game besides: l05's and l01's regions
 read in the editor (the log line of a selected region: size, flags, fog, image, pairs); a golem inside a marker region and one outside stood where they were placed through 20 s

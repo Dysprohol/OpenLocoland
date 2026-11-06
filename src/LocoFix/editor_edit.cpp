@@ -3395,6 +3395,45 @@ std::string plan_status(const PlacePlan& pl) {
     }
 }
 
+// The region of light water from the palette (VID 750). Its picture is drawn with the depth test - it
+// shows where the ground's picture is lower than the region's z - and the missions' lie over a bed
+// lower than them: l05's river is its 750 at level 40 over a bed at 0-27 (median 27, no water tiles in
+// the map), l01's at 60 over a hollow down to 10. At the ground's own level (where a placed object
+// goes) only its frame showed. Placed, it is lifted: over a light-water lake of the Water tool (a
+// tile of VID 204 in its rectangle) to that water's level, the two one surface; elsewhere to
+// WATER_SHEET levels above the highest ground under its rectangle, a flat sheet of water over the
+// ground. Its rectangle stays where it was put (y goes up with z). The level it got, and the highest
+// ground (-1 over a lake), for the status line.
+constexpr int WATER_SHEET = 2;
+constexpr float WATER_TILE = 128;   // the light water's tile (Region_Draw tiles its picture from the top-left)
+std::pair<int, int> lift_water_region(uint8_t* o) {
+    const float sx = at<float>(o, O_X), sy = at<float>(o, O_Y) - at<float>(o, O_Z);
+    const float hw = at<float>(o, RG_WIDTH) / 2, hh = at<float>(o, RG_HEIGHT) / 2;
+    int lake = -1;
+    for_each_object([&](uint8_t* t) {
+        if (lake >= 0 || removed(t) || nvid_of(t) != WATER_KINDS[0].nvid) return;   // a tile of light water: 128 px
+        const float tx = at<float>(t, O_X), ty = at<float>(t, O_Y) - at<float>(t, O_Z);
+        if (std::fabs(tx - sx) < hw + 64 && std::fabs(ty - sy) < hh + 64) lake = static_cast<int>(std::lround(at<float>(t, O_Z)));
+    });
+    int high = -1;
+    if (lake < 0 && grid()) {
+        // the cells whose ground shows in the rectangle (a cell's screen place is y - its level)
+        const int x0 = (std::max)(0, static_cast<int>((sx - hw) / 8)), x1 = (std::min)(grid_width() - 1, static_cast<int>((sx + hw) / 8));
+        const int y0 = (std::max)(0, static_cast<int>((sy - hh) / 8)), y1 = (std::min)(grid_height() - 1, static_cast<int>((sy + hh + 400) / 8));
+        for (int cy = y0; cy <= y1; ++cy)
+            for (int cx = x0; cx <= x1; ++cx) {
+                const int g = ground_cell(cx, cy);
+                if (std::fabs(cy * 8 + 4 - g - sy) <= hh) high = (std::max)(high, g);
+            }
+        if (high < 0) high = static_cast<int>(std::lround(at<float>(o, O_Z)));
+    }
+    const int level = lake >= 0 ? lake : high + WATER_SHEET;
+    reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, sx, sy + level, static_cast<float>(level));
+    patch::log("edit: light water region at %.0f,%.0f (%.0f x %.0f): level %d - %s %d", sx, sy, 2 * hw, 2 * hh, level,
+               lake >= 0 ? "the light water lake's level, a tile in its rectangle" : "above the highest ground under it,", lake >= 0 ? lake : high);
+    return {level, lake >= 0 ? -1 : high};
+}
+
 void place(POINT p) {
     const int nvid = place_nvid();
     if (nvid <= 0 && is_palette(entry())) {   // nothing picked yet
@@ -3431,9 +3470,13 @@ void place(POINT p) {
     }
     objects.push_back(o);
     if (entry().red) set_red(o, true);
+    std::pair<int, int> water = {-1, -1};
     if (is_region(o)) {   // a region from the palette: a rectangle to start with, sized in its panel
-        at<float>(o, RG_WIDTH) = 192;
+        // the light water's picture is tiled in whole 128 px tiles from the rectangle's top-left corner
+        // (Region_Draw), so a 192 px wide one drew 256 px of water, 64 past its frame: its size in tiles
+        at<float>(o, RG_WIDTH) = made == VID_REGION_WATER ? 2.0f * WATER_TILE : 192;
         at<float>(o, RG_HEIGHT) = 128;
+        if (made == VID_REGION_WATER) water = lift_water_region(o);   // its water over the ground
     }
     const std::vector<Socket> sockets = sockets_of(made, direction);   // a host with the missions' fit
     const std::vector<int> fit = default_fit(made);
@@ -3465,6 +3508,16 @@ void place(POINT p) {
     }
     if (nvid == VID_CRUSHER && crusher_end(o) == CRUSHER_NEVER) {
         MESSAGE("MsgCrusherNoTower", "no tower of its army - the crusher never stops; place a citadel or a tower");
+        return;
+    }
+    if (water.first >= 0 && water.second < 0) {
+        MESSAGE("MsgWaterRegionLake", "light water region at level %d, the level of the light water lake under it: one surface with it",
+                water.first);
+        return;
+    }
+    if (water.first >= 0) {
+        MESSAGE("MsgWaterRegion", "light water region at level %d, %d above the highest ground under it (%d): a flat sheet of water over the ground - a lake with a shore is the Water and lava tool's",
+                water.first, WATER_SHEET, water.second);
         return;
     }
     MESSAGE("MsgPlaced", "placed VID %d at %.0f,%.0f,%.0f direction %d army %d%s%s", made, at<float>(o, O_X), at<float>(o, O_Y),
@@ -8674,14 +8727,16 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
     }
     if (is_region(o)) {   // its size, splashes and fog
         rows.clear();
+        // the light water's region by whole tiles of its picture (its frame is then where its water ends)
+        const float step = nvid_of(o) == VID_REGION_WATER ? WATER_TILE : 32, least = nvid_of(o) == VID_REGION_WATER ? WATER_TILE : 16;
         rows.push_back({{"CtxSize", "SIZE:"},
-                        {{{"CtxWider", "WIDER"}, false, [o] { region_change(o, [o] { at<float>(o, RG_WIDTH) += 32; }); }},
-                         {{"CtxNarrower", "NARROWER"}, false, [o] {
-                              region_change(o, [o] { at<float>(o, RG_WIDTH) = (std::max)(16.0f, at<float>(o, RG_WIDTH) - 32); });
+                        {{{"CtxWider", "WIDER"}, false, [o, step] { region_change(o, [o, step] { at<float>(o, RG_WIDTH) += step; }); }},
+                         {{"CtxNarrower", "NARROWER"}, false, [o, step, least] {
+                              region_change(o, [o, step, least] { at<float>(o, RG_WIDTH) = (std::max)(least, at<float>(o, RG_WIDTH) - step); });
                           }},
-                         {{"CtxTaller", "TALLER"}, false, [o] { region_change(o, [o] { at<float>(o, RG_HEIGHT) += 32; }); }},
-                         {{"CtxLower", "LOWER"}, false, [o] {
-                              region_change(o, [o] { at<float>(o, RG_HEIGHT) = (std::max)(16.0f, at<float>(o, RG_HEIGHT) - 32); });
+                         {{"CtxTaller", "TALLER"}, false, [o, step] { region_change(o, [o, step] { at<float>(o, RG_HEIGHT) += step; }); }},
+                         {{"CtxLower", "LOWER"}, false, [o, step, least] {
+                              region_change(o, [o, step, least] { at<float>(o, RG_HEIGHT) = (std::max)(least, at<float>(o, RG_HEIGHT) - step); });
                           }}}});
         ContextRow splash{{"CtxSplash", "EXPLOSIONS:"}, {}};
         const UiText SPLASH_NAMES[] = {{"CtxSplashNone", "AS THEY ARE"}, {"CtxSplashWater", "ON WATER"}, {"CtxSplashLava", "ON LAVA"}};

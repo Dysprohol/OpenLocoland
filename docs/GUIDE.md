@@ -272,6 +272,13 @@ ground into a basin with a shore, lays the water's surface and adds its effects 
 water, bubbles, lava eruptions) and a region where explosions splash. Shift+drag takes it away.
 One kind of water has one level on a map, as in the missions.
 
+The other way is the **Region of light water** (All objects, theme **Effects**): a rectangle of
+water with straight edges and no shore or effects - a pool, a flooded field, or more of a lake's
+surface. Placed, it lies 2 levels above the highest ground under it, so its water shows over the
+ground; placed over a light-water lake of the Water tool it takes that lake's level (one surface).
+Its size goes by whole tiles of the water (128 px). Which to use: a lake, a river or lava with a
+shore - the Water and lava tool; a flat sheet of light water - the region.
+
 The **Ground height** tool shapes the ground with its row of buttons above the bar: the mode -
 **RAISE/LOWER** (the left button raises, the right one lowers), **FLATTEN**, **SMOOTH**, **RAMP** (drag
 from one point to another: an even slope between their levels, for a driveway up to a plateau) and
@@ -571,9 +578,9 @@ A **Region** (strip): drag its rectangle; its panel sets fog (mist, dust, haze, 
 it or the whole map (**OVER**, a row of its own); a creature placed inside keeps to it. A click inside a region where nothing else stands selects it (the Delete tool and `Del` delete it, the right button opens its panel). A fog is
 thickest low down, objects rise out of it: over the region it takes the shape of a hollow (a lake bed),
 on flat ground it is a tinted rectangle; **OVER: THE WHOLE MAP** makes it a haze over the whole view, as
-in missions 7, 13 and 18 (it also turns a region's explosions into splashes everywhere). The **Effects** theme of All objects has the region of light water (a lake's look) and the
-one with rain circles; the water shows only where the ground under it is lower than the region (lower it
-with Ground height, or lay a lake with the Water tool).
+in missions 7, 13 and 18 (it also turns a region's explosions into splashes everywhere). The **Effects** theme of All objects has the region of light water and the
+one with rain circles; the water shows only where the ground under it is lower than the region, so the
+light water's region is placed above the ground (see 3. Water, swamp, lava).
 
 ### 9. Look at it working
 

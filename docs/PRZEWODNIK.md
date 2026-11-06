@@ -272,6 +272,13 @@ w nieckę z brzegiem, kładzie powierzchnię wody i dodaje jej efekty (kręgi na
 lawy) oraz region, w którym wybuchy rozpryskują wodę. Shift+przeciąganie ją usuwa. Jeden rodzaj
 wody ma na mapie jeden poziom, tak jak w misjach.
 
+Drugi sposób to **Region jasnej wody** (Wszystkie obiekty, temat **Efekty**): prostokąt wody o prostych
+brzegach, bez brzegu terenu i bez efektów - sadzawka, zalana łąka albo dalsza część tafli jeziora.
+Postawiony leży 2 poziomy nad najwyższym terenem pod nim, więc jego wodę widać nad terenem; postawiony
+nad jeziorem jasnej wody z narzędzia wody bierze poziom tego jeziora (jedna tafla). Jego rozmiar
+zmienia się o całe kafle wody (128 px). Co wybrać: jezioro, rzeka albo lawa z brzegiem - narzędzie
+Woda i lawa; płaska tafla jasnej wody - region.
+
 Narzędzie **Wysokosc terenu** kształtuje teren swoim rzędem przycisków nad paskiem: tryb -
 **PODNIES/OBNIZ** (lewy przycisk podnosi, prawy obniża), **WYROWNAJ**, **WYGLADZ**, **RAMPA** (przeciągnij
 z jednego punktu do drugiego: równy spadek między ich poziomami, np. podjazd na płaskowyż) i
@@ -568,8 +575,8 @@ Mgła (wiersz **NAD** osobno) jest najgęstsza nisko, obiekty z niej wystają: n
 kształt zagłębienia (dna jeziora), na płaskim terenie to zabarwiony prostokąt; **NAD: CAŁĄ MAPĄ** robi z
 niej mgiełkę nad całym widokiem, jak w misjach 7, 13 i 18 (zamienia też wybuchy regionu w pluski na całej
 mapie). Temat **Efekty** we Wszystkich obiektach ma region
-jasnej wody (wygląd jeziora) i region z kręgami w deszczu; woda widać tylko tam, gdzie teren pod nią
-jest niżej niż region (obniż go wysokością terenu albo połóż jezioro narzędziem wody).
+jasnej wody i region z kręgami w deszczu; wodę widać tylko tam, gdzie teren pod nią jest niżej niż
+region, więc region jasnej wody stawia się nad terenem (zob. 3. Woda, bagno, lawa).
 
 ### 9. Zobacz, jak działa
 
