@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <vector>
 
+void install_crash_log();
 void install_language();
 void install_editor_text();
 void install_window();
@@ -106,6 +107,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         restart_wait();   // a restarted game waits for the old one first (restart.cpp)
         clean_up_logs();
         patch::log("LocoFix %s", LOCOFIX_VERSION);
+        install_crash_log();   // first: an exception anywhere after this is in LocoFix.log (crash_log.cpp)
         // The patches fit one exe version only - we recognise it by the build date
         // in the PE header (2003-10-07, the Steam version; the same exe for all languages)
         // and its image size: the Italian CD's exe has the same date but is wrapped by a copy
