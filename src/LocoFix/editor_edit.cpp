@@ -52,6 +52,7 @@
 // Every text shown is looked up in [Editor] of the language pack (editor_text.h); the messages go
 // to LocoFix.log in English.
 #include "patch.h"
+#include "profile.h"
 #include "editor_ground.h"
 #include "editor_mission.h"
 #include "editor_text.h"
@@ -237,6 +238,7 @@ template <typename F> void for_each_object(F f) {
         uint8_t* list = w + W_LAYERS + layer * LIST_SIZE;
         const int count = at<int>(list, LIST_COUNT);
         uint8_t** items = at<uint8_t**>(list, LIST_ITEMS);
+        prof::count(prof::ED_ITERATED, count);
         for (int i = 0; i < count; ++i)
             if (items && items[i]) f(items[i]);
     }
@@ -4168,15 +4170,35 @@ rail::Cell cursor_cell(float& x, float& y) {
 // the track freely (the rails may sink under it; the Track tool's own flattening is not undone).
 bool g_track_covered = false;
 
+// The Ground height tool colours its brush's cells by it every frame, so the answer is kept for the
+// same input (rail::cells reads only the rails' ends and the grid's size): on The Factory (368 rails)
+// it was 2.6 ms of every frame of that tool (2026-11-06).
 std::set<rail::Cell> track_cells() {
     std::vector<rail::Segment> segments;
     for (const RailObject& r : map_rails()) {
         const rail::Point a = rail::end_of(r.rail, 0), b = rail::end_of(r.rail, 1);
         segments.push_back({a, b, r.rail.x, r.rail.y, r.rail.shape, a, b});
     }
+    uint64_t key = 1469598103934665603ull;
+    auto mix = [&](const void* p, size_t n) {
+        for (size_t i = 0; i < n; ++i) key = (key ^ static_cast<const uint8_t*>(p)[i]) * 1099511628211ull;
+    };
+    const int size[2] = {grid_width(), grid_height()};
+    mix(size, sizeof size);
+    for (const rail::Segment& g : segments) {
+        const double ends[4] = {g.a.x, g.a.y, g.b.x, g.b.y};
+        mix(ends, sizeof ends);
+    }
+    static uint64_t kept_key = 0;
+    static bool kept = false;
+    static std::set<rail::Cell> kept_cells;
+    if (kept && key == kept_key) return kept_cells;
     std::set<rail::Cell> cells, ring;
-    rail::cells(segments, grid_width(), grid_height(), cells, ring);
+    rail::cells(segments, size[0], size[1], cells, ring);
     cells.insert(ring.begin(), ring.end());
+    kept = true;
+    kept_key = key;
+    kept_cells = cells;
     return cells;
 }
 
@@ -5175,7 +5197,70 @@ struct Trace {
     std::vector<uint8_t*> path;      // from the begin to the end
 };
 
+// The rail network's searches kept while it stays the same. The overlay asks for the same ways
+// every frame - each push line's (trace), each post's rail point against each line (owns ->
+// post_dot -> point_near), the enemy trains' patrols - and on a map with 17 lines and 23 posts that
+// was 8.8 ms of every frame (2026-11-06, The Factory), all of it the same answers. While the push
+// lines, the enemy trains and the arrivals are drawn (RailMemo, a scope) the answers are kept; they stay for the next frames as long as the
+// network has the same points at the same places with the same links (rail_signature, a hash of
+// all of them, computed once a frame), else they are dropped. Outside the scope nothing is kept, so
+// an edit (a rail laid, deleted, undone) is always searched afresh.
+struct RailMemoData {
+    bool on = false;
+    uint64_t signature = 0;
+    std::map<std::tuple<int, int, int, int>, Trace> traces;
+    std::map<std::tuple<uint32_t, uint32_t, int, uint32_t>, uint8_t*> points;
+} g_rail_memo;
+
+uint64_t rail_signature() {
+    uint64_t h = 1469598103934665603ull;
+    auto mix = [&](uint64_t v) { h = (h ^ v) * 1099511628211ull; };
+    const int count = at<int>(reinterpret_cast<void*>(G_RAIL_MAP), RAIL_MAP_COUNT);
+    uint8_t** items = at<uint8_t**>(reinterpret_cast<void*>(G_RAIL_MAP), RAIL_MAP_ITEMS);
+    mix(static_cast<uint32_t>(count));
+    mix(reinterpret_cast<uintptr_t>(items));
+    for (int i = 0; i < count && items; ++i) {
+        uint8_t* d = items[i];
+        mix(reinterpret_cast<uintptr_t>(d));
+        if (!d) continue;
+        mix(static_cast<uint32_t>(at<int>(d, DOT_X)));
+        mix(static_cast<uint32_t>(at<int>(d, DOT_Y)));
+        mix(static_cast<uint32_t>(at<int>(d, DOT_Z)));
+        const int links = at<int>(d, DOT_LINK_COUNT);
+        mix(static_cast<uint32_t>(links));
+        for (int k = 0; k < (std::min)(6, links); ++k) mix(reinterpret_cast<uintptr_t>(dot_link(d, k)));
+    }
+    return h;
+}
+
+struct RailMemo {
+    bool outer = !g_rail_memo.on;
+    RailMemo() {
+        if (!outer) return;
+        const uint64_t s = rail_signature();
+        if (s != g_rail_memo.signature) {
+            g_rail_memo.traces.clear();
+            g_rail_memo.points.clear();
+            g_rail_memo.signature = s;
+        }
+        g_rail_memo.on = true;
+    }
+    ~RailMemo() {
+        if (outer) g_rail_memo.on = false;
+    }
+};
+
+Trace trace_now(const PushLine& l);
+
 Trace trace(const PushLine& l) {
+    if (!g_rail_memo.on) return trace_now(l);
+    const auto key = std::make_tuple(l.bx, l.by, l.ex, l.ey);
+    const auto found = g_rail_memo.traces.find(key);
+    if (found != g_rail_memo.traces.end()) return found->second;
+    return g_rail_memo.traces[key] = trace_now(l);
+}
+
+Trace trace_now(const PushLine& l) {
     Trace t;
     uint8_t* begin = nearest_dot(l.bx, l.by);
     uint8_t* end = nearest_dot(l.ex, l.ey);
@@ -5614,7 +5699,21 @@ void link_vector(uint8_t* d, int k, float& vx, float& vy) {
 int round32(int direction) { return ((direction + 16) & 255) / 32 * 32; }
 
 // The rail point nearest to a map point (world), with at least `links` links, within `reach`.
+uint8_t* point_near_now(float x, float y, int links, float reach);
+
 uint8_t* point_near(float x, float y, int links, float reach) {
+    if (!g_rail_memo.on) return point_near_now(x, y, links, reach);
+    uint32_t bits[3];
+    std::memcpy(&bits[0], &x, 4);
+    std::memcpy(&bits[1], &y, 4);
+    std::memcpy(&bits[2], &reach, 4);
+    const auto key = std::make_tuple(bits[0], bits[1], links, bits[2]);
+    const auto found = g_rail_memo.points.find(key);
+    if (found != g_rail_memo.points.end()) return found->second;
+    return g_rail_memo.points[key] = point_near_now(x, y, links, reach);
+}
+
+uint8_t* point_near_now(float x, float y, int links, float reach) {
     uint8_t* best = nullptr;
     float best_d = reach;
     for (uint8_t* d : rail_dots()) {
@@ -6661,22 +6760,89 @@ void draw_track() {
                      ui_text("StatusTrackKeys", " - the right button cancels, a middle click deletes the rail under the cursor");
 }
 
-// A filled triangle on the screen, a row of pixels at a time (Graphics_FillRect has rectangles only).
-void fill_triangle(float x0, float y0, float x1, float y1, float x2, float y2, uint32_t argb) {
-    const float xs[3] = {x0, x1, x2}, ys[3] = {y0, y1, y2};
-    const float top = std::floor((std::min)({y0, y1, y2})), bottom = (std::max)({y0, y1, y2});
-    for (float y = top; y < bottom; y += 1) {
-        const float mid = y + 0.5f;
-        float l = 1e9f, r = -1e9f;
-        for (int i = 0; i < 3; ++i) {
-            const int j = (i + 1) % 3;
-            if ((ys[i] <= mid) == (ys[j] <= mid)) continue;   // the edge does not cross this row
-            const float x = xs[i] + (mid - ys[i]) * (xs[j] - xs[i]) / (ys[j] - ys[i]);
-            l = (std::min)(l, x);
-            r = (std::max)(r, x);
-        }
-        if (l < r) reinterpret_cast<FillRect_t>(FILL_RECT)(graphics(), nullptr, l, y, r, y + 1, argb);
+// Untextured pre-transformed vertices drawn the way Graphics_FillRect (0x412cd0) draws its rectangle:
+// the back buffer unlocked if a software picture left it locked, no texture, opaque or blended with
+// the source alpha, no z writes, x, y, z 0.99999988, rhw 1, the colour and specular white.
+//
+// Graphics_FillRect's rectangles gathered and drawn as one list of triangles (FillBatch, a scope;
+// fill_rect outside one is the engine's FillRect). Each rectangle is the two triangles of FillRect's
+// fan - the same vertices, in the order they were filled - so the pixels and the blending are the
+// same; only the calls are fewer: the heights' contours are hundreds of small rectangles a frame
+// (2.2 ms at 1920 x 1080, 2026-11-06). The batch is blended with the source alpha when any of its
+// rectangles is not opaque (an opaque one blends to itself: alpha 0xff).
+struct FillVertex {
+    float x, y, z, rhw;
+    uint32_t diffuse, specular;
+};
+
+void draw_fill_vertices(const FillVertex* v, int count, int type, bool opaque) {
+    uint8_t* g = static_cast<uint8_t*>(graphics());
+    if (!g || count < 3) return;
+    constexpr size_t BACK_BITS = 0x208, BACK_BUFFER = 0xc04, DEVICE = 0xbf4;
+    if (void*& bits = *reinterpret_cast<void**>(g + BACK_BITS)) {   // IDirectDrawSurface7::Unlock
+        void* back = *reinterpret_cast<void**>(g + BACK_BUFFER);
+        reinterpret_cast<HRESULT(__stdcall*)(void*, void*)>((*reinterpret_cast<void***>(back))[0x80 / 4])(back, nullptr);
+        bits = nullptr;
     }
+    void* device = *reinterpret_cast<void**>(g + DEVICE);   // IDirect3DDevice7::SetTexture(0, nullptr)
+    reinterpret_cast<HRESULT(__stdcall*)(void*, DWORD, void*)>((*reinterpret_cast<void***>(device))[0x8c / 4])(device, 0, nullptr);
+    using State_t = void(__fastcall*)(void*, void*, int, unsigned);
+    using Blend_t = void(__fastcall*)(void*, void*, int, int);
+    using Primitive_t = void(__fastcall*)(void*, void*, int, unsigned, const void*, int, int);
+    if (opaque) reinterpret_cast<State_t>(0x40f050)(g, nullptr, 0x1b, 0);   // ALPHABLENDENABLE off
+    else reinterpret_cast<Blend_t>(0x40f000)(g, nullptr, 5, 6);   // Graphics_SetBlend: SRCALPHA, INVSRCALPHA
+    reinterpret_cast<State_t>(0x40f050)(g, nullptr, 0xe, 0);   // ZWRITEENABLE off
+    reinterpret_cast<Primitive_t>(0x415e40)(g, nullptr, type, 0xc4, v, sizeof(FillVertex), count);   // XYZRHW | DIFFUSE | SPECULAR
+    reinterpret_cast<State_t>(0x40f050)(g, nullptr, 0xe, 1);
+}
+
+// A filled triangle on the screen, drawn the way Graphics_FillRect (0x412cd0) draws its rectangle
+// (draw_fill_vertices) with three vertices instead of four. Before (until 2026-11-06) it was a
+// FillRect a row of pixels, and the push lines' arrows of The Factory took ~3000 of them a frame
+// (2.4 ms); the pixels covered are the same (the row's middle inside the triangle). The vertices go
+// clockwise on the screen like FillRect's, so the device's culling cannot drop the triangle.
+void fill_triangle(float x0, float y0, float x1, float y1, float x2, float y2, uint32_t argb) {
+    const float cross = (x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0);
+    if (cross == 0) return;   // no area
+    if (cross < 0) {
+        std::swap(x1, x2);
+        std::swap(y1, y2);
+    }
+    constexpr float Z = 0.99999988f;
+    const FillVertex v[3] = {{x0, y0, Z, 1, argb, 0xffffffff}, {x1, y1, Z, 1, argb, 0xffffffff}, {x2, y2, Z, 1, argb, 0xffffffff}};
+    draw_fill_vertices(v, 3, 6, (argb & 0xff000000) == 0xff000000);   // a fan
+}
+
+struct FillBatch;
+FillBatch* g_fill_batch = nullptr;
+
+struct FillBatch {
+    std::vector<FillVertex> v;
+    bool opaque = true;
+    FillBatch* outer = g_fill_batch;
+    FillBatch() { g_fill_batch = this; }
+    ~FillBatch() {
+        flush();
+        g_fill_batch = outer;
+    }
+    void flush() {
+        for (size_t at = 0; at < v.size(); at += 6 * 1024)   // a list of up to 1024 rectangles a call
+            draw_fill_vertices(v.data() + at, static_cast<int>((std::min)(v.size() - at, static_cast<size_t>(6 * 1024))), 4, opaque);
+        v.clear();
+        opaque = true;
+    }
+};
+
+void fill_rect(float l, float t, float r, float b, uint32_t argb) {
+    if (!g_fill_batch) {
+        reinterpret_cast<FillRect_t>(FILL_RECT)(graphics(), nullptr, l, t, r, b, argb);
+        return;
+    }
+    constexpr float Z = 0.99999988f;
+    const FillVertex lt{l, t, Z, 1, argb, 0xffffffff}, rt{r, t, Z, 1, argb, 0xffffffff}, rb{r, b, Z, 1, argb, 0xffffffff},
+        lb{l, b, Z, 1, argb, 0xffffffff};
+    for (const FillVertex& x : {lt, rt, rb, lt, rb, lb}) g_fill_batch->v.push_back(x);   // FillRect's fan as two triangles
+    if ((argb & 0xff000000) != 0xff000000) g_fill_batch->opaque = false;
 }
 
 // An arrowhead with its tip at (x, y) pointing the way (ux, uy) (a unit vector), on a dark outline.
@@ -6969,7 +7135,8 @@ void draw_contours() {
     if (!grid()) return;
     const Box v = view();
     const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
-    const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
+    FillBatch batch;   // hundreds of small rectangles: one list of triangles (FillBatch)
+    const auto fill = [](void*, void*, float l, float t, float r, float b, uint32_t argb) { fill_rect(l, t, r, b, argb); };
     const int gw = grid_width(), gh = grid_height();
     // the cells below the view may show in it raised: up to the highest ground
     const int cx0 = (std::max)(0, static_cast<int>(std::floor((v.l + cam_x) / 8)) - 1);
@@ -7145,47 +7312,6 @@ void set_cursor(int type) {
 
 // ---- the bar, in the state bar's look ----
 
-// A picture of the bar at a screen point, in front of the scene; each part a step further in
-// front than the one under it (Graphics_DrawVid: the depth is z).
-// The VID may be hidden (VID flag 0x400: Player_HideStateBar hides the side tiles with the bar,
-// status_bar.cpp), which the drawing skips, so it is shown for the call.
-void draw_screen(int nvid, int frame, float x, float y, int step) {
-    uint8_t* v = vid_by_number(nvid);
-    if (!v) return;
-    const float z = FRONT + static_cast<float>(step);
-    const uint32_t flags = at<uint32_t>(v, V_FLAGS);
-    at<uint32_t>(v, V_FLAGS) = flags & ~VID_HIDDEN;
-    draw_vid(v, frame, x, y + z, z);
-    at<uint32_t>(v, V_FLAGS) = flags;
-}
-
-// A text in a font VID, the way Text_Draw writes one: a frame per character (its code), sizeX
-// apart, the first character's middle half a character from x; right-aligned with `right`.
-float draw_text(int font, float x, float y, const char* text, bool right = false, int step = 5) {
-    uint8_t* v = vid_by_number(font);
-    if (!v) return x;
-    const float w = at<float>(v, V_SIZE_X), h = at<float>(v, V_SIZE_Y);
-    const float frames = static_cast<float>(at<short>(v, V_FRAME_COUNT));
-    if (right) x -= w * static_cast<float>(std::strlen(text));
-    for (const unsigned char* c = reinterpret_cast<const unsigned char*>(text); *c; ++c, x += w)
-        if (*c >= 0x20 && *c < frames) draw_screen(font, *c, x + w / 2, y + h / 2, step);
-    return x;
-}
-
-constexpr float LINE_HEIGHT = 14;
-
-// A line of the status in the mouse tips' font, which has its own box behind every
-// character - the look of the game's tips.
-std::vector<std::pair<float, float>> g_status_ends;   // this frame's status lines: their top, how far right they reach
-
-void status_line(float x, float y, const char* text) {
-    float cw = 6;
-    if (uint8_t* v = vid_by_number(FONT_TIPS)) cw = at<float>(v, V_SIZE_X);
-    g_status_ends.push_back({y, x + 2 + cw * (std::strlen(text) + 2)});
-    if (vid_by_number(FONT_TIPS)) draw_text(FONT_TIPS, x + 2, y + 1, (std::string(" ") + text + " ").c_str());
-    else reinterpret_cast<Printf_t>(PRINTF)(graphics(), x + 6, y + 2, "%s", text);
-}
-
 // Graphics_DrawVid locks the back and the depth buffer around every layer 2-4 picture (the
 // software sprites) and unlocks them right after it - unless they were already locked when it
 // was called, in which case it leaves them locked for the caller. A lock of those surfaces costs
@@ -7193,6 +7319,10 @@ void status_line(float x, float y, const char* text) {
 // icons, the keys' characters - spends most of its frame in locks (19.8 ms of its 28 ms). Locked
 // once around the whole bar, they stay locked and every picture after the first costs its pixels
 // only. The unlock is the engine's own (EndScene does it the same way before presenting).
+// The same goes for text: every character is such a picture, so draw_text locks once for its whole
+// text, the status lines once for all of them and the mines' labels once for all; with dgVoodoo a
+// lock after Direct3D drawing reads the back buffer back, 30-60 us at 1024x768 ... 1920x1080, and
+// a frame of the editor on The Factory took 190-310 of them (12-25 ms in full screen, 2026-11-06).
 constexpr uintptr_t SURFACE_LOCK = 0x4123c0;
 // Graphics: the software buffers and their pitches (backBufferBits, depthBits, types.txt)
 constexpr size_t G_BACK_BUFFER = 0xc04, G_DEPTH_BUFFER = 0xbf8;
@@ -7207,8 +7337,8 @@ void unlock_surface(void* s) {   // IDirectDrawSurface7::Unlock, vtable slot 0x8
 struct SoftwareLock {
     uint8_t* g = static_cast<uint8_t*>(graphics());
     bool back = false, depth = false;
-    SoftwareLock() {
-        if (!g) return;
+    explicit SoftwareLock(bool when = true) {
+        if (!g || !when) return;
         back = *reinterpret_cast<void**>(g + G_BACK_BITS) == nullptr;
         depth = *reinterpret_cast<void**>(g + G_DEPTH_BITS) == nullptr;
         lock();
@@ -7244,6 +7374,49 @@ struct SoftwareLock {
     }
     ~SoftwareLock() { unlock(); }
 };
+
+// A picture of the bar at a screen point, in front of the scene; each part a step further in
+// front than the one under it (Graphics_DrawVid: the depth is z).
+// The VID may be hidden (VID flag 0x400: Player_HideStateBar hides the side tiles with the bar,
+// status_bar.cpp), which the drawing skips, so it is shown for the call.
+void draw_screen(int nvid, int frame, float x, float y, int step) {
+    uint8_t* v = vid_by_number(nvid);
+    if (!v) return;
+    const float z = FRONT + static_cast<float>(step);
+    const uint32_t flags = at<uint32_t>(v, V_FLAGS);
+    at<uint32_t>(v, V_FLAGS) = flags & ~VID_HIDDEN;
+    draw_vid(v, frame, x, y + z, z);
+    at<uint32_t>(v, V_FLAGS) = flags;
+}
+
+// A text in a font VID, the way Text_Draw writes one: a frame per character (its code), sizeX
+// apart, the first character's middle half a character from x; right-aligned with `right`.
+float draw_text(int font, float x, float y, const char* text, bool right = false, int step = 5) {
+    uint8_t* v = vid_by_number(font);
+    if (!v) return x;
+    const float w = at<float>(v, V_SIZE_X), h = at<float>(v, V_SIZE_Y);
+    const float frames = static_cast<float>(at<short>(v, V_FRAME_COUNT));
+    if (right) x -= w * static_cast<float>(std::strlen(text));
+    SoftwareLock locked;   // one lock for the whole text, not one a character (a no-op when locked already)
+    for (const unsigned char* c = reinterpret_cast<const unsigned char*>(text); *c; ++c, x += w)
+        if (*c >= 0x20 && *c < frames) draw_screen(font, *c, x + w / 2, y + h / 2, step);
+    return x;
+}
+
+constexpr float LINE_HEIGHT = 14;
+
+// A line of the status in the mouse tips' font, which has its own box behind every
+// character - the look of the game's tips.
+std::vector<std::pair<float, float>> g_status_ends;   // this frame's status lines: their top, how far right they reach
+
+void status_line(float x, float y, const char* text) {
+    float cw = 6;
+    if (uint8_t* v = vid_by_number(FONT_TIPS)) cw = at<float>(v, V_SIZE_X);
+    g_status_ends.push_back({y, x + 2 + cw * (std::strlen(text) + 2)});
+    if (vid_by_number(FONT_TIPS)) draw_text(FONT_TIPS, x + 2, y + 1, (std::string(" ") + text + " ").c_str());
+    else reinterpret_cast<Printf_t>(PRINTF)(graphics(), x + 6, y + 2, "%s", text);
+}
+
 
 // The lit icons (a texture VID drawn with a gamma that brightens, set_army_gammas): Texture_DrawZ adds
 // the brightening as specular light and turns SPECULARENABLE (29) on for it, and Graphics_FillRect - an
@@ -7931,56 +8104,83 @@ bool on_options(float x, float y) {
     return false;
 }
 
+// A VID that Graphics_DrawVid draws in software (layers 2-4: it locks the back and the depth buffer
+// for it) rather than with Direct3D (Vid.layer, types.txt).
+constexpr size_t V_LAYER = 0x33c;
+bool software_vid(int nvid) {
+    uint8_t* v = vid_by_number(nvid);
+    const int layer = v ? at<int>(v, V_LAYER) : -1;
+    return layer >= 2 && layer <= 4;
+}
+
+// The rows, in three passes over the same layout: the strips under them, then what Direct3D draws
+// (the frames, the swatches, the hardware icons, a lit text's underline), then the software pictures
+// and the texts under one lock (SoftwareLock). Cell by cell, as it was until 2026-11-06, every text
+// came after a frame or a swatch and took a lock of its own - 34-46 a frame with the Paint tool's rows.
+// Nothing of one pass covers anything of an earlier one that it did not cover before: in a cell the
+// frame is under its icon, the underline beside its text, and the strips under everything.
 void draw_options() {
     g_option_hits.clear();
-    std::vector<Box> drawn;
-    layout_options([&](const OptionItem& i, float x, float cy, float iw, float ch, const Box& box) {
-        if (std::find_if(drawn.begin(), drawn.end(), [&](const Box& b) { return b.t == box.t; }) == drawn.end()) {
-            for (float sx = box.l + STRIP_WIDTH / 2; sx < box.r; sx += STRIP_WIDTH) draw_screen(VID_STRIP, 0, sx, cy, OPTION_STEP - 1);
-            drawn.push_back(box);
-        }
-        const bool hover = i.button && g_mouse.x >= x && g_mouse.x < x + iw && g_mouse.y >= cy - SLOT / 2 && g_mouse.y < cy + SLOT / 2;
-        if (i.rail) {   // the rail's own straight across; the chosen one framed
-            const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
-            const float l = x + 2, r = x + iw - 4, t0 = cy - SLOT / 2 + 4, b0 = cy + SLOT / 2 - 4;
-            if (i.lit || hover) {
-                const uint32_t c = i.lit ? 0xfff0e080 : 0xc0f0e080;
-                fill(graphics(), nullptr, l, t0, r, t0 + 2, c);
-                fill(graphics(), nullptr, l, b0 - 2, r, b0, c);
-                fill(graphics(), nullptr, l, t0, l + 2, b0, c);
-                fill(graphics(), nullptr, r - 2, t0, r, b0, c);
+    const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
+    int items = 0;   // none (a tool without rows, a panel open): no pass, no lock - a lock is a GPU sync
+    layout_options([&](const OptionItem&, float, float, float, float, const Box&) { ++items; });
+    if (!items) return;
+    for (int pass = 0; pass < 3; ++pass) {
+        SoftwareLock locked(pass == 2 || (pass == 0 && software_vid(VID_STRIP)));
+        std::vector<Box> drawn;
+        layout_options([&](const OptionItem& i, float x, float cy, float iw, float ch, const Box& box) {
+            if (pass == 0) {
+                if (std::find_if(drawn.begin(), drawn.end(), [&](const Box& b) { return b.t == box.t; }) == drawn.end()) {
+                    for (float sx = box.l + STRIP_WIDTH / 2; sx < box.r; sx += STRIP_WIDTH) draw_screen(VID_STRIP, 0, sx, cy, OPTION_STEP - 1);
+                    drawn.push_back(box);
+                }
+                return;
             }
-            const float mx = (l + r) / 2;
-            if (uint8_t* rv = vid_by_number(i.rail)) draw_screen(i.rail, frame_for(rv, rail::DIRECTION[1]), mx, cy, OPTION_STEP + 1);
-        } else if (i.object < 0) {   // an empty cell of the last page
-        } else if (i.object) {   // its palette icon (its own picture fitted into the cell); the chosen one framed
-            const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
-            const float mx = x + iw / 2, h = DECAL_ICON / 2 + 2;
-            if (i.lit || hover) {
-                const uint32_t c = i.lit ? 0xfff0e080 : 0xc0f0e080;
-                fill(graphics(), nullptr, mx - h, cy - h, mx + h, cy - h + 2, c);
-                fill(graphics(), nullptr, mx - h, cy + h - 2, mx + h, cy + h, c);
-                fill(graphics(), nullptr, mx - h, cy - h, mx - h + 2, cy + h, c);
-                fill(graphics(), nullptr, mx + h - 2, cy - h, mx + h, cy + h, c);
+            // a picture of this cell, in its pass
+            auto picture = [&](int nvid, int frame, float px, float py) {
+                if ((pass == 2) == software_vid(nvid)) draw_screen(nvid, frame, px, py, OPTION_STEP + 1);
+            };
+            const bool hover = i.button && g_mouse.x >= x && g_mouse.x < x + iw && g_mouse.y >= cy - SLOT / 2 && g_mouse.y < cy + SLOT / 2;
+            if (i.rail) {   // the rail's own straight across; the chosen one framed
+                const float l = x + 2, r = x + iw - 4, t0 = cy - SLOT / 2 + 4, b0 = cy + SLOT / 2 - 4;
+                if (pass == 1 && (i.lit || hover)) {
+                    const uint32_t c = i.lit ? 0xfff0e080 : 0xc0f0e080;
+                    fill(graphics(), nullptr, l, t0, r, t0 + 2, c);
+                    fill(graphics(), nullptr, l, b0 - 2, r, b0, c);
+                    fill(graphics(), nullptr, l, t0, l + 2, b0, c);
+                    fill(graphics(), nullptr, r - 2, t0, r, b0, c);
+                }
+                const float mx = (l + r) / 2;
+                if (uint8_t* rv = vid_by_number(i.rail)) picture(i.rail, frame_for(rv, rail::DIRECTION[1]), mx, cy);
+            } else if (i.object < 0) {   // an empty cell of the last page
+            } else if (i.object) {   // its palette icon (its own picture fitted into the cell); the chosen one framed
+                const float mx = x + iw / 2, h = DECAL_ICON / 2 + 2;
+                if (pass == 1 && (i.lit || hover)) {
+                    const uint32_t c = i.lit ? 0xfff0e080 : 0xc0f0e080;
+                    fill(graphics(), nullptr, mx - h, cy - h, mx + h, cy - h + 2, c);
+                    fill(graphics(), nullptr, mx - h, cy + h - 2, mx + h, cy + h, c);
+                    fill(graphics(), nullptr, mx - h, cy - h, mx - h + 2, cy + h, c);
+                    fill(graphics(), nullptr, mx + h - 2, cy - h, mx + h, cy + h, c);
+                }
+                const int icon = palette_icon(i.object);
+                if (icon >= 0 && vid_by_number(VID_PALETTE_ICONS)) picture(VID_PALETTE_ICONS, icon, mx, cy);
+                else if (uint8_t* dv = vid_by_number(i.object)) picture(i.object, frame_for(dv, 0), mx, cy + DECAL_ICON / 4);
+            } else if (i.swatch >= 0) {
+                if (pass != 1) return;
+                const std::vector<GroundTexture>& t = ground_textures();
+                const uint16_t c = t[i.swatch].mean;
+                const uint32_t rgb = ((c >> 11) << 19) | (((c >> 5) & 63) << 10) | ((c & 31) << 3);
+                const float l = x + 2, t0 = cy - SWATCH / 2;
+                if (i.lit || hover) fill(graphics(), nullptr, l - 2, t0 - 2, l + SWATCH + 2, t0 + SWATCH + 2, i.lit ? 0xfff0e080 : 0xc0f0e080);
+                fill(graphics(), nullptr, l, t0, l + SWATCH, t0 + SWATCH, 0xff000000 | rgb);
+            } else {
+                const char* text = i.value.empty() ? i.text.get() : i.value.c_str();
+                if (pass == 2) draw_text(i.lit || hover ? CONTEXT_FONT_LIT : CONTEXT_FONT_VID, x + (i.button ? 0 : 0), cy - ch / 2, text, false, OPTION_STEP);
+                if (pass == 1 && i.lit) fill(graphics(), nullptr, x, cy + ch / 2 + 1, x + iw - 8, cy + ch / 2 + 3, 0xe0f0e080);
             }
-            const int icon = palette_icon(i.object);
-            if (icon >= 0 && vid_by_number(VID_PALETTE_ICONS)) draw_screen(VID_PALETTE_ICONS, icon, mx, cy, OPTION_STEP + 1);
-            else if (uint8_t* dv = vid_by_number(i.object)) draw_screen(i.object, frame_for(dv, 0), mx, cy + DECAL_ICON / 4, OPTION_STEP + 1);
-        } else if (i.swatch >= 0) {
-            const std::vector<GroundTexture>& t = ground_textures();
-            const uint16_t c = t[i.swatch].mean;
-            const uint32_t rgb = ((c >> 11) << 19) | (((c >> 5) & 63) << 10) | ((c & 31) << 3);
-            const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
-            const float l = x + 2, t0 = cy - SWATCH / 2;
-            if (i.lit || hover) fill(graphics(), nullptr, l - 2, t0 - 2, l + SWATCH + 2, t0 + SWATCH + 2, i.lit ? 0xfff0e080 : 0xc0f0e080);
-            fill(graphics(), nullptr, l, t0, l + SWATCH, t0 + SWATCH, 0xff000000 | rgb);
-        } else {
-            const char* text = i.value.empty() ? i.text.get() : i.value.c_str();
-            draw_text(i.lit || hover ? CONTEXT_FONT_LIT : CONTEXT_FONT_VID, x + (i.button ? 0 : 0), cy - ch / 2, text, false, OPTION_STEP);
-            if (i.lit) reinterpret_cast<FillRect_t>(FILL_RECT)(graphics(), nullptr, x, cy + ch / 2 + 1, x + iw - 8, cy + ch / 2 + 3, 0xe0f0e080);
-        }
-        if (i.button) g_option_hits.push_back({x - 2, cy - SLOT / 2, x + iw, cy + SLOT / 2, i.act, i.object});
-    });
+            if (pass == 2 && i.button) g_option_hits.push_back({x - 2, cy - SLOT / 2, x + iw, cy + SLOT / 2, i.act, i.object});
+        });
+    }
 }
 
 // The object of the strip under the mouse, 0 when none.
@@ -9091,22 +9291,33 @@ void draw_mines() {
     const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
     static const uint32_t COLOURS[4] = {0xf030c030, 0xf0e03020, 0xf0e0d020, 0xf0909090};
     auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
+    std::vector<uint8_t*> mines;
     for_each_object([&](uint8_t* o) {
-        if (removed(o) || (nvid_of(o) != VID_MINE && nvid_of(o) != VID_MINE_MARKER)) return;
+        if (!removed(o) && (nvid_of(o) == VID_MINE || nvid_of(o) == VID_MINE_MARKER)) mines.push_back(o);
+    });
+    if (mines.empty()) return;
+    // the squares first (Direct3D), then the pictures and the labels (software) under one lock -
+    // mine by mine each label had its own lock after a square (SoftwareLock)
+    for (uint8_t* o : mines) {
+        const float sx = at<float>(o, O_X) - cam_x, sy = at<float>(o, O_Y) - at<float>(o, O_Z) - cam_y;
+        const int army = nvid_of(o) == VID_MINE_MARKER ? 1 : army_of(o);   // a marker becomes an enemy mine or nothing
+        fill(graphics(), nullptr, sx - 12, sy - 12, sx + 12, sy - 10, COLOURS[army]);
+        fill(graphics(), nullptr, sx - 12, sy + 10, sx + 12, sy + 12, COLOURS[army]);
+        fill(graphics(), nullptr, sx - 12, sy - 12, sx - 10, sy + 12, COLOURS[army]);
+        fill(graphics(), nullptr, sx + 10, sy - 12, sx + 12, sy + 12, COLOURS[army]);
+    }
+    SoftwareLock locked;
+    for (uint8_t* o : mines) {
         const float sx = at<float>(o, O_X) - cam_x, sy = at<float>(o, O_Y) - at<float>(o, O_Z) - cam_y;
         // hidden from the player: drawn where the engine would (draw_vid takes the map's y and lifts it by z
         // itself - given sy, which is lifted already, the flag stood its height above the mine)
         if (at<uint32_t>(o, O_FLAGS) & 0x8000) draw_vid(vid_of(o), 0, sx, at<float>(o, O_Y) - cam_y, at<float>(o, O_Z));
         const bool marker = nvid_of(o) == VID_MINE_MARKER;
-        const int army = marker ? 1 : army_of(o);   // a marker becomes an enemy mine or nothing
-        fill(graphics(), nullptr, sx - 12, sy - 12, sx + 12, sy - 10, COLOURS[army]);
-        fill(graphics(), nullptr, sx - 12, sy + 10, sx + 12, sy + 12, COLOURS[army]);
-        fill(graphics(), nullptr, sx - 12, sy - 12, sx - 10, sy + 12, COLOURS[army]);
-        fill(graphics(), nullptr, sx + 10, sy - 12, sx + 12, sy + 12, COLOURS[army]);
+        const int army = marker ? 1 : army_of(o);
         const std::string label = ui_printf(marker ? ui_format("MapMineMarker", "MINE 1 IN 3: %s") : ui_format("MapMine", "MINE: %s"),
                                             ui_text(ARMY_CHOICE_KEYS[army], ARMY_CHOICES[army]));
         draw_text(FONT_TIPS, sx + 15, sy - 6, label.c_str(), false, 3);
-    });
+    }
 }
 
 // While a host's panel is open: each socket's number at its place on the wall (the panel's rows
@@ -9178,9 +9389,11 @@ void draw_overlay() {
                           on_options(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y));
     const float mx = cam_x + g_mouse.x, my = cam_y + g_mouse.y;
 
+    prof::Lap lap;
     double began = ground_clock();
     if (g_show_heights || tool() == Tool::Height) draw_contours();
     g_frame_times.contours += ground_clock() - began;
+    lap.to(prof::ED_HEIGHTS);
     for (uint8_t* o : g_selection) circle(o, 1);
     // a selected train's patrol: its far point, marked like the route markers' squares
     int px = 0, py = 0;
@@ -9224,6 +9437,7 @@ void draw_overlay() {
             reinterpret_cast<FillRect_t>(FILL_RECT)(g, nullptr, sx - 5, sy - 5, sx + 5, sy + 5, 0xe020f020);
         }
     }
+    lap.to(prof::ED_MARKS);
     int cursor = CURSOR_ARROW;
     if (over_bar && g_mouse.x >= 0 && !panel_open() && tool() == Tool::Track && !g_line.empty())
         draw_track();   // the line's next rails stay in sight with the cursor over the bar too
@@ -9319,18 +9533,29 @@ void draw_overlay() {
         }
     }
     set_cursor(cursor);
+    lap.to(prof::ED_TOOL);
     draw_regions();
+    lap.to(prof::ED_REGIONS);
     draw_mines();
-    draw_push_lines(tool() == Tool::PushLine);
-    draw_enemy_trains();
-    draw_arrivals();
+    lap.to(prof::ED_MARKS);
+    {
+        const RailMemo memo;   // these three only read the rail network (RailMemo)
+        draw_push_lines(tool() == Tool::PushLine);
+        lap.to(prof::ED_LINES);
+        draw_enemy_trains();
+        lap.to(prof::ED_TRAINS);
+        draw_arrivals();
+        lap.to(prof::ED_ARRIVALS);
+    }
 
     began = ground_clock();
     draw_bar();
     g_frame_times.bar += ground_clock() - began;
+    lap.to(prof::ED_BAR);
     began = ground_clock();
     draw_options();
     g_frame_times.options += ground_clock() - began;
+    lap.to(prof::ED_ROWS);
 
     // the status line, in the mouse tips' font on a dark band: the tool_text (or the entry under
     // the cursor), the undo and redo counts, "not saved" and the last message
@@ -9366,6 +9591,7 @@ void draw_overlay() {
                   static_cast<unsigned>(g_undo.size()), static_cast<unsigned>(g_redo.size()),
                   g_dirty ? ui_text("StatusNotSaved", " - not saved") : "",
                   GetTickCount() - g_message_time < 6000 ? g_message.c_str() : "");
+    SoftwareLock locked(vid_by_number(FONT_TIPS) != nullptr);   // the status lines are text only: one lock for all of them (above); not for the GDI text without the font
     status_line(v.l, v.t, status);
     if (tool() == Tool::Track) status_line(v.l, v.t + LINE_HEIGHT, g_track_status.c_str());
     if (tool() == Tool::PushLine) status_line(v.l, v.t + LINE_HEIGHT, g_push_status.c_str());
@@ -9402,12 +9628,15 @@ void draw_overlay() {
     int below = tool() == Tool::Track ? 3 : 2;   // below the tool's lines (the Track tool has two)
     if (!g_line_status.empty()) status_line(v.l, v.t + below++ * LINE_HEIGHT, g_line_status.c_str());   // the push line under the cursor
     if (!g_enemy_status.empty()) status_line(v.l, v.t + below * LINE_HEIGHT, g_enemy_status.c_str());
+    locked.unlock();
+    lap.to(prof::ED_STATUS);
     music_draw();
     draw_sockets();
     draw_context();
     draw_row_tip();
     draw_hint();
     panel_draw(g_mouse);   // the Help and Menu buttons, an open panel in front of everything
+    lap.to(prof::ED_PANELS);
 }
 
 // The map against the void: the camera of a held level goes 300 px past the map (camera.cpp), where
@@ -9441,17 +9670,23 @@ void draw_map_frame() {
 
 void __fastcall DrawScene_editor(void* g, void* edx, int draw) {
     const bool held = editor_level_held() && draw;
+    prof::Lap lap;
     relief_flush();   // the strokes' changes since the last frame: into the picture and its textures
     ground_flush();
+    lap.to(prof::ED_FLUSH);
     const double began = ground_clock();
     g_draw_scene(g, edx, draw);
     g_frame_times.scene += ground_clock() - began;
     if (held) {
         ++g_frame_times.frames;
+        prof::Lap frame;
         draw_map_frame();
+        frame.to(prof::ED_FRAME);
         draw_overlay();
     }
+    prof::Lap saved;
     if (draw) panel_draw_saved();   // the SAVED notice, also over the level Run the level runs
+    saved.to(prof::ED_PANELS);
 }
 
 }  // namespace
