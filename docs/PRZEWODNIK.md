@@ -1,6 +1,6 @@
 # OpenLocoland - przewodnik gracza
 
-Wersja 0.2.5; edytor map jest wciąż w budowie. [English version: GUIDE.md](GUIDE.md)
+Wersja 0.2.7; edytor map jest wciąż w budowie. [English version: GUIDE.md](GUIDE.md)
 
 **OpenLocoland** to nieoficjalna, fanowska nowa edycja gry **Locoland** (Gromada / ESDigital
 Games, 2003): oryginalna gra działa z poprawkami dla dzisiejszego Windowsa, kilkoma ulepszeniami,

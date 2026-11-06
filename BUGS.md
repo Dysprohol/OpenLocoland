@@ -313,7 +313,7 @@ Harmless log errors:
   `z` and a backspace on an empty name, `menutact.lgc` has an empty first line, `constants.lgc`
   two more entries (258, 260) in a table of VIDs and their values - its `logo.lgc` and
   `constants.lgc` are byte for byte those of the English beta/demo disc of 2003, so the Russian
-  depot has part of the scripts of that older build. Since 2026-11-06 (after 0.2.5) a Steam file that
+  depot has part of the scripts of that older build. Since 0.2.7 a Steam file that
   is not the known one is accepted when our patches can be placed in it (by their lines, not only
   their line numbers: `patch_text.apply_patch`), `logo.lgc.patch` no longer touches the movies'
   lines, and a file our changes do not fit stops the build naming the file and the change - or,

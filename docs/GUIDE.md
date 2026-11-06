@@ -1,6 +1,6 @@
 # OpenLocoland - player's guide
 
-Version 0.2.5; the map editor is still work in progress. [Polish version: PRZEWODNIK.md](PRZEWODNIK.md)
+Version 0.2.7; the map editor is still work in progress. [Polish version: PRZEWODNIK.md](PRZEWODNIK.md)
 
 **OpenLocoland** is an unofficial, fan-made new edition of **Locoland** (Gromada / ESDigital
 Games, 2003): the original game runs with fixes for today's Windows, a few improvements, a page
