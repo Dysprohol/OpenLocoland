@@ -304,6 +304,24 @@ Harmless log errors:
   line 36 - built, the scripts the same as from the clean copy; another change of
   `constants.lgc` and a line added to `maps\menu.lgc` - stopped (`build.py`, and Setup's
   `--silent` with the Polish text, nothing installed).
+- GitHub issue #4 (2026-11-05): Setup 0.2.5 refused a verified, freshly installed Russian Steam
+  copy - `maps\logo.lgc`, `menu.lgc`, `script\constants.lgc` and `script\menutact.lgc` "modified".
+  They are the Russian depot's own (352136; the other five depots have the files of the known
+  SHA-256): `logo.lgc` plays the movies as `.avi` (`video\` has `.avi` files), `menu.lgc` and
+  `menutact.lgc` lay out the score line of the player's header differently (`%-13s` / `%32s`
+  instead of `%-20s` / `%25s`) and `menu.lgc` takes a player's name of up to 12 letters up to
+  `z` and a backspace on an empty name, `menutact.lgc` has an empty first line, `constants.lgc`
+  two more entries (258, 260) in a table of VIDs and their values. Since 2026-11-06 (after 0.2.5) a Steam file that
+  is not the known one is accepted when our patches can be placed in it (by their lines, not only
+  their line numbers: `patch_text.apply_patch`), `logo.lgc.patch` no longer touches the movies'
+  lines, and a file our changes do not fit stops the build naming the file and the change - or,
+  with "Skip version verification", stays as the player's with a warning of what is missing
+  (DEVELOPERS.md "Quick start"). Checked: built from the Russian depot (all patches placed, the
+  nine changes of `menutact.lgc` a line lower), the intro to the menu and POLIGON with its Esc
+  menu briefing in the game, no LOGIC or MOVIE errors in `error.log`; on a copy of the English
+  depot with a line our `menu.lgc.patch` needs changed and three lines added to the top of
+  `menutact.lgc` - refused naming `menu.lgc`'s first change; with `--skip-verify` (`build.py`, and
+  Setup's `--silent` in Polish) built with `menu.lgc` as it was and the warning.
 - Reported by a player of the original game on Windows 10: Alt+Tab spoils the game, and the
   train icons of the factory panel do not show. Neither happens in OpenLocoland (checked with
   `test_game.ps1`'s Alt+Tab step, `A`): in a window (1024x768, 1920x1080) and in full screen at

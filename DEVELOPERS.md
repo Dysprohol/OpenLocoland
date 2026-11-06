@@ -102,13 +102,26 @@ and `OpenLocoland.json`.
 The Steam copy has to be the original. `build.py` (and so Setup) stops when `Steam.exe` is not
 the exe of 2003-10-07 that LocoFix is made for (its SHA-256 in `build.py`; the same exe for every
 language) and asks to restore it in Steam (Properties > Installed Files > Verify integrity of
-game files; Setup says it in its own languages). So it does, before anything is built, when a
-file our patches change differs from the original (the targets of `game/**/*.patch` and of the
-script patches of `lang/<code>/`, by their SHA-256 in `build.py`, the same in every language):
-an old way to turn on the developer keys was to edit `maps\script\constants.lgc` in the Steam
-folder, and the patch then stopped Setup with a Python error. A `#define KEYS_ENABLE` line added
-there is left out by itself when the file without it is the original exactly - the launcher's
-Cheats option does that job now. Of the Steam folder's root only the game's own
+game files; Setup says it in its own languages). The files our patches change (the targets of
+`game/**/*.patch` and of the script patches of `lang/<code>/`) are checked before anything is
+built: a file with the SHA-256 in `build.py` (`ORIGINAL_SHA256`: these files are byte for byte the
+same in the English, German, Hungarian, Polish and Portuguese depots) takes the patches as it is; any other is
+fine as long as every patch that targets it can be placed, and the log says so once ("maps\logo.lgc:
+not the known Steam file, our changes still apply"). The Russian depot is such a copy: four of its
+scripts differ (`BUGS.md`, "Running on current Windows"). `patch_text.apply_patch` places each
+change (hunk) by its lines, byte for byte - at its line number, else where they occur exactly
+once in the file (the Russian `menutact.lgc` has an empty line more at its top, so all nine of its
+changes land a line lower) - and our patches avoid lines a depot changes: `logo.lgc.patch` does
+not touch the movies' lines, whose clip names differ (below, "the intro"). When a change cannot be
+placed (its lines are not there, or twice), `build.py` and Setup stop and name the file and the
+change (`build.modified_steam_files`, the one decision for both; Setup's `modified_files` text
+asks to verify the game files in Steam). Setup's "Skip version verification" box (`--skip-verify`
+of `build.py` and Setup) goes on instead: such a file is left as the player's, and the log and the
+window say which of our features it carries will be missing (`build.FEATURES`; Setup's
+`feature_*` texts), so a player can always install. An old way to turn on the developer keys was
+to edit `maps\script\constants.lgc` in the Steam folder, and the patch then stopped Setup with a
+Python error: a `#define KEYS_ENABLE` line there is left out by itself - the launcher's Cheats
+option does that job now. Of the Steam folder's root only the game's own
 files and folders are used (`Steam.exe`, `objects.res`, `strings.ini`, `steam.cfg`, `cursores`,
 `fonts`, `maps`, `music`, `vid`, `video`, `wav`): anything a player added there - another
 DirectDraw wrapper (dgVoodoo2, DDrawCompat, cnc-ddraw), DxWnd, their settings - is ignored and
@@ -3443,8 +3456,12 @@ mode above) are not tested in full screen.
   shown for the first half of a fade) and VID 481 (`vid\logo.bmp` of the language: LOCOLAND /
   STEAMLAND on black, 640x480, 24-bit BMP converted to a sprite at load) for 6 s (`WAIT_TIME`) or
   until a key or a click, both `MenuCreate`d at the screen's centre - then a fade and the menu.
+  (The Russian depot has the same movies as `.avi` files, and its `logo.lgc` plays those names.)
   `build.py` does not copy the Steam `video\` folder (`SKIPPED_DIRS`) and `game/maps/logo.lgc.patch`
-  comments the four `PlayMovie` lines out, so the start is the title board alone: `game/objects.override`
+  puts the movies' part of the chain under `#ifdef ORIGINAL_MOVIES` (never defined), with an `#else`
+  that takes the same steps without the movies (the same `iff` blocks, each `Pause(1)`) - so the
+  patch does not touch the movies' lines and fits both depots (until 0.2.5 it commented the four
+  `PlayMovie` lines out, which the Russian file does not have) - and the start is the title board alone: `game/objects.override`
   points VID 481 at `vid\481logo.vid`, which `build.py` makes at install time
   (`patch_data.make_logo_board`, so nothing of it is in the repository or the payload): a sprite of
   the board's kind and size (640x480, 16-bit, no palette, one frame) with only the logo's pixels

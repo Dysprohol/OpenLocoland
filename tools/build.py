@@ -2,20 +2,28 @@ r"""Assembles the ready game from the Steam original and the repo contents.
 
     python tools\build.py [--target <folder>] [--steam <game folder in Steam>]
                           [--locofix <LocoFix.dll>] [--captured <folder>] [--dev] [--no-clean]
+                          [--skip-verify]
 
 The default target is the folder Locoland next to the repository (..\Locoland).
 --locofix takes a prebuilt LocoFix.dll instead of compiling src\LocoFix (the installer,
 tools/release.py), --captured keeps the language captures in another folder than captured/,
 --dev copies the developer helpers of game/ too (run_map.cmd, edit_map.cmd), which a build
-without it leaves out and removes from the target, --no-clean removes nothing (clean_up).
+without it leaves out and removes from the target, --no-clean removes nothing (clean_up),
+--skip-verify goes on with a Steam.exe of another version and with Steam files our changes
+cannot be placed in (below).
 
 The Steam copy has to be the original: Steam.exe must be the Steam version of 2003-10-07 (its
 SHA-256, the exe LocoFix is made for) - a changed or replaced exe stops the build with a request
-to verify the game files in Steam - and so must every file our patches change (scripts and
-menus: game/**/*.patch and the scripts of lang/<code>/; their SHA-256, the same in every
-language), checked before anything is built. One edit players made is undone instead: a
-`#define KEYS_ENABLE` line added to maps\script\constants.lgc to turn on the developer keys (the
-launcher's Cheats option now), when without it the file is the original byte for byte. Only the
+to verify the game files in Steam. The files our patches change (scripts and menus:
+game/**/*.patch and the scripts of lang/<code>/) are checked before anything is built: one with
+the SHA-256 of the Polish and English depots (ORIGINAL_SHA256) is fine; another one - the Russian
+depot's differ in four of them, or a player changed it - is fine when every patch that targets it
+can be placed (patch_text.apply_patch places a change by its lines; logged once per file), and
+stops the build naming the file and the change that cannot be placed otherwise. With
+--skip-verify (Setup's "Skip version verification") such a file is left as the player's, with a
+warning naming what of ours it would carry (FEATURES), and the build goes on. One edit players
+made is undone first: a `#define KEYS_ENABLE` line added to maps\script\constants.lgc to turn on
+the developer keys (the launcher's Cheats option now). Only the
 game's own files and folders of the Steam folder's root are used: anything else there (a
 DirectDraw wrapper such as dgVoodoo2, DDrawCompat or cnc-ddraw, DxWnd, config files) is ignored
 and listed, and such a file copied into the target by an older build is removed.
@@ -114,9 +122,10 @@ VERSIONS = {
 STEAM_VERSION = VERSIONS["steam"]
 STEAM_EXE_SHA256 = STEAM_VERSION["exe_sha256"]
 
-# The files of the Steam version our patches change (the same in every language): a file that
-# differs was changed by the player, and the build stops before anything is written. A patch of
-# a file missing here is checked by applying it.
+# The files of the Steam version our patches change, as the Polish and English depots have them
+# (build 17481288). A file that differs - the Russian depot's logo.lgc, menu.lgc, constants.lgc
+# and menutact.lgc, or a file a player changed - is checked by placing the patches in it
+# (modified_steam_files), and so is a patch of a file missing here.
 ORIGINAL_SHA256 = {
     os.path.join("maps", "logo.lgc"): "6b055bf8124832bd334dc2f28d2566cc35a16876b80791c3c1d27c109196dce9",
     os.path.join("maps", "menu.lgc"): "0d1058f31ca2904660acc69e2e8fad7a433e5d2d93f5158884e5267dfb95fc39",
@@ -129,12 +138,36 @@ ORIGINAL_SHA256 = {
     os.path.join("maps", "script", "trainstactfunctions.lgc"): "c6454480a5738d0af28dc7fa8df9967710e496752a869bd9e9b81038deceb5fb",
 }
 # A player's edit of a Steam script that is undone: the `#define KEYS_ENABLE` lines added to
-# constants.lgc for the developer keys, when the file without them is the original.
+# constants.lgc for the developer keys (no version of the game has one).
 CONSTANTS_LGC = os.path.join("maps", "script", "constants.lgc")
 KEYS_ENABLE_LINE = re.compile(rb"^[ \t]*#define[ \t]+KEYS_ENABLE\b[^\r\n]*(\r?\n|$)", re.M)
-MODIFIED_FILES = ("Locoland's files in {path} are modified: {files}. Restore them in Steam: Locoland > "
-                  "Properties > Installed Files > Verify integrity of game files, then build again "
-                  "(OpenLocoland has its own Cheats option for the developer keys).")
+MODIFIED_FILES = ("Locoland's files in {path} differ from those OpenLocoland knows and our changes cannot be "
+                  "placed in them: {files}. Restore them in Steam: Locoland > Properties > Installed Files > "
+                  "Verify integrity of game files, then build again (OpenLocoland has its own Cheats option "
+                  "for the developer keys) - or build with --skip-verify, which leaves these files as they "
+                  "are, without our changes.")
+# What of ours each patched Steam file carries: named when the file is left as the player's
+# (skip_verify). The keys are Setup's too ("feature_<key>" of installer.TEXTS).
+FEATURES = {
+    os.path.join("maps", "logo.lgc"): "intro",
+    os.path.join("maps", "menu.lgc"): "custom_maps",
+    os.path.join("maps", "script", "basefunctions.lgc"): "custom_play",
+    os.path.join("maps", "script", "initdefault.lgc"): "custom_play",
+    os.path.join("maps", "script", "menuend.lgc"): "custom_play",
+    os.path.join("maps", "script", "menutact.lgc"): "esc_menu",
+    os.path.join("maps", "script", "constants.lgc"): "cheats",
+    os.path.join("maps", "script", "debug_functions.lgc"): "dev_texts",
+    os.path.join("maps", "script", "trainstactfunctions.lgc"): "dev_texts",
+}
+FEATURE_TEXTS = {
+    "intro": "the intro without the movies (the game looks for them - they are not copied - and logs an error)",
+    "custom_maps": "the custom maps page and the map editor in the menu, the All missions option",
+    "custom_play": "the custom maps' own objectives, scores and the way back to their page",
+    "esc_menu": "the custom maps' Esc menu (their briefing, restart, BACK TO THE EDITOR)",
+    "cheats": "the Cheats option (the developer keys)",
+    "dev_texts": "the translated texts of the developer mode",
+    "other": "our changes of it",
+}
 MODIFIED_STEAM = ("Steam.exe in {path} is not the original file of the game (it was changed or replaced). "
                   "Restore the original in Steam: Locoland > Properties > Installed Files > Verify integrity "
                   "of game files, then build again.")
@@ -299,7 +332,13 @@ def steam_exe_original(steam, version=None, skip_verify=False):
     return hashlib.sha256(data).hexdigest() == STEAM_EXE_SHA256
 
 
-_told = set()
+_told = set()   # what was logged once: (the Steam file, what)
+
+
+def tell_once(path, what, line):
+    if (os.path.normcase(os.path.abspath(path)), what) not in _told:
+        _told.add((os.path.normcase(os.path.abspath(path)), what))
+        print(line)
 
 
 def known_sha256(rel):
@@ -308,45 +347,72 @@ def known_sha256(rel):
 
 def steam_original(steam, path):
     """The content of a Steam file our changes apply to; maps\\script\\constants.lgc with the
-    `#define KEYS_ENABLE` lines of a player left out when that gives the original exactly."""
+    `#define KEYS_ENABLE` lines of a player left out."""
     data = patch_text.read(path)
     rel = safe_relpath(path, steam)
     if os.path.normcase(rel) != os.path.normcase(CONSTANTS_LGC):
         return data
-    if hashlib.sha256(data).hexdigest() != known_sha256(rel):
-        undone = KEYS_ENABLE_LINE.sub(b"", data)
-        if hashlib.sha256(undone).hexdigest() == known_sha256(rel):
-            if path not in _told:
-                print(f"{CONSTANTS_LGC}: the Steam file's #define KEYS_ENABLE left out "
-                      "(the developer keys are the launcher's Cheats option)")
-                _told.add(path)
-            return undone
-    return data
+    undone = KEYS_ENABLE_LINE.sub(b"", data)
+    if undone != data:
+        tell_once(path, "keys", f"{CONSTANTS_LGC}: the Steam file's #define KEYS_ENABLE left out "
+                                "(the developer keys are the launcher's Cheats option)")
+    return undone
 
 
-def modified_steam_files(steam):
-    """The files of the Steam folder our patches change that differ from the original - changed
-    by the player (relative paths, sorted): the targets of the patches of game/ and of the script
-    patches of the language packs (the language texts' patches apply to the captured files)."""
+def steam_changes():
+    """(change file, Steam file) of every patch applied to a file of the Steam folder: the patches
+    of game/ and the script patches of the language packs (the language texts' patches apply to
+    the captured files)."""
     changes = [(os.path.join(REPO, "game", rel), patch_text.target_name(rel))
                for rel in game_files(os.path.join(REPO, "game")) if rel.endswith(".patch")]
     for code in languages.packs():
         for rel, path in languages.pack_files(code):
             if path.endswith(".patch") and not languages.is_language_file(patch_text.target_name(path)):
                 changes.append((os.path.join(languages.LANG, code, rel), patch_text.target_name(path)))
-    bad = set()
-    for change, name in changes:
+    return changes
+
+
+def modified_steam_files(steam):
+    """The Steam files our patches cannot be placed in: {relative path: [(change file, why)]},
+    sorted by path - empty when every patch applies. A file with the known SHA-256 takes its
+    patches as it is; another one (another depot's, or changed by a player) is tried with each
+    patch that targets it, and when all of them apply it is logged once ("not the known Steam
+    file, our changes still apply"). build.py and Setup decide with it."""
+    bad, unknown = {}, set()
+    for change, name in steam_changes():
         path = os.path.join(steam, name)
         try:
             data = steam_original(steam, path)
-            if known_sha256(name):
-                if hashlib.sha256(data).hexdigest() != known_sha256(name):
-                    bad.add(name)
-            else:
-                patch_text.changed_file(change, path, data)
-        except (OSError, ValueError):
-            bad.add(name)
-    return sorted(bad, key=str.lower)
+            if hashlib.sha256(data).hexdigest() == known_sha256(name):
+                continue
+            unknown.add(name)
+            patch_text.changed_file(change, path, data)
+        except OSError:
+            bad.setdefault(name, []).append((change, "the file is missing"))
+        except patch_text.PatchError as e:
+            bad.setdefault(name, []).append((change, e.short()))
+        except ValueError as e:
+            bad.setdefault(name, []).append((change, str(e)))
+    for name in sorted(unknown - set(bad), key=str.lower):
+        tell_once(os.path.join(steam, name), "unknown", f"{name}: not the known Steam file, our changes still apply")
+    return {name: bad[name] for name in sorted(bad, key=str.lower)}
+
+
+def describe_modified(modified, sep="; "):
+    """The files of modified_steam_files with the changes that cannot be placed, for a message:
+    'maps\\logo.lgc (game\\maps\\logo.lgc.patch: change 2 of 4 (line 57: ...): not found)'."""
+    return sep.join(f"{name} ({', '.join(f'{safe_relpath(change, REPO)}: {why}' for change, why in problems)})"
+                    for name, problems in modified.items())
+
+
+def feature_of(name):
+    """The key of FEATURES (FEATURE_TEXTS, Setup's feature_<key>) of a Steam file our patches change."""
+    return {os.path.normcase(k): v for k, v in FEATURES.items()}.get(os.path.normcase(name), "other")
+
+
+def unplaced_changes(modified):
+    """The change files of modified_steam_files (normcased): left out with skip_verify."""
+    return {os.path.normcase(change) for problems in modified.values() for change, _ in problems}
 
 
 def foreign_root_entries(steam):
@@ -561,8 +627,15 @@ def build(steam, target, locofix=None, captured=None, progress=None, version=Non
     if has_locoland and has_steam:
         sys.exit(MODIFIED_STEAM.format(path=a.steam) + " (both Steam.exe and Locoland.exe present)")
     modified = modified_steam_files(a.steam)
-    if modified:
-        sys.exit(MODIFIED_FILES.format(path=a.steam, files=", ".join(modified)))
+    if modified and not skip_verify:
+        sys.exit(MODIFIED_FILES.format(path=a.steam, files=describe_modified(modified)))
+    # with skip_verify the changes that cannot be placed are left out: their files stay the player's
+    unplaced = unplaced_changes(modified)
+    for name, problems in modified.items():
+        print(f"Warning: {name} is left as in the Steam folder (skip verification: our changes cannot be "
+              f"placed in it) - missing: {FEATURE_TEXTS[feature_of(name)]}")
+        for change, why in problems:
+            print(f"  {safe_relpath(change, REPO)}: {why}")
     foreign = foreign_root_entries(a.steam)
     if foreign:
         print(f"Steam folder: not the game's, not used: {', '.join(foreign)}")
@@ -611,6 +684,8 @@ def build(steam, target, locofix=None, captured=None, progress=None, version=Non
             if rel.lower() in DEV_FILES and not dev:
                 continue
             copy(os.path.join(game, rel), os.path.join(a.target, rel), copied)
+        elif os.path.normcase(os.path.join(game, rel)) in unplaced:
+            copy(os.path.join(a.steam, name), os.path.join(a.target, name), copied)   # warned above
         else:
             try:
                 copied[0] += write(
@@ -636,7 +711,7 @@ def build(steam, target, locofix=None, captured=None, progress=None, version=Non
             print(f"lang/{code}: built on captured/{base} (no captured/{languages.pack_base(code)}): "
                   f"its fonts and logo are those of {base}")
         written = languages.install(code, a.steam, a.target, lambda src, dst: copy(src, dst, copied),
-                                    lambda path: steam_original(a.steam, path), write)
+                                    lambda path: steam_original(a.steam, path), write, skip=unplaced)
         copied[0] += written
     # the language of the game's root, which the launcher falls back on when the saved pack is gone
     root = "en" if english else root_language(a.steam)
@@ -738,8 +813,10 @@ def main():
     p.add_argument("--captured", help="the folder of the language captures (default: captured/)")
     p.add_argument("--dev", action="store_true", help="copy the developer helpers run_map.cmd and edit_map.cmd too")
     p.add_argument("--no-clean", action="store_true", help="remove nothing earlier versions left in the target")
+    p.add_argument("--skip-verify", action="store_true",
+                   help="go on with another Steam.exe and leave the Steam files our changes cannot be placed in as they are")
     a = p.parse_args()
-    build(a.steam, a.target, a.locofix, a.captured, dev=a.dev, clean=not a.no_clean)
+    build(a.steam, a.target, a.locofix, a.captured, dev=a.dev, clean=not a.no_clean, skip_verify=a.skip_verify)
 
 
 if __name__ == "__main__":

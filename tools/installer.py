@@ -108,7 +108,7 @@ TEXTS = {
         "options": "Options (they can be changed later in the game's launcher window)",
         "cheats": "Cheats (developer keys: h, W, B, A, K, M, #, x)",
         "unlock": "All missions unlocked (your progress stays as it is)",
-        "skip_verify": "Skip version verification (for CD/beta-demo exes; patches may break)",
+        "skip_verify": "Skip version verification (other exes and changed game files)",
         "shortcuts": "Shortcuts",
         "desktop": "On the desktop",
         "start_menu": "In the Start menu",
@@ -123,7 +123,15 @@ TEXTS = {
         "bad_steam": "This folder has no Locoland from Steam (Steam.exe is missing):\n{path}",
         "inside_steam": "The install folder must not be the Steam folder of the game or inside it.",
         "modified_steam": "Steam.exe in this folder is not the original file of the game - it was changed or replaced (e.g. by a resolution fix):\n{path}\n\nRestore the original in Steam: right-click Locoland > Properties > Installed Files > Verify integrity of game files. Then run Setup again.",
-        "modified_files": "Your Locoland files in Steam are modified ({files}):\n{path}\n\nRestore them in Steam: right-click Locoland > Properties > Installed Files > Verify integrity of game files. Then run Setup again. OpenLocoland has its own option for the developer keys: Cheats, below.",
+        "modified_files": "Your Locoland files in Steam differ from those OpenLocoland knows, and our changes do not fit them:\n{files}\n\n{path}\n\nRestore them in Steam: right-click Locoland > Properties > Installed Files > Verify integrity of game files. Then run Setup again. Or tick \"Skip version verification\": these files are left as they are, without our changes. OpenLocoland has its own option for the developer keys: Cheats, below.",
+        "unplaced": "Warning: {file} is left as in Steam (our changes do not fit it) - missing: {feature}",
+        "feature_intro": "the intro without the movies",
+        "feature_custom_maps": "the custom maps page and the map editor in the menu, All missions",
+        "feature_custom_play": "the custom maps' objectives, scores and the way back to their page",
+        "feature_esc_menu": "the custom maps' Esc menu (briefing, restart, back to the editor)",
+        "feature_cheats": "the Cheats option",
+        "feature_dev_texts": "the translated texts of the developer mode",
+        "feature_other": "our changes of it",
         "not_empty": "The folder is not empty and has no OpenLocoland install:\n{path}\n\n"
                      "Install there anyway? Its other files are left alone.",
         "running": "OpenLocoland is running from this folder. Close the game first.",
@@ -163,7 +171,7 @@ TEXTS = {
         "options": "Optionen (später im Startfenster des Spiels änderbar)",
         "cheats": "Cheats (Entwicklertasten: h, W, B, A, K, M, #, x)",
         "unlock": "Alle Missionen freigeschaltet (dein Fortschritt bleibt erhalten)",
-        "skip_verify": "Versionsprüfung überspringen (für CD/beta-demo exes; Patches können brechen)",
+        "skip_verify": "Versionsprüfung überspringen (andere exes und geänderte Spieldateien)",
         "shortcuts": "Verknüpfungen",
         "desktop": "Auf dem Desktop",
         "start_menu": "Im Startmenü",
@@ -178,7 +186,15 @@ TEXTS = {
         "bad_steam": "In diesem Ordner ist kein Locoland aus Steam (Steam.exe fehlt):\n{path}",
         "inside_steam": "Der Installationsordner darf nicht der Steam-Ordner des Spiels sein oder darin liegen.",
         "modified_steam": "Die Steam.exe in diesem Ordner ist nicht die Originaldatei des Spiels - sie wurde geändert oder ersetzt (z. B. durch einen Auflösungs-Fix):\n{path}\n\nStelle das Original in Steam wieder her: Rechtsklick auf Locoland > Eigenschaften > Installierte Dateien > Dateien auf Fehler überprüfen. Dann Setup erneut starten.",
-        "modified_files": "Deine Locoland-Dateien in Steam sind verändert ({files}):\n{path}\n\nStelle sie in Steam wieder her: Rechtsklick auf Locoland > Eigenschaften > Installierte Dateien > Dateien auf Fehler überprüfen. Dann Setup erneut starten. OpenLocoland hat für die Entwicklertasten eine eigene Option: Cheats, unten.",
+        "modified_files": "Deine Locoland-Dateien in Steam weichen von denen ab, die OpenLocoland kennt, und unsere Änderungen passen nicht zu ihnen:\n{files}\n\n{path}\n\nStelle sie in Steam wieder her: Rechtsklick auf Locoland > Eigenschaften > Installierte Dateien > Dateien auf Fehler überprüfen. Dann Setup erneut starten. Oder kreuze \"Versionsprüfung überspringen\" an: diese Dateien bleiben, wie sie sind, ohne unsere Änderungen. OpenLocoland hat für die Entwicklertasten eine eigene Option: Cheats, unten.",
+        "unplaced": "Warnung: {file} bleibt wie in Steam (unsere Änderungen passen nicht dazu) - es fehlt: {feature}",
+        "feature_intro": "das Intro ohne die Filme",
+        "feature_custom_maps": "die Seite der eigenen Karten und der Karteneditor im Menü, Alle Missionen",
+        "feature_custom_play": "Ziele, Punkte und der Weg zurück zur Seite der eigenen Karten",
+        "feature_esc_menu": "das Esc-Menü der eigenen Karten (Einweisung, Neustart, zurück zum Editor)",
+        "feature_cheats": "die Option Cheats",
+        "feature_dev_texts": "die übersetzten Texte des Entwicklermodus",
+        "feature_other": "unsere Änderungen daran",
         "not_empty": "Der Ordner ist nicht leer und enthält keine OpenLocoland-Installation:\n{path}\n\n"
                      "Trotzdem dort installieren? Seine anderen Dateien bleiben unberührt.",
         "running": "OpenLocoland läuft aus diesem Ordner. Beende zuerst das Spiel.",
@@ -217,7 +233,7 @@ TEXTS = {
         "options": "Beállítások (később a játék indítóablakában is módosíthatók)",
         "cheats": "Csalások (fejlesztői billentyűk: h, W, B, A, K, M, #, x)",
         "unlock": "Minden küldetés elérhető (az előrehaladásod nem változik)",
-        "skip_verify": "Verzióellenőrzés kihagyása (CD/beta-demo exekhez; javítások megszakadhatnak)",
+        "skip_verify": "Verzióellenőrzés kihagyása (más exek és módosított játékfájlok)",
         "shortcuts": "Parancsikonok",
         "desktop": "Az asztalon",
         "start_menu": "A Start menüben",
@@ -232,7 +248,15 @@ TEXTS = {
         "bad_steam": "Ebben a mappában nincs Steames Locoland (hiányzik a Steam.exe):\n{path}",
         "inside_steam": "A telepítési mappa nem lehet a játék Steam-mappája, és nem lehet azon belül.",
         "modified_steam": "Ebben a mappában a Steam.exe nem a játék eredeti fájlja - módosították vagy kicserélték (pl. egy felbontásjavítás):\n{path}\n\nÁllítsd vissza az eredetit a Steamben: jobb klikk a Locolandon > Tulajdonságok > Telepített fájlok > Játékfájlok sértetlenségének ellenőrzése. Utána futtasd újra a Setupot.",
-        "modified_files": "A Locoland Steames fájljai módosítva vannak ({files}):\n{path}\n\nÁllítsd vissza őket a Steamben: jobb klikk a Locolandon > Tulajdonságok > Telepített fájlok > Játékfájlok sértetlenségének ellenőrzése. Utána futtasd újra a Setupot. Az OpenLocolandnak saját beállítása van a fejlesztői billentyűkhöz: Csalások, lent.",
+        "modified_files": "A Locoland Steames fájljai eltérnek azoktól, amelyeket az OpenLocoland ismer, és a változtatásaink nem illeszkednek hozzájuk:\n{files}\n\n{path}\n\nÁllítsd vissza őket a Steamben: jobb klikk a Locolandon > Tulajdonságok > Telepített fájlok > Játékfájlok sértetlenségének ellenőrzése. Utána futtasd újra a Setupot. Vagy jelöld be a \"Verzióellenőrzés kihagyása\" négyzetet: ezek a fájlok úgy maradnak, ahogy vannak, a változtatásaink nélkül. Az OpenLocolandnak saját beállítása van a fejlesztői billentyűkhöz: Csalások, lent.",
+        "unplaced": "Figyelem: {file} úgy marad, mint a Steamben (a változtatásaink nem illeszkednek hozzá) - hiányozni fog: {feature}",
+        "feature_intro": "az intro a filmek nélkül",
+        "feature_custom_maps": "a saját térképek oldala és a térképszerkesztő a menüben, Minden küldetés",
+        "feature_custom_play": "a saját térképek céljai, pontszámai és a visszaút az oldalukra",
+        "feature_esc_menu": "a saját térképek Esc menüje (eligazítás, újraindítás, vissza a szerkesztőbe)",
+        "feature_cheats": "a Csalások beállítás",
+        "feature_dev_texts": "a fejlesztői mód lefordított szövegei",
+        "feature_other": "a változtatásaink benne",
         "not_empty": "A mappa nem üres, és nincs benne OpenLocoland:\n{path}\n\n"
                      "Mégis ide telepítsem? A többi fájlja érintetlen marad.",
         "running": "Az OpenLocoland ebből a mappából fut. Előbb zárd be a játékot.",
@@ -271,7 +295,7 @@ TEXTS = {
         "options": "Opcje (można je później zmienić w oknie startowym gry)",
         "cheats": "Kody (klawisze twórców: h, W, B, A, K, M, #, x)",
         "unlock": "Wszystkie misje odblokowane (Twoje postępy pozostają bez zmian)",
-        "skip_verify": "Pomiń weryfikację wersji (dla CD/beta-demo exe; poprawki mogą nie zadziałać)",
+        "skip_verify": "Pomiń weryfikację wersji (inne exe i zmienione pliki gry)",
         "shortcuts": "Skróty",
         "desktop": "Na pulpicie",
         "start_menu": "W menu Start",
@@ -286,7 +310,15 @@ TEXTS = {
         "bad_steam": "W tym folderze nie ma Locoland ze Steama (brak Steam.exe):\n{path}",
         "inside_steam": "Folder instalacji nie może być folderem gry w Steamie ani leżeć w nim.",
         "modified_steam": "Steam.exe w tym folderze nie jest oryginalnym plikiem gry - został zmieniony lub podmieniony (np. przez poprawkę rozdzielczości):\n{path}\n\nPrzywróć oryginał w Steamie: prawy klik na Locoland > Właściwości > Zainstalowane pliki > Sprawdź spójność plików gry. Potem uruchom Setup jeszcze raz.",
-        "modified_files": "Twoje pliki Locoland w Steamie są zmienione ({files}):\n{path}\n\nPrzywróć je w Steamie: prawy klik na Locoland > Właściwości > Zainstalowane pliki > Sprawdź spójność plików gry. Potem uruchom Setup jeszcze raz. OpenLocoland ma własną opcję klawiszy twórców: Kody, poniżej.",
+        "modified_files": "Twoje pliki Locoland w Steamie różnią się od tych, które zna OpenLocoland, i nasze zmiany do nich nie pasują:\n{files}\n\n{path}\n\nPrzywróć je w Steamie: prawy klik na Locoland > Właściwości > Zainstalowane pliki > Sprawdź spójność plików gry. Potem uruchom Setup jeszcze raz. Albo zaznacz \"Pomiń weryfikację wersji\": te pliki zostaną takie, jakie są, bez naszych zmian. OpenLocoland ma własną opcję klawiszy twórców: Kody, poniżej.",
+        "unplaced": "Uwaga: {file} zostaje taki jak w Steamie (nasze zmiany do niego nie pasują) - zabraknie: {feature}",
+        "feature_intro": "intra bez filmów",
+        "feature_custom_maps": "strony własnych map i edytora map w menu, opcji Wszystkie misje",
+        "feature_custom_play": "celów i wyników własnych map oraz powrotu na ich stronę",
+        "feature_esc_menu": "menu Esc własnych map (odprawa, restart, powrót do edytora)",
+        "feature_cheats": "opcji Kody",
+        "feature_dev_texts": "przetłumaczonych tekstów trybu twórców",
+        "feature_other": "naszych zmian w nim",
         "not_empty": "Folder nie jest pusty i nie ma w nim OpenLocoland:\n{path}\n\n"
                      "Zainstalować mimo to? Pozostałe pliki zostaną nietknięte.",
         "running": "OpenLocoland jest uruchomiony z tego folderu. Najpierw zamknij grę.",
@@ -325,7 +357,7 @@ TEXTS = {
         "options": "Opções (podem ser alteradas mais tarde na janela inicial do jogo)",
         "cheats": "Batotas (teclas de programador: h, W, B, A, K, M, #, x)",
         "unlock": "Todas as missões desbloqueadas (o teu progresso fica como está)",
-        "skip_verify": "Ignorar verificação de versão (para exes CD/beta-demo; patches podem falhar)",
+        "skip_verify": "Ignorar verificação de versão (outros exes e ficheiros do jogo alterados)",
         "shortcuts": "Atalhos",
         "desktop": "No ambiente de trabalho",
         "start_menu": "No menu Iniciar",
@@ -340,7 +372,15 @@ TEXTS = {
         "bad_steam": "Esta pasta não tem o Locoland do Steam (falta o Steam.exe):\n{path}",
         "inside_steam": "A pasta de instalação não pode ser a pasta do jogo no Steam nem estar dentro dela.",
         "modified_steam": "O Steam.exe desta pasta não é o ficheiro original do jogo - foi alterado ou substituído (p. ex. por uma correção de resolução):\n{path}\n\nReponha o original no Steam: clique com o botão direito em Locoland > Propriedades > Ficheiros instalados > Verificar a integridade dos ficheiros do jogo. Depois execute o Setup outra vez.",
-        "modified_files": "Os seus ficheiros do Locoland no Steam foram alterados ({files}):\n{path}\n\nReponha-os no Steam: clique com o botão direito em Locoland > Propriedades > Ficheiros instalados > Verificar a integridade dos ficheiros do jogo. Depois execute o Setup outra vez. O OpenLocoland tem uma opção própria para as teclas de programador: Batotas, abaixo.",
+        "modified_files": "Os seus ficheiros do Locoland no Steam são diferentes dos que o OpenLocoland conhece, e as nossas alterações não encaixam neles:\n{files}\n\n{path}\n\nReponha-os no Steam: clique com o botão direito em Locoland > Propriedades > Ficheiros instalados > Verificar a integridade dos ficheiros do jogo. Depois execute o Setup outra vez. Ou marque \"Ignorar verificação de versão\": estes ficheiros ficam como estão, sem as nossas alterações. O OpenLocoland tem uma opção própria para as teclas de programador: Batotas, abaixo.",
+        "unplaced": "Aviso: {file} fica como no Steam (as nossas alterações não encaixam nele) - vai faltar: {feature}",
+        "feature_intro": "a introdução sem os filmes",
+        "feature_custom_maps": "a página dos mapas próprios e o editor de mapas no menu, Todas as missões",
+        "feature_custom_play": "os objetivos e pontuações dos mapas próprios e o regresso à sua página",
+        "feature_esc_menu": "o menu Esc dos mapas próprios (briefing, reiniciar, voltar ao editor)",
+        "feature_cheats": "a opção Batotas",
+        "feature_dev_texts": "os textos traduzidos do modo de programador",
+        "feature_other": "as nossas alterações nele",
         "not_empty": "A pasta não está vazia e não tem uma instalação do OpenLocoland:\n{path}\n\n"
                      "Instalar mesmo assim? Os outros ficheiros ficam intactos.",
         "running": "O OpenLocoland está a correr a partir desta pasta. Fecha primeiro o jogo.",
@@ -379,7 +419,7 @@ TEXTS = {
         "options": "Параметры (их можно изменить позже в окне запуска игры)",
         "cheats": "Читы (клавиши разработчиков: h, W, B, A, K, M, #, x)",
         "unlock": "Все миссии открыты (ваш прогресс не меняется)",
-        "skip_verify": "Пропустить проверку версии (для CD/beta-demo exe; патчи могут не работать)",
+        "skip_verify": "Пропустить проверку версии (другие exe и изменённые файлы игры)",
         "shortcuts": "Ярлыки",
         "desktop": "На рабочем столе",
         "start_menu": "В меню «Пуск»",
@@ -394,7 +434,15 @@ TEXTS = {
         "bad_steam": "В этой папке нет Locoland из Steam (нет Steam.exe):\n{path}",
         "inside_steam": "Папка установки не может быть папкой игры в Steam или находиться внутри неё.",
         "modified_steam": "Steam.exe в этой папке - не оригинальный файл игры: он изменён или заменён (например, исправлением разрешения):\n{path}\n\nВосстановите оригинал в Steam: правый щелчок по Locoland > Свойства > Установленные файлы > Проверить целостность файлов игры. Затем снова запустите Setup.",
-        "modified_files": "Ваши файлы Locoland в Steam изменены ({files}):\n{path}\n\nВосстановите их в Steam: правый щелчок по Locoland > Свойства > Установленные файлы > Проверить целостность файлов игры. Затем снова запустите Setup. У OpenLocoland есть своя настройка для клавиш разработчиков: Читы, ниже.",
+        "modified_files": "Ваши файлы Locoland в Steam отличаются от известных OpenLocoland, и наши изменения к ним не подходят:\n{files}\n\n{path}\n\nВосстановите их в Steam: правый щелчок по Locoland > Свойства > Установленные файлы > Проверить целостность файлов игры. Затем снова запустите Setup. Или отметьте \"Пропустить проверку версии\": эти файлы останутся как есть, без наших изменений. У OpenLocoland есть своя настройка для клавиш разработчиков: Читы, ниже.",
+        "unplaced": "Внимание: {file} остаётся как в Steam (наши изменения к нему не подходят) - не будет: {feature}",
+        "feature_intro": "заставки без видеороликов",
+        "feature_custom_maps": "страницы своих карт и редактора карт в меню, опции Все миссии",
+        "feature_custom_play": "целей и очков своих карт и возврата на их страницу",
+        "feature_esc_menu": "меню Esc своих карт (брифинг, перезапуск, возврат в редактор)",
+        "feature_cheats": "опции Читы",
+        "feature_dev_texts": "переведённых текстов режима разработчика",
+        "feature_other": "наших изменений в нём",
         "not_empty": "Папка не пуста, и в ней нет OpenLocoland:\n{path}\n\n"
                      "Всё равно установить туда? Остальные файлы останутся нетронутыми.",
         "running": "OpenLocoland запущена из этой папки. Сначала закройте игру.",
@@ -433,7 +481,7 @@ TEXTS = {
         "options": "Volby (lze je později změnit v úvodním okně hry)",
         "cheats": "Cheaty (klávesy vývojářů: h, W, B, A, K, M, #, x)",
         "unlock": "Všechny mise odemčené (tvůj postup zůstane, jak je)",
-        "skip_verify": "Přeskočit kontrolu verze (pro CD/beta-demo exe; opravy mohou nefungovat)",
+        "skip_verify": "Přeskočit kontrolu verze (jiná exe a změněné soubory hry)",
         "shortcuts": "Zástupci",
         "desktop": "Na ploše",
         "start_menu": "V nabídce Start",
@@ -448,7 +496,15 @@ TEXTS = {
         "bad_steam": "V této složce není Locoland ze Steamu (chybí Steam.exe):\n{path}",
         "inside_steam": "Instalační složka nesmí být složkou hry ve Steamu ani v ní ležet.",
         "modified_steam": "Steam.exe v této složce není původní soubor hry - byl změněn nebo nahrazen (např. opravou rozlišení):\n{path}\n\nObnovte originál ve Steamu: pravým tlačítkem na Locoland > Vlastnosti > Nainstalované soubory > Ověřit integritu herních souborů. Pak spusťte Setup znovu.",
-        "modified_files": "Vaše soubory Locoland ve Steamu jsou změněné ({files}):\n{path}\n\nObnovte je ve Steamu: pravým tlačítkem na Locoland > Vlastnosti > Nainstalované soubory > Ověřit integritu herních souborů. Pak spusťte Setup znovu. OpenLocoland má pro klávesy vývojářů vlastní volbu: Cheaty, níže.",
+        "modified_files": "Vaše soubory Locoland ve Steamu se liší od těch, které OpenLocoland zná, a naše změny do nich nepasují:\n{files}\n\n{path}\n\nObnovte je ve Steamu: pravým tlačítkem na Locoland > Vlastnosti > Nainstalované soubory > Ověřit integritu herních souborů. Pak spusťte Setup znovu. Nebo zaškrtněte \"Přeskočit kontrolu verze\": tyto soubory zůstanou, jak jsou, bez našich změn. OpenLocoland má pro klávesy vývojářů vlastní volbu: Cheaty, níže.",
+        "unplaced": "Pozor: {file} zůstává jako ve Steamu (naše změny do něj nepasují) - bude chybět: {feature}",
+        "feature_intro": "úvod bez filmů",
+        "feature_custom_maps": "stránka vlastních map a editor map v menu, Všechny mise",
+        "feature_custom_play": "cíle a skóre vlastních map a návrat na jejich stránku",
+        "feature_esc_menu": "menu Esc vlastních map (briefing, restart, zpět do editoru)",
+        "feature_cheats": "volba Cheaty",
+        "feature_dev_texts": "přeložené texty vývojářského režimu",
+        "feature_other": "naše změny v něm",
         "not_empty": "Složka není prázdná a není v ní OpenLocoland:\n{path}\n\n"
                      "Přesto do ní instalovat? Ostatní soubory zůstanou nedotčené.",
         "running": "OpenLocoland běží z této složky. Nejdřív hru ukonči.",
@@ -771,12 +827,24 @@ def remove_shortcuts(manifest):
             os.rmdir(folder)
 
 
+def steam_files_check(steam, lang, skip_verify=False):
+    """build.modified_steam_files for Setup, in the language `lang`: (the message that stops the
+    install, or None; the warnings for the files left as the player's with skip_verify)."""
+    modified = build.modified_steam_files(steam)
+    texts = TEXTS[lang]
+    if modified and not skip_verify:
+        return texts["modified_files"].format(path=steam, files=build.describe_modified(modified, "\n")), []
+    return None, [texts["unplaced"].format(file=name, feature=texts["feature_" + build.feature_of(name)])
+                  for name in modified]
+
+
 def install(steam, target, choices, ver, progress=None, skip_verify=False):
     """Assembles the game into `target`, writes the options (and the game's language when one is
     given), the shortcuts and the record of the install. `choices`: cheats, unlock, desktop,
     start_menu (bool), game_language (a code or None: keep the saved one) and lang (the language
-    of the shortcuts' names). `skip_verify`: bypass Steam.exe version check. Prints its log; stops
-    with SystemExit and the reason."""
+    of the shortcuts' names). `skip_verify`: bypass Steam.exe version check and leave the Steam files
+    our changes do not fit as they are. Prints its log; stops with SystemExit and the reason. Returns
+    the warnings of the files left so (steam_files_check)."""
     if not is_game(steam):
         sys.exit(f"No Locoland from Steam in {steam}")
     if inside(target, steam):
@@ -786,9 +854,9 @@ def install(steam, target, choices, ver, progress=None, skip_verify=False):
             print(f"Warning: Steam.exe in {steam} does not match a known version (continuing with --skip-verify)")
         else:
             sys.exit(TEXTS[choices["lang"]]["modified_steam"].format(path=steam))
-    modified = build.modified_steam_files(steam)
-    if modified:
-        sys.exit(TEXTS[choices["lang"]]["modified_files"].format(path=steam, files=", ".join(modified)))
+    stop, warnings = steam_files_check(steam, choices["lang"], skip_verify)
+    if stop:
+        sys.exit(stop)
     if game_running(target):
         sys.exit("Locoland is running from the install folder - close it first")
     locofix = os.path.join(BUNDLE, "LocoFix.dll") if BUNDLE else None
@@ -808,6 +876,9 @@ def install(steam, target, choices, ver, progress=None, skip_verify=False):
     with open(os.path.join(target, MANIFEST), "w", encoding="utf-8") as f:
         json.dump({"version": ver, "steam": steam, "captured": CAPTURED, "shortcuts": shortcuts, "files": files}, f,
                   indent=2)
+    for line in warnings:
+        print(line)
+    return warnings
 
 
 def make_shortcuts(target, choices, ver):
@@ -1173,9 +1244,9 @@ class Installer:
         if has_locoland and has_steam:
             self.error(self.t("modified_steam", path=steam) + " (both Steam.exe and Locoland.exe present)")
             return
-        modified = build.modified_steam_files(steam)
-        if modified:
-            self.error(self.t("modified_files", path=steam, files=", ".join(modified)))
+        stop, _ = steam_files_check(steam, self.lang, skip_verify)
+        if stop:
+            self.error(stop)
             return
         target = os.path.abspath(target)
         update = read_manifest(target) is not None
@@ -1201,10 +1272,10 @@ class Installer:
         out, err = sys.stdout, sys.stderr
         sys.stdout = sys.stderr = LogWriter(self.events)
         try:
-            install(steam, target, choices, self.version,
-                    lambda f: self.events.put(("progress", f)),
-                    skip_verify=choices.get("skip_verify", False))
-            self.events.put(("done", self.t("done", path=target)))
+            warnings = install(steam, target, choices, self.version,
+                               lambda f: self.events.put(("progress", f)),
+                               skip_verify=choices.get("skip_verify", False))
+            self.events.put(("done", "\n\n".join([self.t("done", path=target)] + warnings)))
         except SystemExit as e:
             self.events.put(("failed", str(e.code)))
         except Exception as e:   # anything else: shown, not lost in a closed console
@@ -1312,7 +1383,7 @@ def main():
     p.add_argument("--no-clean", action="store_true",
                    help="remove nothing that earlier versions left in the install folder")
     p.add_argument("--skip-verify", action="store_true",
-                   help="skip Steam.exe version verification (for CD/beta-demo exes; may break patches)")
+                   help="go on with a Steam.exe of another version (CD/beta-demo) and leave the Steam files our changes do not fit as they are, with a warning")
     p.add_argument("--captured", help="the folder of the language captures (default: " + DEFAULT_CAPTURED +
                    "; tests: a folder with only some languages)")
     a = p.parse_args()

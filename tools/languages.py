@@ -316,7 +316,7 @@ def capture(code, game_folder, force=False):
     return copied
 
 
-def install(code, game_folder, target, copy, read_original=None, write=None):
+def install(code, game_folder, target, copy, read_original=None, write=None, skip=()):
     """Assembles pack `code` into <target>\\lang\\<code>\\: the captured files (of its base, see
     build_base), then our files from lang/<code>/ at their place in the pack (pack_path; copied,
     or applied when they are changes). The originals of changed files come from the capture, or
@@ -330,6 +330,8 @@ def install(code, game_folder, target, copy, read_original=None, write=None):
     ones marked `!` (patch_text.merge_ini fill_only), and the font sheets only the cells the
     capture's fonts leave empty. language.ini is written with base= the capture built on (the
     launcher marks a pack on another language's capture unofficial, language.cpp).
+    `skip`: change files (normcased paths) left out - a script patch that cannot be placed in the
+    player's Steam file (build.py, skip_verify), so the pack has no copy and the root's is read.
     Returns the number of files written by the changes."""
     base = build_base(code)
     own = base == code
@@ -356,6 +358,8 @@ def install(code, game_folder, target, copy, read_original=None, write=None):
         name = patch_text.target_name(path)
         if name is None:
             copy(src, os.path.join(pack, path))
+            continue
+        if os.path.normcase(src) in skip:
             continue
         original = os.path.join(source, name)
         if not os.path.isfile(original):
