@@ -121,7 +121,12 @@ and the tester's "how do I change an object's height" had no answer either. Now:
   to notice, went on painting under the panel and after it with no button held. Checked in the game
   (POLIGON, radius 0): the drag raised 101 cells in a band; a Paint stroke with Help opened and the
   button let go over it ended there ("231x81 px"), and one dragged down over the rows and back painted
-  nothing under them (test steps `j` / `J`: the left button only pressed / let go). How a stroke
+  nothing under them (test steps `j` / `J`: the left button only pressed / let go). A Ramp stroke, laid
+when it ends, ends at the last cell the cursor had on the map (`Stroke.ramp_to`): let go over the bar, the
+rows or a panel - or ended by a panel, Alt+Tab, the capture lost - it ramped to the unseen ground under
+the cursor (the one case of the strokes' review left, 2026-11-06); its preview over the bar shows that
+end. Checked: a ramp dragged from 400,200 to 600,300 and down onto the bar, let go there - "ramp from cell
+112,167 to cell 137,179" (before: the cell under the bar, 137,234). How a stroke
   ends (`end_strokes(why)`, each end logged "edit: stroke: <kind> ended - <why>", each begin "edit:
   stroke: <kind> begun at x,y"): its own button let go (anywhere - the mouse is captured), a tool
   changed (Esc, a number key, the bar), a panel opened (F1, the Help / Menu button: the Height timer

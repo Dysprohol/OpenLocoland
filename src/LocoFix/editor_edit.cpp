@@ -4363,6 +4363,9 @@ struct Stroke {
     bool right = false;                    // Height: begun with the right button
     rail::Cell ramp_from = {-1, -1};       // Ramp: where the drag began and its level
     int ramp_level = 0;
+    rail::Cell ramp_to = {-1, -1};         // ... and the last cell the cursor had on the map (not under the
+                                           // bar, the rows, a panel or out of the window: let go there, the
+                                           // ramp ends here - the stroke closes whole)
     uint32_t seed = 0;                     // Rough: its randomness
     int steps = 0;
     // Height: the cells changed since the picture last followed (drawn once a frame, relief_flush)
@@ -4477,6 +4480,7 @@ void start_height_stroke(bool right) {
     }
     if (g_stroke.brush == Brush::Ramp) {
         g_stroke.ramp_from = c;
+        g_stroke.ramp_to = c;
         g_stroke.ramp_level = here;
         MESSAGE("MsgRampFrom", "ramp: from level %d - drag to its other end", here);
     }
@@ -4557,8 +4561,9 @@ float brush_weight(float d) {
 // ends get the level along it - the begin's level to the end's -, the edge as the brush's.
 void ramp_apply() {
     float x, y;
-    const rail::Cell a = g_stroke.ramp_from, b = cursor_cell(x, y);
+    const rail::Cell a = g_stroke.ramp_from, b = in_grid(g_stroke.ramp_to) ? g_stroke.ramp_to : cursor_cell(x, y);
     if (!in_grid(a) || !in_grid(b)) return;
+    patch::log("edit: ramp from cell %d,%d to cell %d,%d", a.first, a.second, b.first, b.second);
     const int la = g_stroke.ramp_level, lb = ground_cell(b.first, b.second);
     const float ux = static_cast<float>(b.first - a.first), uy = static_cast<float>(b.second - a.second), len2 = ux * ux + uy * uy;
     const int r = g_radius;
@@ -4631,7 +4636,12 @@ void height_dab(const rail::Cell& centre) {
 // raised 11 cells) and a ring drawn quickly did not close; now every cell of the way gets its step,
 // as a slow drag gives them. Held still, the repeat timer steps again where it is (`again`).
 void height_step(bool again = false) {
-    if (g_stroke.brush == Brush::Ramp) return;   // laid when the drag ends
+    if (g_stroke.brush == Brush::Ramp) {   // laid when the drag ends, to the last cell on the map
+        float rx, ry;
+        g_stroke.ramp_to = cursor_cell(rx, ry);
+        g_stroke.gap = false;
+        return;
+    }
     float x, y;
     const rail::Cell centre = cursor_cell(x, y);
     if (centre == g_stroke.last && !again) return;
@@ -7552,9 +7562,11 @@ void draw_ground_tool(bool heights) {
                 const float sx = cx * 8 + 4 - cam_x, sy = cy * 8 + 4 - z - cam_y;
                 fill(graphics(), nullptr, sx - 2, sy - 2, sx + 2, sy + 2, 0xc0000000u | rgb);
             }
-        if (g_stroke.active && g_stroke.brush == Brush::Ramp && in_grid(g_stroke.ramp_from) && in_grid(c)) {
-            // the ramp being dragged: its line at the levels it will give, from its begin to the cursor
-            const rail::Cell a = g_stroke.ramp_from;
+        const rail::Cell ramp_end = g_stroke.gap && in_grid(g_stroke.ramp_to) ? g_stroke.ramp_to : c;
+        if (g_stroke.active && g_stroke.brush == Brush::Ramp && in_grid(g_stroke.ramp_from) && in_grid(ramp_end)) {
+            // the ramp being dragged: its line at the levels it will give, from its begin to the cursor (over
+            // the bar or the rows: to the last cell on the map, where it ends if let go there)
+            const rail::Cell a = g_stroke.ramp_from, c = ramp_end;
             const int la = g_stroke.ramp_level, lb = ground_cell(c.first, c.second);
             const int n = (std::max)(1, static_cast<int>(std::hypot(c.first - a.first, c.second - a.second)));
             for (int k = 0; k <= n; ++k) {
