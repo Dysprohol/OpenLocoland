@@ -3125,9 +3125,16 @@ Engine_PutOnRails also couples to a car standing at the spot (`Engine_FindAdjace
 occupant): the cars leave their points first and `occupy_all` sets every car's points again after each
 operation. The engine's chain has each car's front end toward the car in front (`Engine_AttachToTrain`,
 `Train_MoveCars`), as the campaign's trains are laid (all but 4 of their couplings); POLIGON's two
-trains have every car the other way round - in play the engine logs `rail 1` / `zmdots5` for them -, so
-R, E, C and a placed car first give such a train's cars their ends swapped and their flag toggled
-(`normalize_chain`: the same place and look). The `edit:` lines of `LocoFix.log` give each decision
+trains had every car the other way round - in a run the engine logged `ENGINE 5: 0 rail 1`, `zmdots5`
+and `zmdots6` (`Engine_UpdateRear`'s unusual cases) for them in `error.log` -, so R, E, C and a placed
+car first give such a train's cars their ends swapped and their flag toggled (`normalize_chain`: the
+same place and look). game/maps.new/sandbox now has them the campaign's way (2026-11-06): each car's
+two rail positions swapped in its data (the chain's ids kept) and the east train's direction 128 ->
+129, exactly opposite its new front link, so the load sets the "stands backwards" flag (128 is 127
+off and would not) - the rows an E twice on a car of each train and a save give; loaded, both trains
+list as before with `back 1` (`D0:0`), and a run logs none of those lines. No map shipped has such a
+train any more (the 20 missions, the template), so there is no normalize at the load: a map made from
+an older POLIGON keeps them until R, E or C touches the train, and only the log lines show it. The `edit:` lines of `LocoFix.log` give each decision
 (`move train ... to the link ... laid / <why>`, `coupled ... px along the rails`, `couple ...: no free
 end along the rails (by the straight line: ...)`, `turned car ...`, `turned round ... rail points the
 same`, `uncoupled in front of / behind ... every car's place and ends kept`), and the test step `D<x>:<y>` lists the trains near the
