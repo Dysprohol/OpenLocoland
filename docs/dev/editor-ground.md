@@ -457,7 +457,7 @@ line (`StatusStripHover`); a click picks it as the palette would, [ and ] step t
 vehicles across the groups), < and > turn the pages. While the
 Track tool is chosen, its row holds RAIL: the four kinds (`RAIL_KINDS`, each drawn as its own straight
 rail across, the chosen one framed; a click picks it as V does) and RAILS GO: UP / FLAT / DOWN (the
-ramp of the wheel and PgUp / PgDn). While the Ground height or the Paint tool is chosen, a row of buttons stands above the bar's strip: the depot
+ramp of the wheel and PgUp / PgDn). While the Ground height, the Paint or the Water tool is chosen, a row of buttons stands above the bar's strip (Water: KIND - the five of `WATER_KINDS`, W cycles them - and SIZE, since 2026-11-06; before, the kind was W's alone): the depot
 panel's strip (VID 497) laid as long as the row, centred on the view, the menu font (VID 2; VID 7 lit
 for what is set and what is under the mouse, the set choice underlined). Ground height: the modes
 RAISE/LOWER, FLATTEN, SMOOTH, RAMP, ROUGH, SIZE - n +, STRENGTH - n +, EDGE SOFT / HARD; Paint: a

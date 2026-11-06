@@ -8437,7 +8437,7 @@ constexpr int OPTION_STEP = 3, CONTEXT_FONT_VID = 2, CONTEXT_FONT_LIT = 7;   // 
 constexpr float SWATCH = 15;
 
 bool strip_tool() { return tool() == Tool::Decals || (tool() == Tool::Place && is_palette(entry())); }
-bool options_tool() { return tool() == Tool::Height || tool() == Tool::Paint || tool() == Tool::Track || tool() == Tool::Region || strip_tool(); }
+bool options_tool() { return tool() == Tool::Height || tool() == Tool::Paint || tool() == Tool::Water || tool() == Tool::Track || tool() == Tool::Region || strip_tool(); }
 constexpr float RAIL_ICON = 71;   // a straight rail across (VID 610 ... 71 x 50)
 constexpr float DECAL_ICON = 40;  // a palette icon (VID 944)
 int g_strip_page = 0;             // the page of the strip above the bar
@@ -8656,6 +8656,20 @@ std::vector<OptionGroup> option_groups() {
                           option_button({"OptRaiseOff", "AS IT IS"}, g_raise_ground == Raise::Off, raise(Raise::Off)),
                           option_button({"OptRaiseSoft", "SOFT"}, g_raise_ground == Raise::Soft, raise(Raise::Soft)),
                           option_button({"OptRaiseHard", "HARD"}, g_raise_ground == Raise::Hard, raise(Raise::Hard))});
+        return groups;
+    }
+    if (tool() == Tool::Water) {   // the kind of water (W cycles it) and the brush's size
+        const UiText KINDS[] = {{"OptSheetLight", "LIGHT WATER"}, {"OptSheetDark", "DARK WATER"}, {"OptSheetSwamp", "SWAMP"},
+                                {"OptSheetSwamp2", "SWAMP 2"}, {"OptSheetLava", "LAVA"}};
+        OptionGroup kinds{option_label({"OptWaterKind", "KIND:"})};
+        for (int k = 0; k < WATER_KIND_COUNT; ++k)
+            kinds.push_back(option_button(KINDS[k], g_water_kind == k, [k] {
+                g_water_kind = k;
+                MESSAGE("MsgWaterKind", "water: %s (VID %d)", ui_text(WATER_KINDS[k].key, WATER_KINDS[k].english), WATER_KINDS[k].nvid);
+            }));
+        groups.push_back(kinds);
+        groups.push_back(option_number({"OptSize", "SIZE:"}, g_paint_radius, MIN_PAINT_RADIUS, MAX_PAINT_RADIUS, PAINT_STEP,
+                                       "MsgBrushSize", "brush %d px"));
         return groups;
     }
     if (tool() == Tool::Region) {   // MAKES: a region, or a sheet of water or lava (sheets, above)

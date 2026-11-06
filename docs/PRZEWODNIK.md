@@ -277,7 +277,7 @@ się razem z mapą.
 
 ### 3. Woda, bagno, lawa
 
-**Woda i lawa** z listwy: `W` wybiera wodę, bagno albo lawę; przeciągaj, żeby ją położyć. Obniża teren
+**Woda i lawa** z listwy: w rzędzie **RODZAJ** (jasna woda, ciemna woda, bagno, bagno 2, lawa; `W` je przełącza) i **ROZMIAR**; przeciągaj, żeby ją położyć. Obniża teren
 w nieckę z brzegiem, kładzie powierzchnię wody i dodaje jej efekty (kręgi na wodzie, bąble, wybuchy
 lawy) oraz region, w którym wybuchy rozpryskują wodę. Shift+przeciąganie ją usuwa. Jeden rodzaj
 wody ma na mapie jeden poziom, tak jak w misjach.
