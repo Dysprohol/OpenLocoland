@@ -29,6 +29,8 @@ The [trailer](https://www.youtube.com/watch?v=04BeRSnfL6o) and more videos of th
   missing texts, and Czech is there too: a fan translation (unofficial) that works on any Steam
   language - with the files of the Czech CD edition at hand, that edition is used as its base. Setup's
   list shows every language, and for the ones still to be downloaded from Steam, how to get them.
+  Volunteers can translate the game into their own language without git: they get a folder of texts
+  to fill in (see [TRANSLATING.md](docs/TRANSLATING.md)).
 - **Custom maps.** A second page of the strategic map holds **POLIGON**, a ready mission to try,
   and every map you make or get from a friend.
 - **A map editor inside the game (work in progress).** Make your own missions - lay the track,
@@ -36,10 +38,11 @@ The [trailer](https://www.youtube.com/watch?v=04BeRSnfL6o) and more videos of th
   during the mission, plan what the enemy's factory builds, decide who fights whom - and play them
   at once. The trains that come onto the map are set in a list of arrivals, and a factory's plan says
   which trains it builds and when; a train of any army can drive, patrol, attack, guard a point or
-  watch an area from where it stands. The cars and the decorations are picked from a row above the
-  bar, the gravel bed is painted under the rails, a quick test runs the map right in the editor
-  without saving it, and a map can be renamed or deleted from the editor's menu. The custom maps page
-  lists every map folder it finds, however the map got there.
+  watch an area from where it stands, and a car can be turned round in its place or uncoupled. The
+  cars and the decorations are picked from a row above the bar, the gravel bed is painted under the
+  rails, a quick test runs the map right in the editor without saving it, and a map can be renamed or
+  deleted from the editor's menu. The help inside the editor has 29 pages. The custom maps page lists
+  every map folder it finds, however the map got there.
 - **Maps for friends.** A map goes to a friend as one file and turns up on their custom maps page.
 - **An OpenLocoland logo at the start.** The game opens with the project's logo for a few seconds in
   place of the original intro movies; any key or a click skips it.
@@ -102,6 +105,8 @@ rest around it: the bar, the tools and the help in the look of the game.
 
 - **Multiplayer.** The engine already lists network functions for its mission scripts, but the
   authors never wrote them. The goal is to play with or against a friend.
+- **The other editions.** The fixes and the editor for the copies with another program file (the
+  Italian CD, the English beta/demo), which now install as they are.
 - **New missions.** Our own missions and an alternative campaign made in the editor, next to the
   original twenty.
 - **More fixes and polish.** The bugs still open in [BUGS.md](BUGS.md), the interface scaled up on
@@ -130,7 +135,7 @@ https://discord.gg/NG5DnHFvYM
 OpenLocoland is better thanks to the people who gave something of their own to it:
 
 - **spacenerdy** (from Discord) - Discord creator 
-- **Danetry** (from Discord) - support of the Czech fan translation of the game).
+- **Danetry** (from Discord) - support of the Czech fan translation of the game.
 - **just_Martin** (from Discord) - the OpenLocoland logo (the installer's header and the launcher's
   picture).
 - **[JohnVitoScaletta](https://steamcommunity.com/profiles/76561199078710882/)** (from Steam) - the
