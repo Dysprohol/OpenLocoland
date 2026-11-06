@@ -304,7 +304,7 @@ Harmless log errors:
   line 36 - built, the scripts the same as from the clean copy; another change of
   `constants.lgc` and a line added to `maps\menu.lgc` - stopped (`build.py`, and Setup's
   `--silent` with the Polish text, nothing installed).
-- GitHub issue #4 (2026-11-05): Setup 0.2.5 refused a verified, freshly installed Russian Steam
+- GitHub issue #4 (2026-11-05): Setup 0.2.2 refused a verified, freshly installed Russian Steam
   copy - `maps\logo.lgc`, `menu.lgc`, `script\constants.lgc` and `script\menutact.lgc` "modified".
   They are the Russian depot's own (352136; the other five depots have the files of the known
   SHA-256): `logo.lgc` plays the movies as `.avi` (`video\` has `.avi` files), `menu.lgc` and

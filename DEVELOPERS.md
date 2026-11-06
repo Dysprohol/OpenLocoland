@@ -3464,7 +3464,7 @@ mode above) are not tested in full screen.
   `build.py` does not copy the Steam `video\` folder (`SKIPPED_DIRS`) and `game/maps/logo.lgc.patch`
   puts the movies' part of the chain under `#ifdef ORIGINAL_MOVIES` (never defined), with an `#else`
   that takes the same steps without the movies (the same `iff` blocks, each `Pause(1)`) - so the
-  patch does not touch the movies' lines and fits both depots (until 0.2.5 it commented the four
+  patch does not touch the movies' lines and fits both depots (until 0.2.2 it commented the four
   `PlayMovie` lines out, which the Russian file does not have) - and the start is the title board alone: `game/objects.override`
   points VID 481 at `vid\481logo.vid`, which `build.py` makes at install time
   (`patch_data.make_logo_board`, so nothing of it is in the repository or the payload): a sprite of
