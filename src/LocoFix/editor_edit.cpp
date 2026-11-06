@@ -8347,6 +8347,9 @@ const char* hint_of(Tool t) {
     case Tool::Region:
         return g_region_kind ? ui_text("HintSheet", "drag: the sheet's tiles there, Shift+drag: away, LEVEL - +")
                              : ui_text("HintRegion", "drag: its rectangle, right on it: its panel");
+    // the strip's two panels (the tester found no hint on them, the last two of its upper row)
+    case Tool::Arrivals: return ui_text("HintArrivals", "click: the trains that come during the mission (a panel)");
+    case Tool::Settings: return ui_text("HintSettings", "click: the mission's settings - texts, money, weather, music");
     default: return nullptr;
     }
 }
