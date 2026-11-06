@@ -67,7 +67,8 @@ under the frame limit - the launcher's choice counts from that start on, nothing
 **Updates.** "Sprawdź aktualizacje" / "Check for updates" in the launcher asks GitHub for the latest
 release; a newer one than the running version is offered with its Setup.exe, downloaded into the
 Downloads folder and started on a click (LocoFix fix 33); the box "przy starcie" / "at start" next to
-it (off by default) checks every time the launcher opens. Nothing is updated by itself.
+it (on by default; unticked, it stays off) checks as the launcher opens, at most once a day.
+Nothing is updated by itself.
 
 **Developers** build the game from the repository instead. Requirements: the game installed
 through Steam, Python 3, Visual Studio or Build Tools with the C++ tools (for LocoFix.dll); for
@@ -3752,10 +3753,18 @@ mode above) are not tested in full screen.
       original code runs. 5 locks per frame became 3,
   33. "check for updates" in the launcher (`update_check.cpp`): a row under the options with the
       button "Sprawdź aktualizacje" / "Check for updates", the box "przy starcie" / "at start"
-      (`UpdateCheckAtStart`, off by default: the check runs as the launcher opens - left off on
-      purpose: the game asks a server on the internet only when the player says so, a launcher
-      opened offline shows no notice it did not ask for, and the line keeps the last check's date
-      and version, so a player sees how old it is), a link "GitHub"
+      (`UpdateCheckAtStart`: the check runs as the launcher opens; ON by default since 2026-11-06 -
+      no value in the registry is on, the player's saved choice stays, so whoever unticked it keeps
+      it off; the box is saved as soon as it is clicked, not only with OK; at most once a day: not
+      when `UpdateLastCheck` is today's - "update check at start: skipped - already checked today",
+      the button always checks; no window, only the line, and without a connection the check at
+      the start says calmly `update_offline_start` - "No connection - the check at start was
+      skipped; the box beside turns it off." - instead of `update.txt`'s notice, which stays for
+      the button; before, it was off so that the game asked the internet only when the player said
+      so; checked with LOCOFIX_UPDATE_URL on a host that does not exist (the calm line at once),
+      GitHub itself (up to date), a second start the same day (no request in the log), the box
+      unticked and the launcher started again ("off (the player's choice)", no check), the test's
+      release (New version and Download at start), the line in Polish and German), a link "GitHub"
       (the releases page, or the new release's; its right button opens it or copies the address)
       and a result line with a button beside it (labels `check_updates`, `check_at_start`,
       `update_*`, `open_link`, `copy_link` of `[launcher]`, filled in with %1 / %2). The check
@@ -3810,7 +3819,7 @@ mode above) are not tested in full screen.
       unreachable: a host that does not exist, a repository that does not exist (404) and an address
       that does not answer (the notice after 5.2 s), with the shipped `update.txt`, a replaced one
       (its notice, and its `link=` copied by the menu) and none (the built-in English); the box
-      ticked checks as the launcher opens, OK saves it,
+      ticked checks as the launcher opens, a click on it saves it,
   34. the neutrals and the pirates of an editor map (`factions.cpp`, MAP_RULES.md 6d): on a map
       whose script has `#define FACTIONS 1` (the editor writes it, read from `<map>.lgc` in the
       `Level_Load` wrapper of `frame_limit.cpp`) the army test of `Object_FindTarget` (0x449f7b ...

@@ -57,9 +57,11 @@ odpowiada „Masz aktualną wersję” albo „Jest nowa wersja ...”; wtedy **
 `Setup.exe` w folderze Pobrane, a **Uruchom Setup** uruchamia go (po pytaniu) i zamyka grę, żeby
 instalator mógł ją zaktualizować - Windows może zapytać, czy uruchomić pobrany program, jak po
 pobraniu przeglądarką. Link **GitHub** otwiera zamiast tego stronę wydań w przeglądarce (prawy
-przycisk myszy kopiuje adres). Zaznacz **przy starcie**, żeby sprawdzać przy każdym otwarciu
-okienka; domyślnie jest wyłączone i nic nie jest pobierane ani instalowane bez twojego kliknięcia.
-Gdy GitHub jest nieosiągalny (brak internetu albo projekt się przeniósł), okienko mówi o tym i
+przycisk myszy kopiuje adres). **przy starcie** jest domyślnie włączone: okienko sprawdza przy
+otwarciu, najwyżej raz dziennie i bez żadnego okna - tylko w swojej linijce, która bez połączenia
+spokojnie mówi, że sprawdzanie pominięto; odznacz pole obok przycisku, żeby je wyłączyć (zapisuje się
+od razu). Nic nie jest pobierane ani instalowane bez twojego kliknięcia. Gdy przycisk nie może
+dosięgnąć GitHuba (brak internetu albo projekt się przeniósł), okienko mówi o tym i
 podaje adres projektu z pliku `update.txt` w folderze gry - późniejszy Setup może ten plik zmienić,
 ty też.
 

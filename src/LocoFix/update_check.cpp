@@ -1,6 +1,6 @@
-// "Check for updates" in the launcher: a row under the options' with the button, a box to check
-// at every start (off by default), a link to the project's releases on GitHub and a line with
-// the result.
+// "Check for updates" in the launcher: a row under the options' with the button, a box to check at
+// the start (on by default, at most once a day), a link to the project's releases on GitHub and a
+// line with the result.
 //
 // The check asks GitHub's API for the latest release - WinHTTP in a thread of its own, the answer
 // awaited 5 s, so the launcher never waits - and reads its tag, its page and the Setup.exe it holds.
@@ -9,9 +9,11 @@
 // a download). A newer version shows with Download: Setup.exe goes into the Downloads folder (as
 // a browser's download, with the internet zone mark; its size and SHA-256 are checked against the
 // release's), and then Run Setup starts it after a question and closes the game, so Setup can
-// update the install. Nothing happens without a click: the check runs from the button or, with the
-// box ticked, as the launcher opens; the link opens the page in the browser, its right button
-// copies the address.
+// update the install. Nothing is downloaded without a click: the check runs from the button or, with
+// the box ticked (the default: no value in the registry is on; the player's choice is saved as soon as
+// the box is clicked), as the launcher opens - at most once a day (not when UpdateLastCheck is today's)
+// and without a window: only the line, which says calmly when there was no connection; the link opens
+// the page in the browser, its right button copies the address.
 //
 // When GitHub cannot be reached (no network, the repository gone) the line shows the notice of
 // update.txt in the game folder - a line per language pack code, en= for the others - or the
@@ -87,7 +89,8 @@ Release g_release;
 std::wstring g_file;                     // the downloaded Setup.exe
 unsigned long long g_done = 0, g_total = 0;
 volatile LONG g_cancel = 0;              // the dialog is gone or the download was cancelled
-bool g_at_start = false;
+bool g_at_start = true;                  // UpdateCheckAtStart: on unless the player turned it off
+bool g_auto = false;                     // the check under way or last done began as the launcher opened
 std::string g_last;                      // UpdateLastCheck
 DLGPROC g_launcher_proc = nullptr;
 HFONT g_font = nullptr, g_link_font = nullptr;   // the row's font, underlined for the link
@@ -122,8 +125,10 @@ void read_settings() {
     HKEY key;
     if (RegOpenKeyExA(HKEY_CURRENT_USER, REG_KEY, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) return;
     DWORD value = 0, size = sizeof value, type = 0;
-    g_at_start = RegQueryValueExA(key, REG_AT_START, nullptr, &type, reinterpret_cast<BYTE*>(&value), &size) ==
-                     ERROR_SUCCESS && type == REG_DWORD && value != 0;
+    // no value (a new install, or a player who never clicked the box) is on
+    if (RegQueryValueExA(key, REG_AT_START, nullptr, &type, reinterpret_cast<BYTE*>(&value), &size) == ERROR_SUCCESS &&
+        type == REG_DWORD)
+        g_at_start = value != 0;
     char last[64] = {};
     size = sizeof last - 1;
     if (RegQueryValueExA(key, REG_LAST, nullptr, &type, reinterpret_cast<BYTE*>(last), &size) == ERROR_SUCCESS &&
@@ -622,7 +627,10 @@ void set_texts(HWND dialog) {
         status = fill(launcher_text("update_dev", L"The latest version is %1 (this build: %2)."), tag, version);
         break;
     case State::unreachable:
-        status = unreachable_notice();
+        // the check at the start without a connection is no error: a calm line, not update.txt's notice
+        status = g_auto ? launcher_text("update_offline_start",
+                                        L"No connection - the check at start was skipped; the box beside turns it off.")
+                        : unreachable_notice();
         break;
     case State::downloading:
         status = fill(launcher_text("update_downloading", L"Downloading Setup: %1 of %2 MB..."), mb(g_done),
@@ -659,7 +667,9 @@ void set_texts(HWND dialog) {
     EnableWindow(GetDlgItem(dialog, ID_CHECK), g_state != State::checking && g_state != State::downloading);
 }
 
-void start_check(HWND dialog) {
+void start_check(HWND dialog, bool automatic = false) {
+    g_auto = automatic;
+    patch::log("update check: %s", automatic ? "as the launcher opens (at start)" : "the button");
     g_state = State::checking;
     set_texts(dialog);
     if (!start_thread(check_thread, new Job{dialog, {}, {}})) {
@@ -809,7 +819,20 @@ void add_update_row(HWND dialog) {
     add_control(dialog, L"BUTTON", L"", WS_TABSTOP | BS_PUSHBUTTON, dialog_rect(dialog, 124, ROW_Y + 16, 56, 13),
                 ID_GET);
     set_texts(dialog);
-    if (g_at_start) start_check(dialog);
+    if (!g_at_start) {
+        patch::log("update check at start: off (the player's choice)");
+        return;
+    }
+    // once a day at most: the date of the last answer is today's (the button always checks)
+    SYSTEMTIME now;
+    GetLocalTime(&now);
+    char today[16];
+    std::snprintf(today, sizeof today, "%04u-%02u-%02u", now.wYear, now.wMonth, now.wDay);
+    if (g_last.compare(0, 10, today) == 0) {
+        patch::log("update check at start: skipped - already checked today (%s)", g_last.c_str());
+        return;
+    }
+    start_check(dialog, true);
 }
 
 INT_PTR CALLBACK launcher_proc(HWND dialog, UINT m, WPARAM w, LPARAM l) {
@@ -824,6 +847,13 @@ INT_PTR CALLBACK launcher_proc(HWND dialog, UINT m, WPARAM w, LPARAM l) {
             else if (g_state == State::downloaded) run_setup(dialog);
             else start_download(dialog);
             set_texts(dialog);
+            return TRUE;
+        }
+        if (LOWORD(w) == ID_AT_START && HIWORD(w) == BN_CLICKED) {   // saved at once (not only with OK)
+            g_at_start = IsDlgButtonChecked(dialog, ID_AT_START) == BST_CHECKED;
+            const DWORD on = g_at_start;
+            save_setting(REG_AT_START, REG_DWORD, &on, sizeof on);
+            patch::log("update check at start: %s (saved)", g_at_start ? "on" : "off");
             return TRUE;
         }
         if (LOWORD(w) == ID_LINK && HIWORD(w) == STN_CLICKED) {

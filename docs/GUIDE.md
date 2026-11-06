@@ -57,8 +57,10 @@ latest version" or "New version ... is available"; then **Download** saves the n
 your Downloads folder, and **Run Setup** starts it (after a question) and closes the game, so Setup
 can update it - Windows may ask whether to run a downloaded program, as it does after a browser's
 download. The **GitHub** link opens the releases page in your browser instead (right-click it to
-copy the address). Tick **at start** to check every time the launcher opens; it is off by default,
-and nothing is downloaded or installed without your click. When GitHub cannot be reached (no
+copy the address). **at start** is on by default: the launcher checks as it opens, at most once a
+day and without a window - only its line, which says calmly when there is no connection; untick the
+box beside the button to turn it off (it is kept at once). Nothing is downloaded or installed
+without your click. When the button's check cannot reach GitHub (no
 internet, or the project has moved) the launcher says so with the project's address, taken from
 `update.txt` in the game folder - a later Setup may change that file, and you may too.
 
