@@ -26,14 +26,20 @@ The [trailer](https://www.youtube.com/watch?v=04BeRSnfL6o) and more videos of th
 - **Old bugs fixed.** Some of the original's crashes, missing sounds and a car the factory could
   never build are fixed; the ones still open are listed in [BUGS.md](BUGS.md).
 - **Languages with their gaps filled.** English, German, Hungarian, Polish and Russian get their
-  missing texts, a Czech fan translation (unofficial) works on any Steam copy (with the files of the
-  Czech CD edition at hand, its own texts are used instead), and Setup lists them all.
+  missing texts, and Czech is there too: a fan translation (unofficial) that works on any Steam
+  language - with the files of the Czech CD edition at hand, that edition is used as its base. Setup's
+  list shows every language, and for the ones still to be downloaded from Steam, how to get them.
 - **Custom maps.** A second page of the strategic map holds **POLIGON**, a ready mission to try,
   and every map you make or get from a friend.
 - **A map editor inside the game (work in progress).** Make your own missions - lay the track,
   shape the ground, put up buildings with their guns, give trains their orders, send in new trains
   during the mission, plan what the enemy's factory builds, decide who fights whom - and play them
-  at once.
+  at once. The trains that come onto the map are set in a list of arrivals, and a factory's plan says
+  which trains it builds and when; a train of any army can drive, patrol, attack, guard a point or
+  watch an area from where it stands. The cars and the decorations are picked from a row above the
+  bar, the gravel bed is painted under the rails, a quick test runs the map right in the editor
+  without saving it, and a map can be renamed or deleted from the editor's menu. The custom maps page
+  lists every map folder it finds, however the map got there.
 - **Maps for friends.** A map goes to a friend as one file and turns up on their custom maps page.
 - **An OpenLocoland logo at the start.** The game opens with the project's logo for a few seconds in
   place of the original intro movies; any key or a click skips it.
@@ -50,6 +56,8 @@ The [trailer](https://www.youtube.com/watch?v=04BeRSnfL6o) and more videos of th
 | A battle over the lava at 1920 x 1080 | Custom maps: POLIGON, your own maps and the editor |
 | ![The map editor](docs/img/editor-factory-en.jpg) | ![The train arrivals](docs/img/arrivals-en.jpg) |
 | The editor on POLIGON: the two factories | The trains that come during the mission |
+| ![A train's panel](docs/img/train-panel-en.jpg) | ![A train guarding an area](docs/img/area-watch-en.jpg) |
+| A train's orders and fight rules | A train watching an area from where it stands |
 | ![The editor's help](docs/img/help-contents-en.jpg) | ![The launcher](docs/img/launcher-update-en.jpg) |
 | Help inside the editor | The launcher, checking for updates |
 
@@ -63,12 +71,12 @@ The [trailer](https://www.youtube.com/watch?v=04BeRSnfL6o) and more videos of th
 3. Start **Locoland** or **Locoland - map editor** from the desktop or the Start menu.
 
 Running a newer `Setup.exe` updates the game and keeps your maps, scores and progress; **Check for
-updates** in the launcher downloads a newer one for you. The
+updates** in the launcher finds a newer release and downloads its `Setup.exe` for you. The
 player's guide tells the rest, the editor with a step-by-step first mission included:
 [GUIDE.md](docs/GUIDE.md) (English), [PRZEWODNIK.md](docs/PRZEWODNIK.md) (Polish).
 
-This is the first regular release; the map editor is still work in progress. Bugs and ideas are
-welcome in [Issues](https://github.com/Dysprohol/OpenLocoland/issues).
+The map editor is still work in progress. Bugs and ideas are welcome in
+[Issues](https://github.com/Dysprohol/OpenLocoland/issues).
 
 ## How it was made
 
@@ -92,6 +100,8 @@ rest around it: the bar, the tools and the help in the look of the game.
   original twenty.
 - **More fixes and polish.** The bugs still open in [BUGS.md](BUGS.md), the interface scaled up on
   big screens, the editor tried in full screen, and whatever turns up while playing.
+- **Releases after players' reports.** The next releases follow what players report and ask for in
+  Issues.
 - **The engine in readable code.** The understood parts of the engine rewritten in C++ one by one,
   so the game can grow past the limits of the original program.
 - **Ideas for later**: a modding tool for new objects, music and sounds of our own.
