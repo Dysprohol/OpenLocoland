@@ -4113,8 +4113,8 @@ from their own Steam copy, as `build.py` does it for a developer.
 
 1. the version is `git describe --tags --always --dirty` (the short hash while there is no tag);
    it is in Setup's title, in `OpenLocoland.json` of the install, in the first line of
-   `LocoFix.log` ("LocoFix <version>") and in the launcher's caption ("... - OpenLocoland
-   <version>"; a `build.py` build says "dev"),
+   `LocoFix.log` ("LocoFix <version>"), in the launcher's caption and in the game window's title
+   ("... - OpenLocoland <version>", `scaling_wndproc` at WM_CREATE; a `build.py` build says "dev"),
 2. LocoFix.dll is compiled with that version (`build_locofix.build(out_dir, version)`, the define
    `LOCOFIX_VERSION`, into `build\release\LocoFix`) - the player gets it prebuilt,
 3. the payload (`build\release\payload`) has our files in the repository's layout: `game\`,

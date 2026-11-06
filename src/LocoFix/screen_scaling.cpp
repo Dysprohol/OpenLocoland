@@ -428,6 +428,15 @@ bool to_logical(POINT& p) {
 }
 
 LRESULT CALLBACK scaling_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
+    if (m == WM_CREATE) {   // the game window's title gets the OpenLocoland version after the game's own
+        const LRESULT r = CallWindowProcA(g_game_wndproc, window, m, w, l);   // ("Locoland v 1.02"), as the launcher's caption has it
+        char title[256] = {};
+        GetWindowTextA(window, title, 200);
+        char text[300];
+        wsprintfA(text, "%s - OpenLocoland %s", title, LOCOFIX_VERSION);
+        SetWindowTextA(window, text);
+        return r;
+    }
     if (m == WM_NCHITTEST) {
         // only a point in the game area: one over the menu bar or the frame, mapped, would land
         // outside the window and the hit test would say HTNOWHERE - the menu bar would not open
