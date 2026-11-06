@@ -510,17 +510,22 @@ pixels without being painted, so a rail painted in a later stroke meets its neig
 seam. On a picture of the map's own (`ground_own`) the band is painted (a pixel's texture becomes
 `BED_TEXTURE` + the kind) and the rails' decal beds are taken away - the band is their bed now, and a
 decal over it would show the bed twice; on a campaign terrain whose `lNN.vid` is not yet the map's
-own the decal of the kind is laid under each rail instead (one of another kind replaced). The right
+own the decal of the kind is laid under each rail instead (one of another kind replaced) - until
+2026-11-06, see below. The right
 button puts the original picture back in the band, or takes the decals away; Alt+click takes the
 kind painted there, else the kind of the nearest rail's decal, else the kind whose mean colour the
 picture has near a rail (`ground_bed_at`). A stroke or the button is one step of the history (the
 picture's rectangle and the decals laid and taken). New track still gets the decal of the kind (B),
-the band's look and width in play. The four beds of the Decals strip (DECORATIONS) run the same
-stroke (`start_bed_brush`: `GroundStroke.reach` is the Decals brush's circle instead of SIZE, the
-picture read only when the band is painted into it), so the two paths give one result on either kind
-of ground: the band of the Paint tool's WIDTH, STRENGTH and EDGE where the picture is the map's own,
-the decal of the kind elsewhere; their Shift is this tool's right button, and it takes the decal beds
-(and any loose bed) as well ("Ground, gravel bed, decals" above). Checked in the game (Polish and English): POLIGON's junctions
+the band's look and width in play. Since 2026-11-06 (the maintainer's rule) the two are separate:
+the Paint tool's GRAVEL BED paints the band and only the band, on any map (`start_bed(erase, false)`:
+a campaign terrain's picture becomes the map's own, as the Ground height tool makes it) and leaves
+the rails' decal beds where they are; the four beds of the Decals strip (DECORATIONS) lay the decal
+of the kind under the rails within the Decals brush's circle on any map (`start_bed_brush`,
+`start_bed(erase, true)`: `GroundStroke.reach` is the circle, the picture is never read), and their
+Shift takes the decal beds and any loose bed away ("Ground, gravel bed, decals" above). The Track
+tool's row shows the four beds as pictures (GRAVEL BED: ..., NONE; the same `g_bed` B cycles) so the
+bed of new track is chosen by sight. Before, the strip's beds painted the band where the picture was
+the map's own and the band took the decals away, which looked like a dummy bed to the maintainer. Checked in the game (Polish and English): POLIGON's junctions
 and curves bedded with a stroke (meadow), the kind ICE and WIDTH 40 over the main line, undone and
 redone, desert UNDER THE WHOLE TRACK (166 rails, one step), the right button putting POLIGON's
 original back over three rails, Alt+click naming meadow and ice; on mission 2 (a campaign terrain)

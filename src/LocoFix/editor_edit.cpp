@@ -4967,10 +4967,10 @@ void set_bed_kind(int k) {
 }
 
 // The Decals strip's four beds are not dropped as loose decals: picked, they are the swap of the
-// track's bed - a click or a drag gives the rails within the brush's circle the bed of the kind (the
-// Paint tool's GRAVEL BED stroke with the Decals brush's circle: lay_bed per rail on a campaign terrain,
-// the band painted on a picture of the map's own), Shift takes their beds away. Before (until
-// 2026-11-06) a click dropped a loose bed at the cursor beside the rail's own, which stayed.
+// track's bed - a click or a drag gives the rails within the brush's circle the decal bed of the kind
+// (lay_bed per rail, on any map; the painted band is the Paint tool's own business), Shift takes their
+// beds away. Before (until 2026-11-06) a click dropped a loose bed at the cursor beside the rail's own,
+// which stayed.
 bool bed_brush() { return tool() == Tool::Decals && bed_kind_of(decal_nvid()) >= 0; }
 float bed_brush_reach() { return (std::max)(8.0f * g_radius, 12.0f); }   // the Decals brush's circle
 
@@ -5016,8 +5016,6 @@ void bed_dab(float sx, float sy, float reach) {
             continue;
         }
         fresh.push_back(bed_rail(o));
-        // the band is the rail's bed now; the Decals strip's Shift takes the decal bed as well
-        if (!g_gstroke.erase || g_gstroke.reach > 0) take_bed(o);
     }
     if (fresh.empty() || g_gstroke.decals) return;
     const size_t paint = fresh.size();
@@ -5026,10 +5024,14 @@ void bed_dab(float sx, float sy, float reach) {
                g_paint_hard, g_gstroke.erase);
 }
 
-void start_bed(bool erase) {
+// The Paint tool's GRAVEL BED paints the band into the picture (`decals` false; on a campaign terrain
+// the picture becomes the map's own, as the Ground height tool makes it) and leaves the rails' decal
+// beds alone; the Decals strip's beds lay the decals (true) and never touch the picture - the two are
+// separate, as the missions have them (l10, l14, l16 painted their bed, the others laid decals).
+void start_bed(bool erase, bool decals) {
     g_gstroke.gravel = true;
     g_gstroke.erase = erase;
-    g_gstroke.decals = !ground_own();
+    g_gstroke.decals = decals;
     for_each_object([&](uint8_t* o) {
         if (plain_rail(o)) g_gstroke.rails.push_back(o);
     });
@@ -5049,19 +5051,14 @@ void take_beds_near(float sx, float sy, float r) {
     });
 }
 
-bool bed_painted();   // the drawing, below: the GRAVEL BED mode paints the band (the picture is the map's own)
-
-// The Decals strip's bed brush (bed_brush, above): the Paint tool's GRAVEL BED stroke with the circle of
-// the Decals brush. The picture is read only when the band is painted into it (a picture of the map's
-// own); on a campaign terrain the decal beds are laid without it.
+// The Decals strip's bed brush (bed_brush, above): the decal beds swapped under the rails within the
+// circle of the Decals brush (lay_bed / take_bed); the picture is not read or painted.
 void start_bed_brush(bool erase) {
-    const bool picture = bed_painted() && ground_paintable(true);
     g_gstroke = GroundStroke();
     g_gstroke.active = true;
     g_gstroke.reach = bed_brush_reach();
     stroke_timing_begin();
-    start_bed(erase);
-    if (picture && !g_gstroke.decals) ground_stroke_begin();
+    start_bed(erase, true);
 }
 
 // The level of the map's water of a VID (its tiles'), or -1.
@@ -5084,7 +5081,7 @@ void start_ground_stroke(bool water, bool erase = false) {
     stroke_timing_begin();
     g_gstroke.water = water;
     g_gstroke.erase = erase || shift_down();
-    if (!water && g_paint_bed) start_bed(g_gstroke.erase);
+    if (!water && g_paint_bed) start_bed(g_gstroke.erase, false);
     if (water) {
         g_gstroke.kind = g_water_kind;
         const WaterKind& k = WATER_KINDS[g_water_kind];
@@ -5324,7 +5321,7 @@ void end_ground_stroke() {
         MESSAGE("MsgBedLaid", "gravel bed (%s): %u rails, %s, %u decals laid, %u taken away",
                 g_gstroke.erase ? ui_text("WordOriginal", "the original") : bed_kind_name(g_bed_kind),
                 static_cast<unsigned>(g_gstroke.bedded.size()),
-                g_gstroke.decals ? ui_text("WordBedDecals", "decals (a campaign terrain)") : ui_text("WordBedPainted", "painted into the picture"),
+                g_gstroke.decals ? ui_text("WordBedDecals", "decals under the rails") : ui_text("WordBedPainted", "painted into the picture"),
                 static_cast<unsigned>(g_gstroke.made.size()), static_cast<unsigned>(g_gstroke.taken.size()));
     else
         MESSAGE("MsgPainted", "ground painted: %s, %dx%d px", g_gstroke.erase ? ui_text("WordOriginal", "the original") : ground_texture_name(g_texture),
@@ -5380,17 +5377,12 @@ void bed_whole_track() {
     g_gstroke = GroundStroke();
     g_gstroke.active = true;
     stroke_timing_begin();
-    start_bed(false);
+    start_bed(false, false);
     ground_stroke_begin();
     std::vector<BedRail> all;
     for (uint8_t* o : g_gstroke.rails) {
         g_gstroke.bedded.insert(o);
-        if (g_gstroke.decals) {
-            lay_bed(o);
-        } else {
-            all.push_back(bed_rail(o));
-            take_bed(o);
-        }
+        all.push_back(bed_rail(o));
     }
     if (!all.empty())
         ground_bed(all, all.size(), g_bed_kind, static_cast<float>(g_bed_width), g_paint_strength / static_cast<float>(MAX_STRENGTH),
@@ -7806,7 +7798,7 @@ void draw_ground_tool(bool heights) {
         std::snprintf(text, sizeof text,
                       ui_format("StatusBedBrush", "gravel bed: %s - click / drag on the track (dotted: the rails it re-beds), radius %d (wheel, + -) - Shift takes the beds away; %s"),
                       bed_kind_label(g_bed_kind), g_radius,
-                      bed_painted() ? ui_text("WordBedPainted", "painted into the picture") : ui_text("WordBedDecals", "decals (a campaign terrain)"));
+                      ui_text("WordBedPainted", "painted into the picture"));
     } else {
         const bool scatter = scatter_on(decal_nvid());
         if (scatter || shift_down()) draw_brush_circle(x, y, (std::max)(8.0f * g_radius, 12.0f));
@@ -7824,19 +7816,6 @@ void draw_ground_tool(bool heights) {
                       name ? name : "?", decal_nvid(), v ? to_step(g_place_direction, at<int>(v, V_ND_DIR)) : 0, g_radius, g_spacing);
     }
     g_ground_status = text;
-}
-
-// The GRAVEL BED mode paints the band (the picture is the map's own), or lays decals.
-bool bed_painted() {
-    if (ground_ready()) return ground_own();
-    static std::string map;
-    static bool own = false;
-    const char* level = at<const char*>(world(), W_LEVEL_FILE);
-    if (level && map != level) {
-        map = level;
-        own = !campaign_ground_image(map_ground_image(map));
-    }
-    return own;
 }
 
 // Where a gravel bed stroke lands (the Paint tool's GRAVEL BED, the Decals strip's beds): the band's two
@@ -7890,7 +7869,7 @@ void draw_paint_tool() {
                       ui_format("StatusBed", "Paint - GRAVEL BED (dotted: where it goes): %s ([ ]), width %d px, brush %d px (wheel), strength %d, edge %s - %s; the right button puts the original back"),
                       bed_kind_name(g_bed_kind), g_bed_width, g_paint_radius, g_paint_strength,
                       g_paint_hard ? ui_text("WordHard", "hard") : ui_text("WordSoft", "soft"),
-                      bed_painted() ? ui_text("WordBedPainted", "painted into the picture") : ui_text("WordBedDecals", "decals (a campaign terrain)"));
+                      ui_text("WordBedPainted", "painted into the picture"));
     } else if (tool() == Tool::Paint) {
         const std::vector<GroundTexture>& t = ground_textures();
         if (g_texture < static_cast<int>(t.size())) {
@@ -8647,6 +8626,23 @@ std::vector<OptionGroup> option_groups() {
             kinds.push_back(i);
         }
         groups.push_back(kinds);
+        OptionGroup beds{option_label({"OptTrackBed", "GRAVEL BED:"})};   // under new rails (B cycles them): the decals' own pictures
+        for (int k = 0; k < BED_KINDS; ++k) {
+            OptionItem i;
+            i.object = BEDS[k];
+            i.lit = g_bed == BEDS[k];
+            i.button = true;
+            i.act = [k] {
+                set_bed_kind(k);
+                MESSAGE("MsgBed", "gravel bed of new track: %s", bed_kind_label(g_bed_kind));
+            };
+            beds.push_back(i);
+        }
+        beds.push_back(option_button({"OptBedNone", "NONE"}, g_bed == 0, [] {
+            g_bed = 0;
+            MESSAGE("MsgBed", "gravel bed of new track: %s", ui_text("WordNone", "none"));
+        }));
+        groups.push_back(beds);
         groups.push_back({option_label({"OptNextRail", "RAILS GO:"}), option_button({"OptRailUp", "UP"}, g_ramp > 0, [] { set_ramp(1); }),
                           option_button({"OptRailFlat", "FLAT"}, g_ramp == 0, [] { set_ramp(0); }),
                           option_button({"OptRailDown", "DOWN"}, g_ramp < 0, [] { set_ramp(-1); })});
@@ -10821,7 +10817,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             const int* at_bed = std::find(std::begin(BEDS), std::end(BEDS), g_bed);
             g_bed = g_bed == 0 ? BEDS[0] : (at_bed + 1 == std::end(BEDS) ? 0 : *(at_bed + 1));
             if (g_bed) set_bed_kind(bed_kind_of(g_bed));   // the Paint tool's and the Decals strip's bed the same
-            MESSAGE("MsgBed", "gravel bed of new track: %s", g_bed ? std::to_string(g_bed).c_str() : ui_text("WordNone", "none"));
+            MESSAGE("MsgBed", "gravel bed of new track: %s", g_bed ? bed_kind_label(bed_kind_of(g_bed)) : ui_text("WordNone", "none"));
         }
         else if ((w == VK_DELETE || w == 'T') && g_selection.empty() && g_push_selected >= 0) {   // a push line selected
             push_change(static_cast<int>(w));

@@ -352,18 +352,20 @@ jest podnoszony, z szerokim albo krótkim stokiem (jedno cofnięcie razem z szyn
 wokół jej końca i wyrównaj go, zaczynając na torze. `B` wybiera podsypkę pod nowe szyny. Kliknięcie
 kółkiem, Del albo narzędzie Usun usuwa szynę; Shift+klik narzędziem Usun usuwa cały odcinek.
 
-**Podsypka.** Gdy tory leżą, **Malowanie terenu** → **TRYB: PODSYPKA** (drugi tryb, **TEKSTURA**,
-maluje tekstury gdziekolwiek) kładzie podsypkę pod szynami, po których przejdzie pędzel - kropki
-wzdłuż nich pokazują, gdzie legnie pas, zanim przeciągniesz: **RODZAJ** (łąka, lód, wulkan, pustynia - ten sam, który `B` kładzie pod
-nowe szyny), **SZEROKOSC** (28 px, jak w misjach), **ROZMIAR**, **SILA**, **KRAWEDZ**. Na mapie z
-własnym terenem pas jest wmalowany w obraz, na środku szyn, wzdłuż łuków, rozjazdów i ramp, a
-naklejki podsypki tych szyn znikają (pas jest teraz ich podsypką); na terenie mapy kampanii kładzie
-zamiast tego naklejki podsypki. Prawy przycisk przywraca oryginalny obraz, Alt+klik pobiera rodzaj,
-**POD CALA MAPA** kładzie podsypkę pod każdą szyną mapy naraz. Jedno pociągnięcie to jedno cofnięcie.
-Cztery podsypki z tematu **Dekoracje** robią to samo pędzlem dekoracji: wybierz jedną (łąka, lód,
-wulkan albo pustynia - staje się też rodzajem Malowania terenu i `B`), a kliknięcie albo
-przeciągnięcie po torze daje szynom w kole pędzla tę podsypkę zamiast dotychczasowej; Shift zabiera
-ich podsypkę (także luźną, zostawioną przez starszą wersję edytora). Nic nie zostaje luzem na ziemi.
+**Podsypka.** Podsypka to obiekt gry pod każdą szyną, jak w większości misji. Nowe tory dostają
+podsypkę wybraną w rzędzie narzędzia Tory, **PODSYPKA** (łąka, lód, wulkan, pustynia albo brak; `B`
+przełącza). Żeby podmienić podsypkę pod gotowym torem - zwykłą na wulkaniczną - wybierz jedną z
+czterech podsypek tematu **Dekoracje** i kliknij albo przeciągnij po torze: szyny w kole pędzla
+dostają tę podsypkę zamiast dotychczasowej, a Shift zabiera ich podsypkę (także luźną, zostawioną
+przez starszą wersję edytora). Nic nie zostaje luzem na ziemi, obraz terenu nie jest ruszany.
+
+**Malowanie terenu** → **TRYB: PODSYPKA** to co innego: wmalowuje pas żwiru w obraz terenu pod
+szynami, po których przejdzie pędzel, tak jak zrobiły to trzy misje zamiast kłaść obiekty - kropki
+wzdłuż szyn pokazują, gdzie legnie: **RODZAJ**, **SZEROKOSC** (28 px, jak w misjach), **ROZMIAR**,
+**SILA**, **KRAWEDZ**; pas idzie wzdłuż łuków, rozjazdów i ramp. Obiekty podsypki tych szyn zostają
+(zabierz je Shiftem z podsypek Dekoracji, jeśli chcesz sam pas). Prawy przycisk przywraca oryginalny
+obraz, Alt+klik pobiera rodzaj, **POD CALA MAPA** maluje pas pod każdą szyną mapy naraz. Jedno
+pociągnięcie to jedno cofnięcie.
 
 ![Podsypka pod rozjazdem](img/paint-bed-pl.jpg)
 

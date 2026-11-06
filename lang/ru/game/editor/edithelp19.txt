@@ -1,14 +1,14 @@
-ÁÀËËÀÑÒ
+THE GRAVEL BED
 
-ÏÎÊÐÀÑÊÀ > ÁÀËËÀÑÒ ÊËÀÄÅÒ ÁÀËËÀÑÒ ÏÎÄ
-ÐÅËÜÑÛ, ÏÎ ÊÎÒÎÐÛÌ ÏÐÎÉÄÅÒ ÊÈÑÒÜ: ÂÈÄ
-(ËÓÃ, ËÅÄ, ÂÓËÊÀÍ, ÏÓÑÒÛÍß), ØÈÐÈÍÀ. ÍÀ
-ÑÎÁÑÒÂÅÍÍÎÌ ÐÈÑÓÍÊÅ ÊÀÐÒÛ ÏÎËÎÑÀ ÐÈÑÓÅÒÑß,
-ÍÀ ÌÅÑÒÍÎÑÒÈ ÊÀÌÏÀÍÈÈ ÊËÀÄÓÒÑß ÍÀÊËÅÉÊÈ.
-ÏÊÌ ÂÎÇÂÐÀÙÀÅÒ ÈÑÕÎÄÍÛÉ, ALT+ÊËÈÊ ÁÅÐÅÒ
-ÂÈÄ, ÏÎÄ ÂÑÅÌÈ ÏÓÒßÌÈ: ÏÎÄ ÊÀÆÄÛÌ ÐÅËÜÑÎÌ.
-×ÅÒÛÐÅ ÁÀËËÀÑÒÀ ÈÇ ÄÅÊÎÐÀÖÈÉ - ÒÎ ÆÅ:
-ÂÛÁÅÐÈ ÎÄÈÍ, ÙÅË×ÎÊ / ÒÀÙÈ ÏÎ ÏÓÒÈ -
-ÐÅËÜÑÛ Â ÊÐÓÃÅ ÏÎËÓ×ÀÒ ÅÃÎ, SHIFT ÓÁÅÐÅÒ.
-ÎÄÈÍ ÂÈÄ ÂÅÇÄÅ (È ÏÎÄ ÍÎÂÛÌÈ ÏÓÒßÌÈ, B).
-ÎÄÈÍ ÌÀÇÎÊ - ÎÄÍÀ ÎÒÌÅÍÀ; ÒÎ×ÊÈ: ÊÓÄÀ.
+NEW TRACK GETS THE BED CHOSEN IN THE TRACK
+ROW: GRAVEL BED (MEADOW, ICE, VOLCANIC,
+DESERT, NONE; B CYCLES). TO SWAP THE BED OF
+TRACK ALREADY LAID: DECORATIONS, PICK ONE OF
+THE FOUR BEDS, CLICK / DRAG ON THE TRACK -
+THE RAILS IN THE CIRCLE GET IT, SHIFT TAKES
+IT AWAY. THESE ARE THE GAME'S OWN BEDS.
+PAINT > GRAVEL BED IS ANOTHER THING: IT
+PAINTS A BAND INTO THE GROUND'S PICTURE
+(KIND, WIDTH; RMB PUTS THE ORIGINAL BACK,
+UNDER THE WHOLE TRACK PAINTS IT EVERYWHERE).
+ONE STROKE IS ONE UNDO; DOTS: WHERE IT GOES.
