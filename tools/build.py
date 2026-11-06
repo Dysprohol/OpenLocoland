@@ -20,7 +20,7 @@ the SHA-256 of the Polish and English depots (ORIGINAL_SHA256) is fine; another 
 depot's differ in four of them, or a player changed it - is fine when every patch that targets it
 can be placed (patch_text.apply_patch places a change by its lines; logged once per file), and
 stops the build naming the file and the change that cannot be placed otherwise. With
---skip-verify (Setup's "Skip version verification") such a file is left as the player's, with a
+--skip-verify (Setup's "Skip verification of the game files - install as it is") such a file is left as the player's, with a
 warning naming what of ours it would carry (FEATURES), and the build goes on. One edit players
 made is undone first: a `#define KEYS_ENABLE` line added to maps\script\constants.lgc to turn on
 the developer keys (the launcher's Cheats option now). Only the
@@ -726,7 +726,13 @@ def build(steam, target, locofix=None, captured=None, progress=None, version=Non
     steam_exe = os.path.join(a.steam, "Steam.exe")
     locoland_exe = os.path.join(a.steam, "Locoland.exe")
     target_exe = os.path.join(a.target, OUTPUT_EXE)
-    if os.path.isfile(steam_exe):
+    if os.path.isfile(steam_exe) and not steam_exe_original(a.steam, version):
+        # another exe (skip_verify: a CD or the beta/demo): our patches fit only the Steam one, so it
+        # is copied as it is - LocoFix is not loaded and the game runs as the original, dgVoodoo2 kept
+        print(f"Warning: Steam.exe is not the Steam version of 2003-10-07 - copied as {OUTPUT_EXE} unchanged: "
+              "LocoFix is not loaded, the game runs as the original (no fixes, launcher options or editor)")
+        copy(steam_exe, target_exe, copied)
+    elif os.path.isfile(steam_exe):
         generate(copied, lambda path: patch_exe.build(steam_exe, path), target_exe)
     elif os.path.isfile(locoland_exe):
         copy(locoland_exe, target_exe, copied)   # an already patched copy of the game

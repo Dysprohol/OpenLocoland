@@ -106,11 +106,16 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         clean_up_logs();
         patch::log("LocoFix %s", LOCOFIX_VERSION);
         // The patches fit one exe version only - we recognise it by the build date
-        // in the PE header (2003-10-07, the Steam version; the same exe for all languages).
+        // in the PE header (2003-10-07, the Steam version; the same exe for all languages)
+        // and its image size: the Italian CD's exe has the same date but is wrapped by a copy
+        // protection (0x20d000), the English beta/demo's is another build (0x3F5345A5). On
+        // any other exe nothing is patched and the game runs as the original.
         auto* dos = reinterpret_cast<IMAGE_DOS_HEADER*>(GetModuleHandleA(nullptr));
         auto* nt = reinterpret_cast<IMAGE_NT_HEADERS*>(reinterpret_cast<uint8_t*>(dos) + dos->e_lfanew);
-        if (nt->FileHeader.TimeDateStamp != 0x3F8275D4) {
-            patch::log("unknown exe - no fixes applied");
+        if (nt->FileHeader.TimeDateStamp != 0x3F8275D4 || nt->OptionalHeader.SizeOfImage != 0x208000) {
+            patch::log("unknown exe (built %08lX, image size %lX) - LocoFix inactive, no fixes applied",
+                       static_cast<unsigned long>(nt->FileHeader.TimeDateStamp),
+                       static_cast<unsigned long>(nt->OptionalHeader.SizeOfImage));
             return TRUE;
         }
         install_language();
