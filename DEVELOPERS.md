@@ -115,10 +115,14 @@ changes land a line lower) - and our patches avoid lines a depot changes: `logo.
 not touch the movies' lines, whose clip names differ (below, "the intro"). When a change cannot be
 placed (its lines are not there, or twice), `build.py` and Setup stop and name the file and the
 change (`build.modified_steam_files`, the one decision for both; Setup's `modified_files` text
-asks to verify the game files in Steam). Setup's "Skip version verification" box (`--skip-verify`
+asks to verify the game files in Steam). Setup's "Skip verification of the game files - install as it is" box (`--skip-verify`
 of `build.py` and Setup) goes on instead: such a file is left as the player's, and the log and the
 window say which of our features it carries will be missing (`build.FEATURES`; Setup's
-`feature_*` texts), so a player can always install. An old way to turn on the developer keys was
+`feature_*` texts), and a `Steam.exe` of another version (the Italian CD's, wrapped by a copy
+protection, or the English beta/demo's) is copied as `Locoland.exe` unchanged - our exe patches
+and LocoFix fit only the Steam exe, so that game runs as the original, with dgVoodoo2 (LocoFix,
+loaded by a patched exe only, also checks the exe's build date and image size and does nothing
+on another) - so a player with the game's files can always install. An old way to turn on the developer keys was
 to edit `maps\script\constants.lgc` in the Steam folder, and the patch then stopped Setup with a
 Python error: a `#define KEYS_ENABLE` line there is left out by itself - the launcher's Cheats
 option does that job now. Of the Steam folder's root only the game's own
@@ -144,9 +148,8 @@ download_depot 352130 352136    Russian
 ```
 
 (The Steam name of each depot is `Locoland ENG/GER/HUN/POL/POR/RUS`. 352135 Portuguese -
-Portugal is listed with exactly the size of 352131 English - 551,618,874 bytes on disk and
-180,658,752 to download - so it is probably a copy of the English files; no `lang/pt`
-until that is checked.) Steam
+Portugal is a copy of 352131 English, every file byte for byte (`tools\editions.py diff en-steam
+pt-steam`, 2026-11-06); so there is no `lang/pt`.) Steam
 puts them in `steamapps\content\app_352130\depot_<id>\`. `build.py` captures the language
 files of the installed game and of every downloaded depot into `captured/<code>/` (outside
 git) and assembles the packs that have a capture (a fan translation such as Czech: its base's,
@@ -174,7 +177,7 @@ For working on the engine, generate the local reverse-engineering output (not in
 | `lang/<code>/` | Our translation work for each language pack (`cs`, `de`, `en`, `hu`, `pl`, `ru`): `language.ini` (the launcher's name and labels, `codepage`, `base` for a translation Steam does not ship) and in `game/` the texts by kind, each assembled into its place in `<game>\lang\<code>\` (`languages.pack_path`): `game/strings.override.ini` -> `strings.ini` (changes to the captured file), `game/briefings/<map>/` -> `maps\<map>\` (the missions', POLIGON's and the template's texts), `game/menus/menu*.txt` -> `maps\` (the menu's pages), `game/editor/edithelp*.txt` -> `maps\` (the editor's help pages), `game/scripts/*.lgc.patch` -> `maps\script\` and `game/scripts/shiftb.txt.patch` -> `maps\` (the developer mode); and in `fonts/` a pack's own letters, `<font>.png` pasted into the captured `fonts\<font>*.bmp` (`tools/font_cells.py`, Czech - see "Languages"). A pack ships only what it changes; the rest comes from its capture. `lang/_template/` is the starting point of a new translation (a placeholder for every file and `README.md` notes per folder) and not a pack: `languages.packs()` leaves out folders starting with `_`, and no `README.md` is shipped. Each pack's texts are in its code page (CP1250/1251/1252); format details in `docs/TRANSLATING.md` and `tools/patch_text.py`. |
 | `external/dgVoodoo2/` | dgVoodoo2 2.87.5 (`DDraw.dll`, `D3DImm.dll`, unmodified; credit in `NOTICE.md`). |
 | `src/LocoFix/` | Game fixes in C++ - a library loaded by the exe before WinMain. |
-| `tools/` | Game assembly, language capture, text/exe/data patches, LocoFix build, decompilation, data unpacking, editing of objects.res, maps and images, tests; the installer (`installer.py`) and the release (`release.py`, see "Release"); the translator's kit (`translate_kit.py`: a pack's texts exported as UTF-8 files with the English beside them for a volunteer without git, and imported back checked and committed with the translator as the author - `docs/TRANSLATING.md` "For translators without git"). |
+| `tools/` | Game assembly, language capture, text/exe/data patches, LocoFix build, decompilation, data unpacking, editing of objects.res, maps and images, tests; the installer (`installer.py`) and the release (`release.py`, and `editions.py`, the editions every release is checked on - see "Release"); the translator's kit (`translate_kit.py`: a pack's texts exported as UTF-8 files with the English beside them for a volunteer without git, and imported back checked and committed with the translator as the author - `docs/TRANSLATING.md` "For translators without git"). |
 | `re/symbols.csv` | Names and descriptions of functions and variables in the exe - everything we learn about the code goes here. |
 | `re/types.txt` | Struct types (fields at their offsets), vtables, types of globals and function prototypes. |
 
@@ -183,6 +186,7 @@ Local only (in `.gitignore`), made from the player's own copy:
 | Folder | Contents |
 |---|---|
 | `captured/<code>/` | Original language files captured from Steam, one folder per language (`languages.py`). |
+| `editions/<code>/` | The files of the game's editions for `tools/editions.py` (en-steam whole, the others what differs from it; their manifests, in git, are `tools/editions/<code>.tsv`; see "Release"). |
 | `re/c/` | C code from Ghidra (`decompile.py`, with names from `symbols.csv` and types from `types.txt`; `types.h` lists the structs). |
 | `re/exe/`, `re/data/` | Imports, strings, dialogs of the exe; objects and weapons from `objects.res` (`unpack.py`). |
 | `build/` | Ghidra project, LocoFix build, test results, previews. |
@@ -4143,6 +4147,43 @@ from their own Steam copy, as `build.py` does it for a developer.
 4. PyInstaller (`--onefile --windowed`) freezes `tools/installer.py` - the window - with
    `build.py` and every module it imports (Pillow for the generated pictures included) and the
    payload, which the frozen modules find in `sys._MEIPASS` (`build.REPO`, `languages.REPO`).
+
+**Every edition before the tag.** `python tools\editions.py check --run` builds the game from
+every edition of it we know and starts each one (an hour or so for all of them); a release waits
+until its table has no FAILED, "no menu" or LOGIC. `tools/editions.py` is a developer's tool, not
+part of Setup. It keeps a manifest of each edition - `tools/editions/<code>.tsv`, every file with
+its size and SHA-256 (in git: nothing of the game) - and the files in a local store,
+`editions/<code>/` (outside git, as `captured/`): `en-steam`, the base, whole (about 550 MB), the
+others only the files that differ from it. The codes are `<language>-<source>`: `en-steam`,
+`de-steam`, `hu-steam`, `pl-steam`, `pt-steam`, `ru-steam` - the depots, which `download_depot
+352130 3521NN` in the Steam console puts into `steamapps\content\app_352130\depot_3521NN` (see
+"Languages") - and the discs, `cs-cd` (the Czech edition), `pl-cd` (the Polish CD 1.02: the
+Polish depot's files with a `license.txt` and a `readme.txt`), `it-cd` (the Italian one: the
+English depot's scripts and data with Italian texts, and an exe of its own, wrapped by a copy
+protection that ends it at once without the disc) and `en-beta-demo` (the English beta/demo disc:
+another exe; its `logo.lgc` and `constants.lgc` are the Russian depot's, which so has part of
+the scripts of that older build). A new edition is one folder of its files - an install of the
+disc, by our convention in `C:\Locoland Decomp\notes\diffs\<name>` - and `editions.py capture
+<code> <folder>`; an installer's own files (`unins*`, logs) and a disc install's score tables
+(`hiscores`, the player's; the depots ship theirs) are left out, a file that cannot be read (the
+Italian CD's `CDPRO.BIN`, taken by the antivirus) is named and left out, and `refresh <code>
+<folder>` captures again and says what changed (a Steam update). `list` shows the editions
+(language, source, exe, files, how many differ from `en-steam`, the nearest other edition with
+the files they have with other content and the files only this one has, when and where from),
+`diff <a> <b>` the files that differ, marking our patches' targets, and `assemble <code>
+<folder>` puts a whole edition together (hard links into the store). `check [--run] [<code>
+...]` assembles each into `build\editions\<code>\steam`, reports for each of our patches whether
+it is placed at its line numbers, shifted or not at all, builds it with `build.py` into
+`build\editions\<code>\game` (with `--skip-verify` only when the build is refused; its log next
+to it) and with `--run` starts it with `test_game.ps1`: the intro to the main menu, and POLIGON
+with its Esc menu where LocoFix runs (the Steam exe; on another exe the game is the original:
+`build.py` copies such an exe unchanged and LocoFix, should it be loaded, does nothing), looking
+for LOGIC errors in `error.log`; an edition's own exe that ends before the engine starts (no
+`error.log` at all: the Italian CD without its disc) is "did not start (its exe)", a limit of that
+edition, not a failure. On 2026-11-06 all ten built (the beta/demo and the Italian CD with
+`--skip-verify`, for their exes), every patch was placed - at its line numbers but the Russian
+`menutact.lgc`'s, a line lower - and each reached the main menu but the Italian CD, POLIGON too
+on the Steam exe, with no LOGIC error.
 
 The launcher's update check (LocoFix fix 33) reads the release GitHub calls the latest - the newest
 that is neither a draft nor a pre-release - so a release is found by it when its tag is

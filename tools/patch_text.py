@@ -99,13 +99,13 @@ def _hunks(patch):
     return hunks
 
 
-def apply_patch(original, patch, name="file"):
+def apply_patch(original, patch, name="file", placed=None):
     """Applies a patch from make_patch (or diff -u). Each hunk is placed by its lines: at its line
     number when the file has its "before" lines (the removed and context ones, byte for byte)
     there, else where they occur exactly once in the file - an original with lines added, removed
     or changed elsewhere (another language's Steam depot) takes the patch too. Raises PatchError
     (a ValueError) when a hunk's lines occur nowhere, more than once, or before the hunk ahead of
-    it."""
+    it. `placed`, a list, gets each hunk's offset from its line number (0: placed there)."""
     src = _lines(original)
     hunks = _hunks(patch)
     out, pos = [], 0
@@ -119,7 +119,11 @@ def apply_patch(original, patch, name="file"):
                 text = rows[first][1].strip().decode("latin-1") if rows else ""
                 raise PatchError(name, number, len(hunks), start + first + 1, len(found),
                                  text[:40] + ("..." if len(text) > 40 else ""))
+            if placed is not None:
+                placed.append(found[0] - start)
             start = found[0]
+        elif placed is not None:
+            placed.append(0)
         out += src[pos:start]
         pos = start
         for sign, text in rows:
@@ -136,9 +140,13 @@ def tests():
     original = b"".join(b"line %d\r\n" % i for i in range(1, 21))
     changed = original.replace(b"line 5\r\n", b"line 5\r\nnew a\r\n").replace(b"line 15\r\n", b"LINE 15\r\n")
     patch = make_patch(original, changed, "t.txt")
-    assert apply_patch(original, patch) == changed                      # at its line numbers
+    placed = []
+    assert apply_patch(original, patch, placed=placed) == changed and placed == [0, 0]   # at its line numbers
     shifted = b"added 1\r\nadded 2\r\n" + original
     assert apply_patch(shifted, patch) == b"added 1\r\nadded 2\r\n" + changed
+    placed = []
+    apply_patch(shifted, patch, placed=placed)
+    assert placed == [2, 2], placed
     middle = original.replace(b"line 10\r\n", b"line 10\r\nmore\r\nmore\r\nmore\r\n")
     assert apply_patch(middle, patch) == changed.replace(b"line 10\r\n", b"line 10\r\nmore\r\nmore\r\nmore\r\n")
     assert apply_patch(original.replace(b"\r\n", b"\n"), patch.replace(b"\r\n", b"\n")) == \

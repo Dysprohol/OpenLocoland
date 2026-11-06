@@ -3,6 +3,8 @@ build/
 __pycache__/
 # language files captured from the player's own Steam install (languages.py)
 captured/
+# the files of the game's editions (tools/editions.py; their manifests are in tools/editions/)
+/editions/
 # generated from the player's own copy of the game: decompile.py and unpack.py
 re/c/
 re/exe/
