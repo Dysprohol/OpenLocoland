@@ -1454,6 +1454,8 @@ int g_picked_nvid[2] = {0, 0}, g_picked_army[2] = {0, 0};
 bool is_palette(const Entry& e) { return e.nvid == PALETTE_NVID || e.nvid == VEHICLES_NVID; }
 int palette_of(const Entry& e) { return e.nvid == VEHICLES_NVID ? 1 : 0; }
 bool is_decal(int nvid);   // the decals, below
+int bed_kind_of(int nvid);   // the gravel bed in the Paint tool, below: a bed's kind (BEDS' order), -1 not a bed
+void bed_picked(int nvid);   // ... a bed picked in the Decals strip or the palette: the kind of the swap
 
 // The Decals tool's decal: the All objects entry's object when that is a decal, else the one [ and ]
 // chose last (the Decals entry's).
@@ -1554,7 +1556,10 @@ void choose_entry(int i) {
     g_entry = i;
     close_context();   // an object's panel goes with the tool it was opened in
     if (is_palette(entry())) panel_open_palette(entry().nvid == VEHICLES_NVID);   // pick an object there
-    if (tool() == Tool::Decals && is_palette(entry())) {   // the All objects entry with a decal: the brush
+    if (tool() == Tool::Decals && is_palette(entry()) && bed_kind_of(decal_nvid()) >= 0) {   // a bed: the swap
+        g_selection.clear();
+        bed_picked(decal_nvid());
+    } else if (tool() == Tool::Decals && is_palette(entry())) {   // the All objects entry with a decal: the brush
         g_selection.clear();
         MESSAGE("MsgDecal", "decal: %s (VID %d)", object_name(decal_nvid()) ? object_name(decal_nvid()) : "?", decal_nvid());
     } else if (tool() == Tool::Place) {
@@ -1588,6 +1593,10 @@ void choose_decal(int k) {
     g_picked_nvid[0] = g_decals[g_decal];
     g_picked_army[0] = 0;
     panel_choose_group(0, "GroupDecals");
+    if (bed_kind_of(decal_nvid()) >= 0) {
+        bed_picked(decal_nvid());
+        return;
+    }
     const char* name = object_name(decal_nvid());
     MESSAGE("MsgDecal", "decal: %s (VID %d)", name ? name : "?", decal_nvid());
 }
@@ -4602,6 +4611,7 @@ struct GroundStroke {
     std::set<std::pair<int, int>> others;    // ... and with a tile of another kind (left to it)
     std::vector<uint8_t*> made;              // Water: the tiles made; the bed: the decals laid
     bool gravel = false, decals = false;     // the gravel bed's band; laid as decals (a campaign terrain)
+    float reach = 0;                         // the Decals strip's bed brush: its circle (0: the Paint tool's brush)
     std::vector<uint8_t*> rails;             // the bed: the map's plain rails
     std::set<uint8_t*> bedded;               // ... those the stroke went over
     std::vector<std::pair<uint8_t*, State>> taken;   // ... the decals taken away (as they were)
@@ -4656,9 +4666,37 @@ const char* bed_kind_name(int k) {
     return ui_text(b.key, b.english);
 }
 
+// The kind's name as the rows write it (MEADOW, ICE ...).
+const char* bed_kind_label(int k) {
+    static const UiText NAMES[BED_KINDS] = {{"OptBedMeadow", "MEADOW"}, {"OptBedIce", "ICE"}, {"OptBedVolcanic", "VOLCANIC"},
+                                            {"OptBedDesert", "DESERT"}};
+    return NAMES[(std::max)(0, (std::min)(BED_KINDS - 1, k))].get();
+}
+
+// One kind for the three ways of bedding the track: the Paint tool's KIND, the Track tool's B and the
+// bed picked in the Decals strip (its brush is the swap of the kind, below).
 void set_bed_kind(int k) {
     g_bed_kind = k;
     g_bed = BEDS[k];   // the bed of new track the same
+    if (bed_kind_of(g_picked_nvid[0]) >= 0) g_picked_nvid[0] = BEDS[k];   // the strip's framed bed the same
+    if (!g_decals.empty() && bed_kind_of(g_decals[g_decal % g_decals.size()]) >= 0) {
+        const auto it = std::find(g_decals.begin(), g_decals.end(), BEDS[k]);
+        if (it != g_decals.end()) g_decal = static_cast<int>(it - g_decals.begin());
+    }
+}
+
+// The Decals strip's four beds are not dropped as loose decals: picked, they are the swap of the
+// track's bed - a click or a drag gives the rails within the brush's circle the bed of the kind (the
+// Paint tool's GRAVEL BED stroke with the Decals brush's circle: lay_bed per rail on a campaign terrain,
+// the band painted on a picture of the map's own), Shift takes their beds away. Before (until
+// 2026-11-06) a click dropped a loose bed at the cursor beside the rail's own, which stayed.
+bool bed_brush() { return tool() == Tool::Decals && bed_kind_of(decal_nvid()) >= 0; }
+float bed_brush_reach() { return (std::max)(8.0f * g_radius, 12.0f); }   // the Decals brush's circle
+
+void bed_picked(int nvid) {
+    set_bed_kind(bed_kind_of(nvid));
+    MESSAGE("MsgBedBrush", "gravel bed: %s - click / drag on the track gives the rails this bed, Shift takes it away",
+            bed_kind_label(g_bed_kind));
 }
 
 // A rail's decal bed taken away (kept in the stroke for the history).
@@ -4697,7 +4735,8 @@ void bed_dab(float sx, float sy, float reach) {
             continue;
         }
         fresh.push_back(bed_rail(o));
-        if (!g_gstroke.erase) take_bed(o);
+        // the band is the rail's bed now; the Decals strip's Shift takes the decal bed as well
+        if (!g_gstroke.erase || g_gstroke.reach > 0) take_bed(o);
     }
     if (fresh.empty() || g_gstroke.decals) return;
     const size_t paint = fresh.size();
@@ -4713,6 +4752,35 @@ void start_bed(bool erase) {
     for_each_object([&](uint8_t* o) {
         if (plain_rail(o)) g_gstroke.rails.push_back(o);
     });
+}
+
+// The Shift of the Decals strip's bed brush: the beds lying in the circle, a rail's or loose ones - an
+// older build dropped loose beds from the strip, and a map saved then still has them.
+void take_beds_near(float sx, float sy, float r) {
+    for_each_object([&](uint8_t* o) {
+        if (removed(o) || bed_kind_of(nvid_of(o)) < 0 ||
+            std::hypot(at<float>(o, O_X) - sx, at<float>(o, O_Y) - at<float>(o, O_Z) - sy) > r)
+            return;
+        State s = state_of(o);
+        g_gstroke.taken.push_back({o, s});
+        s.present = false;
+        apply(o, s);
+    });
+}
+
+bool bed_painted();   // the drawing, below: the GRAVEL BED mode paints the band (the picture is the map's own)
+
+// The Decals strip's bed brush (bed_brush, above): the Paint tool's GRAVEL BED stroke with the circle of
+// the Decals brush. The picture is read only when the band is painted into it (a picture of the map's
+// own); on a campaign terrain the decal beds are laid without it.
+void start_bed_brush(bool erase) {
+    const bool picture = bed_painted() && ground_paintable(true);
+    g_gstroke = GroundStroke();
+    g_gstroke.active = true;
+    g_gstroke.reach = bed_brush_reach();
+    stroke_timing_begin();
+    start_bed(erase);
+    if (picture && !g_gstroke.decals) ground_stroke_begin();
 }
 
 // The level of the map's water of a VID (its tiles'), or -1.
@@ -4769,7 +4837,7 @@ void ground_step(bool first) {
     if (!g_gstroke.active) return;
     float sx, sy;
     mouse_on_map(sx, sy);
-    const float spacing = g_paint_radius * 0.3f;
+    const float spacing = (g_gstroke.reach > 0 ? g_gstroke.reach : g_paint_radius) * 0.3f;
     if (first || g_gstroke.gap) {   // back from over the bar: from here on, nothing painted under it
         ground_dab(sx, sy, first);
         g_gstroke.gap = false;
@@ -4783,7 +4851,7 @@ void ground_step(bool first) {
 }
 
 void ground_dab(float sx, float sy, bool first) {
-    const float r = static_cast<float>(g_paint_radius);
+    const float r = g_gstroke.reach > 0 ? g_gstroke.reach : static_cast<float>(g_paint_radius);
     g_gstroke.last_x = sx;
     g_gstroke.last_y = sy;
     g_gstroke.dabs.push_back({sx, sy});
@@ -4793,6 +4861,7 @@ void ground_dab(float sx, float sy, bool first) {
     g_gstroke.y1 = (std::max)(g_gstroke.y1, sy + r);
     if (g_gstroke.gravel) {
         bed_dab(sx, sy, r);
+        if (g_gstroke.erase && g_gstroke.reach > 0) take_beds_near(sx, sy, r);   // loose beds too
         return;
     }
     if (!g_gstroke.water) {
@@ -7163,13 +7232,15 @@ void draw_contours() {
         }
 }
 
+void draw_bed_reach(float mx, float my, float r, bool erase);   // below
+
 void draw_ground_tool(bool heights) {
     uint8_t* w = world();
     const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
     const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
     float x, y;
     const rail::Cell c = cursor_cell(x, y);
-    char text[160];
+    char text[320];
     if (heights) {
         const std::set<rail::Cell> track = g_stroke.active ? g_stroke.track : g_track_covered ? std::set<rail::Cell>() : track_cells();
         const int reach = g_radius;   // the brush's cells (the contours show the rest)
@@ -7202,6 +7273,18 @@ void draw_ground_tool(bool heights) {
                       brush_name(), g_radius, g_strength, g_hard_edge ? ui_text("WordHard", "hard") : ui_text("WordSoft", "soft"),
                       inside ? ground_cell(c.first, c.second) : 0,
                       g_flatten_level >= 0 ? ui_printf(ui_format("StatusLevelTaken", " - Flatten to %d (Alt+click)"), g_flatten_level).c_str() : "");
+    } else if (bed_brush()) {   // the swap of the rails' bed: the circle on the screen, the rails it reaches
+        const float mx = static_cast<float>(g_mouse.x), my = static_cast<float>(g_mouse.y), r = bed_brush_reach();
+        for (int k = 0; k < 24; ++k) {
+            const float a = k * 6.2831853f / 24;
+            fill(graphics(), nullptr, mx + r * std::cos(a) - 1.5f, my + r * std::sin(a) - 1.5f, mx + r * std::cos(a) + 1.5f,
+                 my + r * std::sin(a) + 1.5f, shift_down() ? 0xe0ff4040 : 0xe0ffffff);
+        }
+        draw_bed_reach(mx, my, r, shift_down());
+        std::snprintf(text, sizeof text,
+                      ui_format("StatusBedBrush", "gravel bed: %s - click / drag on the track (dotted: the rails it re-beds), radius %d (wheel, + -) - Shift takes the beds away; %s"),
+                      bed_kind_label(g_bed_kind), g_radius,
+                      bed_painted() ? ui_text("WordBedPainted", "painted into the picture") : ui_text("WordBedDecals", "decals (a campaign terrain)"));
     } else {
         const float r = (std::max)(8.0f * g_radius, 12.0f);
         for (int k = 0; k < 24; ++k) {
@@ -7233,6 +7316,39 @@ bool bed_painted() {
     return own;
 }
 
+// Where a gravel bed stroke lands (the Paint tool's GRAVEL BED, the Decals strip's beds): the band's two
+// edges along each rail whose line the brush of radius r at the mouse (mx, my) reaches (bed_dab beds
+// those), BED_RISE up the screen as ground_bed lays it, and the kind's colour beside the brush.
+void draw_bed_reach(float mx, float my, float r, bool erase) {
+    const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
+    uint8_t* w = world();
+    const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y), sx = mx + cam_x, sy = my + cam_y;
+    const float half = g_bed_width / 2.0f;
+    for_each_object([&](uint8_t* o) {
+        if (!plain_rail(o) || std::fabs(at<float>(o, O_X) - sx) > r + 60 || std::fabs(at<float>(o, O_Y) - at<float>(o, O_Z) - sy) > r + 60)
+            return;
+        const BedRail rail = bed_rail(o);
+        if (ground_bed_distance(rail, sx, sy) > r) return;
+        float px[24], py[24];
+        const int n = ground_bed_path(rail, px, py, 24);
+        for (int i = 0; i + 1 < n; ++i) {
+            const float ux = px[i + 1] - px[i], uy = py[i + 1] - py[i], len = std::hypot(ux, uy);
+            if (len < 0.5f) continue;
+            const float nx = -uy / len, ny = ux / len;
+            for (float t = 0; t < len; t += 5) {
+                const float x = px[i] + ux * t / len - cam_x, y = py[i] + uy * t / len - cam_y;
+                for (int side = -1; side <= 1; side += 2)
+                    fill(graphics(), nullptr, x + side * nx * half - 1, y + side * ny * half - 1, x + side * nx * half + 1,
+                         y + side * ny * half + 1, erase ? 0xe0ff4040 : 0xe0ffd040);
+            }
+        }
+    });
+    const uint16_t c = ground_bed_kinds()[g_bed_kind].mean;
+    const uint32_t rgb = ((c >> 11) << 19) | (((c >> 5) & 63) << 10) | ((c & 31) << 3);
+    fill(graphics(), nullptr, mx + r + 4, my - 8, mx + r + 20, my + 8, 0xff000000);
+    fill(graphics(), nullptr, mx + r + 5, my - 7, mx + r + 19, my + 7, 0xff000000 | rgb);
+}
+
 // The Paint and Water tools: the brush's circle on the screen (the picture is the screen), the
 // texture's colour in a square beside it; the status line.
 void draw_paint_tool() {
@@ -7246,34 +7362,7 @@ void draw_paint_tool() {
     }
     char text[300];
     if (tool() == Tool::Paint && g_paint_bed) {
-        // where the stroke lands: the band's two edges along each rail whose line the brush reaches
-        // (bed_dab beds those), BED_RISE up the screen as ground_bed lays it
-        uint8_t* w = world();
-        const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y), sx = mx + cam_x, sy = my + cam_y;
-        const float half = g_bed_width / 2.0f;
-        for_each_object([&](uint8_t* o) {
-            if (!plain_rail(o) || std::fabs(at<float>(o, O_X) - sx) > r + 60 || std::fabs(at<float>(o, O_Y) - at<float>(o, O_Z) - sy) > r + 60)
-                return;
-            const BedRail rail = bed_rail(o);
-            if (ground_bed_distance(rail, sx, sy) > r) return;
-            float px[24], py[24];
-            const int n = ground_bed_path(rail, px, py, 24);
-            for (int i = 0; i + 1 < n; ++i) {
-                const float ux = px[i + 1] - px[i], uy = py[i + 1] - py[i], len = std::hypot(ux, uy);
-                if (len < 0.5f) continue;
-                const float nx = -uy / len, ny = ux / len;
-                for (float t = 0; t < len; t += 5) {
-                    const float x = px[i] + ux * t / len - cam_x, y = py[i] + uy * t / len - cam_y;
-                    for (int side = -1; side <= 1; side += 2)
-                        fill(graphics(), nullptr, x + side * nx * half - 1, y + side * ny * half - 1, x + side * nx * half + 1,
-                             y + side * ny * half + 1, erase ? 0xe0ff4040 : 0xe0ffd040);
-                }
-            }
-        });
-        const uint16_t c = ground_bed_kinds()[g_bed_kind].mean;
-        const uint32_t rgb = ((c >> 11) << 19) | (((c >> 5) & 63) << 10) | ((c & 31) << 3);
-        fill(graphics(), nullptr, mx + r + 4, my - 8, mx + r + 20, my + 8, 0xff000000);
-        fill(graphics(), nullptr, mx + r + 5, my - 7, mx + r + 19, my + 7, 0xff000000 | rgb);
+        draw_bed_reach(mx, my, r, erase);
         std::snprintf(text, sizeof text,
                       ui_format("StatusBed", "Paint - GRAVEL BED (dotted: where it goes): %s ([ ]), width %d px, brush %d px (wheel), strength %d, edge %s - %s; the right button puts the original back"),
                       bed_kind_name(g_bed_kind), g_bed_width, g_paint_radius, g_paint_strength,
@@ -7709,7 +7798,9 @@ const char* hint_of(Tool t) {
     case Tool::Delete: return ui_text("HintDelete", "click / drag: delete, Shift+click on a rail: its section");
     case Tool::Track: return ui_text("HintTrack", "click: start / end, wheel: ramp, V: kind, middle: delete a rail");
     case Tool::Place: return ui_text("HintPlace", "click: place, R / E: turn, Shift: where the cursor is");
-    case Tool::Decals: return ui_text("HintDecals", "click / drag: scatter, R / E: turn, [ ]: decal, Shift: take away");
+    case Tool::Decals:
+        return bed_brush() ? ui_text("HintBedBrush", "click / drag on the track: this gravel bed, Shift: beds away")
+                           : ui_text("HintDecals", "click / drag: scatter, R / E: turn, [ ]: decal, Shift: take away");
     case Tool::PushLine: return ui_text("HintPushLine", "click: begin, click: end; on a line: Del, T, R");
     case Tool::Height: return ui_text("HintHeight", "drag: the mode, right: lower, M: mode, Alt+click: level");
     case Tool::Paint:
@@ -8201,7 +8292,11 @@ void draw_row_tip() {
         const char* name = object_name(h.object);
         uint8_t* font = vid_by_number(FONT_TIPS);
         if (!name || !*name || !font) return;
-        const std::string shown = std::string(" ") + name + " ";
+        // a bed is the swap of the track's bed, not a decal to drop: the tip says what its brush does
+        const int bed = bed_kind_of(h.object);
+        const std::string shown = std::string(" ") +
+                                  (bed >= 0 ? ui_printf(ui_format("TipBedBrush", "gravel bed: %s - click / drag on the track"), bed_kind_label(bed))
+                                            : std::string(name)) + " ";
         const float cw = at<float>(font, V_SIZE_X), w = cw * shown.size();
         const Box v = view();
         float x = (h.l + h.r) / 2 - w / 2;
@@ -9600,8 +9695,13 @@ void draw_overlay() {
     const int under = strip_under_mouse();   // an object of the strip under the mouse
     if (under) {
         const char* name = object_name(under);
-        status_line(v.l, v.t + LINE_HEIGHT,
-                    ui_printf(ui_format("StatusStripHover", "%s: %s, VID %d - a click picks it"), strip().name.c_str(), name ? name : "?", under).c_str());
+        if (bed_kind_of(under) >= 0)
+            status_line(v.l, v.t + LINE_HEIGHT,
+                        ui_printf(ui_format("StatusStripBed", "%s: %s, VID %d - a click picks the gravel bed %s: click / drag on the track gives the rails this bed"),
+                                  strip().name.c_str(), name ? name : "?", under, bed_kind_label(bed_kind_of(under))).c_str());
+        else
+            status_line(v.l, v.t + LINE_HEIGHT,
+                        ui_printf(ui_format("StatusStripHover", "%s: %s, VID %d - a click picks it"), strip().name.c_str(), name ? name : "?", under).c_str());
     } else if (tool() == Tool::Height || tool() == Tool::Decals || tool() == Tool::Paint || tool() == Tool::Water) {
         status_line(v.l, v.t + LINE_HEIGHT, g_ground_status.c_str());
     }
@@ -9798,6 +9898,12 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             SetTimer(window, HEIGHT_TIMER, HEIGHT_REPEAT, nullptr);
             if (!g_test) SetCapture(window);
             patch::log("edit: stroke: ground height (%s) begun at %ld,%ld", BRUSH_NAMES[static_cast<int>(g_stroke.brush)], g_mouse.x, g_mouse.y);
+        } else if (tool() == Tool::Decals && bed_brush()) {   // a bed picked: the swap of the rails' bed
+            start_bed_brush(shift_down());
+            ground_step(true);
+            if (!g_test) SetCapture(window);
+            patch::log("edit: stroke: %s (the Decals strip, %s) begun at %ld,%ld", stroke_kind(), g_gstroke.erase ? "Shift: away" : bed_kind_name(g_bed_kind),
+                       g_mouse.x, g_mouse.y);
         } else if (tool() == Tool::Decals) {
             g_stroke = Stroke();
             g_stroke.active = true;
@@ -10016,7 +10122,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         } else if (tool() == Tool::Track && w == 'B') {
             const int* at_bed = std::find(std::begin(BEDS), std::end(BEDS), g_bed);
             g_bed = g_bed == 0 ? BEDS[0] : (at_bed + 1 == std::end(BEDS) ? 0 : *(at_bed + 1));
-            if (g_bed) g_bed_kind = bed_kind_of(g_bed);   // the Paint tool's bed the same
+            if (g_bed) set_bed_kind(bed_kind_of(g_bed));   // the Paint tool's and the Decals strip's bed the same
             MESSAGE("MsgBed", "gravel bed of new track: %s", g_bed ? std::to_string(g_bed).c_str() : ui_text("WordNone", "none"));
         }
         else if ((w == VK_DELETE || w == 'T') && g_selection.empty() && g_push_selected >= 0) {   // a push line selected
@@ -11018,7 +11124,8 @@ void edit_pick_object(int nvid, int army) {
     end_line();
     g_selection.clear();
     g_context = nullptr;
-    if (decal != g_decals.end()) MESSAGE("MsgDecal", "decal: %s (VID %d)", object_name(nvid) ? object_name(nvid) : "?", nvid);   // the Decals tool now
+    if (decal != g_decals.end() && bed_kind_of(nvid) >= 0) bed_picked(nvid);   // a bed: the swap of its kind
+    else if (decal != g_decals.end()) MESSAGE("MsgDecal", "decal: %s (VID %d)", object_name(nvid) ? object_name(nvid) : "?", nvid);   // the Decals tool now
     else MESSAGE("MsgPlaceArmy", "place: %s (VID %d), army %d (%s)", place_label(), nvid, place_army(), army_name(place_army()));
 }
 

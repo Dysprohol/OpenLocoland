@@ -27,7 +27,30 @@ click puts one at the cursor as shown, dragging scatters 1 + radius of them a st
 -; radius 0 one a step along the drag, as shown), each turned at random (a decal's directions are its
 variants), none nearer than the spacing (< and >, 4-64 px, 16 by default)
 to a decal already there (beds aside), so they do not stack; Shift takes the decals in the circle
-away. The decals are the palette's DECORATIONS category (`GroupDecals` of `game/editor/palette.tsv`:
+away. The four beds of the category (612, 615, 616, 617) are not dropped as loose decals (until
+2026-11-06 a click dropped one at the cursor beside the rail's own bed, which stayed, and the loose
+one could not even be picked - `pickable` leaves beds out): picked in the strip or the palette, a bed
+is the swap of the track's bed (`bed_brush`). Picking it sets the kind (`set_bed_kind`: the same
+`g_bed` / `g_bed_kind` as the Paint tool's KIND and the Track tool's B, so the three stay in step -
+the strip's framed bed follows the other two as well); a click or a drag re-beds the plain and
+destroyed rails whose line comes within the Decals brush's circle (8 px x the radius, at least 12; the
+wheel or + and - size it) - the Paint tool's GRAVEL BED stroke with that circle (`start_bed_brush`,
+below): on a campaign terrain `lay_bed` per rail (a decal of another kind replaced), on a picture
+of the map's own the band painted and the decal beds taken away; swamp rails keep their embankment
+(602); nothing is laid loose on the ground. Shift takes the rails' beds in the circle away (the
+decals, and on a picture of the map's own the band too, the original put back) together with any
+loose bed lying in it (`take_beds_near`), so the loose beds of a map saved with an older build go
+the same way. The preview is the circle with the band's edges dotted along the rails it reaches and
+the kind's colour beside it; the status line ("gravel bed: ICE - click / drag on the track ..."),
+the row's tip above a bed's icon ("gravel bed: ICE - click / drag on the track") and the hint say
+what the brush does. One stroke is one step of the history. Checked in the game on a copy of
+mission 2 (decal beds, 612 meadow): ICE picked, a click on a rail of the left line made its bed 615
+("1 rails, ... 1 decals laid, 1 taken away"), undone, a drag down the line re-bedded 5 rails, the map
+saved - `map_tool.py unpack` showed 5 beds 615 and 356 612 under the 361 rails -, Shift-dragged
+back to no bed (saved: none of the five), two loose beds put into it with `map_tool.py place` taken
+by a Shift-click ("2 taken away", gone from the saved file); on a copy of POLIGON (its own picture)
+the click painted the ice band under 2 rails ("painted into the picture"), saved with the map's own
+`.vid` and shown again after loading. The decals are the palette's DECORATIONS category (`GroupDecals` of `game/editor/palette.tsv`:
 every class-8 VID of `objects.res` once, in the file's order - `make_editor_palette` stops the build
 when the group and the file disagree; `find_decals` reads the group through `panel_group_nvids`), so
 the row above the bar and the palette show one list. The row is the strip of that category ("The rows
@@ -487,7 +510,12 @@ button puts the original picture back in the band, or takes the decals away; Alt
 kind painted there, else the kind of the nearest rail's decal, else the kind whose mean colour the
 picture has near a rail (`ground_bed_at`). A stroke or the button is one step of the history (the
 picture's rectangle and the decals laid and taken). New track still gets the decal of the kind (B),
-the band's look and width in play. Checked in the game (Polish and English): POLIGON's junctions
+the band's look and width in play. The four beds of the Decals strip (DECORATIONS) run the same
+stroke (`start_bed_brush`: `GroundStroke.reach` is the Decals brush's circle instead of SIZE, the
+picture read only when the band is painted into it), so the two paths give one result on either kind
+of ground: the band of the Paint tool's WIDTH, STRENGTH and EDGE where the picture is the map's own,
+the decal of the kind elsewhere; their Shift is this tool's right button, and it takes the decal beds
+(and any loose bed) as well ("Ground, gravel bed, decals" above). Checked in the game (Polish and English): POLIGON's junctions
 and curves bedded with a stroke (meadow), the kind ICE and WIDTH 40 over the main line, undone and
 redone, desert UNDER THE WHOLE TRACK (166 rails, one step), the right button putting POLIGON's
 original back over three rails, Alt+click naming meadow and ice; on mission 2 (a campaign terrain)

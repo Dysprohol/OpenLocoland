@@ -348,7 +348,11 @@ under new rails is the same one), **WIDTH** (28 px, as the missions have it), **
 centred on the rails and following curves, switches and ramps, and those rails' bed decals go (the
 band is their bed now); on a campaign map's terrain the bed decals are laid instead. The right
 button puts the original picture back, Alt+click takes the kind, **UNDER THE WHOLE TRACK** beds
-every rail of the map at once. A stroke is one undo.
+every rail of the map at once. A stroke is one undo. The four gravel beds of the **Decorations**
+theme do the same from the Decals brush: pick one (meadow, ice, volcanic or desert - it becomes the
+kind of the Paint tool and of `B` too), then a click or a drag on the track gives the rails in the
+brush's circle that bed instead of the one they had, and Shift takes their beds away (also a loose
+bed left by an older version of the editor). Nothing is dropped loose on the ground.
 
 ![The gravel bed under a junction](img/paint-bed-en.jpg)
 
@@ -565,7 +569,8 @@ right next to it**.
 
 ### 8. Decorate
 
-**Decals**: grass, bushes, flowers, stones, paving, the gravel beds, wrecks... - the **Decorations**
+**Decals**: grass, bushes, flowers, stones, paving, the gravel beds (they re-bed the track, see
+"The gravel bed" above), wrecks... - the **Decorations**
 theme of All objects, every decal in one list (`[` `]` from any tool take you there). The row above the
 bar shows the theme (its arrows turn the pages); the name of the one under the pointer shows above it, a
 click there picks one, and so do `[` `]`. A click on the map

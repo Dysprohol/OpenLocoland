@@ -349,6 +349,10 @@ własnym terenem pas jest wmalowany w obraz, na środku szyn, wzdłuż łuków, 
 naklejki podsypki tych szyn znikają (pas jest teraz ich podsypką); na terenie mapy kampanii kładzie
 zamiast tego naklejki podsypki. Prawy przycisk przywraca oryginalny obraz, Alt+klik pobiera rodzaj,
 **POD CALA MAPA** kładzie podsypkę pod każdą szyną mapy naraz. Jedno pociągnięcie to jedno cofnięcie.
+Cztery podsypki z tematu **Dekoracje** robią to samo pędzlem dekoracji: wybierz jedną (łąka, lód,
+wulkan albo pustynia - staje się też rodzajem Malowania terenu i `B`), a kliknięcie albo
+przeciągnięcie po torze daje szynom w kole pędzla tę podsypkę zamiast dotychczasowej; Shift zabiera
+ich podsypkę (także luźną, zostawioną przez starszą wersję edytora). Nic nie zostaje luzem na ziemi.
 
 ![Podsypka pod rozjazdem](img/paint-bed-pl.jpg)
 
@@ -563,7 +567,8 @@ nim**.
 
 ### 8. Ozdoby
 
-**Dekoracje**: trawa, krzaki, kwiaty, kamienie, bruk, podsypki, wraki... - temat **Dekoracje** we
+**Dekoracje**: trawa, krzaki, kwiaty, kamienie, bruk, podsypki (zmieniają podsypkę torów, zob.
+„Podsypka” wyżej), wraki... - temat **Dekoracje** we
 Wszystkich obiektach, każda dekoracja na jednej liście (`[` `]` z dowolnego narzędzia tam prowadzą).
 Rząd nad paskiem pokazuje temat (jego strzałki zmieniają strony); nazwa tej pod wskaźnikiem pokazuje
 się nad nią, kliknięcie tam wybiera jedną, tak samo `[` `]`. Kliknięcie
