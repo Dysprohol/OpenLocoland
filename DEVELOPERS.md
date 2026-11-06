@@ -4192,14 +4192,21 @@ the store, `editions/<code>.source.txt`),
 it is placed at its line numbers, shifted or not at all, builds it with `build.py` into
 `build\editions\<code>\game` (with `--skip-verify` only when the build is refused; its log next
 to it) and with `--run` starts it with `test_game.ps1`: the intro to the main menu, and POLIGON
-with its Esc menu where LocoFix runs (the Steam exe; on another exe the game is the original:
-`build.py` copies such an exe unchanged and LocoFix, should it be loaded, does nothing), looking
-for LOGIC errors in `error.log`; an edition's own exe that ends before the engine starts (no
-`error.log` at all: the Italian CD without its disc) is "did not start (its exe)", a limit of that
-edition, not a failure. On 2026-11-06 all ten built (the beta/demo and the Italian CD with
-`--skip-verify`, for their exes), every patch was placed - at its line numbers but the Russian
-`menutact.lgc`'s, a line lower - and each reached the main menu but the Italian CD, POLIGON too
-on the Steam exe, with no LOGIC error.
+with its Esc menu where LocoFix runs (the Steam exe), looking for LOGIC errors in `error.log`. An
+edition with another exe is installed as it is ("Quick start": none of our patches goes in), so
+its patches column says "as is" instead of counting them, POLIGON is "n/a (no LocoFix)", and the
+wait for the menu is 300 s instead of 60 (its own intro movies play first). The errors column counts
+the `!!!ERROR` lines of the menu's run (the most common kinds are printed under each edition) and
+names any "Unknown extern" or `custom.lst` line, which would mean our scripts went in without
+LocoFix - that fails the check, as FAILED, "no menu" and LOGIC do. An edition's own exe that ends
+before the engine starts (no `error.log` at all: the Italian CD without its disc) is "did not start
+(its exe)", a limit of that edition, not a failure. On 2026-11-06 all ten built (the beta/demo and
+the Italian CD with `--skip-verify`, for their exes), every patch was placed - at its line numbers
+but the Russian `menutact.lgc`'s, a line lower - and each reached the main menu but the Italian
+CD, POLIGON too on the Steam exe, with no LOGIC error; again after the as-is install: the beta/demo
+and the Italian CD "as is", the beta reaching the menu with 36 `!!!ERROR` lines, all the
+original's own (sounds its `wav\` lacks, the fort cannon's frames, its old-format `logo.map` and
+`menu.map`, a movie it lacks), en-steam and ru-steam as before.
 
 The launcher's update check (LocoFix fix 33) reads the release GitHub calls the latest - the newest
 that is neither a draft nor a pre-release - so a release is found by it when its tag is

@@ -340,7 +340,7 @@ def run_test(game, name, args):
            "-Exe", os.path.join(game, "Locoland.exe"), "-SetFull", "0", "-ClickOk", "15", "-LastShotOnly",
            "-Shot", shot] + args
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=240)
+        result = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=420)
         output = result.stdout + result.stderr
     except subprocess.TimeoutExpired:
         output = "test_game.ps1 timed out"
@@ -365,12 +365,14 @@ AS_IS_ERRORS = ("Unknown extern", "custom.lst")
 
 def error_kinds(log):
     """The `!!!ERROR` lines of an error.log: (count, [(n, kind)] most common first) - a kind is the
-    message with its quoted names and numbers left out."""
+    message with its quoted and bracketed names (VID [110-<its Russian name>]) and numbers left out,
+    in ASCII (the console's code page may not have the names' letters)."""
     kinds = {}
     for line in log.splitlines():
         m = ERROR_LINE.search(line)
         if m:
-            kind = re.sub(r"\d+", "N", re.sub(r"'[^']*'", "'.'", m.group(1).strip()))[:70]
+            kind = re.sub(r"(?<![A-Za-z])'[^']*'", "'.'", re.sub(r"\[[^\]]*\]", "[.]", m.group(1).strip()))
+            kind = re.sub(r"\d+", "N", kind)[:70].encode("ascii", "replace").decode()
             kinds[kind] = kinds.get(kind, 0) + 1
     return sum(kinds.values()), sorted(((n, k) for k, n in kinds.items()), reverse=True)
 
@@ -414,8 +416,10 @@ def check(selected, run, captured, store=STORE):
         print(f"  patches: {summary}; build: {build_state} (log: {os.path.relpath(os.path.join(work, 'build.log'), REPO)})")
         menu = poligon = logic = errors = "-"
         if run and build_state != "FAILED":
-            out, error_log, locofix_log = run_test(game, "menu", ["-WaitFor", r"menu\.map"])
             steam_exe = bool(exe_of(files)) and exe_of(files)[1] == build.STEAM_EXE_SHA256
+            # installed as it is, another exe plays the game's own intro movies first (over a minute)
+            out, error_log, locofix_log = run_test(game, "menu", ["-WaitFor", r"menu\.map"] +
+                                                   ([] if steam_exe else ["-LogWait", "300"]))
             menu = "ok" if "WaitFor 'menu\\.map': True" in out else "no menu"
             if menu != "ok" and not steam_exe and not error_log:
                 # the edition's own exe ended before the engine started (the Italian CD's copy

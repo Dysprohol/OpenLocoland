@@ -330,7 +330,15 @@ Harmless log errors:
   Italian CD's exes are other builds, so "Skip verification of the game files" copies them
   unchanged and the game runs as the original, without LocoFix (the Italian exe, wrapped by a copy
   protection, ends at once without its disc; LocoFix now also checks the exe's image size, which
-  alone tells that exe from the Steam one).
+  alone tells that exe from the Steam one). That first build of such a copy still put our script
+  patches in, so its menu called LocoFix's externs: the beta's `error.log` filled with "LOGIC:
+  Unknown extern Function 20N" and "couldn't open maps\custom.lst". Now such a copy is installed
+  as it is (`build.build_as_is`, DEVELOPERS.md "Quick start"): its own files unchanged, with
+  dgVoodoo2, `Locoland.cfg` and `logs\`, and nothing of ours that needs LocoFix. Checked with
+  `editions.py check --run en-beta-demo it-cd` (2026-11-06): both "as is", the beta through its
+  own intro movies to the menu with no LOGIC error and none of those lines - its 36 `!!!ERROR`
+  lines are the original's (25 sounds its `objects.res` names and its `wav\` lacks, the fort
+  cannon's frames of `vid\110.vid`, the old-format `logo.map` and `menu.map`, a movie it lacks).
 - Reported by a player of the original game on Windows 10: Alt+Tab spoils the game, and the
   train icons of the factory panel do not show. Neither happens in OpenLocoland (checked with
   `test_game.ps1`'s Alt+Tab step, `A`): in a window (1024x768, 1920x1080) and in full screen at
