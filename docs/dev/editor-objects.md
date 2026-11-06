@@ -97,6 +97,58 @@ factory placed 200 px off the track (where the cursor is, no line), a fort snapp
 line, another with Shift beside it at its own direction, a tree placed into the fort, the locomotive
 refused in the factory's door and the bush put there.
 
+**Placing helps: the grid, onto the track, the height, the turn, scattering** (`editor_edit.cpp`
+"placing helps", `plan_place`, `decal_step`; GitHub issue #5, the suggestions of paulevsGitch). While an
+object of the palette or a decal is to be placed, a row above the strip holds them, and the status line's
+third line names them; each is a key as well, and all start off (as before):
+- **GRID** (Ctrl+G; the row's GRID: OFF / ON, - n + px, 4-256, 32 at first): the object goes to the
+  grid's nearest point of the map (x, y), the preview with it and the grid's points around the cursor
+  dotted, the one it takes lit; the track's objects snap from there as before. A decal placed one at a
+  time and a paste go to the grid too.
+- **ONTO TRACK** (N; Place tool): an object that is not one of the track's own (those snap anyway, "On
+  the track") within 30 px of a rail link on the screen (`track_spot`, as the wrecks) goes onto the
+  link's line at the rails' level; the arched bridge 776 at its height under them as the missions have it
+  - all 133 of l05, l09, l12, l13 and l15 lie within 45 px of a rail at the rail's z - 81 (the points' height
+  - 91; z -15 under rails at 66), and a placed one matches (a click on l02's line at z 0 put it at -81). The turn stays the one chosen: the missions'
+  bridges follow no one rule of direction against their rails (on straights across 0, on l09's diagonals
+  160 and 192), so R / E turn it. Shift places where the cursor is.
+- **HEIGHT** before placing (PgUp / PgDn by 4, Shift by 16, Home 0; the row's HEIGHT: - n +, -32 to
+  400): the preview stands at that height above the ground and so do the objects placed (and the decals
+  of the Decals tool) until it is changed; not for the VIDs the game always puts on the ground, the cars,
+  regions, flags and the track's objects. Before, PgUp / PgDn worked only on the object just placed (the
+  selection); they still do in the Select tool.
+- **TURN: AS SHOWN / RANDOM** (Q): the next turn is drawn in advance (`roll_turn`), so the preview
+  shows it, and drawn again after each placing; R / E draw another. For the objects whose turn is theirs
+  (not the track's objects or a flag in the wind).
+- **PLACE: ONE / SCATTER** (X), per VID (`g_scatter`, for the session): the decals of the ground's cover
+  scatter by default (`ground_cover`: not the beds, wrecks, buildings, track and industry pieces of
+  `NOT_COVER`) and everything else goes one at a time - before, every decal scattered on a drag, also a
+  wreck or a paving stone. A decal one at a time: a click puts it as shown, a drag adds none (Shift+drag
+  still takes away). An object that scatters (the decals and the plain objects - not units, buildings,
+  the track's objects, wholes, hosts of guns, flags, wrecks, regions, cars: `scatter_able`) makes the
+  Place tool's click and drag the Decals tool's stroke (`decal_step` with the stroke's VID and army): the
+  first where the preview shows it, then 1 + the radius of them a step in the circle (the wheel, + and
+  -, the row's SIZE), none nearer than the spacing (< >, SPACING) to one of the same VID, each in a look at
+  random; Shift takes that VID away in the circle; one step of the history.
+Checked in the game on a copy of mission 2: the arched bridge snapped onto the left line (1029,724,-81),
+Ctrl+G and two flowers (220) on the grid (1216,832 and 1216,864), PgUp three times - the next one 12 above
+the ground -, Q - placed at direction 16, R drew 28 -, X and a drag scattering 20 flowers, a cart
+wreckage decal (93) dragged placing 1, round bushes (936) dragged scattering 15, PgUp on a selected fort
+in the Select tool lifting it by 4, each undone.
+
+**Copy, paste, duplicate** (`editor_edit.cpp` "copy, paste, duplicate"). Ctrl+C copies the selection - the
+object with its guns in their sockets and its pieces (`group_of`) -, Ctrl+V puts a copy with its first
+object at the map point under the cursor (on the grid when it is on), Ctrl+D one beside the original
+(its width + 8 px to the right, whole steps of the grid when it is on); each is one step of the history,
+and the copy is selected in the Select tool so it can be dragged at once. A copy keeps the original's
+VID, turn, army, height above the ground, a post's red, a region's size, flags, fog and splash, a unit's
+behave and a factory's build list (its `State`, put on the new object through `apply`); a building gets
+its footprint flattened as a placed one. It does not keep links: a pasted factory or repair point has no
+push line and a post no line of its own (dragged onto the track they snap and get them), and rails (the
+Track tool lays track) and train cars (they stand on their rails) are not copied - the status line says
+so. Checked: a fort placed across mission 2's line, copied with its two guns, pasted and duplicated
+(each "and 2 more"), both undone.
+
 **The history's limits** (`editor_edit.cpp`, "object state and the undo history"). Undoing and
 redoing far crashed the editor: a train car's state kept the pointers to the rail points its two ends
 stand on (`RailPos`), but undo and redo take rails away and lay them again - `RailDot_Release`
@@ -177,6 +229,17 @@ older build's line beside it for comparison (`build\shots\_ba.png`: the ridge's 
 gone); a locomotive of ours patrolling over it in Run the level, up, along and down and back. Extern 81 `ReCalcGridZ(int unit)`, which `export.lgc` describes as recalculating the
 grid with a unit's size, is not used: it is not implemented in the exe and is about one object's
 footprint, not the cells along a track.
+
+**The ground under rising rails** (the Track tool's G, the row's GROUND UNDER RISING RAILS: AS IT IS /
+SOFT / HARD; `g_raise_ground` in `lay_step`; issue #5). AS IT IS, the default, is the rule above: a rail
+above the ground leaves it. HARD raises it the way a cutting is lowered: the cells the rail crosses go up
+to its level (along a ramp, sloping with it), the ring around them half way (`rail::ramp`), so a climbing
+line stands on an embankment of the grid; SOFT adds a slope of `RAISE_RING` (3) cells round the raised
+cells, a smoothstep from the rail's level down to the ground. Only up: cells above the rail keep the
+cutting's rule, cells of the line already laid stay. One step of the history with the rail, the picture
+following where it is the map's own (`relief_for`). Checked on a copy of POLIGON (flat, 70): three lines
+of four rails climbing from 66 to 99 - SOFT changed 70-82 cells a rail, HARD 28-32, AS IT IS none; the
+relief shows the two embankments, the wide and the short slope.
 
 `Rail_Action` has no case for `ACT_UNDO_REMOVE`/`INSERT`, so a deleted rail would leave its two
 points and their links in the rail network and trains would go on driving there. The editor

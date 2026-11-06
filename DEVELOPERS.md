@@ -79,7 +79,7 @@ Paragraphs: The level is held; The menu; Saving; Starting it and going back; Bac
 
 Sections: "Editor mode" (continued).
 
-Paragraphs: Editing objects; Placing over objects, the track as a help; The history's limits; Laying track; Debug keys.
+Paragraphs: Editing objects; Placing over objects, the track as a help; Placing helps: the grid, onto the track, the height, the turn, scattering; Copy, paste, duplicate; The history's limits; Laying track; The ground under rising rails; Debug keys.
 
 ### [editor-mission.md](docs/dev/editor-mission.md) (~58 KB)
 

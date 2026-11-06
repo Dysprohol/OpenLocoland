@@ -337,7 +337,9 @@ zniszczone bagienne, każdy pokazany swoją szyną - i czy szyny idą w górę, 
 też przełącza rodzaje. `PgUp` / `PgDn` albo kółko myszy sprawiają, że każda kładziona szyna wznosi się albo opada o stopień po poprzedniej, dopóki tego nie zmienisz (rampy na
 wyższy teren: każda rampa to 11 poziomów; wiersz stanu pokazuje poziom). Szyny na ziemi mają teren
 tuż nad sobą (wzgórze na ich drodze zostaje ścięte do nich); rampa albo podniesiona linia zostawia teren
-pod sobą taki, jaki był, i stoi na podsypce, która wygląda jak nasyp. Linię na wzgórze najpierw wprowadź po rampach, potem podnieś teren
+pod sobą taki, jaki był, i stoi na podsypce, która wygląda jak nasyp - chyba że w rzędzie **TEREN POD
+WZNOSZACYMI SZYNAMI** (albo `G`) jest **LAGODNIE** lub **OSTRO**: wtedy teren pod wznoszącymi się szynami
+jest podnoszony, z szerokim albo krótkim stokiem (jedno cofnięcie razem z szyną). Linię na wzgórze najpierw wprowadź po rampach, potem podnieś teren
 wokół jej końca i wyrównaj go, zaczynając na torze. `B` wybiera podsypkę pod nowe szyny. Kliknięcie
 kółkiem, Del albo narzędzie Usun usuwa szynę; Shift+klik narzędziem Usun usuwa cały odcinek.
 
@@ -578,6 +580,19 @@ Dekoracja wybrana w dowolnym temacie **Wszystkich obiektów** stawia się tak sa
 też są we Wszystkich obiektach, a gdy jeden z nich ma być postawiony, rząd nad paskiem pokazuje tak samo
 jego temat.
 
+**Pomoce przy stawianiu** (rząd nad paskiem, gdy coś stawiasz; na początku wszystkie wyłączone; strona
+pomocy 30): **SIATKA** (`Ctrl+G`) stawia na punktach siatki o wybranym rozmiarze - części mostów, latarnie
+i płoty w rzędzie; **NA TOR** (`N`) kładzie obiekt, który znajdzie się blisko szyny, na jej linii, most
+łukowy na jego wysokości pod szynami jak w misjach (obracasz go `R` `E`); **WYSOKOSC** (`PgUp` / `PgDn`,
+`Home`) ustawia wysokość przed postawieniem, podgląd ją pokazuje; **OBROT: LOSOWY** (`Q`) obraca każdy
+obiekt inaczej, podgląd pokazuje następny obrót (`R` `E` losują inny); **STAWIAJ: POJEDYNCZO / ROZRZUC**
+(`X`), osobno dla każdego obiektu: trawa, krzaki i podobne rozrzucają się przy przeciąganiu, reszta idzie
+pojedynczo (dekoracja wraku już się nie rozrzuca), a drzewo albo kwiat też można rozrzucać.
+
+**Kopiuj i wstaw**: `Ctrl+C` kopiuje zaznaczony obiekt (fort z działami), `Ctrl+V` wstawia kopię pod
+wskaźnikiem, `Ctrl+D` obok oryginału - każde to jedno cofnięcie. Szyn i wagonów się nie kopiuje, a
+skopiowana fabryka albo semafor nie ma własnej linii, dopóki nie przeciągniesz jej na tor.
+
 **Zestawy z misji** (Wszystkie obiekty): to, co autorzy zawsze stawiali razem, jest jednym obiektem, a
 jego panel wybiera część - słup graniczny ze świdrem (cały albo złamany), wyjście z poziomu z jego
 szczytem, maszt albo dworzec z flagą, kominy z dymem albo poświatą, szyb naftowy, basen. **Zgniatacz**
@@ -704,8 +719,14 @@ rzadziej stawiane rzeczy, na końcu dwa panele.
 | H | wysokości terenu (poziomice) przy każdym narzędziu |
 | B | podsypka nowych torów |
 | V | rodzaj nowych szyn |
-| PgUp / PgDn | zaznaczony obiekt wyżej / niżej o 4 (Shift: o 16); narzędzie Tory: następna szyna wznosi się / opada (także kółko) |
-| Home | zaznaczony obiekt z powrotem na ziemi |
+| PgUp / PgDn | zaznaczony obiekt wyżej / niżej o 4 (Shift: o 16); przy stawianiu: wysokość obiektu do postawienia; narzędzie Tory: następna szyna wznosi się / opada (także kółko) |
+| Home | zaznaczony obiekt z powrotem na ziemi; przy stawianiu: obiekt do postawienia na ziemi |
+| Ctrl+C / Ctrl+V / Ctrl+D | kopiuj zaznaczony obiekt / wstaw go pod wskaźnikiem / powiel obok oryginału |
+| Ctrl+G | stawianie na siatce (jej rozmiar w rzędzie) |
+| N | stawianie na linii pobliskiego toru |
+| Q | stawianie: obrót jak widać albo losowy |
+| X | stawianie: pojedynczo albo rozrzut przeciąganiem (dla wybranego obiektu) |
+| G | narzędzie Tory: teren pod wznoszącymi się szynami bez zmian / podniesiony łagodnie / ostro |
 | W | woda, bagno albo lawa |
 | S | semafory zaznaczonej linii (narzędzie Linia jednokierunkowa) |
 | Shift (z pędzlem) | usuwanie |

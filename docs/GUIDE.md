@@ -336,7 +336,9 @@ The row above the bar picks the kind of the next rails - plain, swamp (on its em
 destroyed swamp, each shown as its rail - and whether the rails go up, flat or down; `V` cycles the kinds too. `PgUp` / `PgDn` or the mouse wheel make every rail laid climb or descend a step after the one before, until you change it (ramps onto higher
 ground: each ramp 11 levels; the status line shows the level). Rails on the ground keep the ground
 just above them (a hill in their way is cut down to them); a ramp or a raised line leaves the ground under
-it as it was and stands on its gravel bed, which looks like an embankment. For a line on a hill, lay it up its ramps first, then raise the ground around the top and
+it as it was and stands on its gravel bed, which looks like an embankment - unless the row's **GROUND
+UNDER RISING RAILS** (or `G`) is **SOFT** or **HARD**: then the ground is raised under the climbing rails,
+with a wide or a short slope (one undo with the rail). For a line on a hill, lay it up its ramps first, then raise the ground around the top and
 flatten it starting on the track. `B` picks the gravel bed under new rails. The wheel's click, Del
 or the Delete tool removes a rail; Shift+click with the Delete tool removes a whole section.
 
@@ -579,6 +581,19 @@ at random, never nearer than the spacing (`<` `>`). Shift+drag takes them away. 
 theme of **All objects** is placed the same way. Trees, houses and the rest are in All objects too, and
 while one of them is to be placed the row above the bar shows its theme the same way.
 
+**Placing helps** (a row above the strip while something is to be placed, all off at first; help page
+30): **GRID** (`Ctrl+G`) puts what you place on the points of a grid of the size you choose - bridge
+parts, lamps and fences in a row; **ONTO TRACK** (`N`) puts an object that comes near a rail onto its
+line, an arched bridge at its height under the rails as in the missions (turn it with `R` `E`);
+**HEIGHT** (`PgUp` / `PgDn`, `Home`) sets the height before you place, the preview shows it; **TURN:
+RANDOM** (`Q`) turns each object differently, the preview showing the next turn (`R` `E` draw another);
+**PLACE: ONE / SCATTER** (`X`), chosen per object: grass, bushes and the like scatter on a drag, the rest
+goes one at a time (a wreck decal no longer scatters), and a tree or a flower can be scattered too.
+
+**Copy and paste**: `Ctrl+C` copies the selected object (a fort with its guns), `Ctrl+V` puts a copy
+under the pointer, `Ctrl+D` one beside it - each one undo. Rails and train cars are not copied, and a
+copied factory or semaphore has no push line of its own until it is dragged onto the track.
+
 **Sets of the missions** (All objects): what the authors always put together is one object, its panel
 choosing the part - the border post with its corkscrew (whole or broken), the level exit with its top,
 a flagpole or a station with its flag, chimneys with their smoke or glow, an oil derrick, a pool. The
@@ -706,8 +721,14 @@ tools, the rarer things placed, the two panels last.
 | H | the ground's heights (contour lines) with any tool |
 | B | the gravel bed of new track |
 | V | the kind of new rails |
-| PgUp / PgDn | the selected object up / down by 4 (Shift: 16); Track tool: the next rail climbs / descends (the wheel too) |
-| Home | the selected object back on the ground |
+| PgUp / PgDn | the selected object up / down by 4 (Shift: 16); while placing: the height of the object to place; Track tool: the next rail climbs / descends (the wheel too) |
+| Home | the selected object back on the ground; while placing: the object to place on the ground |
+| Ctrl+C / Ctrl+V / Ctrl+D | copy the selected object / paste it under the pointer / duplicate it beside the original |
+| Ctrl+G | placing on a grid (its size in the row) |
+| N | placing onto a nearby track's line |
+| Q | placing: turned as shown or at random |
+| X | placing: one at a time or scattered by a drag (for the object chosen) |
+| G | Track tool: the ground under rising rails as it is / raised soft / raised hard |
 | W | water, swamp or lava |
 | S | the selected line's semaphores (Push line tool) |
 | Shift (with a brush) | take away |

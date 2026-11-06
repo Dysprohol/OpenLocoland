@@ -84,7 +84,7 @@ is (the bar, the status line, the two buttons), the bar's tools, selecting and p
 undo), the keys, laying track, trains, the object's panel, all objects and decals, the mission,
 saving and playing, the ground (height, paint, water, regions, map size), the ground tools' rows,
 then the train arrivals and the orders (13, 14) turning (15) and the citadel, Charybdis, fly nests and mines (16; page 1 names 13-16), a factory's plan (17), the crusher, Scylla and the decorations' sets (18), the gravel bed (19), the neutrals and the pirates (20), the map files (21: a map is its folder, the
-page finds it, Rename or delete, the names), placing - the track as a help, overlaps, flags (22), the rails' lattice (23) - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
+page finds it, Rename or delete, the names), placing - the track as a help, overlaps, flags (22), the rails' lattice (23), the placing helps (30: the grid, onto the track, the height, the turn, scattering), copy and paste and the ground under rising rails (31) - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
 44 characters a line - the ESC pairs not counted, so a line with lit words is longer in the file - and 14
 lines, ESC 7 / ESC 2 switch to the lit font VID 7 and back to VID 2):
 English in `game/maps/` (the fallback of every pack) and the others in `lang/<code>/game/editor/`; the files are
@@ -95,7 +95,7 @@ tab-separated (`maps\edithelp5.txt<TAB>HelpCatTrack<TAB>TRACK AND TRAINS`); the 
 the order of their first pages, a page keeps its number (its line), and a line with the file alone is
 in the category of the page before - so a new page is one line of the list, with a category of its
 own (a new `HelpCat...` key in the six packs) or an existing one. Six now: BASICS (1-4, 15), TRACK AND
-TRAINS (5, 6, 23), OBJECTS (7, 8, 16, 18, 20, 22), MISSION, SAVING (9, 10, 21), GROUND (11, 12, 19), ARRIVALS, FACTORIES (13,
+TRAINS (5, 6, 23), OBJECTS (7, 8, 16, 18, 20, 22, 30, 31), MISSION, SAVING (9, 10, 21), GROUND (11, 12, 19), ARRIVALS, FACTORIES (13,
 14, 17). The 29 rows of categories and titles (up to 37 characters) do not fit a page's 14 lines, so
 the contents are laid out as the palette: the categories down the left (two lines at most, the chosen
 one lit and underlined; the mouse over one, Up / Down or a click chooses it), the chosen one's pages on

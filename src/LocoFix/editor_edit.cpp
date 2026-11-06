@@ -1601,6 +1601,10 @@ void choose_decal(int k) {
     MESSAGE("MsgDecal", "decal: %s (VID %d)", name ? name : "?", decal_nvid());
 }
 
+bool scatter_on(int nvid);   // placing helps, below
+// The Place tool with an object that scatters (X): its click and drag are the Decals tool's stroke.
+bool scatter_place() { return tool() == Tool::Place && !nothing_picked() && place_nvid() > 0 && scatter_on(place_nvid()); }
+
 // ---- the mouse ----
 
 POINT g_mouse = {-1, -1};   // logical pixels
@@ -2850,6 +2854,11 @@ int to_step(int direction, int dirs) {
 }
 
 void push_change(int key);   // push lines, below
+bool turn_free(int nvid);    // placing helps, below
+void roll_turn();
+extern bool g_random_turn;
+extern int g_random_direction;
+bool bed_brush();
 
 // R, E, the wheel, Edit > Turn right / left and the panel's TURN, by what is turned (DEVELOPERS.md
 // "Editing objects", help page 15) - the preview of the object to place, else the selected object:
@@ -2867,6 +2876,12 @@ void turn(int steps) {
     }
     if (tool() == Tool::Track) {
         MESSAGE("MsgTurnTrack", "track: a rail goes the way of its line - R / E turn nothing here");
+        return;
+    }
+    if ((tool() == Tool::Decals || (tool() == Tool::Place && !nothing_picked() && turn_free(place_nvid()))) && g_random_turn &&
+        !bed_brush()) {   // TURN: RANDOM (Q): another turn drawn, the preview shows it
+        roll_turn();
+        MESSAGE("MsgTurnDrawn", "turn: %d, drawn at random (Q: as shown)", g_random_direction);
         return;
     }
     if (tool() == Tool::Decals) {   // the decal to place: a step of its looks, as the Place tool's preview
@@ -3280,6 +3295,80 @@ void set_piece(uint8_t* host, size_t i, int nvid, int army = -1);   // wholes' p
 constexpr int VID_FLAGPOLE = 769, VID_STATION = 170, FLAG_WIND = 32, FLAG_REACH = 24;
 bool is_flag(int nvid) { return nvid >= 770 && nvid <= 774; }
 
+// ---- placing helps: the grid, the track, the height, the turn, scattering ----
+//
+// The suggestions of issue #5 (paulevsGitch, 2026-11): an object to place (the Place tool, a decal of
+// the Decals tool, a paste) goes
+//  - to the nearest point of a GRID of g_grid_size px (Ctrl+G or the row's GRID: OFF / ON, - n +),
+//    off by default: bridge parts, street lamps and fences in a row;
+//  - ONTO THE TRACK (N or the row): an object that is not one of the track's own (those snap anyway,
+//    "On the track") within SNAP_REACH px of a rail link on the screen goes onto the link's line, at the
+//    rails' level - the arched bridge 776 at its height under them as the missions have it (all 133 of
+//    the missions: 91 below the rail points) -, turned as chosen (the missions' bridges follow no one rule of
+//    direction against their rails, so R / E turn it); off by default, Shift places where the cursor is;
+//  - at the HEIGHT set before it is placed (PgUp / PgDn by 4, Shift by 16, Home 0; the row's HEIGHT -
+//    n +): the preview stands there, and the objects placed after it too until it is changed;
+//  - turned at random (Q or the row's TURN: AS SHOWN / RANDOM): the next turn is drawn in advance, so
+//    the preview shows it, and drawn again after each placing (R / E draw another);
+//  - one by one or scattered by a drag (X or the row's PLACE: ONE / SCATTER, per object): the decals of
+//    ground cover scatter by default, the other decals (wrecks, buildings, track and industry pieces) and
+//    every object are placed one by one; a scattering drag lays 1 + the radius of them a step in its
+//    circle (the wheel, + and -), none nearer than the spacing (< and >) to one of the same, Shift takes
+//    them away - the objects that can scatter are the decals and the plain objects (not units,
+//    buildings, the track's objects, wholes, hosts of guns, flags, wrecks, regions, cars).
+bool g_grid_on = false;
+int g_grid_size = 32;
+constexpr int MIN_GRID = 4, MAX_GRID = 256, GRID_STEP = 4;
+bool g_snap_track = false;
+constexpr float SNAP_REACH = 30;
+int g_place_lift = 0;
+bool g_random_turn = false;
+int g_random_direction = 0;      // the turn drawn for the next object
+std::map<int, bool> g_scatter;   // X: the choice made for a VID (else its class's default)
+struct OnLine {
+    int nvid;
+    float below_points;   // its z under the rail points (the missions')
+};
+constexpr OnLine ON_LINE[] = {{776, 91}};
+
+int random_below(int n);           // decals in quantity, below
+bool ground_cover(int nvid);       // ... a decal of the ground's cover
+bool is_decal(int nvid);
+
+void grid_snap(float& x, float& y) {
+    if (!g_grid_on || g_grid_size < 2) return;
+    x = std::round(x / g_grid_size) * g_grid_size;
+    y = std::round(y / g_grid_size) * g_grid_size;
+}
+
+void roll_turn() { g_random_direction = random_below(256); }
+
+// A VID whose height above the ground can be set (the height of an object, above).
+bool vid_liftable(uint8_t* v) {
+    if (!v) return false;
+    const int c = at<int>(v, V_CLASS);
+    return c != B_RAIL && c != B_ENGINE && c != B_REGION && !(at<uint32_t>(v, V_FLAGS) & VID_FLAG_ON_GROUND);
+}
+
+bool scatter_able(int nvid) {
+    if (bed_kind_of(nvid) >= 0) return false;   // the beds are the swap of the track's bed
+    if (is_decal(nvid)) return true;
+    uint8_t* v = vid_by_number(nvid);
+    if (!v) return false;
+    const int c = at<int>(v, V_CLASS);
+    return !is_unit_class(c) && c != B_RAIL && c != B_REGION && c != B_ENGINE && !on_track_vid(nvid) && !wreck_vid(nvid) &&
+           !is_flag(nvid) && sockets_of(nvid, 0).empty() && pieces_of_kind(nvid, 0).empty();
+}
+
+bool scatter_on(int nvid) {
+    if (!scatter_able(nvid)) return false;
+    const auto it = g_scatter.find(nvid);
+    return it != g_scatter.end() ? it->second : ground_cover(nvid);
+}
+
+// A turn of its own for the object to place (not one the track or a flag's wind gives).
+bool turn_free(int nvid) { return !on_track_vid(nvid) && !is_flag(nvid); }
+
 enum class Placed { As, Track, Shift, Far, Slot, Pole };
 
 struct PlacePlan {
@@ -3345,8 +3434,12 @@ int to_step(int direction, int dirs);   // changes of the selection, below
 PlacePlan plan_place(POINT p, int nvid, uint8_t* v) {
     PlacePlan pl;
     map_point(p, v, pl.x, pl.y, pl.z);
+    if (g_grid_on) {   // the grid's nearest point (the track's objects snap from there)
+        grid_snap(pl.x, pl.y);
+        pl.z = ground_z(v, pl.x, pl.y);
+    }
     const int dirs = (std::max)(1, at<int>(v, V_ND_DIR));
-    pl.direction = to_step(g_place_direction, dirs);
+    pl.direction = to_step(g_random_turn && turn_free(nvid) ? g_random_direction : g_place_direction, dirs);
     float sx, sy;
     mouse_on_map(sx, sy);
     const bool free = shift_down();
@@ -3379,7 +3472,20 @@ PlacePlan plan_place(POINT p, int nvid, uint8_t* v) {
             pl.how = Placed::Far;
         }
         if (nvid == VID_CRUSHER) pl.direction = (pl.direction & ~63) + 8 * (army_has_tower(place_army()) ? CRUSHER_TOWERS : CRUSHER_NEVER);
+    } else if (g_snap_track && !free) {   // ONTO THE TRACK (N): onto the line of the link near the cursor
+        const TrackSpot spot = track_spot(sx, sy, SNAP_REACH);
+        if (spot.found) {
+            float below = static_cast<float>(rail::ALTITUDE);   // on the rails' level
+            for (const OnLine& o : ON_LINE)
+                if (o.nvid == nvid) below = o.below_points;
+            pl.x = spot.x;
+            pl.y = spot.y;
+            pl.z = spot.z - below;
+            pl.how = Placed::Track;
+        }
     }
+    // the height set before placing (PgUp / PgDn / Home), not for what the track or a flag decides
+    if (g_place_lift && vid_liftable(v) && turn_free(nvid) && !wreck_vid(nvid)) pl.z += g_place_lift;
     if (pl.how != Placed::Slot && factory_door(pl.how == Placed::Pole ? vid_by_number(VID_FLAGPOLE) : v, pl.x, pl.y, nullptr)) {
         pl.why = {"PlaceDoor", "the factory's door - the factory deletes what stands there when it builds a unit"};
         return pl;
@@ -3499,6 +3605,7 @@ void place(POINT p) {
     std::vector<State> before = states(objects);
     for (State& s : before) s.present = false;
     commit({"OpPlace", "place"}, objects, before);
+    if (g_random_turn) roll_turn();   // the next one turned anew (the preview shows it)
     g_selection = group_of(o);   // the new one is selected (L on a post, A, Del)
     // a building: the ground under it at its height, the ring around half way (map_tool.py place)
     if (class_of(o) == B_BUILDING || class_of(o) == B_DEPO) {
@@ -3538,6 +3645,106 @@ void place(POINT p) {
             : pl.how == Placed::Shift ? ui_text("MsgPlacedFree", " - where the cursor is (Shift)")
             : pl.how == Placed::Pole  ? ui_text("MsgFlagOwnPole", " - a flagpole with the flag")
                                       : "");
+}
+
+// ---- copy, paste, duplicate ----
+//
+// Ctrl+C copies the selection - the object and what goes with it (a host's guns, a whole's pieces) -,
+// Ctrl+V puts a copy where the cursor is (on the grid when it is on), Ctrl+D one beside the original
+// (its width and 8 px to the right; whole steps of the grid when it is on), each one step of the history,
+// the copy selected in the Select tool. A copy has the original's VID, turn, army, height above the
+// ground, a post's red, a region's size and kind, a unit's behave and a factory's build list; not its
+// links - a factory or repair point pasted gets no push line, a post no line of its own (the track's
+// objects snap when they are dragged onto it). Not copied: rails (the Track tool lays them) and train
+// cars (they stand on their rails).
+struct Clip {
+    int nvid;
+    float dx, dy, lift;   // from the first object; its height above the ground
+    State state;
+};
+std::vector<Clip> g_clip;
+
+UiText why_not_copied(uint8_t* o) {
+    if (class_of(o) == B_RAIL) return {"MsgCopyRail", "a rail is not copied - the Track tool lays track"};
+    if (is_car(o)) return {"MsgCopyCar", "a train car is not copied - it stands on its rails (Vehicles places one)"};
+    return {};
+}
+
+bool clip_of(const std::vector<uint8_t*>& objects, std::vector<Clip>& clip) {
+    clip.clear();
+    if (objects.empty() || removed(objects[0])) {
+        MESSAGE("MsgCopyNothing", "nothing selected to copy (Select: a click on an object)");
+        return false;
+    }
+    const UiText why = why_not_copied(objects[0]);
+    if (why.english[0]) {
+        MESSAGE("MsgCopyNot", "VID %d: %s", nvid_of(objects[0]), why.get());
+        return false;
+    }
+    const float bx = at<float>(objects[0], O_X), by = at<float>(objects[0], O_Y);
+    for (uint8_t* o : objects)
+        if (!removed(o)) clip.push_back({nvid_of(o), at<float>(o, O_X) - bx, at<float>(o, O_Y) - by, lift_of(o), state_of(o)});
+    return !clip.empty();
+}
+
+void copy_selection() {
+    if (!clip_of(g_selection, g_clip)) return;
+    MESSAGE("MsgCopied", "copied VID %d%s - Ctrl+V puts it where the cursor is", g_clip[0].nvid,
+            g_clip.size() > 1 ? ui_printf(ui_format("MsgAndMore", " and %u more"), static_cast<unsigned>(g_clip.size() - 1)).c_str() : "");
+}
+
+// The clip with its first object at the map point x, y.
+void paste_at(const std::vector<Clip>& clip, float x, float y, const UiText& what) {
+    std::vector<uint8_t*> made;
+    for (const Clip& c : clip) {
+        uint8_t* v = vid_by_number(c.nvid);
+        if (!v) continue;
+        const float px = x + c.dx, py = y + c.dy;
+        const float pz = c.state.region ? c.state.z : ground_z(v, px, py) + (vid_liftable(v) ? c.lift : 0.0f);
+        uint8_t* o = create(c.nvid, px, py, pz, c.state.direction, c.state.army);
+        if (!o) continue;
+        State st = c.state;
+        st.x = px, st.y = py, st.z = pz;
+        st.present = true;
+        st.car = false;
+        apply(o, st);
+        made.push_back(o);
+    }
+    if (made.empty()) {
+        MESSAGE("MsgNotCreated", "VID %d could not be created", clip[0].nvid);
+        return;
+    }
+    std::vector<State> before = states(made);
+    for (State& b : before) b.present = false;
+    commit(what, made, before);
+    if (class_of(made[0]) == B_BUILDING || class_of(made[0]) == B_DEPO) {   // as placed: the ground under it at its height
+        g_undo.back().grid = flatten_under(made[0]);
+        g_undo.back().paint = relief_for(g_undo.back().grid);
+    }
+    choose_entry(0);   // Select: the copy can be dragged at once
+    g_selection = group_of(made[0]);
+    MESSAGE("MsgPasted", "pasted VID %d at %.0f,%.0f%s", nvid_of(made[0]), at<float>(made[0], O_X), at<float>(made[0], O_Y),
+            made.size() > 1 ? ui_printf(ui_format("MsgAndMore", " and %u more"), static_cast<unsigned>(made.size() - 1)).c_str() : "");
+}
+
+void paste() {
+    if (g_clip.empty()) {
+        MESSAGE("MsgPasteNothing", "nothing copied yet (Ctrl+C copies the selected object)");
+        return;
+    }
+    float x, y, z;
+    map_point(g_mouse, vid_by_number(g_clip[0].nvid), x, y, z);
+    grid_snap(x, y);
+    paste_at(g_clip, x, y, {"OpPaste", "paste"});
+}
+
+void duplicate() {
+    std::vector<Clip> clip;
+    if (!clip_of(g_selection, clip)) return;
+    uint8_t* v = vid_by_number(clip[0].nvid);
+    float dx = (std::max)(16.0f, (v ? at<float>(v, V_SIZE_X) : 0) + 8);
+    if (g_grid_on && g_grid_size > 1) dx = std::ceil(dx / g_grid_size) * g_grid_size;
+    paste_at(clip, clip[0].state.x + dx, clip[0].state.y, {"OpDuplicate", "duplicate"});
 }
 
 // ---- the track ----
@@ -3586,6 +3793,14 @@ int g_ramp = 0;                  // the rails laid climb (1), descend (-1) or st
 // Track tool leaves it. Within it the rail lies on the ground (its level the ground's, the rails 4
 // below the surface - l11: the GRID 6 above its rails), and the cell goes to the level.
 constexpr int FLAT_SLACK = 4;
+// The ground under rails above it (G in the Track tool, the row's GROUND UNDER RISING RAILS): left as it
+// is (the default, the user's rule of 2026-11-05), or raised to the rails as a cutting is lowered to
+// them - HARD: the cells the rail crosses to its level and the ring around half way (the cutting's
+// rule the other way up), SOFT: and a wider slope round them, RAISE_RING cells, a smoothstep down to the
+// ground (issue #5). Undone with the rail, the picture following as for the flattening.
+enum class Raise { Off, Soft, Hard };
+Raise g_raise_ground = Raise::Off;
+constexpr int RAISE_RING = 3;
 
 bool swamp_rail(int nvid) { return nvid == 600 || nvid == 601; }
 bool destroyed_rail(int nvid) { return nvid == 611 || nvid == 601; }
@@ -3899,21 +4114,45 @@ void lay_step() {
             return it->second;
         };
         auto on_ground = [&](const rail::Cell& c) { return original(c) >= level_at(c) - FLAT_SLACK; };
+        const bool raise = g_raise_ground != Raise::Off;
         std::vector<GridChange> here;
         if (!swamp) {
+            std::vector<rail::Cell> raised;   // crossed cells under the rail lifted to it (G)
             for (const rail::Cell& c : cells) {
                 original(c);
                 g_line_cells.insert(c);
-                if (!on_ground(c)) continue;   // the rail above the ground: it stays
+                if (!on_ground(c) && !raise) continue;   // the rail above the ground: it stays
+                if (!on_ground(c)) raised.push_back(c);
                 const short before = ground_cell(c.first, c.second);
                 if (before != level_at(c)) here.push_back({c.first, c.second, before, level_at(c)});
             }
             for (const rail::Cell& c : buffer) {
                 if (g_line_cells.count(c)) continue;   // a cell of the track stays at its level
-                if (!on_ground(c)) continue;
+                if (!on_ground(c) && !raise) continue;
                 const short before = ground_cell(c.first, c.second);
                 const short after = static_cast<short>(rail::ramp(original(c), level_at(c)));
-                if (before != after) here.push_back({c.first, c.second, before, after});
+                if (before != after && (on_ground(c) || after > before)) here.push_back({c.first, c.second, before, after});
+            }
+            if (g_raise_ground == Raise::Soft) {   // the slope round the raised cells
+                std::map<rail::Cell, short> slope;
+                for (const rail::Cell& c : raised)
+                    for (int dy = -RAISE_RING; dy <= RAISE_RING; ++dy)
+                        for (int dx = -RAISE_RING; dx <= RAISE_RING; ++dx) {
+                            const rail::Cell n{c.first + dx, c.second + dy};
+                            if (n.first < 0 || n.second < 0 || n.first >= grid_width() || n.second >= grid_height() || g_line_cells.count(n) ||
+                                buffer.count(n))
+                                continue;
+                            const float d = std::hypot(static_cast<float>(dx), static_cast<float>(dy));
+                            if (d > RAISE_RING + 0.5f) continue;
+                            const float t = 1 - d / (RAISE_RING + 1.5f), w = t * t * (3 - 2 * t);
+                            const short base = original(n);
+                            const short want = static_cast<short>(std::lround(base + (level_at(c) - base) * w));
+                            if (want > base && want > (slope.count(n) ? slope[n] : base)) slope[n] = want;
+                        }
+                for (const auto& n : slope) {
+                    const short before = ground_cell(n.first.first, n.first.second);
+                    if (n.second > before) here.push_back({n.first.first, n.first.second, before, n.second});
+                }
             }
         }
         for (const GridChange& g : here) set_ground_cell(g.cx, g.cy, g.after);
@@ -4112,6 +4351,7 @@ struct Stroke {
     std::vector<uint8_t*> objects;         // the objects that may stand on changed ground
     std::vector<float> lift;               // their height above the ground at the start
     std::vector<State> object_before;
+    int nvid = 0, army = 0;                // Decals, a scattering Place: what it places, in which army
     std::vector<uint8_t*> made;            // Decals: the ones placed
     std::vector<uint8_t*> erased;          // Decals: the ones taken away
     std::vector<State> erased_before;
@@ -4475,6 +4715,11 @@ constexpr int NOT_COVER[] = {93, 96, 98, 177, 266, 530, 627, 804, 842, 849, 869,
 
 bool is_decal(int nvid) { return std::find(g_decals.begin(), g_decals.end(), nvid) != g_decals.end(); }
 
+// A decal of the ground's cover (grass, bushes, stones ...): it scatters by default (placing helps).
+bool ground_cover(int nvid) {
+    return is_decal(nvid) && bed_kind_of(nvid) < 0 && std::find(std::begin(NOT_COVER), std::end(NOT_COVER), nvid) == std::end(NOT_COVER);
+}
+
 void choose_default_decal() {
     std::map<int, int> count;
     for_each_object([&](uint8_t* o) {
@@ -4495,27 +4740,35 @@ int random_below(int n) {
     return n > 0 ? static_cast<int>((g_random >> 8) % static_cast<uint32_t>(n)) : 0;
 }
 
-// A decal (not a bed) nearer than d to (x, y).
-bool decal_near(float x, float y, float d) {
+// A decal (not a bed) nearer than d to (x, y) - for an object scattered, one of its own VID.
+bool decal_near(float x, float y, float d, int nvid) {
+    const bool decal = is_decal(nvid);
     bool found = false;
     for_each_object([&](uint8_t* o) {
-        if (found || removed(o) || is_bed(nvid_of(o)) || !is_decal(nvid_of(o))) return;
+        if (found || removed(o) || (decal ? is_bed(nvid_of(o)) || !is_decal(nvid_of(o)) : nvid_of(o) != nvid)) return;
         if (std::hypot(at<float>(o, O_X) - x, at<float>(o, O_Y) - y) < d) found = true;
     });
     return found;
 }
 
+PlacePlan plan_place(POINT p, int nvid, uint8_t* v);
+
+// A step of the Decals tool's stroke, or of a scattering Place (g_stroke.nvid: what it places).
 void decal_step(bool first) {
+    const int nvid = g_stroke.nvid ? g_stroke.nvid : decal_nvid();
+    const bool decal = is_decal(nvid);
     float x, y;
     cursor_cell(x, y);
     const float r = 8.0f * g_radius, gap = static_cast<float>(g_spacing);
+    // one by one (X): a click places one, a drag nothing more - but Shift takes away along the drag
+    if (!first && !shift_down() && !scatter_on(nvid)) return;
     if (!first && std::hypot(x - g_stroke.last_x, y - g_stroke.last_y) < (std::max)(gap, r))
         return;
     g_stroke.last_x = x;
     g_stroke.last_y = y;
     if (shift_down()) {
         for_each_object([&](uint8_t* o) {
-            if (removed(o) || std::find(g_decals.begin(), g_decals.end(), nvid_of(o)) == g_decals.end()) return;
+            if (removed(o) || (decal ? !is_decal(nvid_of(o)) : nvid_of(o) != nvid)) return;
             if (std::hypot(at<float>(o, O_X) - x, at<float>(o, O_Y) - y) > (std::max)(r, 12.0f)) return;
             g_stroke.erased.push_back(o);
             g_stroke.erased_before.push_back(state_of(o));
@@ -4528,11 +4781,13 @@ void decal_step(bool first) {
             }
         return;
     }
-    uint8_t* v = vid_by_number(decal_nvid());
+    uint8_t* v = vid_by_number(nvid);
     if (!v) return;
     const int dirs = (std::max)(1, at<int>(v, V_ND_DIR));
     const bool scatter = !first && g_radius > 0;   // a click: one at the cursor
+    const bool one_by_one = !scatter_on(nvid);    // placed as shown, wherever the others are
     const int count = scatter ? 1 + g_radius : 1;
+    const float lift = vid_liftable(v) ? static_cast<float>(g_place_lift) : 0.0f;
     int placed = 0;
     for (int tries = 0; placed < count && tries < count * 4; ++tries) {
         float px = x, py = y;
@@ -4541,18 +4796,27 @@ void decal_step(bool first) {
                 px = x + (random_below(2001) - 1000) / 1000.0f * r;
                 py = y + (random_below(2001) - 1000) / 1000.0f * r;
             } while (std::hypot(px - x, py - y) > r);
+        } else if (g_grid_on) {
+            grid_snap(px, py);
         }
-        if (decal_near(px, py, gap)) {
+        if (!one_by_one && decal_near(px, py, gap, nvid)) {
             if (!scatter) break;
             continue;
         }
-        // the look shown (R / E), or - scattered - one of its looks at random
-        const int direction = dirs <= 1 ? 0 : scatter ? random_below(dirs) * 256 / dirs : to_step(g_place_direction, dirs);
-        if (uint8_t* o = create(decal_nvid(), px, py, ground_z(v, px, py), direction, 0)) {
+        // the look shown (R / E) or drawn (Q), or - scattered - one of its looks at random
+        int direction = dirs <= 1 ? 0 : scatter ? random_below(dirs) * 256 / dirs
+                                                : to_step(g_random_turn ? g_random_direction : g_place_direction, dirs);
+        float pz = ground_z(v, px, py) + lift;
+        if (!decal && !scatter) {   // an object's first one: where the preview shows it (the grid, the track)
+            const PlacePlan pl = plan_place(g_mouse, nvid, v);
+            px = pl.x, py = pl.y, pz = pl.z, direction = pl.direction;
+        }
+        if (uint8_t* o = create(nvid, px, py, pz, direction, g_stroke.army)) {
             g_stroke.made.push_back(o);
             ++placed;
         }
     }
+    if (!scatter && placed && g_random_turn) roll_turn();
     if (first && placed == 0)
         MESSAGE("MsgDecalTaken", "a decal is nearer than %d px here - the spacing (< >) keeps them apart", g_spacing);
 }
@@ -4566,8 +4830,10 @@ void end_decal_stroke() {
     objects.insert(objects.end(), g_stroke.erased.begin(), g_stroke.erased.end());
     before.insert(before.end(), g_stroke.erased_before.begin(), g_stroke.erased_before.end());
     if (objects.empty()) return;
+    const int nvid = g_stroke.nvid ? g_stroke.nvid : decal_nvid();
     commit(g_stroke.erased.empty() ? UiText{"OpDecals", "decals"} : UiText{"OpDecalsAway", "decals away"}, objects, before);
-    MESSAGE("MsgDecals", "decals: %u placed (VID %d), %u taken away", static_cast<unsigned>(g_stroke.made.size()), decal_nvid(),
+    if (!g_stroke.made.empty() && !is_decal(nvid)) g_selection = {g_stroke.made.back()};
+    MESSAGE("MsgDecals", "decals: %u placed (VID %d), %u taken away", static_cast<unsigned>(g_stroke.made.size()), nvid,
             static_cast<unsigned>(g_stroke.erased.size()));
 }
 
@@ -6693,7 +6959,8 @@ int g_held_button = 0;
 bool stroke_under_way() { return g_stroke.active || g_gstroke.active || g_drag.active || g_sweep.active || g_region_drag; }
 
 const char* stroke_kind() {
-    return g_stroke.active && tool() == Tool::Height ? "ground height" : g_stroke.active ? "decals"
+    return g_stroke.active && tool() == Tool::Height ? "ground height" : g_stroke.active && tool() == Tool::Place ? "scatter"
+         : g_stroke.active ? "decals"
          : g_gstroke.active ? (g_gstroke.water ? "water" : g_gstroke.gravel ? "gravel bed" : "paint")
          : g_drag.active ? "drag" : g_sweep.active ? "delete sweep" : "region";
 }
@@ -6725,7 +6992,7 @@ void end_strokes(const char* why) {
         if (g_stroke.brush == Brush::Ramp) ramp_apply();
         end_height_stroke();
     }
-    if (g_stroke.active && tool() == Tool::Decals) end_decal_stroke();
+    if (g_stroke.active && (tool() == Tool::Decals || tool() == Tool::Place)) end_decal_stroke();
     end_ground_stroke();
     if (g_region_drag) {
         float sx, sy;
@@ -6746,7 +7013,7 @@ void end_strokes(const char* why) {
 // object's height, is for the Select tool.
 bool brush_tool() {
     const Tool t = tool();
-    return t == Tool::Height || t == Tool::Decals || t == Tool::Paint || t == Tool::Water;
+    return t == Tool::Height || t == Tool::Decals || t == Tool::Paint || t == Tool::Water || scatter_place();
 }
 
 void brush_size(int steps) {
@@ -7234,6 +7501,36 @@ void draw_contours() {
 
 void draw_bed_reach(float mx, float my, float r, bool erase);   // below
 
+// The grid's points around the map point x, y (GRID: ON), on the ground; and a brush's circle there.
+void draw_grid_near(float x, float y) {
+    if (!g_grid_on || g_grid_size < 2) return;
+    uint8_t* w = world();
+    const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
+    const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
+    uint8_t* post = vid_by_number(VID_SEMAPHORE);
+    const int n = g_grid_size >= 64 ? 2 : 3;
+    const float gx = std::round(x / g_grid_size) * g_grid_size, gy = std::round(y / g_grid_size) * g_grid_size;
+    for (int j = -n; j <= n; ++j)
+        for (int i = -n; i <= n; ++i) {
+            const float px = gx + i * g_grid_size, py = gy + j * g_grid_size, pz = ground_z(post, px, py);
+            const bool here = i == 0 && j == 0;
+            fill(graphics(), nullptr, px - cam_x - (here ? 2.0f : 1.0f), py - pz - cam_y - (here ? 2.0f : 1.0f),
+                 px - cam_x + (here ? 2.0f : 1.0f), py - pz - cam_y + (here ? 2.0f : 1.0f), here ? 0xf0ffd040 : 0xa0ffffff);
+        }
+}
+
+void draw_brush_circle(float x, float y, float r) {
+    uint8_t* w = world();
+    const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
+    const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
+    for (int k = 0; k < 24; ++k) {
+        const float a = k * 6.2831853f / 24, px = x + r * std::cos(a), py = y + r * std::sin(a);
+        const float sz = ground_z(vid_by_number(VID_SEMAPHORE), px, py);
+        fill(graphics(), nullptr, px - cam_x - 1.5f, py - sz - cam_y - 1.5f, px - cam_x + 1.5f, py - sz - cam_y + 1.5f,
+             shift_down() ? 0xe0ff4040 : 0xe0ffffff);
+    }
+}
+
 void draw_ground_tool(bool heights) {
     uint8_t* w = world();
     const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
@@ -7286,15 +7583,16 @@ void draw_ground_tool(bool heights) {
                       bed_kind_label(g_bed_kind), g_radius,
                       bed_painted() ? ui_text("WordBedPainted", "painted into the picture") : ui_text("WordBedDecals", "decals (a campaign terrain)"));
     } else {
-        const float r = (std::max)(8.0f * g_radius, 12.0f);
-        for (int k = 0; k < 24; ++k) {
-            const float a = k * 6.2831853f / 24, px = x + r * std::cos(a), py = y + r * std::sin(a);
-            const float sz = ground_z(vid_by_number(VID_SEMAPHORE), px, py);
-            fill(graphics(), nullptr, px - cam_x - 1.5f, py - sz - cam_y - 1.5f, px - cam_x + 1.5f, py - sz - cam_y + 1.5f,
-                 shift_down() ? 0xe0ff4040 : 0xe0ffffff);
-        }
+        const bool scatter = scatter_on(decal_nvid());
+        if (scatter || shift_down()) draw_brush_circle(x, y, (std::max)(8.0f * g_radius, 12.0f));
         uint8_t* v = vid_by_number(decal_nvid());
-        if (v && !shift_down()) draw_vid(v, frame_for(v, g_place_direction), x - cam_x, y - cam_y, ground_z(v, x, y));
+        // where a click puts it: on the grid (one by one), at the height set, turned as shown or as drawn
+        float px = x, py = y;
+        if (!scatter) grid_snap(px, py);
+        draw_grid_near(x, y);
+        if (v && !shift_down())
+            draw_vid(v, frame_for(v, g_random_turn ? g_random_direction : g_place_direction), px - cam_x, py - cam_y,
+                     ground_z(v, px, py) + (vid_liftable(v) ? g_place_lift : 0));
         const char* name = object_name(decal_nvid());
         std::snprintf(text, sizeof text,
                       ui_format("StatusDecals", "Decals: %s, VID %d ([ ]), direction %d (R / E), radius %d (wheel, + -), spacing %d px (< >) - Shift takes away"),
@@ -7841,6 +8139,40 @@ void draw_hint() {
     draw_text(FONT_TIPS, x, y, shown.c_str());
 }
 
+// The placing helps' names and the X of the object to place.
+const char* raise_name() {
+    return g_raise_ground == Raise::Off ? ui_text("WordRaiseOff", "left as it is")
+         : g_raise_ground == Raise::Soft ? ui_text("WordRaiseSoft", "raised to them, soft")
+                                         : ui_text("WordRaiseHard", "raised to them, hard");
+}
+
+int helps_nvid() { return tool() == Tool::Decals ? decal_nvid() : place_nvid(); }
+
+void toggle_scatter() {
+    const int nvid = helps_nvid();
+    if (!scatter_able(nvid)) {
+        MESSAGE("MsgScatterNot", "VID %d is placed one by one (it is not scattered: a unit, building, the track's object, a whole ...)", nvid);
+        return;
+    }
+    g_scatter[nvid] = !scatter_on(nvid);
+    const char* name = object_name(nvid);
+    MESSAGE("MsgScatter", "%s (VID %d): %s", name ? name : "?", nvid,
+            scatter_on(nvid) ? ui_text("WordScatter", "a drag scatters it (radius: wheel, + -; spacing < >)") : ui_text("WordOneByOne", "placed one by one"));
+}
+
+// The status line of the placing helps (the Place tool, the Decals tool's decals).
+std::string helps_status() {
+    const int nvid = helps_nvid();
+    std::string t = ui_printf(ui_format("StatusHelps", "grid (Ctrl+G): %s, onto track (N): %s, height %d (PgUp / PgDn, Home), turn (Q): %s"),
+                              g_grid_on ? ui_printf("%d px", g_grid_size).c_str() : ui_text("WordOff", "off"),
+                              g_snap_track ? ui_text("WordOn", "on") : ui_text("WordOff", "off"), g_place_lift,
+                              g_random_turn ? ui_text("WordRandom", "at random") : ui_text("WordAsShown", "as shown (R / E)"));
+    if (scatter_able(nvid))
+        t += ui_printf(ui_format("StatusScatter", ", X: %s"), scatter_on(nvid) ? ui_printf(ui_format("WordScatterRadius", "scatter, radius %d, spacing %d px"), g_radius, g_spacing).c_str()
+                                                                             : ui_text("WordOneByOneShort", "one by one"));
+    return t;
+}
+
 // ---- the rows of the ground's tools ----
 //
 // While the Ground height or the Paint tool is chosen, its options stand in a row of buttons above the
@@ -8019,6 +8351,37 @@ std::vector<OptionGroup> option_groups() {
     std::vector<OptionGroup> groups;
     if (strip_tool()) {
         groups.push_back(strip_group());
+        if (bed_brush() || nothing_picked()) return groups;
+        // the placing helps (above the strip: the strip takes the row's width)
+        const int nvid = helps_nvid();
+        OptionGroup grid{option_label({"OptGrid", "GRID:"}),
+                         option_button({"OptOff", "OFF"}, !g_grid_on, [] { g_grid_on = false; MESSAGE("MsgGrid", "placing on a grid of %d px (Ctrl+G): %s", g_grid_size, ui_text("WordOff", "off")); }),
+                         option_button({"OptOn", "ON"}, g_grid_on, [] { g_grid_on = true; MESSAGE("MsgGrid", "placing on a grid of %d px (Ctrl+G): %s", g_grid_size, ui_text("WordOn", "on")); })};
+        for (OptionItem& i : option_number({nullptr, ""}, g_grid_size, MIN_GRID, MAX_GRID, GRID_STEP, "MsgGridSize", "grid %d px"))
+            if (i.button || !i.value.empty()) grid.push_back(i);
+        groups.push_back(grid);
+        if (tool() == Tool::Place)
+            groups.push_back({option_label({"OptSnapTrack", "ONTO TRACK:"}),
+                              option_button({"OptOff", "OFF"}, !g_snap_track, [] { g_snap_track = false; MESSAGE("MsgSnapTrack", "objects onto a nearby track's line (N): %s", ui_text("WordOff", "off")); }),
+                              option_button({"OptOn", "ON"}, g_snap_track, [] { g_snap_track = true; MESSAGE("MsgSnapTrack", "objects onto a nearby track's line (N): %s", ui_text("WordOn", "on")); })});
+        if (scatter_able(nvid)) {
+            const bool on = scatter_on(nvid);
+            groups.push_back({option_label({"OptPlaceHow", "PLACE:"}),
+                              option_button({"OptOne", "ONE"}, !on, [on] { if (on) toggle_scatter(); }),
+                              option_button({"OptScatter", "SCATTER"}, on, [on] { if (!on) toggle_scatter(); })});
+            if (on) {
+                groups.push_back(option_number({"OptSize", "SIZE:"}, g_radius, 0, MAX_RADIUS, 1, "MsgRadius", "radius %d"));
+                groups.push_back(option_number({"OptSpacing", "SPACING:"}, g_spacing, MIN_SPACING, MAX_SPACING, SPACING_STEP, "MsgSpacing", "spacing %d px"));
+            }
+        }
+        uint8_t* v = vid_by_number(nvid);
+        if (v && at<int>(v, V_ND_DIR) > 1 && turn_free(nvid))
+            groups.push_back({option_label({"OptTurn", "TURN:"}),
+                              option_button({"OptAsShown", "AS SHOWN"}, !g_random_turn, [] { g_random_turn = false; MESSAGE("MsgRandomTurn", "turn of the objects placed (Q): %s", ui_text("WordAsShown", "as shown (R / E)")); }),
+                              option_button({"OptRandom", "RANDOM"}, g_random_turn, [] { g_random_turn = true; roll_turn(); MESSAGE("MsgRandomTurn", "turn of the objects placed (Q): %s", ui_text("WordRandom", "at random")); })});
+        if (vid_liftable(v))
+            groups.push_back(option_number({"OptHeight", "HEIGHT:"}, g_place_lift, MIN_LIFT, MAX_LIFT, LIFT_STEP, "MsgPlaceLift",
+                                           "the object to place: %d above the ground (PgUp / PgDn, Home: on the ground)"));
         return groups;
     }
     if (tool() == Tool::Track) {   // the kinds of rail (V cycles them) and the next rail's ramp (the wheel, PgUp / PgDn)
@@ -8038,6 +8401,16 @@ std::vector<OptionGroup> option_groups() {
         groups.push_back({option_label({"OptNextRail", "RAILS GO:"}), option_button({"OptRailUp", "UP"}, g_ramp > 0, [] { set_ramp(1); }),
                           option_button({"OptRailFlat", "FLAT"}, g_ramp == 0, [] { set_ramp(0); }),
                           option_button({"OptRailDown", "DOWN"}, g_ramp < 0, [] { set_ramp(-1); })});
+        auto raise = [](Raise r) {
+            return [r] {
+                g_raise_ground = r;
+                MESSAGE("MsgRaiseGround", "track: the ground under rising rails %s", raise_name());
+            };
+        };
+        groups.push_back({option_label({"OptRaiseGround", "GROUND UNDER RISING RAILS:"}),
+                          option_button({"OptRaiseOff", "AS IT IS"}, g_raise_ground == Raise::Off, raise(Raise::Off)),
+                          option_button({"OptRaiseSoft", "SOFT"}, g_raise_ground == Raise::Soft, raise(Raise::Soft)),
+                          option_button({"OptRaiseHard", "HARD"}, g_raise_ground == Raise::Hard, raise(Raise::Hard))});
         return groups;
     }
     if (tool() == Tool::Height) {
@@ -9592,6 +9965,10 @@ void draw_overlay() {
                     draw_vid(v, frame_for(v, slot.direction), fx - cam_x, fy - cam_y, at<float>(pl.flag_host, O_Z) + dz);
                     circle(pl.flag_host, 1);
                 } else if (pl.ok) {
+                    float gx, gy;
+                    cursor_cell(gx, gy);
+                    draw_grid_near(gx, gy);
+                    if (scatter_place()) draw_brush_circle(gx, gy, (std::max)(8.0f * g_radius, 12.0f));
                     const int made = pl.how == Placed::Pole ? VID_FLAGPOLE : nvid;
                     uint8_t* mv = vid_by_number(made);
                     const int md = pl.how == Placed::Pole ? 0 : direction;
@@ -9713,6 +10090,10 @@ void draw_overlay() {
                     ui_text("StatusDelete", "Delete: a click or a drag deletes the objects under the cursor; Shift+click on a rail deletes its section, up to a junction or an end"));
     if (tool() == Tool::Place && !g_place_status.empty() && !under)
         status_line(v.l, v.t + LINE_HEIGHT, g_place_status.c_str());
+    const bool helps = (tool() == Tool::Place && !nothing_picked() && place_nvid() > 0 &&
+                        at<int>(vid_by_number(place_nvid()) ? vid_by_number(place_nvid()) : vid_by_number(VID_GROUND), V_CLASS) != B_ENGINE) ||
+                       (tool() == Tool::Decals && !bed_brush());
+    if (helps) status_line(v.l, v.t + 2 * LINE_HEIGHT, helps_status().c_str());
     if (tool() == Tool::Select && !g_selection.empty() && liftable(g_selection[0]))   // the selected object's height
         status_line(v.l, v.t + LINE_HEIGHT,
                     ui_printf(ui_format("StatusLift", "height above the ground: %d (PgUp / PgDn, Shift by 16; Home: on the ground)"),
@@ -9724,9 +10105,10 @@ void draw_overlay() {
                       g_ramp > 0 ? ui_text("WordClimbs", "climbs") : g_ramp < 0 ? ui_text("WordDescends", "descends")
                                                                      : ui_text("WordFlat", "flat"),
                       swamp_rail(RAIL_KINDS[g_rail_kind]) ? "602" : g_bed ? std::to_string(g_bed).c_str() : ui_text("WordNone", "none"));
-        status_line(v.l, v.t + 2 * LINE_HEIGHT, bed);
+        const std::string ground = std::string(bed) + ui_printf(ui_format("StatusRaiseGround", ", the ground under rising rails (G): %s"), raise_name());
+        status_line(v.l, v.t + 2 * LINE_HEIGHT, ground.c_str());
     }
-    int below = tool() == Tool::Track ? 3 : 2;   // below the tool's lines (the Track tool has two)
+    int below = tool() == Tool::Track || helps ? 3 : 2;   // below the tool's lines (the Track tool and the placing helps have two)
     if (!g_line_status.empty()) status_line(v.l, v.t + below++ * LINE_HEIGHT, g_line_status.c_str());   // the push line under the cursor
     if (!g_enemy_status.empty()) status_line(v.l, v.t + below * LINE_HEIGHT, g_enemy_status.c_str());
     locked.unlock();
@@ -9840,7 +10222,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         }
         if (g_sweep.active) sweep_to(g_mouse);
         if (g_stroke.active && tool() == Tool::Height) height_step();
-        if (g_stroke.active && tool() == Tool::Decals) decal_step(false);
+        if (g_stroke.active && (tool() == Tool::Decals || tool() == Tool::Place)) decal_step(false);
         if (g_gstroke.active) ground_step(false);
         return false;   // the game scrolls by it
     case WM_LBUTTONDOWN: {
@@ -9863,7 +10245,15 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         if (tool() == Tool::Select && start_mark_click()) return true;
         uint8_t* w0 = world();
         const float x = at<float>(w0, W_CAMERA_X) + g_mouse.x, y = at<float>(w0, W_CAMERA_Y) + g_mouse.y;
-        if (tool() == Tool::Place) {
+        if (tool() == Tool::Place && scatter_place()) {   // PLACE: SCATTER (X): a stroke, as the Decals tool's
+            g_stroke = Stroke();
+            g_stroke.active = true;
+            g_stroke.nvid = place_nvid();
+            g_stroke.army = place_army();
+            decal_step(true);
+            if (!g_test) SetCapture(window);
+            patch::log("edit: stroke: scatter VID %d begun at %ld,%ld", g_stroke.nvid, g_mouse.x, g_mouse.y);
+        } else if (tool() == Tool::Place) {
             place(g_mouse);
         } else if (tool() == Tool::Track) {   // a click starts a section, the next lays it and ends it
             if (g_line.empty()) start_line();
@@ -9907,6 +10297,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         } else if (tool() == Tool::Decals) {
             g_stroke = Stroke();
             g_stroke.active = true;
+            g_stroke.nvid = decal_nvid();
             decal_step(true);
             if (!g_test) SetCapture(window);
         } else if (tool() == Tool::Paint || tool() == Tool::Water) {
@@ -10082,8 +10473,32 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         if (w == VK_SHIFT) g_shift = m == WM_KEYDOWN;
         if (m == WM_KEYUP) return w != VK_CONTROL && w != VK_SHIFT && (w < VK_LEFT || w > VK_DOWN);
         const bool ctrl = g_ctrl || GetKeyState(VK_CONTROL) < 0;
+        const bool placing = (tool() == Tool::Place && !nothing_picked()) || (tool() == Tool::Decals && !bed_brush());
         if (ctrl && w == 'Z') undo(false);
         else if (ctrl && w == 'Y') undo(true);
+        else if (ctrl && w == 'C') copy_selection();
+        else if (ctrl && w == 'V') paste();
+        else if (ctrl && w == 'D') duplicate();
+        else if (ctrl && w == 'G') {
+            g_grid_on = !g_grid_on;
+            MESSAGE("MsgGrid", "placing on a grid of %d px (Ctrl+G): %s", g_grid_size, g_grid_on ? ui_text("WordOn", "on") : ui_text("WordOff", "off"));
+        } else if (!ctrl && w == 'N' && tool() != Tool::Track && tool() != Tool::PushLine) {
+            g_snap_track = !g_snap_track;
+            MESSAGE("MsgSnapTrack", "objects onto a nearby track's line (N): %s", g_snap_track ? ui_text("WordOn", "on") : ui_text("WordOff", "off"));
+        } else if (!ctrl && w == 'Q' && tool() != Tool::Track && tool() != Tool::PushLine) {
+            g_random_turn = !g_random_turn;
+            roll_turn();
+            MESSAGE("MsgRandomTurn", "turn of the objects placed (Q): %s", g_random_turn ? ui_text("WordRandom", "at random") : ui_text("WordAsShown", "as shown (R / E)"));
+        } else if (!ctrl && w == 'X' && placing) {
+            toggle_scatter();
+        } else if (!ctrl && tool() == Tool::Track && w == 'G') {
+            g_raise_ground = g_raise_ground == Raise::Off ? Raise::Soft : g_raise_ground == Raise::Soft ? Raise::Hard : Raise::Off;
+            MESSAGE("MsgRaiseGround", "track: the ground under rising rails %s", raise_name());
+        } else if (placing && (w == VK_PRIOR || w == VK_NEXT || w == VK_HOME)) {   // the height of the object to place
+            const int step = shift_down() ? LIFT_BIG_STEP : LIFT_STEP;
+            g_place_lift = w == VK_HOME ? 0 : (std::max)(MIN_LIFT, (std::min)(MAX_LIFT, g_place_lift + (w == VK_PRIOR ? step : -step)));
+            MESSAGE("MsgPlaceLift", "the object to place: %d above the ground (PgUp / PgDn, Home: on the ground)", g_place_lift);
+        }
         else if (tool() == Tool::PushLine && (w == VK_DELETE || w == 'T' || w == 'R')) push_change(static_cast<int>(w));
         else if (tool() == Tool::PushLine && w == 'S') push_semaphores();
         else if (tool() == Tool::Height && w == 'M') {
@@ -10103,7 +10518,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             g_water_kind = (g_water_kind + 1) % WATER_KIND_COUNT;
             MESSAGE("MsgWaterKind", "water: %s (VID %d)", ui_text(WATER_KINDS[g_water_kind].key, WATER_KINDS[g_water_kind].english),
                     WATER_KINDS[g_water_kind].nvid);
-        } else if (tool() == Tool::Decals && (w == VK_OEM_COMMA || w == VK_OEM_PERIOD)) {
+        } else if ((tool() == Tool::Decals || scatter_place()) && (w == VK_OEM_COMMA || w == VK_OEM_PERIOD)) {
             g_spacing = (std::max)(MIN_SPACING, (std::min)(MAX_SPACING, g_spacing + (w == VK_OEM_PERIOD ? SPACING_STEP : -SPACING_STEP)));
             MESSAGE("MsgSpacing", "spacing %d px", g_spacing);
         } else if (tool() == Tool::Track && w == 'V') {
@@ -10174,7 +10589,10 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         return std::strchr("rReEaAtTlLuUcChH[]0123456789\x1b\x1a\x19", static_cast<int>(w)) != nullptr ||
                (tool() == Tool::PushLine && (w == 's' || w == 'S')) ||
                ((tool() == Tool::Height || tool() == Tool::Decals) && std::strchr("+-=mM", static_cast<int>(w))) ||
-               (tool() == Tool::Decals && std::strchr(",.<>", static_cast<int>(w))) ||
+               ((tool() == Tool::Decals || scatter_place()) && std::strchr("+-=,.<>", static_cast<int>(w))) ||
+               (tool() != Tool::Track && tool() != Tool::PushLine && std::strchr("nNqQ", static_cast<int>(w))) ||
+               (tool() == Tool::Track && (w == 'g' || w == 'G')) ||
+               ((tool() == Tool::Place || tool() == Tool::Decals) && (w == 'x' || w == 'X')) ||
                ((tool() == Tool::Paint || tool() == Tool::Water) && std::strchr("+-=", static_cast<int>(w))) ||
                (tool() == Tool::Water && (w == 'w' || w == 'W')) ||
                (tool() == Tool::Track && std::strchr("bBvV", static_cast<int>(w)));
