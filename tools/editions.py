@@ -105,6 +105,33 @@ def read_manifest(code):
     return meta, files
 
 
+def source_description(folder):
+    """What the manifest (public, in git) says the edition came from - no local path: "steam depot
+    352136", "steam install", or the folder's name with its parent's ("Steamland CZ/Steamland",
+    written with a backslash)."""
+    parts = os.path.normpath(os.path.abspath(folder)).split(os.sep)
+    depot = re.fullmatch(r"depot_(\d+)", parts[-1], re.I)
+    if depot:
+        return f"steam depot {depot.group(1)}"
+    if len(parts) > 2 and parts[-2].lower() == "common" and parts[-3].lower() == "steamapps":
+        return "steam install"
+    if len(parts) > 1 and parts[-2].lower() not in ("diffs", "") and not parts[-2].endswith(":"):
+        return parts[-2] + "\\" + parts[-1]
+    return parts[-1]
+
+
+def source_file(code, store=STORE):
+    """The local note of the folder an edition was captured from (beside its store, outside git)."""
+    return os.path.join(store, code + ".source.txt")
+
+
+def local_source(code, store=STORE):
+    try:
+        return open(source_file(code, store), encoding="utf-8").read().strip()
+    except OSError:
+        return None
+
+
 def write_manifest(code, source, files):
     os.makedirs(MANIFESTS, exist_ok=True)
     with open(manifest_path(code), "w", encoding="utf-8", newline="\n") as f:
@@ -165,7 +192,10 @@ def capture(code, folder, store=STORE, report_changes=False):
                 os.remove(path)
         if directory != target and not os.listdir(directory):
             os.rmdir(directory)
-    write_manifest(code, os.path.abspath(folder), files)
+    write_manifest(code, source_description(folder), files)
+    os.makedirs(store, exist_ok=True)
+    with open(source_file(code, store), "w", encoding="utf-8") as f:
+        f.write(os.path.abspath(folder) + "\n")
     print(f"{code}: {len(files)} files ({exe_text(files)}), {len(keep)} in the store"
           f"{'' if code == BASE else f' (differ from {BASE})'}, {stored} copied now")
     if report_changes:
@@ -202,7 +232,8 @@ def list_editions():
     for code, (meta, files) in manifests.items():
         differ = "-" if code == BASE or not base else str(len(differing(files, base[1])))
         rows.append((code, code.split("-")[0], source_kind(code), exe_text(files), str(len(files)), differ,
-                     nearest(code, files, manifests), meta.get("captured", "?"), meta.get("source", "?")))
+                     nearest(code, files, manifests), meta.get("captured", "?"),
+                     local_source(code) or meta.get("source", "?")))
     table(rows)
 
 

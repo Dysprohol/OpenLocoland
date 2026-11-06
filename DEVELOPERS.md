@@ -4169,7 +4169,9 @@ disc, by our convention in `C:\Locoland Decomp\notes\diffs\<name>` - and `editio
 Italian CD's `CDPRO.BIN`, taken by the antivirus) is named and left out, and `refresh <code>
 <folder>` captures again and says what changed (a Steam update). `list` shows the editions
 (language, source, exe, files, how many differ from `en-steam`, the nearest other edition with
-the files they have with other content and the files only this one has, when and where from),
+the files they have with other content and the files only this one has, when and where from -
+the manifest says only "steam depot 352136" or the folder's name, the full path is kept beside
+the store, `editions/<code>.source.txt`),
 `diff <a> <b>` the files that differ, marking our patches' targets, and `assemble <code>
 <folder>` puts a whole edition together (hard links into the store). `check [--run] [<code>
 ...]` assembles each into `build\editions\<code>\steam`, reports for each of our patches whether

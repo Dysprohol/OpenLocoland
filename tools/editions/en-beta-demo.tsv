@@ -1,6 +1,6 @@
 # An edition of the game: every file, its size and SHA-256 (tools/editions.py)
 # code	en-beta-demo
-# source	C:\Locoland Decomp\notes\diffs\Steamland english beta demo files\Steamland
+# source	Steamland english beta demo files\Steamland
 # captured	2026-11-06
 path	size	sha256
 autorun.inf	49	925a912305e1f9b3844429c448b34ba6177c6ccb24631b7dd5eff347a1c31f4b

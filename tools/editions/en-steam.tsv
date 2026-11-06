@@ -1,6 +1,6 @@
 # An edition of the game: every file, its size and SHA-256 (tools/editions.py)
 # code	en-steam
-# source	C:\Program Files (x86)\Steam\steamapps\content\app_352130\depot_352131
+# source	steam depot 352131
 # captured	2026-11-06
 path	size	sha256
 cursores\arrow.ani	2338	f6728510eb207a81336cd9ab6168be25678679b5ec339919cbe7fc3fa6954a66
