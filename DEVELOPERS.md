@@ -3784,7 +3784,27 @@ mode above) are not tested in full screen.
       controls use the TrueType Microsoft Sans Serif in the dialog font's size: the bitmap MS Sans
       Serif has only the letters of code page 1252, and a button measured its Russian label with it
       but drew it with a wider fallback, cut off. `LOCOFIX_UPDATE_URL` replaces the API's address
-      (tests). Checked in the game with DLLs built as v0.1.9 (New version v0.1.10, Download: 37158157
+      (tests). `LOCOFIX_UPDATE_TEST=<file.json>` makes the check read that file instead of asking
+      GitHub (an answer of the API saved, or written by hand: `tag_name`, `html_url` with
+      `/releases/tag/`, an asset with `size`, `digest` "sha256:<hex>" and `browser_download_url`),
+      and the Setup may then be a `file:///` address (`%20` for a space), read from the disk with
+      the same checks, zone mark and Downloads folder; every step is logged ("update check: the
+      test's release ...", "update download: the test's Setup ...", "update: Setup ... started, the
+      game closes", "update: the link ... opened"). The flow against a real Setup: build it
+      (`tools\release.py`), a game with its LocoFix.dll (`build.py --target build\game_upd --locofix
+      build\release\LocoFix\LocoFix.dll`: a numbered version, which a dev build is not), copy
+      Setup.exe to a name of its own ending in Setup.exe (Downloads may hold the player's
+      Setup.exe), write the JSON with a higher tag, its size and SHA-256, start the game with the
+      variable set, then Check, Download, Run Setup, Yes. Windows then shows its own "Open File -
+      Security Warning" (unknown publisher: the file carries the internet zone mark, as a browser's
+      download does) before Setup starts, and the game stays open until it is answered; Run starts
+      Setup and the game closes. Checked 2026-11-06 with v0.2.2-30-g0fbebfe-dirty against a v9.9.9
+      of its own Setup (24554127 bytes): New version, Download (size and SHA-256 checked), the
+      question, the warning, Setup's window open with the game closed (then closed unused, the test
+      file deleted), and a left click on GitHub opened the release page in the browser. Not tried:
+      Cancel in the warning (ShellExecute then fails and the game should stay - "did not start").
+      The check writes `UpdateLastCheck` into the game's registry key, shared with an installed
+      game: put the old value back after such a test. Checked in the game with DLLs built as v0.1.9 (New version v0.1.10, Download: 37158157
       bytes and the release's SHA-256, the zone mark, Run Setup's question; Cancel halfway removed the
       part), v0.1.10 and v0.1.10-17-gcef9557 (the latest version) and dev, in all six languages;
       unreachable: a host that does not exist, a repository that does not exist (404) and an address

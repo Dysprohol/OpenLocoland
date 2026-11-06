@@ -18,7 +18,12 @@
 // English one built in here; a later Setup or the player can replace the file, and its link= line
 // is the address the link opens then. The last check's date and the version it found are kept in
 // the registry next to the other settings (UpdateLastCheck), the box as UpdateCheckAtStart (DWORD).
-// LOCOFIX_UPDATE_URL replaces the API's address (tests: an unreachable host).
+// LOCOFIX_UPDATE_URL replaces the API's address (tests: an unreachable host). LOCOFIX_UPDATE_TEST=
+// <file.json> makes the check read that file instead of asking GitHub (an answer of the API saved, or
+// one written by hand with a higher tag_name), and its Setup.exe may then be a file:/// address,
+// copied instead of downloaded with the same checks (size, SHA-256, the zone mark, the Downloads
+// folder): the whole flow - Download, Run Setup - against a Setup built by tools\release.py
+// (DEVELOPERS.md "Updates": the steps).
 #include "patch.h"
 #include <bcrypt.h>
 #include <shellapi.h>
@@ -191,6 +196,28 @@ int compare_versions(const std::vector<int>& a, const std::vector<int>& b) {
     return 0;
 }
 
+// LOCOFIX_UPDATE_TEST's file, or an empty string.
+std::wstring update_test_file() {
+    wchar_t value[1024] = {};
+    return GetEnvironmentVariableW(L"LOCOFIX_UPDATE_TEST", value, 1024) ? value : L"";
+}
+
+// A file:/// address as a path: C:/a%20b/Setup.exe -> C:\a b\Setup.exe.
+std::wstring local_path(const std::string& url) {
+    std::string p;
+    for (size_t i = 8; i < url.size(); ++i) {
+        if (url[i] == '%' && i + 2 < url.size()) {
+            p += static_cast<char>(std::strtol(url.substr(i + 1, 2).c_str(), nullptr, 16));
+            i += 2;
+        } else {
+            p += url[i] == '/' ? '\\' : url[i];
+        }
+    }
+    return widen(p);
+}
+
+bool local_url(const std::string& url) { return url.compare(0, 8, "file:///") == 0 && !update_test_file().empty(); }
+
 // ---- the release (GitHub's JSON, read as text: enough for its flat fields) ----
 
 // The position of the value of "key" at or after `from`, or npos.
@@ -249,7 +276,7 @@ bool parse_release(const std::string& json, Release& r) {
         at = json_value(json, "browser_download_url", at);
         if (at == std::string::npos) break;
         const std::string url = json_string(json, at);
-        if (!ends_with(url, "Setup.exe") || url.compare(0, 8, "https://") != 0) continue;
+        if (!ends_with(url, "Setup.exe") || (url.compare(0, 8, "https://") != 0 && !local_url(url))) continue;
         r.setup_url = url;
         r.setup_name = url.substr(url.rfind('/') + 1);
         if (!plain_name(r.setup_name)) r.setup_name = "OpenLocoland-Setup.exe";
@@ -360,7 +387,19 @@ DWORD WINAPI check_thread(void* parameter) {
     Http h;
     DWORD status = 0;
     std::string json;
-    if (http_get(h, url, L"Accept: application/vnd.github+json\r\n", status)) {
+    const std::wstring test = update_test_file();
+    if (!test.empty()) {   // the test's release (LOCOFIX_UPDATE_TEST)
+        if (FILE* f = _wfopen(test.c_str(), L"rb")) {
+            char buffer[4096];
+            for (size_t n; (n = std::fread(buffer, 1, sizeof buffer, f)) > 0;) json.append(buffer, n);
+            std::fclose(f);
+            status = 200;
+            patch::log("update check: the test's release %ls (LOCOFIX_UPDATE_TEST), %u bytes", test.c_str(),
+                       static_cast<unsigned>(json.size()));
+        } else {
+            patch::log("update check: LOCOFIX_UPDATE_TEST %ls cannot be read", test.c_str());
+        }
+    } else if (http_get(h, url, L"Accept: application/vnd.github+json\r\n", status)) {
         if (status == 200)
             http_read(h, [&](const char* data, DWORD n) {
                 json.append(data, n);
@@ -413,8 +452,19 @@ DWORD WINAPI download_thread(void* parameter) {
     const std::wstring part = job->path + L".part";
     Http h;
     DWORD status = 0;
-    bool ok = http_get(h, widen(job->release.setup_url), nullptr, status) && status == 200;
-    if (!ok && status) patch::log("update download: HTTP %lu", status);
+    // the test's Setup (LOCOFIX_UPDATE_TEST, a file:/// address): read from the disk, the rest the same
+    const bool local = local_url(job->release.setup_url);
+    HANDLE source = INVALID_HANDLE_VALUE;
+    bool ok;
+    if (local) {
+        const std::wstring from = local_path(job->release.setup_url);
+        source = CreateFileW(from.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        ok = source != INVALID_HANDLE_VALUE;
+        patch::log("update download: the test's Setup %ls%s", from.c_str(), ok ? "" : " cannot be read");
+    } else {
+        ok = http_get(h, widen(job->release.setup_url), nullptr, status) && status == 200;
+        if (!ok && status) patch::log("update download: HTTP %lu", status);
+    }
     HANDLE file = ok ? CreateFileW(part.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
                                    nullptr)
                      : INVALID_HANDLE_VALUE;
@@ -424,20 +474,29 @@ DWORD WINAPI download_thread(void* parameter) {
     }
     Sha256 sha;
     unsigned long long done = 0, posted = 0;
-    if (ok) {
-        ok = http_read(h, [&](const char* data, DWORD n) {
-            DWORD written = 0;
-            if (g_cancel || !WriteFile(file, data, n, &written, nullptr) || written != n) return false;
-            sha.add(data, n);
-            done += n;
-            if (done - posted >= 256 * 1024) {
-                posted = done;
-                PostMessageW(job->dialog, WM_UPDATE_PROGRESS, static_cast<WPARAM>(done),
-                             static_cast<LPARAM>(job->release.size));
-            }
-            return true;
-        });
+    auto piece = [&](const char* data, DWORD n) {
+        DWORD written = 0;
+        if (g_cancel || !WriteFile(file, data, n, &written, nullptr) || written != n) return false;
+        sha.add(data, n);
+        done += n;
+        if (done - posted >= 256 * 1024) {
+            posted = done;
+            PostMessageW(job->dialog, WM_UPDATE_PROGRESS, static_cast<WPARAM>(done),
+                         static_cast<LPARAM>(job->release.size));
+        }
+        return true;
+    };
+    if (ok && local) {
+        std::vector<char> buffer(64 * 1024);
+        for (DWORD read = 0; ok;) {
+            ok = ReadFile(source, buffer.data(), static_cast<DWORD>(buffer.size()), &read, nullptr) != 0;
+            if (!ok || read == 0) break;
+            ok = piece(buffer.data(), read);
+        }
+    } else if (ok) {
+        ok = http_read(h, piece);
     }
+    if (source != INVALID_HANDLE_VALUE) CloseHandle(source);
     if (file != INVALID_HANDLE_VALUE) CloseHandle(file);
     if (ok && job->release.size && done != job->release.size) {
         patch::log("update download: %llu bytes, the release has %llu", done, job->release.size);
@@ -654,8 +713,9 @@ void start_download(HWND dialog) {
 
 void shell_open(HWND dialog, const std::wstring& file) {
     const HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-    ShellExecuteW(dialog, L"open", file.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+    const INT_PTR opened = reinterpret_cast<INT_PTR>(ShellExecuteW(dialog, L"open", file.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
     if (SUCCEEDED(com)) CoUninitialize();
+    patch::log("update: the link %ls %s", file.c_str(), opened > 32 ? "opened" : "did not open");
 }
 
 void run_setup(HWND dialog) {
