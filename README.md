@@ -36,13 +36,9 @@ The [trailer](https://www.youtube.com/watch?v=04BeRSnfL6o) and more videos of th
 - **A map editor inside the game (work in progress).** Make your own missions - lay the track,
   shape the ground, put up buildings with their guns, give trains their orders, send in new trains
   during the mission, plan what the enemy's factory builds, decide who fights whom - and play them
-  at once. The trains that come onto the map are set in a list of arrivals, and a factory's plan says
-  which trains it builds and when; a train of any army can drive, patrol, attack, guard a point or
-  watch an area from where it stands, and a car can be turned round in its place or uncoupled. The
-  cars and the decorations are picked from a row above the bar, the gravel bed is painted under the
-  rails, a quick test runs the map right in the editor without saving it, and a map can be renamed or
-  deleted from the editor's menu. The help inside the editor has 29 pages. The custom maps page lists
-  every map folder it finds, however the map got there.
+  at once. The trains that come onto the map, the enemy factory's plan and every train's orders are
+  set from panels in the editor, and a quick test runs the map without saving it. The help inside
+  the editor has 29 pages, and the custom maps page lists every map folder it finds.
 - **Maps for friends.** A map goes to a friend as one file and turns up on their custom maps page.
 - **An OpenLocoland logo at the start.** The game opens with the project's logo for a few seconds in
   place of the original intro movies; any key or a click skips it.
@@ -93,7 +89,7 @@ The map editor is still work in progress. Bugs and ideas are welcome in
 
 Nobody has the source code of Locoland, so the work started with the program itself. The 2003
 `Locoland.exe` was taken apart with the [Ghidra](https://ghidra-sre.org/) decompiler, and step by
-step every one of the engine's 993 functions got a name and a description: how the trains drive,
+step the engine's functions got names and descriptions: how the trains drive,
 how a map is stored, how the mission scripts run. The fixes are written in C++ in `LocoFix.dll`,
 which the original program loads at start, so the game stays itself and keeps working at every
 step. Graphics go through [dgVoodoo2](http://dege.freeweb.hu/dgVoodoo2/), which turns the old
@@ -136,7 +132,7 @@ https://discord.gg/NG5DnHFvYM
 
 OpenLocoland is better thanks to the people who gave something of their own to it:
 
-- **spacenerdy** (from Discord) - Discord creator 
+- **spacenerdy** (from Discord) - the Discord server.
 - **Danetry** (from Discord) - support of the Czech fan translation of the game.
 - **just_Martin** (from Discord) - the OpenLocoland logo (the installer's header and the launcher's
   picture).
