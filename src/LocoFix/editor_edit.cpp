@@ -866,6 +866,7 @@ const char* post_line_text(uint8_t* o);
 void give_post_line(uint8_t* o);
 std::vector<int> lines_going_with(const std::vector<uint8_t*>& objects);
 void end_strokes(const char* why = nullptr);   // the mouse, below
+bool ground_paintable(bool quiet);   // the ground's picture, below
 
 void undo(bool redo) {
     // a stroke under way is a step of its own first: what it keeps of the ground before it is the
@@ -901,7 +902,9 @@ void undo(bool redo) {
         }
     }
     for (const GridChange& g : op.grid) set_ground_cell(g.cx, g.cy, redo ? g.after : g.before);
-    if (op.paint) ground_apply(*op.paint, redo);
+    // the picture may not be read yet in this load (back from Run the level, the step's picture patch
+    // came with the history): ready first, or the patch went nowhere and the old picture stayed
+    if (op.paint && ground_paintable(true)) ground_apply(*op.paint, redo);
     if (op.lines) mission_push_lines() = redo ? op.lines_after : op.lines_before;
     if (op.arrivals) mission_arrivals() = redo ? op.arrivals_after : op.arrivals_before;
     if (op.factories) mission_factories() = redo ? op.factories_after : op.factories_before;
@@ -11213,6 +11216,7 @@ std::vector<KeptObject> g_kept;
 std::map<std::pair<uint8_t*, int>, DotKey> g_kept_dots;   // (dot, link) -> places
 std::vector<Operation> g_kept_undo, g_kept_redo;
 bool g_kept_valid = false;
+std::map<rail::Cell, short> g_kept_grid_original;   // the Water tool's cells as the level had them
 
 uint8_t* pos_dot(const int* pos) { return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(static_cast<uint32_t>(pos[0]))); }
 
@@ -11248,6 +11252,8 @@ void edit_keep_history() {
                     }
     g_kept_undo = g_undo;
     g_kept_redo = g_redo;
+    g_kept_grid_original = g_grid_original;
+    ground_keep();   // the picture's original: the copy's picture is all the load reads again
     g_kept_valid = true;
     patch::log("edit: run - %u objects and %u steps of the history kept", static_cast<unsigned>(g_kept.size()),
                static_cast<unsigned>(g_undo.size() + g_redo.size()));
@@ -11353,6 +11359,12 @@ void edit_restore_history() {
     }
     g_undo = std::move(g_kept_undo);
     g_redo = std::move(g_kept_redo);
+    g_grid_original = std::move(g_kept_grid_original);
+    g_kept_grid_original.clear();
+    // the picture read again now (from the copy, which has every stroke), with the original of before
+    // the run: an undo or redo of a stroke straight away has a picture to put its patch into, and the
+    // right button or Shift restores the map's original and not the copy's picture
+    if (ground_kept() && ground_paintable(true)) ground_take_kept();
     g_kept.clear();
     g_kept_dots.clear();
     patch::log("edit: back from the run - %u steps of the history, %d objects made again, %d changes lost",

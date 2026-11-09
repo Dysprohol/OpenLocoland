@@ -81,6 +81,15 @@ int g_x0 = 0, g_y0 = 0, g_x1 = -1, g_y1 = -1;
 // the rectangle changed since the last frame, to be written into the textures (ground_flush)
 int g_pending_x0 = 0, g_pending_y0 = 0, g_pending_x1 = -1, g_pending_y1 = -1;
 GroundTimes g_times;
+// kept over Run the level (ground_keep): what the picture of the map loaded again cannot tell - the
+// original it is restored to, the textures painted on it, whether it was painted
+struct KeptGround {
+    bool valid = false, painted = false;
+    std::string image;
+    int w = 0, h = 0;
+    std::vector<uint16_t> original_pixels, original_heights;
+    std::vector<uint8_t> textures_of;
+} g_kept;
 
 std::vector<std::string> fields(const std::string& line) {
     std::vector<std::string> out;
@@ -504,6 +513,37 @@ void ground_reset() {
     g_stroke_heights.clear();
     g_textures_of.clear();
     g_stroke_textures.clear();
+}
+
+void ground_keep() {
+    g_kept = KeptGround();
+    if (!g_ready) return;
+    g_kept.valid = true;
+    g_kept.painted = g_painted;
+    g_kept.image = g_image;
+    g_kept.w = g_w;
+    g_kept.h = g_h;
+    g_kept.original_pixels = g_original_pixels;
+    g_kept.original_heights = g_original_heights;
+    g_kept.textures_of = g_textures_of;
+}
+
+bool ground_kept() { return g_kept.valid; }
+
+void ground_take_kept() {
+    if (!g_kept.valid) return;
+    KeptGround k = std::move(g_kept);
+    g_kept = KeptGround();
+    if (!g_ready || k.w != g_w || k.h != g_h || k.original_pixels.size() != g_pixels.size() || k.textures_of.size() != g_pixels.size()) {
+        patch::log("ground: the picture kept over the run does not fit the one loaded again (%dx%d, now %dx%d) - not taken", k.w, k.h, g_w, g_h);
+        return;
+    }
+    g_original_pixels = std::move(k.original_pixels);
+    g_original_heights = std::move(k.original_heights);
+    g_textures_of = std::move(k.textures_of);
+    g_image = k.image;
+    g_painted = k.painted;
+    patch::log("ground: back from the run - the original picture is %s's again%s", g_image.c_str(), g_painted ? " (painted)" : "");
 }
 
 const std::vector<GroundTexture>& ground_textures() {

@@ -32,6 +32,13 @@ bool ground_prepare(const std::string& map, float x, float y, void* vid, std::st
 bool ground_ready();
 // The level goes: everything forgotten.
 void ground_reset();
+// Run the level writes the map's copy and loads it, so the picture is read again from the copy: before
+// the run, ground_keep keeps what the copy cannot tell - the original picture the right button or Shift
+// restores, the textures painted on it, whether it was painted (nothing when the picture was not read);
+// back, once the picture is ready again, ground_take_kept puts that back (ground_kept: there is any).
+void ground_keep();
+bool ground_kept();
+void ground_take_kept();
 // The textures (game folder's editor\textures.tsv), sampled at the first use.
 const std::vector<GroundTexture>& ground_textures();
 // A texture's 128 x 128 sample (laid mirrored it tiles without seams); false when it is not available.

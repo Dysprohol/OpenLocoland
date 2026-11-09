@@ -197,7 +197,18 @@ the run the editor keeps it with every object of the level in the world's order 
 its cars stand on (their places and their links' other points); after the load held again
 (`edit_restore_history`) the new objects are matched by that order, VID and place (the save keeps the
 order), a deleted one the history can bring back is made again and hidden, and the history's objects,
-the cars' couplings and rail positions and the later units' factories point at the new ones. RESTART of the same map keeps it running.
+the cars' couplings and rail positions and the later units' factories point at the new ones. The
+ground's picture is read again from the copy as soon as the level is held again (`edit_restore_history`),
+and what the copy cannot tell is kept over the run (`ground_keep`, `ground_take_kept`): the original
+picture the right button or Shift restores, the textures painted on it, whether it was painted, and the
+Water tool's cells as the level had them. Before, the picture was read only when a ground tool was used
+next: an undo or redo of a stroke straight after the run put its picture patch nowhere (the GRID went
+back, the stroke's picture stayed - issue #9; the same for Paint and Water steps), and the copy's
+picture, every stroke in it, became the original. Checked: a hill raised, Ctrl+R there and back, Ctrl+Z -
+the hill's picture gone with its GRID (v0.2.9: "undo: ground height" and the hill still drawn), Ctrl+Y -
+back; the same straight after a run for a Paint stroke (sand) and two Water strokes; the Paint tool with
+Shift over the hill after a run - the map's flat meadow back (v0.2.9: the hill, the copy's picture).
+RESTART of the same map keeps it running.
 
 **Hints under the cursor** (`editor_edit.cpp`, "the hint under the cursor"). The status line explains
 the tool; a hint is a few words beside the cursor - the keys of the tool on the map, or of the bar's
