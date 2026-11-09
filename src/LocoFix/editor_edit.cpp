@@ -224,8 +224,24 @@ int act(uint8_t* o, int action, int v1 = 0) {
     return reinterpret_cast<Action_t>(at<void**>(o, 0)[1])(o, nullptr, action, v1, 0, 0);
 }
 
+short* grid();   // the ground's heights, below
+int grid_width();
+int grid_height();
+
+// The ground's height under an object of `vid` at a map point. The engine's GetGroundZ (0x420ec0, which
+// World_GetGroundZForVid calls for every class but 7) reads the GRID without bounds, and the editor asks
+// for points off the map - the cursor over the black area beyond its edge, the brush's circle and the
+// grid's points there -, so the point is brought onto the map first: off it, the height is the edge's.
 float ground_z(uint8_t* vid, float x, float y) {
-    return reinterpret_cast<GroundZ_t>(GROUND_Z_FOR_VID)(world(), nullptr, vid, x, y);
+    const int gw = grid() ? grid_width() : 0, gh = grid() ? grid_height() : 0;
+    if (gw <= 0 || gh <= 0) return 0;
+    const float cx = (std::max)(0.0f, (std::min)(gw * 8 - 1.0f, x)), cy = (std::max)(0.0f, (std::min)(gh * 8 - 1.0f, y));
+    static bool logged = false;
+    if ((cx != x || cy != y) && !logged) {
+        logged = true;
+        patch::log("edit: a ground height asked off the map at %.0f,%.0f - taken at its edge, %.0f,%.0f (logged once)", x, y, cx, cy);
+    }
+    return reinterpret_cast<GroundZ_t>(GROUND_Z_FOR_VID)(world(), nullptr, vid, cx, cy);
 }
 
 bool is_unit_class(int c) {

@@ -110,6 +110,16 @@ and the tester's "how do I change an object's height" had no answer either. Now:
   picture's heights where it paints, MAP_RULES.md 2). Chosen over an overlay alone because it shows
   in the game too: the hill is in the saved picture, the objects stand on what is seen, the depth hides
   what is behind it; the cost is a picture of the map's own (a few MB) once the ground is shaped.
+- *Off the map.* The engine's `GetGroundZ` (0x420ec0; `World_GetGroundZForVid` calls it for every class
+  but 7, which clamps its footprint itself) reads the GRID without bounds (`BUGS.md`, Quirks), and the
+  editor asked it for points off the map - the cursor's point over the black area beyond the map's edge
+  (`map_point`), the brush's circle and the grid's points there, an object dragged out. Every height the
+  editor asks goes through `ground_z`, which brings the point onto the map first: off it, the height is
+  the edge's (the first such point of a session is logged, "a ground height asked off the map at ...").
+  Checked: every tool of the bar hovered over the black area beyond the four sides and at the four
+  corners of the template's map and far past them, the brush tools and the Select and Delete tools
+  dragged there too (3.5 minutes) - no exception in the logs; v0.2.9 did not fail either there (the
+  reads land in the game's own memory), the point is read on the map now.
 - *The brush.* Raise and lower add the strength (1-5, 2 at first) a step times the edge's weight -
   soft: a smoothstep of the distance (full in the middle, 0 at the edge), hard: full to the edge -,
   the parts of a level kept per cell for its next step, so hills come out round instead of as
