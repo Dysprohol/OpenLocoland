@@ -186,10 +186,10 @@ Co widać:
   początku wyłączona; edytor pamięta, czy grała i który plik. **TEST BEZ ZAPISU** i **ZAGRAJ
   ZAPISANA MAPE** grają własną muzykę mapy.
 - **Przyciski ? i menu** na lewym końcu paska (tam, gdzie gra ma przycisk pauzy). **?** (albo F1)
-  otwiera pomoc: 29 stron z tym, co jest w tym rozdziale, w skrócie. Zaczyna się od **spisu
+  otwiera pomoc: 32 strony z tym, co jest w tym rozdziale, w skrócie. Zaczyna się od **spisu
   treści**: kategorie (PODSTAWY, TORY I POCIAGI, OBIEKTY, MISJA I ZAPIS, TEREN, PRZYJAZDY I FABRYKI)
   po lewej, strony tej pod myszą po prawej - kliknięcie otwiera stronę. Strona ma swoją kategorię za
-  tytuł i swój numer (5 / 29); strzałki, Page Up / Down i kółko zmieniają strony, a **SPIS TRESCI**,
+  tytuł i swój numer (5 / 32); strzałki, Page Up / Down i kółko zmieniają strony, a **SPIS TRESCI**,
   `Esc` albo prawy przycisk wracają do spisu.
 
   ![Spis treści pomocy](img/help-contents-pl.jpg)

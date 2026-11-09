@@ -38,7 +38,7 @@ The [trailer](https://www.youtube.com/watch?v=04BeRSnfL6o) and more videos of th
   during the mission, plan what the enemy's factory builds, decide who fights whom - and play them
   at once. The trains that come onto the map, the enemy factory's plan and every train's orders are
   set from panels in the editor, and a quick test runs the map without saving it. The help inside
-  the editor has 29 pages, and the custom maps page lists every map folder it finds.
+  the editor has 32 pages, and the custom maps page lists every map folder it finds.
 - **Maps for friends.** A map goes to a friend as one file and turns up on their custom maps page.
 - **An OpenLocoland logo at the start.** The game opens with the project's logo for a few seconds in
   place of the original intro movies; any key or a click skips it.

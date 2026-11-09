@@ -185,10 +185,10 @@ What you see:
   settings. Off at first; the editor remembers whether it played and which file. **QUICK TEST, NO
   SAVE** and **PLAY THE SAVED MAP** play the map's own music.
 - **The ? and menu buttons** at the left end of the bar (where the game has its pause button).
-  **?** (or F1) opens the help: 29 pages with everything of this chapter in short. It starts on
+  **?** (or F1) opens the help: 32 pages with everything of this chapter in short. It starts on
   its **contents**: the categories - BASICS; TRACK AND TRAINS; OBJECTS; MISSION, SAVING; GROUND;
   ARRIVALS, FACTORIES - on the left, the pages of the one under the mouse on the right - a click opens
-  one. A page has its category for the title and its number (5 / 29); the arrows, Page Up / Down and
+  one. A page has its category for the title and its number (5 / 32); the arrows, Page Up / Down and
   the wheel turn the pages, and **CONTENTS**, `Esc` or the right button go back to the contents.
 
   ![The help's contents](img/help-contents-en.jpg)
