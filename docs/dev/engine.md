@@ -61,6 +61,30 @@ skipped, ms, locks given a stand-in)"); `error.log` gets none of the failed fram
 Test mode (`LOCOFIX_TEST`) keeps the game active behind other windows, so a full-screen test game
 that is not in front skips its frames until it is.
 
+**The fog buffer** (`src/LocoFix/fog_buffer.cpp`, `BUGS.md` F23). `Graphics_Init` makes three
+256x256 scratch textures: the grey one (+0xbd4, P8 with a grey palette, R5G6B5 without P8), the rgb
+one (+0xbd8) and the alpha one (+0xbdc). `Graphics_DrawFog` (a region's fog) and
+`Graphics_DrawGroundSnow` (`ENV_GROUND_SNOW`) build a mask from the depth buffer at a quarter of
+the screen's resolution in the grey texture - the fog the visible part of its region, the snow the
+whole screen - and draw it over the screen; both step through it with the pitch its lock returns,
+and `Texture_Draw` / `Texture_DrawZ` divide the texels by the texture's own width and height, so
+only the texture's size ties them to 1024x1024 pixels. `Graphics_DrawLight` takes the grey and the
+rgb texture in turn for a light of at most 0x200 to each side, `EFF_ALPHAAPPEAR` draws its snapshot
+in 256x256 pieces through the rgb texture and `GroundVid2_Draw` puts one sprite through the alpha
+texture: none of them depends on the screen. LocoFix gives fog and ground snow a texture of their
+own, put at +0xbd4 for the length of those two calls: the smallest power of two holding a quarter of
+the chosen resolution on each side (512x512 at 1920x1080, 1024x512 at 2560x1440, 1024x1024 at
+3840x2160; a logical screen is never bigger), made like the grey one (P8 with its palette, or what
+`Texture_Construct` falls back to) at the first `Graphics_ReloadPalettes` (the end of
+`Graphics_Init`) and again at the later ones (after a surface restore), as the engine remakes the
+grey one. Up to 1024x1024 pixels none is made. The grey texture stays 256x256 for the lights, so
+their cost stays as it was (a light locks and fills it, or the rgb texture, every time; a first
+version that made the grey texture itself bigger measured slower in mission 14 at 2560x1440, though
+within the spread of runs on a busy machine). If the texture cannot be made, fog and ground snow
+are left out on a screen the grey texture does not cover (logged once) instead of writing past it.
+`LocoFix.log` says "fog buffer: 512x512 (P8) for the 1920x1080 screen". No shipped mission turns
+ground snow on (no map's `GRPH` has 0x40 and no script sets it).
+
 Worth knowing when changing it: `Graphics_Init` always clears the flags 0x10 (Windows
 cursor drawn with GDI), 0x20 (software device) and 0x40 (triple buffering), so those paths
 are dead code. Effects 4 (`OPEN_WINDOW`) and 8 (`SCALE_WINDOW`) have no drawing code;

@@ -224,6 +224,9 @@ Before drawing, the engine skips objects far from the screen centre, with a box 
 pass of `Graphics_DrawScene`) within x +-512 and y +-512. LocoFix makes the box as big as
 the screen plus the original margin (`view_culling.cpp`); otherwise shadows stop in the
 middle 1024 pixels at 1920x1080 and objects disappear at the edges at 2560x1080 or 1920x1200.
+The fog of regions and the snow on the ground go through a scratch texture that covers 1024x1024
+pixels; on a bigger screen LocoFix draws them through one as big as the screen needs
+(`fog_buffer.cpp`, see "The fog buffer") - before that a fog over the whole view crashed the game.
 
 ## Status and known bugs
 

@@ -1292,7 +1292,7 @@ struct Graphics 0xc0c             # the renderer (g_graphics), created in World_
   0xbbc int fontSizeY             # 8, .cfg [graph] FontSizeY
   0xbc0 Movie movie               # PlayMovie/StopMovie; while movie.graph is set the frame is not presented
   0xbd0 HWND hwnd                 # game window (Graphics_Init)
-  0xbd4 Texture* grayTexture      # 256x256 P8 with a grey palette (Graphics_ReloadPalettes; falls back to R5G6B5): scratch for fog ("fog buffer"), ground snow ("snow buffer") and lights ("light buffer")
+  0xbd4 Texture* grayTexture      # 256x256 P8 with a grey palette (Graphics_ReloadPalettes; falls back to R5G6B5): scratch for fog ("fog buffer"), ground snow ("snow buffer") and lights ("light buffer"); above 1024x1024 px LocoFix fog_buffer.cpp puts a bigger texture here for fog and ground snow
   0xbd8 Texture* rgbTexture       # 256x256 R5G6B5 (or 555): EFF_ALPHAAPPEAR copies the snapshot through it; lights alternate between it and grayTexture; its format picks g_redMask16.. (565 or 555)
   0xbdc Texture* alphaTexture     # 256x256 A4R4G4B4: scratch of GroundVid2_Draw (sprites with per-pixel depth)
   0xbe4 int displayFormat         # set to 0x17 (R5G6B5) by Graphics_Init before InitDirectDraw; no other reader found (guess)

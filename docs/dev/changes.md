@@ -438,6 +438,12 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       registers and the top 24 words of the stack, each pointer into a module's code named the same
       way - at most 4 a run; it handles nothing (the engine's filter still writes "EXCEPTION!" to
       `error.log` and ends the game),
+  38. the fog buffer (`fog_buffer.cpp`, `BUGS.md` F23, "Rendering"): region fog and snow on the
+      ground are drawn through a scratch texture of their own, big enough for the screen (the
+      smallest power of two holding a quarter of it on each side: 512x512 at 1920x1080, 1024x512
+      at 2560x1440; up to 1024x1024 the engine's 256x256 grey texture as before) - a fog over the
+      whole view (missions 7, 13, 18, the editor's OVER: THE WHOLE MAP) no longer crashes the game
+      above 1024 pixels,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
