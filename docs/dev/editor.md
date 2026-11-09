@@ -43,7 +43,7 @@ the logo and the menu maps run as usual) as soon as it is loaded: paused as scri
 does (`World_Pause`, no object updates) and with the script events off (World flags 0x20000,
 not even `main` runs). The map shows as authored, without the interface; the camera moves with
 the screen edge, the arrow keys (the scroll type the script would set is set) and the middle
-mouse button. Options > Run the level runs it from its saved file and holds it again (below).
+mouse button. Options > Run the level runs it from a copy written for the run and holds it again (below).
 
 **The menu.** The exe's window procedure handles only Exit (40004) and the screenshot key
 (Shift+F9, 40023); Load, Save and About lost their handlers (comdlg32 is not even imported) and
@@ -167,18 +167,27 @@ A tester's way into a running map: Run the level (Ctrl+R) runs the level inside 
 with the game's interface and its Esc menu. The script is compiled when a level loads, so resuming the
 held level would run the script of the load - without what the panels changed since (an arrival set in
 the Arrivals panel never came). So Run the level (the Menu panel's QUICK TEST, NO SAVE / TEST BEZ ZAPISU) writes the
-map and loads it again running, never asking: a map of its own is written as a save writes it; a map
-not written in place - a campaign map, POLIGON or the template, and the start's new map without a
-name - is written with its script (its editor blocks anew; a script without them as it is), ground
-and texts into a hidden copy, `maps\_run\` (marked as `maps\_new\` is, written for every run, removed
-when the editor leaves the map and swept at the next start), which runs. Back, the copy is held again
+map and loads it again running, never asking and saving nothing: the map - the player's own, a
+campaign map, POLIGON or the template, the start's new map without a name - is written with its script
+(its editor blocks anew; a script without them as it is), ground and texts into a hidden copy,
+`maps\_run\` (marked as `maps\_new\` is, written for every run, removed when the editor leaves the map
+and swept at the next start), which runs; only a campaign map, POLIGON or the template without edits
+runs from its own file, which is not written either. Until v0.2.9 a map of the player's own was written
+in place, as a save writes it - the button says NO SAVE, and a quick test of an edit the player did not
+want kept saved it all the same; since, its files (`.map`, `.lgc`, `.vid`, the texts) are not touched by a
+run, and the high scores of a run go with the copy (its `hiscores.txt` is copied in, so the briefing's page
+shows them). Checked: a map of the player's own with a stroke not saved - its `.map`, `.lgc`, `.vid` and
+texts the same before and after Ctrl+R and back (v0.2.9: `.map` and `.lgc` written, "saved as" in the
+log), the stroke there in the running level, "not saved" after it, and Ctrl+S then writing the map with
+its own picture; l01 and the template, loaded and edited - run from the copy, their files unchanged; l01
+without edits - from its own file; `maps\_run` removed every time. Back, the copy is held again
 with the editor on the original map (Ctrl+S, the dialogs' names, "not saved" and the history as
 before the run; a close of the game during the run asks to save, and Yes saves from the copy held
 again); while a level runs, the menu's other commands are not taken. Checked in Polish and English:
 POLIGON with a semaphore placed, Ctrl+R at once, the semaphore in the running level, Ctrl+R and the
 Esc menu's way back - the semaphore there, "not saved", Ctrl+Z undoing it; a second run from the
-copy; Ctrl+S then asking for a name; the start map and mission 1 run the same way; a map of its own
-written in place; `maps\_run` gone after the game is closed. File > Play the map (PLAY THE SAVED MAP /
+copy; Ctrl+S then asking for a name; the start map and mission 1 run the same way; `maps\_run` gone
+after the game is closed. File > Play the map (PLAY THE SAVED MAP /
 ZAGRAJ ZAPISANA MAPE) needs the saved map for the separate game and asks to save first; in the Menu
 panel the status line says what each of the two does (`TipRun`, `TipPlay`). The run
 (`run_level`: `g_running` on, `editor_level_loaded` does not hold it). Back - Ctrl+R, BACK TO

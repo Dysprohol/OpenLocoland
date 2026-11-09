@@ -813,26 +813,25 @@ bool asks();
 bool run_level(HWND window) {
     if (!g_held) return false;
     const std::string map = game_path(current_map());
-    // a map not written in place runs from a copy: the start's new map, a game's own map with edits
-    // or held again from its copy after a run (unchanged, the game's own map runs from its file)
-    const bool copy = auto_folder(folder_of(map)) ||
-                      (game_folder_map(map) && (edit_dirty() || lower_path(game_path(level_file())) != lower_path(map)));
+    // the quick test saves nothing: a map runs from a copy, maps\_run\ - the player's own map too (it
+    // was written in place before, although the button says NO SAVE), the start's new map, a game's
+    // own map with edits or held again from its copy after a run; only a game's own map without edits
+    // runs from its own file, which is not written either
+    const bool copy = !game_folder_map(map) || edit_dirty() || lower_path(game_path(level_file())) != lower_path(map);
     const std::string run = copy ? RUN_MAP : map;
-    // written as a save writes it, without asking - also when nothing changed, so the script has the
-    // runner and the panels' settings of this version (an older map's script is brought up to date)
-    if (copy || !game_folder_map(map)) {
-        bool written = true;
-        if (copy) {
-            // the copy's script is the map's own, its editor blocks written anew (a script without them
-            // runs as it is); the high scores page stays in its briefing
-            written = mark_folder(RUN_FOLDER, "Run the level's copy of the map the editor runs; written again for every run and "
-                                              "removed with this folder when the editor leaves the map.\r\n");
-            DeleteFileA(script_of(run).c_str());
-            CopyFileA(script_of(map).c_str(), script_of(run).c_str(), FALSE);
-            const std::string scores = folder_of(map) + "\\hiscores.txt";
-            if (GetFileAttributesA(scores.c_str()) != INVALID_FILE_ATTRIBUTES)
-                CopyFileA(scores.c_str(), (std::string(RUN_FOLDER) + "\\hiscores.txt").c_str(), FALSE);
-        }
+    // the copy written as a save writes it, without asking - also when nothing changed, so the script
+    // has the runner and the panels' settings of this version (an older map's script is brought up to
+    // date in the copy)
+    if (copy) {
+        // the copy's script is the map's own, its editor blocks written anew (a script without them
+        // runs as it is); the high scores page stays in its briefing
+        bool written = mark_folder(RUN_FOLDER, "Run the level's copy of the map the editor runs; written again for every run and "
+                                               "removed with this folder when the editor leaves the map.\r\n");
+        DeleteFileA(script_of(run).c_str());
+        CopyFileA(script_of(map).c_str(), script_of(run).c_str(), FALSE);
+        const std::string scores = folder_of(map) + "\\hiscores.txt";
+        if (GetFileAttributesA(scores.c_str()) != INVALID_FILE_ATTRIBUTES)
+            CopyFileA(scores.c_str(), (std::string(RUN_FOLDER) + "\\hiscores.txt").c_str(), FALSE);
         written = written && save_map(run);
         g_current = map;   // the editor stays on its map (save_map took the copy's name)
         if (!written) {

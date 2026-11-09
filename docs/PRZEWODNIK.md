@@ -623,8 +623,8 @@ region, więc region jasnej wody stawia się nad terenem (zob. 3. Woda, bagno, l
 
 Menu → **TEST BEZ ZAPISU** (albo `Ctrl+R`): mapa działa w edytorze taka, jaka jest teraz, zapisana czy
 nie, tak jak w grze - pociągi jeżdżą, działa strzelają, przyjeżdżają pociągi z panelu Przyjazdy. Nic
-nie pyta: twoja mapa zapisuje się najpierw, a POLIGON, szablon, mapa kampanii i nowa mapa bez nazwy
-działają z ukrytej kopii, więc zostają, jakie były. `Ctrl+R` wraca do edytora z mapą taką, jak przed
+nie pyta i nic się nie zapisuje: mapa działa z ukrytej kopii, więc pliki twojej mapy zostają, jakie
+były (wynik zdobyty w teście nie trafia na listę najlepszych). `Ctrl+R` wraca do edytora z mapą taką, jak przed
 uruchomieniem - niezapisane zmiany dalej niezapisane, `Ctrl+Z` cofa je jak przedtem -, tak samo menu gry
 pod `Esc` (WYJDZ Z GRY → WROC DO EDYTORA albo TAK) i koniec poziomu (wygrana albo przegrana).
 

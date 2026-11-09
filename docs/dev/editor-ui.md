@@ -119,7 +119,7 @@ laid or a push line whose begin is picked, or leaves a tool for Select - before,
 Menu and none of these could be done with it.
 **Ctrl+R** runs the level or holds it again (Options > Run the level): the bar and its buttons are
 not there while the level runs. **Every save** (`save_map` in `editor.cpp`: Ctrl+S, Save map, a Yes to
-"Save the changes?", the write of Run the level and Play the map) shows SAVED (`SavedNotice`, in the
+"Save the changes?", the save before Play the map; not Run the level's copy, which saves nothing) shows SAVED (`SavedNotice`, in the
 menu titles' font VID 3) in the middle of the view, the map's file under it in the menu font when it
 was saved under a name (not the scratch folder of a new map), on a dark box whose last 0.4 s fade -
 the box over the held level only, as a running level's lighting turns the untextured quad light -,
