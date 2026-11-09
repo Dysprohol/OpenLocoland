@@ -84,13 +84,22 @@ the GRID alone made the objects stand dz px higher than the ground they were dra
 and the tester's "how do I change an object's height" had no answer either. Now:
 
 - *The relief.* When the GRID changes, the picture is drawn again there: a column at a time, front to
-  back (the ground's world y from the bottom of the screen up, in quarter-pixel steps), every pixel
-  gets the first ground point that reaches it - raised ground shows higher and hides what is behind
+  back (the ground's world y from the bottom of the screen up, by the stretches between the cells'
+  middles, 8 px, the height linear along each), every pixel gets the first ground point that reaches it - raised ground shows higher and hides what is behind
   it, lowered ground may be hidden by the ground in front -, that point's texel from where the old
   heights showed it, lightened or darkened by the new slope against the old one (light from the upper
   left, half of it ambient: a steep face toward the viewer stays readable), and its height texel
   raised by 8 a level. The heights between the cells' middles are interpolated (the engine stands an
-  object on its cell's value, the value at the middle). Within a Ground height stroke every step is
+  object on its cell's value, the value at the middle). The walk counts the middles with an integer:
+  it took each next middle as `8 * floor((y - 4.0001) / 8) + 4` in single precision, which from y
+  2060 down the map rounds back to y itself - the walk stood still and the editor hung for good on the
+  lower part of any map taller than 2048 px (issue #12; Ground height, the track's and a building's
+  flattening there). Checked in the game: l08 (3072 x 2304), a raise at map y ~2150 - v0.2.9 stopped
+  responding, now that stroke and three more in its lower part end at once; a new 4096 x 3072 meadow,
+  all five modes and the right button's lower in its lowest rows and at its bottom-right corner, two
+  rails laid there (26 cells flattened) and a factory placed on them; on the 2048 x 1536 template the
+  picture after the same raise, ramp and smooth strokes is the same as v0.2.9's, pixel for pixel. Within
+  a Ground height stroke every step is
   drawn from the stroke's start picture, so nothing is lost step by step; the stroke keeps the
   rectangle it changed (`PaintPatch`) and undo puts the picture back exactly. The track's and a
   placed building's flattening are drawn the same way, one step each. Always for the Ground height

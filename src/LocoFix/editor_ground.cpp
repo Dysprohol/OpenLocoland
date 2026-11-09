@@ -749,7 +749,11 @@ void ground_relief(const short* from, const short* to, int gw, int gh, int cx0, 
         }
     // the screen rows where the changed ground showed or shows now
     const int s_lo = cy0 * 8 - z_max - 1, s_hi = (cy1 + 1) * 8 - z_min + 1;
-    const float y_start = static_cast<float>(s_hi + column_max + 1), y_end = static_cast<float>(s_lo + column_min - 1);
+    const int y_start = s_hi + column_max + 1, y_end = s_lo + column_min - 1;
+    // the first cell middle (8k + 4) above y_start: the walk steps from middle to middle by an integer
+    // (in single precision, 8 * floor((ya - 4.0001f) / 8) + 4 gave ya itself from 2060 down the map -
+    // ya - 4.0001f rounds to 8k there - and the walk stood still: the editor hung on a tall map, issue #12)
+    const int m_start = static_cast<int>(std::floor((y_start - 5) / 8.0));
     int px0 = g_w, px1 = -1, py0 = g_h, py1 = -1;
     for (int x = cx0 * 8; x < (cx1 + 1) * 8; ++x) {
         const int px = static_cast<int>(std::floor(x - g_left));
@@ -759,9 +763,9 @@ void ground_relief(const short* from, const short* to, int gw, int gh, int cx0, 
         // front to back by the stretches between the cells' middles (8 px, the height linear along
         // each): a stretch coming up the screen gives each row it reaches the ground point that
         // reaches it - a sample a row; one going down the screen (rising steeper than 1:1) is hidden
-        float ya = y_start, za = t.at(fx, ya);
-        while (ya > y_end && top > s_lo) {
-            const float yb = (std::max)(y_end, 8 * std::floor((ya - 4.0001f) / 8) + 4), zb = t.at(fx, yb);
+        float ya = static_cast<float>(y_start), za = t.at(fx, ya);
+        for (int m = m_start; ya > y_end && top > s_lo; --m) {
+            const float yb = static_cast<float>((std::max)(y_end, 8 * m + 4)), zb = t.at(fx, yb);
             const float sa = ya - za, sb = yb - zb;
             if (sb < sa) {
                 const float k = (sa - sb) / (ya - yb);
