@@ -1,0 +1,2828 @@
+[
+  {
+    "name": "ACT_ADD_AMMO",
+    "value": "93",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 93",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_ADD_ITEM",
+    "value": "54",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 54",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_ATTACK",
+    "value": "32",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 32",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_BACKUP_COMMAND",
+    "value": "70",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 70",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_BUILD_UNIT",
+    "value": "35",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 35",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_CHANGE_ANIMATION",
+    "value": "61",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 61",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_CHANGE_COOR",
+    "value": "63",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 63",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_CHANGE_DIRECTION",
+    "value": "60",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 60",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_CHANGE_VID",
+    "value": "62",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 62",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_CLASH_ENGINE",
+    "value": "151",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 151",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_CLEAR_COMMAND",
+    "value": "42",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 42",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_CLEAR_STACK",
+    "value": "72",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 72",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_COOR_ATTACK",
+    "value": "37",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 37",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_CYCLE_STACK",
+    "value": "71",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 71",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_DAMAGE",
+    "value": "85",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 85",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_DELETE_ALL_ITEM",
+    "value": "57",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 57",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_DELETE_ITEM",
+    "value": "55",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 55",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_DESTROY_UNIT",
+    "value": "134",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 134",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_FIRST_ENGINE",
+    "value": "154",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 154",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_FLAGMAN_TRIGGER",
+    "value": "43",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 43",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_FORCELINK_ENGINE",
+    "value": "152",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 152",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_GET_AMMO",
+    "value": "92",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 92",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_GET_ANIMATION",
+    "value": "91",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 91",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_GET_ARMY",
+    "value": "96",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 96",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_GET_BATTLE_RANGE",
+    "value": "100",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 100",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_GET_BEHAVE",
+    "value": "94",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 94",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_GET_COMMAND",
+    "value": "111",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 111",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_GET_GOAL",
+    "value": "90",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 90",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_GET_HP",
+    "value": "87",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 87",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_GET_ITEM",
+    "value": "58",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 58",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_GET_LINK",
+    "value": "101",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 101",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_GET_PERCENT_HP",
+    "value": "89",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 89",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_GET_SPEED",
+    "value": "109",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 109",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_GET_TEXT",
+    "value": "121",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 121",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_GET_TIMER",
+    "value": "105",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 105",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_GET_UPLINK",
+    "value": "103",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 103",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_GET_ZSPEED",
+    "value": "107",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 107",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_HAVE_ITEM",
+    "value": "56",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 56",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_IN_TRAIN",
+    "value": "158",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 158",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_IS_FIRST",
+    "value": "157",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 157",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_IS_TRAIN",
+    "value": "159",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 159",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_LAST_ENGINE",
+    "value": "155",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 155",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_LINK_ENGINE",
+    "value": "150",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 150",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_LOGIC_RUN",
+    "value": "131",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 131",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_MOVE",
+    "value": "33",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 33",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_MOVE_TO",
+    "value": "34",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 34",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_NEXT_COMMAND",
+    "value": "130",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 130",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_NEXT_ENGINE",
+    "value": "156",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 156",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_NONE",
+    "value": "255",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 255",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_PATH_BLOCK",
+    "value": "50",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 50",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_PATH_GROUND",
+    "value": "51",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 51",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_PATH_LIMIT",
+    "value": "52",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 52",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_PATROL",
+    "value": "36",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 36",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_PAUSE",
+    "value": "40",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 40",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_PLAY_SFX",
+    "value": "135",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 135",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_RANDOM",
+    "value": "38",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 38",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_REPAIR",
+    "value": "86",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 86",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_RESTORE",
+    "value": "81",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 81",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_ROTATE",
+    "value": "41",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 41",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_SAVE",
+    "value": "80",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 80",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_SET_ARMY",
+    "value": "97",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 97",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_SET_BEHAVE",
+    "value": "95",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 95",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_SET_DEATH_TIMER",
+    "value": "112",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 112",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_SET_FILE",
+    "value": "123",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 123",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_SET_HP",
+    "value": "88",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 88",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_SET_INVISIBLE",
+    "value": "98",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 98",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_SET_LINK",
+    "value": "102",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 102",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_SET_SPEED",
+    "value": "110",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 110",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_SET_TEXT",
+    "value": "120",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 120",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_SET_TEXT_COUNT",
+    "value": "122",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 122",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_SET_TIMER",
+    "value": "106",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 106",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_SET_UPLINK",
+    "value": "104",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 104",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_SET_ZSPEED",
+    "value": "108",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 108",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_STOP",
+    "value": "39",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 39",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_STOP_STACK",
+    "value": "73",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 73",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_TRAIN_BEHAVE",
+    "value": "153",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 153",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_UNDO_INSERT",
+    "value": "133",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 133",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ACT_UNDO_REMOVE",
+    "value": "132",
+    "description": "Action opcode used with Action() and AddCommand(). Value: 132",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_BIRTH",
+    "value": "14",
+    "description": "Animation identifier. Value: 14",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_BUILD",
+    "value": "1",
+    "description": "Animation identifier. Value: 1",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_CLASH",
+    "value": "12",
+    "description": "Animation identifier. Value: 12",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_CLOSE",
+    "value": "7",
+    "description": "Animation identifier. Value: 7",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_DEATH",
+    "value": "15",
+    "description": "Animation identifier. Value: 15",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_DEATH2",
+    "value": "16",
+    "description": "Animation identifier. Value: 16",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_FIGHT",
+    "value": "8",
+    "description": "Animation identifier. Value: 8",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_FONT_NEXT_CHAR",
+    "value": "1",
+    "description": "Animation identifier. Value: 1",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_FONT_NEXT_LINE",
+    "value": "2",
+    "description": "Animation identifier. Value: 2",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_FONT_NORMAL",
+    "value": "0",
+    "description": "Animation identifier. Value: 0",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_GO",
+    "value": "2",
+    "description": "Animation identifier. Value: 2",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_HIT",
+    "value": "7",
+    "description": "Animation identifier. Value: 7",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_LAZY",
+    "value": "12",
+    "description": "Animation identifier. Value: 12",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_LINK",
+    "value": "11",
+    "description": "Animation identifier. Value: 11",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_LOAD",
+    "value": "11",
+    "description": "Animation identifier. Value: 11",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_L_ROTATE",
+    "value": "4",
+    "description": "Animation identifier. Value: 4",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_MENUDISABLE",
+    "value": "6",
+    "description": "Animation identifier. Value: 6",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_MENUDISABLEDOWN",
+    "value": "6",
+    "description": "Animation identifier. Value: 6",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_MENUDISABLEUP",
+    "value": "7",
+    "description": "Animation identifier. Value: 7",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_MENUPRESSDOWN",
+    "value": "4",
+    "description": "Animation identifier. Value: 4",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_MENUPRESSUP",
+    "value": "5",
+    "description": "Animation identifier. Value: 5",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_MENUSELECTDOWN",
+    "value": "2",
+    "description": "Animation identifier. Value: 2",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_MENUSELECTUP",
+    "value": "3",
+    "description": "Animation identifier. Value: 3",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_MENUSTANDDOWN",
+    "value": "0",
+    "description": "Animation identifier. Value: 0",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_MENUSTANDUP",
+    "value": "1",
+    "description": "Animation identifier. Value: 1",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_OPEN",
+    "value": "6",
+    "description": "Animation identifier. Value: 6",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_R_ROTATE",
+    "value": "5",
+    "description": "Animation identifier. Value: 5",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_SALUT",
+    "value": "9",
+    "description": "Animation identifier. Value: 9",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_STAND",
+    "value": "0",
+    "description": "Animation identifier. Value: 0",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_STAND_OPEN",
+    "value": "10",
+    "description": "Animation identifier. Value: 10",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_START_MOVE",
+    "value": "3",
+    "description": "Animation identifier. Value: 3",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_STOP_MOVE",
+    "value": "1",
+    "description": "Animation identifier. Value: 1",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_UNLOAD",
+    "value": "12",
+    "description": "Animation identifier. Value: 12",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ANI_WOUND",
+    "value": "13",
+    "description": "Animation identifier. Value: 13",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_ACTIVE",
+    "value": "2",
+    "description": "Unit, train or text behavior flag. Value: 2",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_AGGRESSIVE",
+    "value": "1",
+    "description": "Unit, train or text behavior flag. Value: 1",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_BIGFIRE",
+    "value": "16",
+    "description": "Unit, train or text behavior flag. Value: 16",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_BOTTOM",
+    "value": "4",
+    "description": "Unit, train or text behavior flag. Value: 4",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_CAREFUL",
+    "value": "4",
+    "description": "Unit, train or text behavior flag. Value: 4",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_CENTER",
+    "value": "(BEH_CENTER_X+BEH_CENTER_Y)",
+    "description": "Unit, train or text behavior flag. Value: (BEH_CENTER_X+BEH_CENTER_Y)",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_CENTER_X",
+    "value": "1",
+    "description": "Unit, train or text behavior flag. Value: 1",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_CENTER_Y",
+    "value": "8",
+    "description": "Unit, train or text behavior flag. Value: 8",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_FILE",
+    "value": "(2*16)",
+    "description": "Unit, train or text behavior flag. Value: (2*16)",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_HAUNT",
+    "value": "8",
+    "description": "Unit, train or text behavior flag. Value: 8",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_LEFT",
+    "value": "0",
+    "description": "Unit, train or text behavior flag. Value: 0",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_LOAD_FROM",
+    "value": "(16+32+64)",
+    "description": "Unit, train or text behavior flag. Value: (16+32+64)",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_NOT_LOAD",
+    "value": "(0*16)",
+    "description": "Unit, train or text behavior flag. Value: (0*16)",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_RIGHT",
+    "value": "2",
+    "description": "Unit, train or text behavior flag. Value: 2",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_SCRIPT_FILE",
+    "value": "(4*16)",
+    "description": "Unit, train or text behavior flag. Value: (4*16)",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_SCRIPT_STRINGS",
+    "value": "(5*16)",
+    "description": "Unit, train or text behavior flag. Value: (5*16)",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_SCRIPT_UPDATED",
+    "value": "(6*16)",
+    "description": "Unit, train or text behavior flag. Value: (6*16)",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_SCRIPT_VARIABLE",
+    "value": "(3*16)",
+    "description": "Unit, train or text behavior flag. Value: (3*16)",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_STRINGS_INI",
+    "value": "(1*16)",
+    "description": "Unit, train or text behavior flag. Value: (1*16)",
+    "source": "export.lgc"
+  },
+  {
+    "name": "BEH_TOP",
+    "value": "0",
+    "description": "Unit, train or text behavior flag. Value: 0",
+    "source": "export.lgc"
+  },
+  {
+    "name": "B_AVIA",
+    "value": "4",
+    "description": "Sprite class identifier. Value: 4",
+    "source": "export.lgc"
+  },
+  {
+    "name": "B_BALLOON",
+    "value": "26",
+    "description": "Sprite class identifier. Value: 26",
+    "source": "export.lgc"
+  },
+  {
+    "name": "B_BUILDING",
+    "value": "3",
+    "description": "Sprite class identifier. Value: 3",
+    "source": "export.lgc"
+  },
+  {
+    "name": "B_CANNON",
+    "value": "5",
+    "description": "Sprite class identifier. Value: 5",
+    "source": "export.lgc"
+  },
+  {
+    "name": "B_CIV_ROBOT",
+    "value": "20",
+    "description": "Sprite class identifier. Value: 20",
+    "source": "export.lgc"
+  },
+  {
+    "name": "B_CREATURE",
+    "value": "25",
+    "description": "Sprite class identifier. Value: 25",
+    "source": "export.lgc"
+  },
+  {
+    "name": "B_DEPO",
+    "value": "24",
+    "description": "Sprite class identifier. Value: 24",
+    "source": "export.lgc"
+  },
+  {
+    "name": "B_ENGINE",
+    "value": "21",
+    "description": "Sprite class identifier. Value: 21",
+    "source": "export.lgc"
+  },
+  {
+    "name": "B_FRAME",
+    "value": "10",
+    "description": "Sprite class identifier. Value: 10",
+    "source": "export.lgc"
+  },
+  {
+    "name": "B_LINKER",
+    "value": "12",
+    "description": "Sprite class identifier. Value: 12",
+    "source": "export.lgc"
+  },
+  {
+    "name": "B_MISSILE",
+    "value": "27",
+    "description": "Sprite class identifier. Value: 27",
+    "source": "export.lgc"
+  },
+  {
+    "name": "B_OBJECT",
+    "value": "1",
+    "description": "Sprite class identifier. Value: 1",
+    "source": "export.lgc"
+  },
+  {
+    "name": "B_PRIMITIVE",
+    "value": "6",
+    "description": "Sprite class identifier. Value: 6",
+    "source": "export.lgc"
+  },
+  {
+    "name": "B_RAIL",
+    "value": "22",
+    "description": "Sprite class identifier. Value: 22",
+    "source": "export.lgc"
+  },
+  {
+    "name": "B_REGION",
+    "value": "23",
+    "description": "Sprite class identifier. Value: 23",
+    "source": "export.lgc"
+  },
+  {
+    "name": "B_SPRITE",
+    "value": "9",
+    "description": "Sprite class identifier. Value: 9",
+    "source": "export.lgc"
+  },
+  {
+    "name": "B_TERRAIN",
+    "value": "0",
+    "description": "Sprite class identifier. Value: 0",
+    "source": "export.lgc"
+  },
+  {
+    "name": "B_TEXT",
+    "value": "19",
+    "description": "Sprite class identifier. Value: 19",
+    "source": "export.lgc"
+  },
+  {
+    "name": "B_UNIT",
+    "value": "2",
+    "description": "Sprite class identifier. Value: 2",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_ATTACK",
+    "value": "3",
+    "description": "Sprite command identifier. Value: 3",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_BUILD",
+    "value": "16",
+    "description": "Sprite command identifier. Value: 16",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_DISTATTACK",
+    "value": "5",
+    "description": "Sprite command identifier. Value: 5",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_ENGINE_ATTACK",
+    "value": "28",
+    "description": "Sprite command identifier. Value: 28",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_ENGINE_CLASH",
+    "value": "27",
+    "description": "Sprite command identifier. Value: 27",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_ENGINE_LINK",
+    "value": "26",
+    "description": "Sprite command identifier. Value: 26",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_ENGINE_MINE",
+    "value": "24",
+    "description": "Sprite command identifier. Value: 24",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_ENGINE_MOVE",
+    "value": "23",
+    "description": "Sprite command identifier. Value: 23",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_ENGINE_ONEATTACK",
+    "value": "29",
+    "description": "Sprite command identifier. Value: 29",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_ENGINE_PATROL",
+    "value": "25",
+    "description": "Sprite command identifier. Value: 25",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_MOVE",
+    "value": "1",
+    "description": "Sprite command identifier. Value: 1",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_MOVE3D",
+    "value": "2",
+    "description": "Sprite command identifier. Value: 2",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_NEARATTACK",
+    "value": "6",
+    "description": "Sprite command identifier. Value: 6",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_NONE",
+    "value": "0",
+    "description": "Sprite command identifier. Value: 0",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_ONEATTACK",
+    "value": "4",
+    "description": "Sprite command identifier. Value: 4",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_OTHER",
+    "value": "31",
+    "description": "Sprite command identifier. Value: 31",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_PASSIVE",
+    "value": "17",
+    "description": "Sprite command identifier. Value: 17",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_PATROL",
+    "value": "7",
+    "description": "Sprite command identifier. Value: 7",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_PAUSE",
+    "value": "18",
+    "description": "Sprite command identifier. Value: 18",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_ROTATE",
+    "value": "19",
+    "description": "Sprite command identifier. Value: 19",
+    "source": "export.lgc"
+  },
+  {
+    "name": "COM_TARAN",
+    "value": "8",
+    "description": "Sprite command identifier. Value: 8",
+    "source": "export.lgc"
+  },
+  {
+    "name": "CURSOR_ATTACK",
+    "value": "5",
+    "description": "Game cursor mode identifier. Value: 5",
+    "source": "export.lgc"
+  },
+  {
+    "name": "CURSOR_CLASH",
+    "value": "3",
+    "description": "Game cursor mode identifier. Value: 3",
+    "source": "export.lgc"
+  },
+  {
+    "name": "CURSOR_CYCLE",
+    "value": "9",
+    "description": "Game cursor mode identifier. Value: 9",
+    "source": "export.lgc"
+  },
+  {
+    "name": "CURSOR_DELETE",
+    "value": "15",
+    "description": "Game cursor mode identifier. Value: 15",
+    "source": "export.lgc"
+  },
+  {
+    "name": "CURSOR_FIGHT",
+    "value": "5",
+    "description": "Game cursor mode identifier. Value: 5",
+    "source": "export.lgc"
+  },
+  {
+    "name": "CURSOR_FIGHT2",
+    "value": "6",
+    "description": "Game cursor mode identifier. Value: 6",
+    "source": "export.lgc"
+  },
+  {
+    "name": "CURSOR_LINK",
+    "value": "10",
+    "description": "Game cursor mode identifier. Value: 10",
+    "source": "export.lgc"
+  },
+  {
+    "name": "CURSOR_MOVE",
+    "value": "2",
+    "description": "Game cursor mode identifier. Value: 2",
+    "source": "export.lgc"
+  },
+  {
+    "name": "CURSOR_NORMAL",
+    "value": "0",
+    "description": "Game cursor mode identifier. Value: 0",
+    "source": "export.lgc"
+  },
+  {
+    "name": "CURSOR_NOTMOVE",
+    "value": "8",
+    "description": "Game cursor mode identifier. Value: 8",
+    "source": "export.lgc"
+  },
+  {
+    "name": "CURSOR_OFF",
+    "value": "-1",
+    "description": "Game cursor mode identifier. Value: -1",
+    "source": "export.lgc"
+  },
+  {
+    "name": "CURSOR_SELECT",
+    "value": "7",
+    "description": "Game cursor mode identifier. Value: 7",
+    "source": "export.lgc"
+  },
+  {
+    "name": "CURSOR_UNLINK",
+    "value": "11",
+    "description": "Game cursor mode identifier. Value: 11",
+    "source": "export.lgc"
+  },
+  {
+    "name": "EFF_ALPHAAPPEAR",
+    "value": "5",
+    "description": "Visual effect identifier used with Effect(). Value: 5",
+    "source": "export.lgc"
+  },
+  {
+    "name": "EFF_FADE",
+    "value": "3",
+    "description": "Visual effect identifier used with Effect(). Value: 3",
+    "source": "export.lgc"
+  },
+  {
+    "name": "EFF_FADE_IN",
+    "value": "9",
+    "description": "Visual effect identifier used with Effect(). Value: 9",
+    "source": "export.lgc"
+  },
+  {
+    "name": "EFF_FADE_OUT",
+    "value": "10",
+    "description": "Visual effect identifier used with Effect(). Value: 10",
+    "source": "export.lgc"
+  },
+  {
+    "name": "EFF_LINESHIFT",
+    "value": "7",
+    "description": "Visual effect identifier used with Effect(). Value: 7",
+    "source": "export.lgc"
+  },
+  {
+    "name": "EFF_NONE",
+    "value": "0",
+    "description": "Visual effect identifier used with Effect(). Value: 0",
+    "source": "export.lgc"
+  },
+  {
+    "name": "EFF_NUKE",
+    "value": "1",
+    "description": "Visual effect identifier used with Effect(). Value: 1",
+    "source": "export.lgc"
+  },
+  {
+    "name": "EFF_OPEN_WINDOW",
+    "value": "4",
+    "description": "Visual effect identifier used with Effect(). Value: 4",
+    "source": "export.lgc"
+  },
+  {
+    "name": "EFF_PIXELAPPEAR",
+    "value": "6",
+    "description": "Visual effect identifier used with Effect(). Value: 6",
+    "source": "export.lgc"
+  },
+  {
+    "name": "EFF_SCALE_WINDOW",
+    "value": "8",
+    "description": "Visual effect identifier used with Effect(). Value: 8",
+    "source": "export.lgc"
+  },
+  {
+    "name": "EFF_SCROLL",
+    "value": "2",
+    "description": "Visual effect identifier used with Effect(). Value: 2",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ENV_BORN_RAIN",
+    "value": "0x0800",
+    "description": "Environment effect flag used with SetEnvironment(). Value: 0x0800",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ENV_BORN_SNOW",
+    "value": "0x8000",
+    "description": "Environment effect flag used with SetEnvironment(). Value: 0x8000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ENV_EARTHQUAKE",
+    "value": "4",
+    "description": "Environment effect flag used with SetEnvironment(). Value: 4",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ENV_FOG",
+    "value": "32",
+    "description": "Environment effect flag used with SetEnvironment(). Value: 32",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ENV_FOGAPPEAR",
+    "value": "0x0200",
+    "description": "Environment effect flag used with SetEnvironment(). Value: 0x0200",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ENV_FOGINV",
+    "value": "0x0100",
+    "description": "Environment effect flag used with SetEnvironment(). Value: 0x0100",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ENV_GROUND_SNOW",
+    "value": "64",
+    "description": "Environment effect flag used with SetEnvironment(). Value: 64",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ENV_LONGSHADOW",
+    "value": "2",
+    "description": "Environment effect flag used with SetEnvironment(). Value: 2",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ENV_MASK_RAIN",
+    "value": "0x0C00",
+    "description": "Environment effect flag used with SetEnvironment(). Value: 0x0C00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ENV_MASK_SNOW",
+    "value": "0xC000",
+    "description": "Environment effect flag used with SetEnvironment(). Value: 0xC000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ENV_RAIN",
+    "value": "0x0C00",
+    "description": "Environment effect flag used with SetEnvironment(). Value: 0x0C00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ENV_SHADOW",
+    "value": "1",
+    "description": "Environment effect flag used with SetEnvironment(). Value: 1",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ENV_SNOW",
+    "value": "0xC000",
+    "description": "Environment effect flag used with SetEnvironment(). Value: 0xC000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ENV_SQUALL",
+    "value": "128",
+    "description": "Environment effect flag used with SetEnvironment(). Value: 128",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ENV_STOP",
+    "value": "0x80000000",
+    "description": "Environment effect flag used with SetEnvironment(). Value: 0x80000000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ENV_STOPALL",
+    "value": "0xFFFFFFFF",
+    "description": "Environment effect flag used with SetEnvironment(). Value: 0xFFFFFFFF",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ENV_STOP_RAIN",
+    "value": "0x0400",
+    "description": "Environment effect flag used with SetEnvironment(). Value: 0x0400",
+    "source": "export.lgc"
+  },
+  {
+    "name": "ENV_STOP_SNOW",
+    "value": "0x4000",
+    "description": "Environment effect flag used with SetEnvironment(). Value: 0x4000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "GETSPRITE_ARMY0",
+    "value": "0x10000",
+    "description": "Sprite lookup filter flag used with GetSprite() and FindNearestSprite(). Value: 0x10000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "GETSPRITE_ARMY1",
+    "value": "0x20000",
+    "description": "Sprite lookup filter flag used with GetSprite() and FindNearestSprite(). Value: 0x20000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "GETSPRITE_ARMY2",
+    "value": "0x40000",
+    "description": "Sprite lookup filter flag used with GetSprite() and FindNearestSprite(). Value: 0x40000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "GETSPRITE_ARMY3",
+    "value": "0x80000",
+    "description": "Sprite lookup filter flag used with GetSprite() and FindNearestSprite(). Value: 0x80000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "GETSPRITE_AVIA",
+    "value": "0x800000",
+    "description": "Sprite lookup filter flag used with GetSprite() and FindNearestSprite(). Value: 0x800000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "GETSPRITE_CANNON",
+    "value": "0x20000000",
+    "description": "Sprite lookup filter flag used with GetSprite() and FindNearestSprite(). Value: 0x20000000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "GETSPRITE_CLASS",
+    "value": "0x1000",
+    "description": "Sprite lookup filter flag used with GetSprite() and FindNearestSprite(). Value: 0x1000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "GETSPRITE_FREE",
+    "value": "0x80000000",
+    "description": "Sprite lookup filter flag used with GetSprite() and FindNearestSprite(). Value: 0x80000000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "GETSPRITE_HASH",
+    "value": "0x8000",
+    "description": "Sprite lookup filter flag used with GetSprite() and FindNearestSprite(). Value: 0x8000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "GETSPRITE_MENU",
+    "value": "0x1000000",
+    "description": "Sprite lookup filter flag used with GetSprite() and FindNearestSprite(). Value: 0x1000000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "GETSPRITE_OBJECT",
+    "value": "0x200000",
+    "description": "Sprite lookup filter flag used with GetSprite() and FindNearestSprite(). Value: 0x200000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "GETSPRITE_RAILWAY",
+    "value": "0x2000000",
+    "description": "Sprite lookup filter flag used with GetSprite() and FindNearestSprite(). Value: 0x2000000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "GETSPRITE_REGION",
+    "value": "0x4000000",
+    "description": "Sprite lookup filter flag used with GetSprite() and FindNearestSprite(). Value: 0x4000000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "GETSPRITE_SPRITE",
+    "value": "0x40000000",
+    "description": "Sprite lookup filter flag used with GetSprite() and FindNearestSprite(). Value: 0x40000000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "GETSPRITE_TERRAIN",
+    "value": "0x100000",
+    "description": "Sprite lookup filter flag used with GetSprite() and FindNearestSprite(). Value: 0x100000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "GETSPRITE_UNIT",
+    "value": "0x400000",
+    "description": "Sprite lookup filter flag used with GetSprite() and FindNearestSprite(). Value: 0x400000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "GETSPRITE_VID",
+    "value": "0x800",
+    "description": "Sprite lookup filter flag used with GetSprite() and FindNearestSprite(). Value: 0x800",
+    "source": "export.lgc"
+  },
+  {
+    "name": "GetVid",
+    "value": "GetVidData",
+    "description": "Game-script constant exported by the Locoland engine. Value: GetVidData",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "INPUT_CTRL",
+    "value": "32",
+    "description": "Input-state bit flag. Value: 32",
+    "source": "export.lgc"
+  },
+  {
+    "name": "INPUT_DOWN",
+    "value": "512",
+    "description": "Input-state bit flag. Value: 512",
+    "source": "export.lgc"
+  },
+  {
+    "name": "INPUT_FIRST",
+    "value": "1024",
+    "description": "Input-state bit flag. Value: 1024",
+    "source": "export.lgc"
+  },
+  {
+    "name": "INPUT_LCLICK",
+    "value": "1",
+    "description": "Input-state bit flag. Value: 1",
+    "source": "export.lgc"
+  },
+  {
+    "name": "INPUT_LDOWN",
+    "value": "4",
+    "description": "Input-state bit flag. Value: 4",
+    "source": "export.lgc"
+  },
+  {
+    "name": "INPUT_LEFT",
+    "value": "64",
+    "description": "Input-state bit flag. Value: 64",
+    "source": "export.lgc"
+  },
+  {
+    "name": "INPUT_RCLICK",
+    "value": "2",
+    "description": "Input-state bit flag. Value: 2",
+    "source": "export.lgc"
+  },
+  {
+    "name": "INPUT_RDOWN",
+    "value": "8",
+    "description": "Input-state bit flag. Value: 8",
+    "source": "export.lgc"
+  },
+  {
+    "name": "INPUT_RIGHT",
+    "value": "128",
+    "description": "Input-state bit flag. Value: 128",
+    "source": "export.lgc"
+  },
+  {
+    "name": "INPUT_SECOND",
+    "value": "2048",
+    "description": "Input-state bit flag. Value: 2048",
+    "source": "export.lgc"
+  },
+  {
+    "name": "INPUT_SHIFT",
+    "value": "16",
+    "description": "Input-state bit flag. Value: 16",
+    "source": "export.lgc"
+  },
+  {
+    "name": "INPUT_UP",
+    "value": "256",
+    "description": "Input-state bit flag. Value: 256",
+    "source": "export.lgc"
+  },
+  {
+    "name": "NET_CLEARKILL",
+    "value": "9",
+    "description": "Network information selector used with GetNetInfo(). Value: 9",
+    "source": "export.lgc"
+  },
+  {
+    "name": "NET_KILLPLAYER",
+    "value": "10",
+    "description": "Network information selector used with GetNetInfo(). Value: 10",
+    "source": "export.lgc"
+  },
+  {
+    "name": "NET_NAMEPLAYER",
+    "value": "2",
+    "description": "Network information selector used with GetNetInfo(). Value: 2",
+    "source": "export.lgc"
+  },
+  {
+    "name": "NET_NOPLAYER",
+    "value": "6",
+    "description": "Network information selector used with GetNetInfo(). Value: 6",
+    "source": "export.lgc"
+  },
+  {
+    "name": "NET_NUMPLAYER",
+    "value": "1",
+    "description": "Network information selector used with GetNetInfo(). Value: 1",
+    "source": "export.lgc"
+  },
+  {
+    "name": "PROP_ACCELERATE",
+    "value": "6",
+    "description": "Train property selector used with TrainProperty(). Value: 6",
+    "source": "export.lgc"
+  },
+  {
+    "name": "PROP_AMMO",
+    "value": "5",
+    "description": "Train property selector used with TrainProperty(). Value: 5",
+    "source": "export.lgc"
+  },
+  {
+    "name": "PROP_AMMO_MAX",
+    "value": "11",
+    "description": "Train property selector used with TrainProperty(). Value: 11",
+    "source": "export.lgc"
+  },
+  {
+    "name": "PROP_AMMO_NO",
+    "value": "10",
+    "description": "Train property selector used with TrainProperty(). Value: 10",
+    "source": "export.lgc"
+  },
+  {
+    "name": "PROP_BUILD_TIME",
+    "value": "7",
+    "description": "Train property selector used with TrainProperty(). Value: 7",
+    "source": "export.lgc"
+  },
+  {
+    "name": "PROP_FREE",
+    "value": "9",
+    "description": "Train property selector used with TrainProperty(). Value: 9",
+    "source": "export.lgc"
+  },
+  {
+    "name": "PROP_HP",
+    "value": "4",
+    "description": "Train property selector used with TrainProperty(). Value: 4",
+    "source": "export.lgc"
+  },
+  {
+    "name": "PROP_LIFE",
+    "value": "3",
+    "description": "Train property selector used with TrainProperty(). Value: 3",
+    "source": "export.lgc"
+  },
+  {
+    "name": "PROP_SPEED",
+    "value": "1",
+    "description": "Train property selector used with TrainProperty(). Value: 1",
+    "source": "export.lgc"
+  },
+  {
+    "name": "PROP_WEAPON",
+    "value": "2",
+    "description": "Train property selector used with TrainProperty(). Value: 2",
+    "source": "export.lgc"
+  },
+  {
+    "name": "SCROLL_FLAGMAN_IN_CENTER",
+    "value": "16",
+    "description": "Map viewport scrolling mode flag. Value: 16",
+    "source": "export.lgc"
+  },
+  {
+    "name": "SCROLL_FROM_BORDER",
+    "value": "1",
+    "description": "Map viewport scrolling mode flag. Value: 1",
+    "source": "export.lgc"
+  },
+  {
+    "name": "SCROLL_NONE",
+    "value": "0",
+    "description": "Map viewport scrolling mode flag. Value: 0",
+    "source": "export.lgc"
+  },
+  {
+    "name": "SCROLL_TO_FLAGMAN",
+    "value": "4",
+    "description": "Map viewport scrolling mode flag. Value: 4",
+    "source": "export.lgc"
+  },
+  {
+    "name": "SCROLL_TO_FLAGMAN_WITH_DIRECTION",
+    "value": "8",
+    "description": "Map viewport scrolling mode flag. Value: 8",
+    "source": "export.lgc"
+  },
+  {
+    "name": "SCROLL_WITH_ARROWS",
+    "value": "32",
+    "description": "Map viewport scrolling mode flag. Value: 32",
+    "source": "export.lgc"
+  },
+  {
+    "name": "SCROLL_WITH_MOUSE",
+    "value": "2",
+    "description": "Map viewport scrolling mode flag. Value: 2",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_ACTIVE_FORT_GUN",
+    "value": "13",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 13",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_AGRESSIVE_TRAIN",
+    "value": "7",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 7",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_ALL_GUN_POWER",
+    "value": "20",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 20",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_ANTIAVIA_GUN_POWER",
+    "value": "18",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 18",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_ANTI_AVIA",
+    "value": "5",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 5",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_AVIA",
+    "value": "3",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 3",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_AVIA_GUN_POWER",
+    "value": "17",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 17",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_BATTLE_TRAIN",
+    "value": "6",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 6",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_DAMAGED_FORT_GUN",
+    "value": "14",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 14",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_DAMAGED_UNITS",
+    "value": "21",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 21",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_ENGINE_GUN_POWER",
+    "value": "16",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 16",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_FREE_DEPO",
+    "value": "12",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 12",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_GROUND_GUN_POWER",
+    "value": "19",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 19",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_LIFE",
+    "value": "15",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 15",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_MOBILE_TRAIN",
+    "value": "2",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 2",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_PASSIVE_TRAIN",
+    "value": "10",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 10",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_PATROL_TRAIN",
+    "value": "9",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 9",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_SUPER_WEAPON",
+    "value": "4",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 4",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_TRAIN",
+    "value": "1",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 1",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_VERYDANGER_TRAIN",
+    "value": "8",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 8",
+    "source": "export.lgc"
+  },
+  {
+    "name": "STAT_WORKING_DEPO",
+    "value": "11",
+    "description": "Statistic selector used with GetStatistics() and CalcStatistics(). Value: 11",
+    "source": "export.lgc"
+  },
+  {
+    "name": "SetVid",
+    "value": "SetVidData",
+    "description": "Game-script constant exported by the Locoland engine. Value: SetVidData",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "U_AVIA",
+    "value": "8",
+    "description": "Sprite type bit flag. Value: 8",
+    "source": "export.lgc"
+  },
+  {
+    "name": "U_CANNON",
+    "value": "512",
+    "description": "Sprite type bit flag. Value: 512",
+    "source": "export.lgc"
+  },
+  {
+    "name": "U_MENU",
+    "value": "16",
+    "description": "Sprite type bit flag. Value: 16",
+    "source": "export.lgc"
+  },
+  {
+    "name": "U_OBJECT",
+    "value": "2",
+    "description": "Sprite type bit flag. Value: 2",
+    "source": "export.lgc"
+  },
+  {
+    "name": "U_RAILWAY",
+    "value": "32",
+    "description": "Sprite type bit flag. Value: 32",
+    "source": "export.lgc"
+  },
+  {
+    "name": "U_REGION",
+    "value": "64",
+    "description": "Sprite type bit flag. Value: 64",
+    "source": "export.lgc"
+  },
+  {
+    "name": "U_SPRITE",
+    "value": "1024",
+    "description": "Sprite type bit flag. Value: 1024",
+    "source": "export.lgc"
+  },
+  {
+    "name": "U_TACTIC",
+    "value": "128",
+    "description": "Sprite type bit flag. Value: 128",
+    "source": "export.lgc"
+  },
+  {
+    "name": "U_TERRAIN",
+    "value": "1",
+    "description": "Sprite type bit flag. Value: 1",
+    "source": "export.lgc"
+  },
+  {
+    "name": "U_UNIT",
+    "value": "4",
+    "description": "Sprite type bit flag. Value: 4",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_AMMO",
+    "value": "26",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 26",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_BATTLERANGE",
+    "value": "23",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 23",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_BEHAVE",
+    "value": "47",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 47",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "VID_BUILDTIME",
+    "value": "55",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 55",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_CHILD",
+    "value": "60",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 60",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_CLASS",
+    "value": "47",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 47",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_COUNT",
+    "value": "28",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 28",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_COUNT0",
+    "value": "34",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 34",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_COUNT1",
+    "value": "35",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 35",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_COUNT2",
+    "value": "36",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 36",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_COUNT3",
+    "value": "37",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 37",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_DAMAGE",
+    "value": "124",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 124",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_DETECTRANGE",
+    "value": "50",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 50",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_EXCHANGEVID",
+    "value": "52",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 52",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_FRAME_SPEED",
+    "value": "58",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 58",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_GAMMA",
+    "value": "18",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 18",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_HIDE",
+    "value": "56",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 56",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_HP_COEFF0",
+    "value": "42",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 42",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_HP_COEFF1",
+    "value": "43",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 43",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_HP_COEFF2",
+    "value": "44",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 44",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_HP_COEFF3",
+    "value": "45",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 45",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_KILLEDUNIT",
+    "value": "29",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 29",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_KILLEDUNIT0",
+    "value": "30",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 30",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_KILLEDUNIT1",
+    "value": "31",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 31",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_KILLEDUNIT2",
+    "value": "32",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 32",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_KILLEDUNIT3",
+    "value": "33",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 33",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_LIFETIME",
+    "value": "49",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 49",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_LINK",
+    "value": "59",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 59",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_MAXHP",
+    "value": "1",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 1",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_MAXHP0",
+    "value": "38",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 38",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_MAXHP1",
+    "value": "39",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 39",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_MAXHP2",
+    "value": "40",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 40",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_MAXHP3",
+    "value": "41",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 41",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_MAXUNIT",
+    "value": "25",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 25",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_MOVE_MASK",
+    "value": "54",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 54",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_NAME",
+    "value": "27",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 27",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_NOT_CREATE_AS_CHILD",
+    "value": "57",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 57",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_NO_CHILD",
+    "value": "92",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 92",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_NO_DIR",
+    "value": "53",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 53",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_PROPERTY",
+    "value": "22",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 22",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_RECOLORUNIT",
+    "value": "125",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 125",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_RECOLORUNIT0",
+    "value": "126",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 126",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_RECOLORUNIT1",
+    "value": "127",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 127",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_RECOLORUNIT2",
+    "value": "128",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 128",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_RECOLORUNIT3",
+    "value": "129",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 129",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_SPEED",
+    "value": "48",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 48",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_SPRITETYPE",
+    "value": "46",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 46",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VID_TYPEUNIT",
+    "value": "46",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 46",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "VID_WEAPONAIM",
+    "value": "51",
+    "description": "Game object property identifier used with GetVidData() and SetVidData(). Value: 51",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_ADD",
+    "value": "0x6B00",
+    "description": "Virtual key or mouse-button code. Value: 0x6B00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_BACK",
+    "value": "0x08",
+    "description": "Virtual key or mouse-button code. Value: 0x08",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_CANCEL",
+    "value": "0x03",
+    "description": "Virtual key or mouse-button code. Value: 0x03",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_CLEAR",
+    "value": "0x0C",
+    "description": "Virtual key or mouse-button code. Value: 0x0C",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_DECIMAL",
+    "value": "0x6E00",
+    "description": "Virtual key or mouse-button code. Value: 0x6E00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_DELETE",
+    "value": "0x2E00",
+    "description": "Virtual key or mouse-button code. Value: 0x2E00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_DIVIDE",
+    "value": "0x6F00",
+    "description": "Virtual key or mouse-button code. Value: 0x6F00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_DOWN",
+    "value": "0x2800",
+    "description": "Virtual key or mouse-button code. Value: 0x2800",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_END",
+    "value": "0x2300",
+    "description": "Virtual key or mouse-button code. Value: 0x2300",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_ESCAPE",
+    "value": "0x1B",
+    "description": "Virtual key or mouse-button code. Value: 0x1B",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_EXECUTE",
+    "value": "0x2B00",
+    "description": "Virtual key or mouse-button code. Value: 0x2B00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F1",
+    "value": "0x7000",
+    "description": "Virtual key or mouse-button code. Value: 0x7000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F10",
+    "value": "0x7900",
+    "description": "Virtual key or mouse-button code. Value: 0x7900",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F11",
+    "value": "0x7A00",
+    "description": "Virtual key or mouse-button code. Value: 0x7A00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F12",
+    "value": "0x7B00",
+    "description": "Virtual key or mouse-button code. Value: 0x7B00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F13",
+    "value": "0x7C00",
+    "description": "Virtual key or mouse-button code. Value: 0x7C00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F14",
+    "value": "0x7D00",
+    "description": "Virtual key or mouse-button code. Value: 0x7D00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F15",
+    "value": "0x7E00",
+    "description": "Virtual key or mouse-button code. Value: 0x7E00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F16",
+    "value": "0x7F00",
+    "description": "Virtual key or mouse-button code. Value: 0x7F00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F17",
+    "value": "0x8000",
+    "description": "Virtual key or mouse-button code. Value: 0x8000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F18",
+    "value": "0x8100",
+    "description": "Virtual key or mouse-button code. Value: 0x8100",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F19",
+    "value": "0x8200",
+    "description": "Virtual key or mouse-button code. Value: 0x8200",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F2",
+    "value": "0x7100",
+    "description": "Virtual key or mouse-button code. Value: 0x7100",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F20",
+    "value": "0x8300",
+    "description": "Virtual key or mouse-button code. Value: 0x8300",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F21",
+    "value": "0x8400",
+    "description": "Virtual key or mouse-button code. Value: 0x8400",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F22",
+    "value": "0x8500",
+    "description": "Virtual key or mouse-button code. Value: 0x8500",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F23",
+    "value": "0x8600",
+    "description": "Virtual key or mouse-button code. Value: 0x8600",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F24",
+    "value": "0x8700",
+    "description": "Virtual key or mouse-button code. Value: 0x8700",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F3",
+    "value": "0x7200",
+    "description": "Virtual key or mouse-button code. Value: 0x7200",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F4",
+    "value": "0x7300",
+    "description": "Virtual key or mouse-button code. Value: 0x7300",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F5",
+    "value": "0x7400",
+    "description": "Virtual key or mouse-button code. Value: 0x7400",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F6",
+    "value": "0x7500",
+    "description": "Virtual key or mouse-button code. Value: 0x7500",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F7",
+    "value": "0x7600",
+    "description": "Virtual key or mouse-button code. Value: 0x7600",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F8",
+    "value": "0x7700",
+    "description": "Virtual key or mouse-button code. Value: 0x7700",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_F9",
+    "value": "0x7800",
+    "description": "Virtual key or mouse-button code. Value: 0x7800",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_HELP",
+    "value": "0x2F00",
+    "description": "Virtual key or mouse-button code. Value: 0x2F00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_HOME",
+    "value": "0x2400",
+    "description": "Virtual key or mouse-button code. Value: 0x2400",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_INSERT",
+    "value": "0x2D00",
+    "description": "Virtual key or mouse-button code. Value: 0x2D00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_LBUTTON",
+    "value": "0x01",
+    "description": "Virtual key or mouse-button code. Value: 0x01",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_LEFT",
+    "value": "0x2500",
+    "description": "Virtual key or mouse-button code. Value: 0x2500",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_MBUTTON",
+    "value": "0x04",
+    "description": "Virtual key or mouse-button code. Value: 0x04",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_MULTIPLY",
+    "value": "0x6A00",
+    "description": "Virtual key or mouse-button code. Value: 0x6A00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_NEXT",
+    "value": "0x2200",
+    "description": "Virtual key or mouse-button code. Value: 0x2200",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_NUMLOCK",
+    "value": "0x90",
+    "description": "Virtual key or mouse-button code. Value: 0x90",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_NUMPAD0",
+    "value": "0x6000",
+    "description": "Virtual key or mouse-button code. Value: 0x6000",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_NUMPAD1",
+    "value": "0x6100",
+    "description": "Virtual key or mouse-button code. Value: 0x6100",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_NUMPAD2",
+    "value": "0x6200",
+    "description": "Virtual key or mouse-button code. Value: 0x6200",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_NUMPAD3",
+    "value": "0x6300",
+    "description": "Virtual key or mouse-button code. Value: 0x6300",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_NUMPAD4",
+    "value": "0x6400",
+    "description": "Virtual key or mouse-button code. Value: 0x6400",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_NUMPAD5",
+    "value": "0x6500",
+    "description": "Virtual key or mouse-button code. Value: 0x6500",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_NUMPAD6",
+    "value": "0x6600",
+    "description": "Virtual key or mouse-button code. Value: 0x6600",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_NUMPAD7",
+    "value": "0x6700",
+    "description": "Virtual key or mouse-button code. Value: 0x6700",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_NUMPAD8",
+    "value": "0x6800",
+    "description": "Virtual key or mouse-button code. Value: 0x6800",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_NUMPAD9",
+    "value": "0x6900",
+    "description": "Virtual key or mouse-button code. Value: 0x6900",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_PRINT",
+    "value": "0x2A00",
+    "description": "Virtual key or mouse-button code. Value: 0x2A00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_PRIOR",
+    "value": "0x2100",
+    "description": "Virtual key or mouse-button code. Value: 0x2100",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_RBUTTON",
+    "value": "0x02",
+    "description": "Virtual key or mouse-button code. Value: 0x02",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_RETURN",
+    "value": "0x0D",
+    "description": "Virtual key or mouse-button code. Value: 0x0D",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_RIGHT",
+    "value": "0x2700",
+    "description": "Virtual key or mouse-button code. Value: 0x2700",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_SCROLL",
+    "value": "0x91",
+    "description": "Virtual key or mouse-button code. Value: 0x91",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_SELECT",
+    "value": "0x2900",
+    "description": "Virtual key or mouse-button code. Value: 0x2900",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_SEPARATOR",
+    "value": "0x6C00",
+    "description": "Virtual key or mouse-button code. Value: 0x6C00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_SNAPSHOT",
+    "value": "0x2C00",
+    "description": "Virtual key or mouse-button code. Value: 0x2C00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_SPACE",
+    "value": "0x20",
+    "description": "Virtual key or mouse-button code. Value: 0x20",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_SUBTRACT",
+    "value": "0x6D00",
+    "description": "Virtual key or mouse-button code. Value: 0x6D00",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_TAB",
+    "value": "0x09",
+    "description": "Virtual key or mouse-button code. Value: 0x09",
+    "source": "export.lgc"
+  },
+  {
+    "name": "VK_UP",
+    "value": "0x2600",
+    "description": "Virtual key or mouse-button code. Value: 0x2600",
+    "source": "export.lgc"
+  },
+  {
+    "name": "act_addammo",
+    "value": "93",
+    "description": "Game-script constant exported by the Locoland engine. Value: 93",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_attack",
+    "value": "32",
+    "description": "Game-script constant exported by the Locoland engine. Value: 32",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_buildunit",
+    "value": "35",
+    "description": "Game-script constant exported by the Locoland engine. Value: 35",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_changeaction",
+    "value": "201",
+    "description": "Game-script constant exported by the Locoland engine. Value: 201",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_changecoor",
+    "value": "203",
+    "description": "Game-script constant exported by the Locoland engine. Value: 203",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_changecoor_z",
+    "value": "204",
+    "description": "Game-script constant exported by the Locoland engine. Value: 204",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_clash_engine",
+    "value": "151",
+    "description": "Game-script constant exported by the Locoland engine. Value: 151",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_clearstack",
+    "value": "72",
+    "description": "Game-script constant exported by the Locoland engine. Value: 72",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_close",
+    "value": "7",
+    "description": "Game-script constant exported by the Locoland engine. Value: 7",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_cycleaction",
+    "value": "71",
+    "description": "Game-script constant exported by the Locoland engine. Value: 71",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_damage",
+    "value": "85",
+    "description": "Game-script constant exported by the Locoland engine. Value: 85",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_death",
+    "value": "15",
+    "description": "Game-script constant exported by the Locoland engine. Value: 15",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_firstengine",
+    "value": "154",
+    "description": "Game-script constant exported by the Locoland engine. Value: 154",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_forcelinkengine",
+    "value": "152",
+    "description": "Game-script constant exported by the Locoland engine. Value: 152",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_getaction",
+    "value": "202",
+    "description": "Game-script constant exported by the Locoland engine. Value: 202",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_getammo",
+    "value": "92",
+    "description": "Game-script constant exported by the Locoland engine. Value: 92",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_getarmy",
+    "value": "96",
+    "description": "Game-script constant exported by the Locoland engine. Value: 96",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_getbehave",
+    "value": "94",
+    "description": "Game-script constant exported by the Locoland engine. Value: 94",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_gethp",
+    "value": "87",
+    "description": "Game-script constant exported by the Locoland engine. Value: 87",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_getlink",
+    "value": "101",
+    "description": "Game-script constant exported by the Locoland engine. Value: 101",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_getpercenthp",
+    "value": "89",
+    "description": "Game-script constant exported by the Locoland engine. Value: 89",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_getstate",
+    "value": "255",
+    "description": "Game-script constant exported by the Locoland engine. Value: 255",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_getuplink",
+    "value": "103",
+    "description": "Game-script constant exported by the Locoland engine. Value: 103",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_getweaponrange",
+    "value": "100",
+    "description": "Game-script constant exported by the Locoland engine. Value: 100",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_intrain",
+    "value": "158",
+    "description": "Game-script constant exported by the Locoland engine. Value: 158",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_lastengine",
+    "value": "155",
+    "description": "Game-script constant exported by the Locoland engine. Value: 155",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_linkengine",
+    "value": "150",
+    "description": "Game-script constant exported by the Locoland engine. Value: 150",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_menudisable",
+    "value": "6",
+    "description": "Game-script constant exported by the Locoland engine. Value: 6",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_menustanddown",
+    "value": "0",
+    "description": "Game-script constant exported by the Locoland engine. Value: 0",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_menustandup",
+    "value": "1",
+    "description": "Game-script constant exported by the Locoland engine. Value: 1",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_move",
+    "value": "33",
+    "description": "Game-script constant exported by the Locoland engine. Value: 33",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_nextengine",
+    "value": "156",
+    "description": "Game-script constant exported by the Locoland engine. Value: 156",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_open",
+    "value": "6",
+    "description": "Game-script constant exported by the Locoland engine. Value: 6",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_repair",
+    "value": "86",
+    "description": "Game-script constant exported by the Locoland engine. Value: 86",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_restore",
+    "value": "200",
+    "description": "Game-script constant exported by the Locoland engine. Value: 200",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_salut",
+    "value": "9",
+    "description": "Game-script constant exported by the Locoland engine. Value: 9",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_setarmy",
+    "value": "97",
+    "description": "Game-script constant exported by the Locoland engine. Value: 97",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_setbehave",
+    "value": "95",
+    "description": "Game-script constant exported by the Locoland engine. Value: 95",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_setstate",
+    "value": "255",
+    "description": "Game-script constant exported by the Locoland engine. Value: 255",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_stand",
+    "value": "0",
+    "description": "Game-script constant exported by the Locoland engine. Value: 0",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_stand_open",
+    "value": "10",
+    "description": "Game-script constant exported by the Locoland engine. Value: 10",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_stop",
+    "value": "39",
+    "description": "Game-script constant exported by the Locoland engine. Value: 39",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "act_train_behave",
+    "value": "153",
+    "description": "Game-script constant exported by the Locoland engine. Value: 153",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "b_engine",
+    "value": "21",
+    "description": "Game-script constant exported by the Locoland engine. Value: 21",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "beh_active",
+    "value": "2",
+    "description": "Game-script constant exported by the Locoland engine. Value: 2",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "beh_aggressive",
+    "value": "1",
+    "description": "Game-script constant exported by the Locoland engine. Value: 1",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "eff_alphaappear",
+    "value": "5",
+    "description": "Game-script constant exported by the Locoland engine. Value: 5",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "eff_fade",
+    "value": "3",
+    "description": "Game-script constant exported by the Locoland engine. Value: 3",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "eff_lineshift",
+    "value": "7",
+    "description": "Game-script constant exported by the Locoland engine. Value: 7",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "eff_none",
+    "value": "0",
+    "description": "Game-script constant exported by the Locoland engine. Value: 0",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "eff_nuke",
+    "value": "1",
+    "description": "Game-script constant exported by the Locoland engine. Value: 1",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "eff_openwindow",
+    "value": "4",
+    "description": "Game-script constant exported by the Locoland engine. Value: 4",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "eff_pixelappear",
+    "value": "6",
+    "description": "Game-script constant exported by the Locoland engine. Value: 6",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "eff_scroll",
+    "value": "2",
+    "description": "Game-script constant exported by the Locoland engine. Value: 2",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "sprintf",
+    "value": "Printf",
+    "description": "Game-script constant exported by the Locoland engine. Value: Printf",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "u_avia",
+    "value": "8",
+    "description": "Game-script constant exported by the Locoland engine. Value: 8",
+    "source": "obsolete.lgc"
+  },
+  {
+    "name": "u_monster",
+    "value": "4",
+    "description": "Game-script constant exported by the Locoland engine. Value: 4",
+    "source": "obsolete.lgc"
+  }
+]

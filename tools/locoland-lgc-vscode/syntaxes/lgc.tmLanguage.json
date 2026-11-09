@@ -1,0 +1,177 @@
+{
+  "scopeName": "source.lgc",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#preprocessor"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#control"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#functions"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#punctuation"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.lgc",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.lgc",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "preprocessor": {
+      "patterns": [
+        {
+          "name": "meta.preprocessor.lgc",
+          "begin": "^\\s*(#)\\s*(include|define|undef|ifdef|ifndef|if|elif|else|endif|pragma)\\b",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.directive.lgc"
+            },
+            "2": {
+              "name": "keyword.control.directive.lgc"
+            }
+          },
+          "end": "$",
+          "patterns": [
+            {
+              "include": "#strings"
+            },
+            {
+              "include": "#comments"
+            },
+            {
+              "name": "entity.name.constant.preprocessor.lgc",
+              "match": "\\b[A-Za-z_]\\w*\\b"
+            }
+          ]
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.lgc",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.lgc",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.lgc",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.lgc",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.lgc",
+          "match": "\\b0[xX][0-9A-Fa-f]+\\b"
+        },
+        {
+          "name": "constant.numeric.lgc",
+          "match": "\\b\\d+(?:\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "storage.type.lgc",
+          "match": "\\b(?:int|string|char|void)\\b"
+        },
+        {
+          "name": "storage.modifier.lgc",
+          "match": "\\b(?:static|extern|const|signed|unsigned)\\b"
+        }
+      ]
+    },
+    "control": {
+      "patterns": [
+        {
+          "name": "keyword.control.lgc",
+          "match": "\\b(?:if|iff|else|while|for|do|switch|case|default|break|continue|return|goto)\\b"
+        },
+        {
+          "name": "constant.language.lgc",
+          "match": "\\b(?:true|false|null|NULL)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.other.lgc",
+          "match": "\\b[A-Z][A-Z0-9_]{2,}\\b"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.lgc",
+          "match": "\\b[A-Za-z_]\\w*(?=\\s*\\()"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.lgc",
+          "match": "(?:==|!=|<=|>=|\\+\\+|--|&&|\\|\\||<<|>>|\\+=|-=|\\*=|/=|%=|->|[+\\-*/%=<>!&|^~?:])"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.separator.lgc",
+          "match": "[,;.]"
+        },
+        {
+          "name": "punctuation.section.lgc",
+          "match": "[{}()\\[\\]]"
+        }
+      ]
+    }
+  }
+}

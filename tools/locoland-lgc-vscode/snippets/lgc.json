@@ -1,0 +1,99 @@
+{
+  "function": {
+    "prefix": "function",
+    "body": [
+      "${1:int} ${2:FunctionName}(${3:int value})",
+      "{",
+      "    ${0}",
+      "}"
+    ],
+    "description": "Declare an LGC function."
+  },
+  "if": {
+    "prefix": "if",
+    "body": [
+      "if (${1:condition})",
+      "{",
+      "    ${0}",
+      "}"
+    ],
+    "description": "Conditional block."
+  },
+  "ifelse": {
+    "prefix": "ifelse",
+    "body": [
+      "if (${1:condition})",
+      "{",
+      "    ${2}",
+      "}",
+      "else",
+      "{",
+      "    ${0}",
+      "}"
+    ],
+    "description": "Conditional with an else block."
+  },
+  "for": {
+    "prefix": "for",
+    "body": [
+      "for (int ${1:i} = 0; ${1:i} < ${2:count}; ${1:i}++)",
+      "{",
+      "    ${0}",
+      "}"
+    ],
+    "description": "Counted loop."
+  },
+  "while": {
+    "prefix": "while",
+    "body": [
+      "while (${1:condition})",
+      "{",
+      "    ${0}",
+      "}"
+    ],
+    "description": "While loop."
+  },
+  "unit-iteration": {
+    "prefix": "units",
+    "body": [
+      "int ${1:unit};",
+      "for (${1:unit} = FirstUnit(U_UNIT); ${1:unit}; ${1:unit} = NextUnit())",
+      "{",
+      "    ${0}",
+      "}"
+    ],
+    "description": "Iterate over units."
+  },
+  "train-iteration": {
+    "prefix": "trains",
+    "body": [
+      "int ${1:train};",
+      "for (${1:train} = FirstTrain(${2:army}); ${1:train}; ${1:train} = NextTrain())",
+      "{",
+      "    ${0}",
+      "}"
+    ],
+    "description": "Iterate over trains belonging to an army."
+  },
+  "action": {
+    "prefix": "action",
+    "body": [
+      "Action(${1:unit}, ${2:ACT_MOVE}, ${3:x}, ${4:y});"
+    ],
+    "description": "Execute an action on a unit."
+  },
+  "add-command": {
+    "prefix": "addcommand",
+    "body": [
+      "AddCommand(${1:unit}, ${2:ACT_MOVE}, ${3:x}, ${4:y});"
+    ],
+    "description": "Append an action to a unit command queue."
+  },
+  "include": {
+    "prefix": "include",
+    "body": [
+      "#include \"${1:maps\\\\script\\\\export.lgc}\""
+    ],
+    "description": "Include another LGC script."
+  }
+}

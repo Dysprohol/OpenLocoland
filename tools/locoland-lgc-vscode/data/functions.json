@@ -1,0 +1,4417 @@
+[
+  {
+    "name": "CreateSprite",
+    "params": [
+      {
+        "name": "nvid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "z",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "dir",
+        "type": "int",
+        "optional": true,
+        "default": "0"
+      },
+      {
+        "name": "parent",
+        "type": "int",
+        "optional": true,
+        "default": "0"
+      }
+    ],
+    "signature": "CreateSprite(int nvid, int x, int y, int z, int dir = 0, int parent = 0)",
+    "returnType": "int",
+    "description": "Creates a sprite instance from a game object VID at world coordinates. Returns the new sprite handle. Optional direction and parent handle default to zero.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 65
+  },
+  {
+    "name": "Flagman",
+    "params": [
+      {
+        "name": "army",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "Flagman(int army)",
+    "returnType": "int",
+    "description": "Returns the currently controlled unit for the requested army.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 66
+  },
+  {
+    "name": "FirstUnit",
+    "params": [
+      {
+        "name": "typeunit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "FirstUnit(int typeunit)",
+    "returnType": "int",
+    "description": "Starts iteration over units matching the supplied sprite-type mask. Pair with NextUnit().",
+    "category": "Sprite iteration and lookup",
+    "source": "export.lgc",
+    "id": 68
+  },
+  {
+    "name": "NextUnit",
+    "params": [],
+    "signature": "NextUnit()",
+    "returnType": "int",
+    "description": "Advances the active unit iterator and returns the next matching unit handle, or zero when iteration ends.",
+    "category": "Sprite iteration and lookup",
+    "source": "export.lgc",
+    "id": 69
+  },
+  {
+    "name": "GetSprite",
+    "params": [
+      {
+        "name": "type",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetSprite(int type, int x, int y)",
+    "returnType": "int",
+    "description": "Finds a sprite intersecting the supplied world coordinates and matching a GETSPRITE_* filter.",
+    "category": "Sprite iteration and lookup",
+    "source": "export.lgc",
+    "id": 70
+  },
+  {
+    "name": "GetSpriteScr",
+    "params": [
+      {
+        "name": "type",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "scr_x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "scr_y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetSpriteScr(int type, int scr_x, int scr_y)",
+    "returnType": "int",
+    "description": "Finds a sprite intersecting screen coordinates and matching a GETSPRITE_* filter.",
+    "category": "Sprite iteration and lookup",
+    "source": "export.lgc",
+    "id": 71
+  },
+  {
+    "name": "FindNearestSprite",
+    "params": [
+      {
+        "name": "type",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "radius",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "FindNearestSprite(int type, int x, int y, int radius)",
+    "returnType": "int",
+    "description": "Finds the nearest sprite matching a GETSPRITE_* filter within the given world-space radius. Returns zero when none is found.",
+    "category": "Sprite iteration and lookup",
+    "source": "export.lgc",
+    "id": 72
+  },
+  {
+    "name": "FirstInBox",
+    "params": [
+      {
+        "name": "left",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "top",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "right",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "bottom",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "FirstInBox(int left, int top, int right, int bottom)",
+    "returnType": "int",
+    "description": "Starts iteration over map objects inside a world-coordinate rectangle. Pair with NextInBox().",
+    "category": "Sprite iteration and lookup",
+    "source": "export.lgc",
+    "id": 74
+  },
+  {
+    "name": "NextInBox",
+    "params": [],
+    "signature": "NextInBox()",
+    "returnType": "int",
+    "description": "Advances the rectangle iterator and returns the next matching object handle.",
+    "category": "Sprite iteration and lookup",
+    "source": "export.lgc",
+    "id": 75
+  },
+  {
+    "name": "FirstSprite",
+    "params": [],
+    "signature": "FirstSprite()",
+    "returnType": "int",
+    "description": "Starts a full-map sprite iteration. This can be very slow on busy maps; prefer FirstUnit() or FirstInBox() when possible.",
+    "category": "Sprite iteration and lookup",
+    "source": "export.lgc",
+    "id": 76
+  },
+  {
+    "name": "NextSprite",
+    "params": [],
+    "signature": "NextSprite()",
+    "returnType": "int",
+    "description": "Advances the full-map sprite iterator started by FirstSprite().",
+    "category": "Sprite iteration and lookup",
+    "source": "export.lgc",
+    "id": 77
+  },
+  {
+    "name": "Action",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "act",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "var1",
+        "type": "int",
+        "optional": true,
+        "default": "0"
+      },
+      {
+        "name": "var2",
+        "type": "int",
+        "optional": true,
+        "default": "0"
+      },
+      {
+        "name": "var3",
+        "type": "int",
+        "optional": true,
+        "default": "0"
+      }
+    ],
+    "signature": "Action(int unit, int act, int var1 = 0, int var2 = 0, int var3 = 0)",
+    "returnType": "int",
+    "description": "Executes an ACT_* operation on a unit. The meaning of var1, var2 and var3 depends on the selected action. Returns the action-specific result.",
+    "category": "Unit and action API",
+    "source": "export.lgc",
+    "id": 79
+  },
+  {
+    "name": "SizeTo",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SizeTo(int unit, int x, int y)",
+    "returnType": "int",
+    "description": "Returns the distance from a unit to a world-coordinate point.",
+    "category": "Unit and action API",
+    "source": "export.lgc",
+    "id": 80
+  },
+  {
+    "name": "ReCalcGridZ",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "ReCalcGridZ(int unit)",
+    "returnType": "void",
+    "description": "Recalculates the unit's Z grid using its current dimensions.",
+    "category": "Unit and action API",
+    "source": "export.lgc",
+    "id": 81
+  },
+  {
+    "name": "AddCommand",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "act",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "var1",
+        "type": "int",
+        "optional": true,
+        "default": "0"
+      },
+      {
+        "name": "var2",
+        "type": "int",
+        "optional": true,
+        "default": "0"
+      },
+      {
+        "name": "var3",
+        "type": "int",
+        "optional": true,
+        "default": "0"
+      }
+    ],
+    "signature": "AddCommand(int unit, int act, int var1 = 0, int var2 = 0, int var3 = 0)",
+    "returnType": "void",
+    "description": "Appends an action to a unit's command queue. Arguments are interpreted according to the selected ACT_* operation.",
+    "category": "Unit and action API",
+    "source": "export.lgc",
+    "id": 82
+  },
+  {
+    "name": "GetUnitVid",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetUnitVid(int unit)",
+    "returnType": "int",
+    "description": "Returns the game object VID associated with a sprite handle.",
+    "category": "Unit and action API",
+    "source": "export.lgc",
+    "id": 83
+  },
+  {
+    "name": "Destroy",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "Destroy(int unit)",
+    "returnType": "void",
+    "description": "Destroys the sprite identified by its handle.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 84
+  },
+  {
+    "name": "GetX",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetX(int unit)",
+    "returnType": "int",
+    "description": "Returns a unit's world X coordinate.",
+    "category": "Unit and action API",
+    "source": "export.lgc",
+    "id": 85
+  },
+  {
+    "name": "GetY",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetY(int unit)",
+    "returnType": "int",
+    "description": "Returns a unit's world Y coordinate.",
+    "category": "Unit and action API",
+    "source": "export.lgc",
+    "id": 86
+  },
+  {
+    "name": "GetZ",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetZ(int unit)",
+    "returnType": "int",
+    "description": "Returns a unit's world Z coordinate.",
+    "category": "Unit and action API",
+    "source": "export.lgc",
+    "id": 87
+  },
+  {
+    "name": "GetDirection",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetDirection(int unit)",
+    "returnType": "int",
+    "description": "Returns a unit's current direction index.",
+    "category": "Unit and action API",
+    "source": "export.lgc",
+    "id": 88
+  },
+  {
+    "name": "GetAnimation",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetAnimation(int unit)",
+    "returnType": "int",
+    "description": "Returns the animation index currently played by the unit.",
+    "category": "Unit and action API",
+    "source": "export.lgc",
+    "id": 89
+  },
+  {
+    "name": "DirectionTo",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "DirectionTo(int unit, int x, int y)",
+    "returnType": "int",
+    "description": "Returns the direction from a unit to a world-coordinate point.",
+    "category": "Unit and action API",
+    "source": "export.lgc",
+    "id": 90
+  },
+  {
+    "name": "GetCommands",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetCommands(int unit)",
+    "returnType": "string",
+    "description": "Returns the serialized command string of a vehicle.",
+    "category": "Unit and action API",
+    "source": "export.lgc",
+    "id": 96
+  },
+  {
+    "name": "SetCommands",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "com",
+        "type": "string",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetCommands(int unit, string com)",
+    "returnType": "void",
+    "description": "Replaces a vehicle's command list from a serialized command string.",
+    "category": "Unit and action API",
+    "source": "export.lgc",
+    "id": 97
+  },
+  {
+    "name": "Load",
+    "params": [
+      {
+        "name": "filename",
+        "type": "string",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "Load(string filename)",
+    "returnType": "void",
+    "description": "Loads a map from the supplied file name.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 98
+  },
+  {
+    "name": "Save",
+    "params": [
+      {
+        "name": "filename",
+        "type": "string",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "Save(string filename)",
+    "returnType": "void",
+    "description": "Saves the current map to the supplied file name.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 99
+  },
+  {
+    "name": "SaveDemo",
+    "params": [
+      {
+        "name": "filename",
+        "type": "string",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SaveDemo(string filename)",
+    "returnType": "void",
+    "description": "Records the next loaded file as a demo under the supplied file name.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 100
+  },
+  {
+    "name": "MenuFind",
+    "params": [
+      {
+        "name": "nvid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "ndir",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "MenuFind(int nvid, int ndir)",
+    "returnType": "int",
+    "description": "Finds a menu item by VID and direction. A direction of 999999 matches any direction.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 101
+  },
+  {
+    "name": "MenuLoad",
+    "params": [
+      {
+        "name": "filename",
+        "type": "string",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "MenuLoad(string filename)",
+    "returnType": "void",
+    "description": "Loads menu definitions from a file.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 102
+  },
+  {
+    "name": "MenuRelease",
+    "params": [],
+    "signature": "MenuRelease()",
+    "returnType": "void",
+    "description": "Removes all currently loaded menu items.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 103
+  },
+  {
+    "name": "MenuNVidUnderCursor",
+    "params": [],
+    "signature": "MenuNVidUnderCursor()",
+    "returnType": "int",
+    "description": "Returns the VID of the menu item currently under the cursor.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 104
+  },
+  {
+    "name": "MenuNDirUnderCursor",
+    "params": [],
+    "signature": "MenuNDirUnderCursor()",
+    "returnType": "int",
+    "description": "Returns the direction value of the menu item currently under the cursor.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 105
+  },
+  {
+    "name": "MenuAction",
+    "params": [
+      {
+        "name": "nvid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "ndir",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "action",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "var1",
+        "type": "int",
+        "optional": true,
+        "default": "0"
+      },
+      {
+        "name": "var2",
+        "type": "int",
+        "optional": true,
+        "default": "0"
+      },
+      {
+        "name": "var3",
+        "type": "int",
+        "optional": true,
+        "default": "0"
+      }
+    ],
+    "signature": "MenuAction(int nvid, int ndir, int action, int var1 = 0, int var2 = 0, int var3 = 0)",
+    "returnType": "void",
+    "description": "Executes an action for menu items matching the supplied VID and direction. Direction 999999 matches any direction.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 106
+  },
+  {
+    "name": "MenuCreate",
+    "params": [
+      {
+        "name": "nvid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "ndir",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "z",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "MenuCreate(int nvid, int ndir, int x, int y, int z)",
+    "returnType": "int",
+    "description": "Creates a menu sprite at the supplied coordinates and returns its sprite handle.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 107
+  },
+  {
+    "name": "MenuLClick",
+    "params": [],
+    "signature": "MenuLClick()",
+    "returnType": "int",
+    "description": "Reports whether the left mouse button was pressed over a menu item.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 108
+  },
+  {
+    "name": "GetInputX",
+    "params": [],
+    "signature": "GetInputX()",
+    "returnType": "int",
+    "description": "Returns the mouse X coordinate in world/map coordinates.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 109
+  },
+  {
+    "name": "GetInputY",
+    "params": [],
+    "signature": "GetInputY()",
+    "returnType": "int",
+    "description": "Returns the mouse Y coordinate in world/map coordinates.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 110
+  },
+  {
+    "name": "GetKey",
+    "params": [],
+    "signature": "GetKey()",
+    "returnType": "int",
+    "description": "Returns the code of the currently pressed key. See the VK_* constants.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 111
+  },
+  {
+    "name": "Pause",
+    "params": [
+      {
+        "name": "flag",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "Pause(int flag)",
+    "returnType": "void",
+    "description": "Pauses or resumes the game according to the supplied flag.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 112
+  },
+  {
+    "name": "SetCursor",
+    "params": [
+      {
+        "name": "type",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetCursor(int type)",
+    "returnType": "void",
+    "description": "Changes the game cursor. See CURSOR_* constants.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 113
+  },
+  {
+    "name": "MessageText",
+    "params": [
+      {
+        "name": "text",
+        "type": "string",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "MessageText(string text, int x, int y)",
+    "returnType": "void",
+    "description": "Displays a message in the game's message/state bar at the supplied coordinates.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 114
+  },
+  {
+    "name": "GetInputState",
+    "params": [],
+    "signature": "GetInputState()",
+    "returnType": "int",
+    "description": "Returns the current input-state bit mask. See INPUT_* constants.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 115
+  },
+  {
+    "name": "SetPosition",
+    "params": [
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetPosition(int x, int y)",
+    "returnType": "void",
+    "description": "Moves the map viewport to the supplied world coordinates.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 116
+  },
+  {
+    "name": "SetScrollType",
+    "params": [
+      {
+        "name": "type",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetScrollType(int type)",
+    "returnType": "void",
+    "description": "Sets the map scrolling mode using SCROLL_* flags.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 117
+  },
+  {
+    "name": "GetScrollType",
+    "params": [],
+    "signature": "GetScrollType()",
+    "returnType": "int",
+    "description": "Returns the active map scrolling mode.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 118
+  },
+  {
+    "name": "ScreenX",
+    "params": [],
+    "signature": "ScreenX()",
+    "returnType": "int",
+    "description": "Returns the width of the game viewport in pixels.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 119
+  },
+  {
+    "name": "ScreenY",
+    "params": [],
+    "signature": "ScreenY()",
+    "returnType": "int",
+    "description": "Returns the height of the game viewport in pixels.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 120
+  },
+  {
+    "name": "SetSelectUnit",
+    "params": [
+      {
+        "name": "flag",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetSelectUnit(int flag)",
+    "returnType": "void",
+    "description": "Enables or disables selecting units for direct control. Pass zero to disable selecting new units.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 121
+  },
+  {
+    "name": "SetStateBar",
+    "params": [
+      {
+        "name": "flag",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetStateBar(int flag)",
+    "returnType": "void",
+    "description": "Shows or hides the game's state bar.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 122
+  },
+  {
+    "name": "GetString",
+    "params": [
+      {
+        "name": "section",
+        "type": "string",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "keyword",
+        "type": "string",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetString(string section, string keyword)",
+    "returnType": "string",
+    "description": "Reads a localized string from the [strings] section of strings.ini.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 123
+  },
+  {
+    "name": "Exit",
+    "params": [
+      {
+        "name": "next_program",
+        "type": "string",
+        "optional": true,
+        "default": "\"\""
+      }
+    ],
+    "signature": "Exit(string next_program = \"\")",
+    "returnType": "void",
+    "description": "Exits to Windows. An optional program name can be supplied to launch another program after the game closes.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 124
+  },
+  {
+    "name": "ToScreenX",
+    "params": [
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "ToScreenX(int x)",
+    "returnType": "unknown",
+    "description": "Converts a world X coordinate to a screen X coordinate.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 125
+  },
+  {
+    "name": "ToScreenY",
+    "params": [
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "z",
+        "type": "int",
+        "optional": true,
+        "default": "0"
+      }
+    ],
+    "signature": "ToScreenY(int y, int z = 0)",
+    "returnType": "unknown",
+    "description": "Converts world Y and optional Z coordinates to a screen Y coordinate.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 126
+  },
+  {
+    "name": "MenuRClick",
+    "params": [],
+    "signature": "MenuRClick()",
+    "returnType": "int",
+    "description": "Reports whether the right mouse button was pressed over a menu item.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 127
+  },
+  {
+    "name": "SetMouseClick",
+    "params": [
+      {
+        "name": "firstOrsecond",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "vk_button",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetMouseClick(int firstOrsecond, int vk_button)",
+    "returnType": "void",
+    "description": "Assigns a virtual mouse button to the first or second game mouse input slot. Commonly used with INPUT_FIRST, INPUT_SECOND and VK_* constants.",
+    "category": "UI and input",
+    "source": "export.lgc",
+    "id": 128
+  },
+  {
+    "name": "SetSoundVolume",
+    "params": [
+      {
+        "name": "volume",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetSoundVolume(int volume)",
+    "returnType": "void",
+    "description": "Sets the sound-effects volume (0-100).",
+    "category": "Audio, video and effects",
+    "source": "export.lgc",
+    "id": 130
+  },
+  {
+    "name": "SetMusicVolume",
+    "params": [
+      {
+        "name": "volume",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetMusicVolume(int volume)",
+    "returnType": "void",
+    "description": "Sets the music volume (0-100).",
+    "category": "Audio, video and effects",
+    "source": "export.lgc",
+    "id": 131
+  },
+  {
+    "name": "PlaySFX",
+    "params": [
+      {
+        "name": "nsfx",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "PlaySFX(int nsfx)",
+    "returnType": "void",
+    "description": "Plays a sound effect by its sound-effect index.",
+    "category": "Audio, video and effects",
+    "source": "export.lgc",
+    "id": 132
+  },
+  {
+    "name": "StopSFX",
+    "params": [
+      {
+        "name": "nsfx",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "StopSFX(int nsfx)",
+    "returnType": "void",
+    "description": "Stops the selected sound effect. Pass -1 to stop all sound effects.",
+    "category": "Audio, video and effects",
+    "source": "export.lgc",
+    "id": 133
+  },
+  {
+    "name": "StopMusic",
+    "params": [],
+    "signature": "StopMusic()",
+    "returnType": "void",
+    "description": "Stops currently playing music.",
+    "category": "Audio, video and effects",
+    "source": "export.lgc",
+    "id": 134
+  },
+  {
+    "name": "PlaySFXFromCoor",
+    "params": [
+      {
+        "name": "nsfx",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "PlaySFXFromCoor(int nsfx, int x, int y)",
+    "returnType": "void",
+    "description": "Plays a sound effect at world coordinates so that its position is spatialized.",
+    "category": "Audio, video and effects",
+    "source": "export.lgc",
+    "id": 135
+  },
+  {
+    "name": "PlayMusicFile",
+    "params": [
+      {
+        "name": "file",
+        "type": "string",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "loop",
+        "type": "int",
+        "optional": true,
+        "default": "1"
+      }
+    ],
+    "signature": "PlayMusicFile(string file, int loop = 1)",
+    "returnType": "void",
+    "description": "Plays a music file. The optional loop flag defaults to one (looping enabled).",
+    "category": "Audio, video and effects",
+    "source": "export.lgc",
+    "id": 136
+  },
+  {
+    "name": "Effect",
+    "params": [
+      {
+        "name": "effect",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "var1",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "var2",
+        "type": "int",
+        "optional": true,
+        "default": "0"
+      },
+      {
+        "name": "duration",
+        "type": "int",
+        "optional": true,
+        "default": "0"
+      }
+    ],
+    "signature": "Effect(int effect, int var1, int var2 = 0, int duration = 0)",
+    "returnType": "void",
+    "description": "Starts a screen or palette effect. The effect identifier and parameters are defined by EFF_* constants.",
+    "category": "Audio, video and effects",
+    "source": "export.lgc",
+    "id": 137
+  },
+  {
+    "name": "SetEnvironment",
+    "params": [
+      {
+        "name": "env",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetEnvironment(int env)",
+    "returnType": "void",
+    "description": "Sets environment effects using ENV_* flags.",
+    "category": "Audio, video and effects",
+    "source": "export.lgc",
+    "id": 138
+  },
+  {
+    "name": "SetGraphDetail",
+    "params": [
+      {
+        "name": "detail",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetGraphDetail(int detail)",
+    "returnType": "void",
+    "description": "Sets graphics detail: zero for low detail, one for high detail.",
+    "category": "Audio, video and effects",
+    "source": "export.lgc",
+    "id": 139
+  },
+  {
+    "name": "SetGamma",
+    "params": [
+      {
+        "name": "gammaindex",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetGamma(int gammaindex)",
+    "returnType": "void",
+    "description": "Selects a game palette/gamma table.",
+    "category": "Audio, video and effects",
+    "source": "export.lgc",
+    "id": 140
+  },
+  {
+    "name": "SetWind",
+    "params": [
+      {
+        "name": "wind",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "direct",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetWind(int wind, int direct)",
+    "returnType": "void",
+    "description": "Sets wind strength and direction.",
+    "category": "Audio, video and effects",
+    "source": "export.lgc",
+    "id": 141
+  },
+  {
+    "name": "PlayMovie",
+    "params": [
+      {
+        "name": "filename",
+        "type": "string",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "PlayMovie(string filename)",
+    "returnType": "void",
+    "description": "Starts playback of a movie file.",
+    "category": "Audio, video and effects",
+    "source": "export.lgc",
+    "id": 142
+  },
+  {
+    "name": "IsPlayMovie",
+    "params": [],
+    "signature": "IsPlayMovie()",
+    "returnType": "int",
+    "description": "Returns non-zero while a movie is playing.",
+    "category": "Audio, video and effects",
+    "source": "export.lgc",
+    "id": 143
+  },
+  {
+    "name": "StopMovie",
+    "params": [],
+    "signature": "StopMovie()",
+    "returnType": "void",
+    "description": "Stops movie playback.",
+    "category": "Audio, video and effects",
+    "source": "export.lgc",
+    "id": 144
+  },
+  {
+    "name": "IsPlayMusic",
+    "params": [],
+    "signature": "IsPlayMusic()",
+    "returnType": "int",
+    "description": "Returns non-zero while music playback is active.",
+    "category": "Audio, video and effects",
+    "source": "export.lgc",
+    "id": 145
+  },
+  {
+    "name": "CountGamma",
+    "params": [
+      {
+        "name": "g1",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "g2",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "time",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "CountGamma(int g1, int g2, int time)",
+    "returnType": "unknown",
+    "description": "Interpolates between two gamma values using a time value from 0 to 255.",
+    "category": "Audio, video and effects",
+    "source": "export.lgc",
+    "id": 146
+  },
+  {
+    "name": "GetGamma",
+    "params": [],
+    "signature": "GetGamma()",
+    "returnType": "int",
+    "description": "Returns the currently selected gamma value.",
+    "category": "Audio, video and effects",
+    "source": "export.lgc",
+    "id": 147
+  },
+  {
+    "name": "GetEffectState",
+    "params": [
+      {
+        "name": "eff",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetEffectState(int eff)",
+    "returnType": "int",
+    "description": "Returns effect progress as a percentage (0-100), or -1 when the effect is not running.",
+    "category": "Audio, video and effects",
+    "source": "export.lgc",
+    "id": 148
+  },
+  {
+    "name": "Exec",
+    "params": [
+      {
+        "name": "command",
+        "type": "string",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "Exec(string command)",
+    "returnType": "void",
+    "description": "Starts an external Windows executable or command.",
+    "category": "Files, registry and logging",
+    "source": "export.lgc",
+    "id": 152
+  },
+  {
+    "name": "charat",
+    "params": [
+      {
+        "name": "str",
+        "type": "string",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "index",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "charat(string str, int index)",
+    "returnType": "string",
+    "description": "Returns the character at the requested zero-based string index.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 153
+  },
+  {
+    "name": "Log",
+    "params": [
+      {
+        "name": "str",
+        "type": "string",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "Log(string str)",
+    "returnType": "void",
+    "description": "Writes a message to the game's logic log.",
+    "category": "Files, registry and logging",
+    "source": "export.lgc",
+    "id": 154
+  },
+  {
+    "name": "Random",
+    "params": [
+      {
+        "name": "max",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "Random(int max)",
+    "returnType": "int",
+    "description": "Returns a pseudo-random integer from zero through the supplied maximum.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 155
+  },
+  {
+    "name": "ChangeZUnit",
+    "params": [
+      {
+        "name": "vid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "z",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "ChangeZUnit(int vid, int z)",
+    "returnType": "void",
+    "description": "Changes the Z coordinate for all instances of the supplied VID.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 156
+  },
+  {
+    "name": "GetTime",
+    "params": [],
+    "signature": "GetTime()",
+    "returnType": "int",
+    "description": "Returns the current game timer in milliseconds.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 157
+  },
+  {
+    "name": "GetGroundZ",
+    "params": [
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetGroundZ(int x, int y)",
+    "returnType": "int",
+    "description": "Returns the ground height at the supplied world coordinates.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 158
+  },
+  {
+    "name": "strlen",
+    "params": [
+      {
+        "name": "str",
+        "type": "string",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "strlen(string str)",
+    "returnType": "int",
+    "description": "Returns the number of characters in a string.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 159
+  },
+  {
+    "name": "SetFlagman",
+    "params": [
+      {
+        "name": "narmy",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetFlagman(int narmy, int unit)",
+    "returnType": "void",
+    "description": "Sets a unit as the flagman (controlled unit) for the specified army.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 160
+  },
+  {
+    "name": "AskPlace",
+    "params": [
+      {
+        "name": "vid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "z",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "AskPlace(int vid, int x, int y, int z)",
+    "returnType": "int",
+    "description": "Checks whether an object with the supplied VID can be placed at the coordinates. Returns the blocking unit handle, or zero when placement is possible.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 161
+  },
+  {
+    "name": "GetVidData",
+    "params": [
+      {
+        "name": "nvid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "type",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetVidData(int nvid, int type)",
+    "returnType": "int",
+    "description": "Reads a property of a game object definition. The property selector is a VID_* constant.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 162
+  },
+  {
+    "name": "SetVidData",
+    "params": [
+      {
+        "name": "nvid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "type",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "var",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetVidData(int nvid, int type, int var)",
+    "returnType": "void",
+    "description": "Changes a property of a game object definition. The property selector is a VID_* constant.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 163
+  },
+  {
+    "name": "itoa",
+    "params": [
+      {
+        "name": "val",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "itoa(int val)",
+    "returnType": "string",
+    "description": "Converts an integer to its decimal string representation.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 164
+  },
+  {
+    "name": "Sin",
+    "params": [
+      {
+        "name": "angle",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "Sin(int angle)",
+    "returnType": "int",
+    "description": "Returns sine(angle) multiplied by 1024. The angle uses the game's 0-255 direction scale.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 165
+  },
+  {
+    "name": "Cos",
+    "params": [
+      {
+        "name": "angle",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "Cos(int angle)",
+    "returnType": "int",
+    "description": "Returns cosine(angle) multiplied by 1024. The angle uses the game's 0-255 direction scale.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 166
+  },
+  {
+    "name": "MapSizeX",
+    "params": [],
+    "signature": "MapSizeX()",
+    "returnType": "int",
+    "description": "Returns the map width in world units.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 167
+  },
+  {
+    "name": "MapSizeY",
+    "params": [],
+    "signature": "MapSizeY()",
+    "returnType": "int",
+    "description": "Returns the map height in world units.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 168
+  },
+  {
+    "name": "Genocide",
+    "params": [
+      {
+        "name": "nvid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "Genocide(int nvid)",
+    "returnType": "void",
+    "description": "Destroys every instance of the supplied VID on the map.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 169
+  },
+  {
+    "name": "ReplaceUnit",
+    "params": [
+      {
+        "name": "nvid1",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "nvid2",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "ReplaceUnit(int nvid1, int nvid2)",
+    "returnType": "void",
+    "description": "Replaces every instance of one VID on the map with another VID.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 170
+  },
+  {
+    "name": "Printf",
+    "params": [
+      {
+        "name": "format",
+        "type": "string",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "int_or_string",
+        "type": "unknown",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "Printf(string format, unknown int_or_string)",
+    "returnType": "unknown",
+    "description": "Formats a string using a format template and one integer-or-string argument.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 172
+  },
+  {
+    "name": "ReloadVid",
+    "params": [],
+    "signature": "ReloadVid()",
+    "returnType": "void",
+    "description": "Reloads the game object's VID parameters.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 173
+  },
+  {
+    "name": "FWrite",
+    "params": [
+      {
+        "name": "file",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "variable",
+        "type": "unknown",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "FWrite(int file, unknown variable)",
+    "returnType": "void",
+    "description": "Writes a variable value to an opened game script file.",
+    "category": "Files, registry and logging",
+    "source": "export.lgc",
+    "id": 174
+  },
+  {
+    "name": "FRead",
+    "params": [
+      {
+        "name": "file",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "FRead(int file)",
+    "returnType": "unknown",
+    "description": "Reads the next variable value from an opened game script file.",
+    "category": "Files, registry and logging",
+    "source": "export.lgc",
+    "id": 175
+  },
+  {
+    "name": "FOpen",
+    "params": [
+      {
+        "name": "filename",
+        "type": "string",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "FOpen(string filename)",
+    "returnType": "int",
+    "description": "Opens a file for script I/O and returns its file handle.",
+    "category": "Files, registry and logging",
+    "source": "export.lgc",
+    "id": 176
+  },
+  {
+    "name": "FClose",
+    "params": [
+      {
+        "name": "file",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "FClose(int file)",
+    "returnType": "void",
+    "description": "Closes an opened script file handle.",
+    "category": "Files, registry and logging",
+    "source": "export.lgc",
+    "id": 177
+  },
+  {
+    "name": "FCreate",
+    "params": [
+      {
+        "name": "filename",
+        "type": "string",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "FCreate(string filename)",
+    "returnType": "int",
+    "description": "Creates a file for script I/O and returns its file handle.",
+    "category": "Files, registry and logging",
+    "source": "export.lgc",
+    "id": 178
+  },
+  {
+    "name": "FEof",
+    "params": [
+      {
+        "name": "file",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "FEof(int file)",
+    "returnType": "int",
+    "description": "Returns non-zero when the file handle has reached end-of-file.",
+    "category": "Files, registry and logging",
+    "source": "export.lgc",
+    "id": 179
+  },
+  {
+    "name": "GetReg",
+    "params": [
+      {
+        "name": "path",
+        "type": "string",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "def_value",
+        "type": "unknown",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetReg(string path, string name, unknown def_value)",
+    "returnType": "unknown",
+    "description": "Reads a string value from the Windows registry, returning the supplied default when the value is absent.",
+    "category": "Files, registry and logging",
+    "source": "export.lgc",
+    "id": 182
+  },
+  {
+    "name": "SetReg",
+    "params": [
+      {
+        "name": "path",
+        "type": "string",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "value",
+        "type": "unknown",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetReg(string path, string name, unknown value)",
+    "returnType": "void",
+    "description": "Writes a string value to the Windows registry.",
+    "category": "Files, registry and logging",
+    "source": "export.lgc",
+    "id": 183
+  },
+  {
+    "name": "DelReg",
+    "params": [
+      {
+        "name": "path",
+        "type": "string",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "DelReg(string path, string name)",
+    "returnType": "void",
+    "description": "Deletes a named value from the Windows registry.",
+    "category": "Files, registry and logging",
+    "source": "export.lgc",
+    "id": 184
+  },
+  {
+    "name": "GetDefaultRegPath",
+    "params": [],
+    "signature": "GetDefaultRegPath()",
+    "returnType": "string",
+    "description": "Returns the registry path configured in game.cfg.",
+    "category": "Files, registry and logging",
+    "source": "export.lgc",
+    "id": 185
+  },
+  {
+    "name": "GetNetInfo",
+    "params": [
+      {
+        "name": "type",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetNetInfo(int type)",
+    "returnType": "int",
+    "description": "Returns a network-game property selected by a NET_* constant.",
+    "category": "Networking",
+    "source": "export.lgc",
+    "id": 192
+  },
+  {
+    "name": "Send",
+    "params": [
+      {
+        "name": "data",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "Send(int data)",
+    "returnType": "void",
+    "description": "Sends an integer data value to the network peer.",
+    "category": "Networking",
+    "source": "export.lgc",
+    "id": 193
+  },
+  {
+    "name": "Receive",
+    "params": [],
+    "signature": "Receive()",
+    "returnType": "int",
+    "description": "Receives the next integer data value from the network peer.",
+    "category": "Networking",
+    "source": "export.lgc",
+    "id": 194
+  },
+  {
+    "name": "SetNet",
+    "params": [
+      {
+        "name": "flag",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetNet(int flag)",
+    "returnType": "void",
+    "description": "Enables or disables network-game mode.",
+    "category": "Networking",
+    "source": "export.lgc",
+    "id": 195
+  },
+  {
+    "name": "GetNetKey",
+    "params": [
+      {
+        "name": "nplayer",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetNetKey(int nplayer)",
+    "returnType": "int",
+    "description": "Returns the key code reported by the specified network player.",
+    "category": "Networking",
+    "source": "export.lgc",
+    "id": 196
+  },
+  {
+    "name": "GetNetInputState",
+    "params": [
+      {
+        "name": "nplayer",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetNetInputState(int nplayer)",
+    "returnType": "int",
+    "description": "Returns the input-state bit mask reported by the specified network player.",
+    "category": "Networking",
+    "source": "export.lgc",
+    "id": 197
+  },
+  {
+    "name": "GetStatistics",
+    "params": [
+      {
+        "name": "narmy",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "stat",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetStatistics(int narmy, int stat)",
+    "returnType": "int",
+    "description": "Returns an AI/game statistic for the selected army. See STAT_* constants.",
+    "category": "AI and railway",
+    "source": "export.lgc",
+    "id": 210
+  },
+  {
+    "name": "CalcStatistics",
+    "params": [
+      {
+        "name": "begx",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "begy",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "endx",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "endy",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "stat",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "CalcStatistics(int begx, int begy, int endx, int endy, int stat)",
+    "returnType": "int",
+    "description": "Calculates a statistic for the rectangular map region. The statistic is selected by a STAT_* constant.",
+    "category": "AI and railway",
+    "source": "export.lgc",
+    "id": 211
+  },
+  {
+    "name": "TrainProperty",
+    "params": [
+      {
+        "name": "train",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "property",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "TrainProperty(int train, int property)",
+    "returnType": "int",
+    "description": "Returns a train property selected by a PROP_* constant.",
+    "category": "AI and railway",
+    "source": "export.lgc",
+    "id": 212
+  },
+  {
+    "name": "SetSemaphore",
+    "params": [
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "newsemaphore",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "army",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetSemaphore(int x, int y, int newsemaphore, int army)",
+    "returnType": "void",
+    "description": "Changes the semaphore on a rail tile for the specified army. The semaphore value controls permitted travel directions.",
+    "category": "AI and railway",
+    "source": "export.lgc",
+    "id": 231
+  },
+  {
+    "name": "BreakTrain",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "BreakTrain(int unit, int x, int y)",
+    "returnType": "void",
+    "description": "Splits a train at the supplied map coordinates, using the given unit as the reference.",
+    "category": "AI and railway",
+    "source": "export.lgc",
+    "id": 239
+  },
+  {
+    "name": "FirstTrain",
+    "params": [
+      {
+        "name": "army",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "FirstTrain(int army)",
+    "returnType": "int",
+    "description": "Starts iteration over trains belonging to the specified army. Pair with NextTrain().",
+    "category": "AI and railway",
+    "source": "export.lgc",
+    "id": 240
+  },
+  {
+    "name": "NextTrain",
+    "params": [],
+    "signature": "NextTrain()",
+    "returnType": "int",
+    "description": "Advances the active train iterator and returns the next train handle.",
+    "category": "AI and railway",
+    "source": "export.lgc",
+    "id": 241
+  },
+  {
+    "name": "PatrolEngine",
+    "params": [
+      {
+        "name": "train",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "PatrolEngine(int train, int x, int y)",
+    "returnType": "void",
+    "description": "Orders a train to patrol toward the supplied world-coordinate point.",
+    "category": "AI and railway",
+    "source": "export.lgc",
+    "id": 242
+  },
+  {
+    "name": "SetPushLine",
+    "params": [
+      {
+        "name": "begin_x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "begin_y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "end_x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "end_y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "push_flag",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetPushLine(int begin_x, int begin_y, int end_x, int end_y, int push_flag)",
+    "returnType": "void",
+    "description": "Defines a one-way train route between two screen-coordinate points. The original export file places a legacy comment about IsMovingToRepair beside this declaration.",
+    "category": "AI and railway",
+    "source": "export.lgc",
+    "id": 243
+  },
+  {
+    "name": "GetScreenInputX",
+    "params": [],
+    "signature": "GetScreenInputX()",
+    "returnType": "unknown",
+    "description": "Returns the mouse X coordinate in screen coordinates.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 244
+  },
+  {
+    "name": "GetScreenInputY",
+    "params": [],
+    "signature": "GetScreenInputY()",
+    "returnType": "unknown",
+    "description": "Returns the mouse Y coordinate in screen coordinates.",
+    "category": "Engine API",
+    "source": "export.lgc",
+    "id": 245
+  },
+  {
+    "name": "SetCleverEnemyAttack",
+    "params": [
+      {
+        "name": "newval",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetCleverEnemyAttack(int newval)",
+    "returnType": "void",
+    "description": "Enables or disables the enemy's smarter attack behavior.",
+    "category": "AI and railway",
+    "source": "export.lgc",
+    "id": 246
+  },
+  {
+    "name": "SetAutoReBirth",
+    "params": [
+      {
+        "name": "newval",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetAutoReBirth(int newval)",
+    "returnType": "void",
+    "description": "Enables or disables automatic rebuilding of destroyed buildings.",
+    "category": "AI and railway",
+    "source": "export.lgc",
+    "id": 247
+  },
+  {
+    "name": "PatrolEngineToPoints",
+    "params": [
+      {
+        "name": "train",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x2",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y2",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "PatrolEngineToPoints(int train, int x, int y, int x2, int y2)",
+    "returnType": "unknown",
+    "description": "Orders a train to patrol between two world-coordinate points.",
+    "category": "AI and railway",
+    "source": "export.lgc",
+    "id": 248
+  },
+  {
+    "name": "AddUnitLimit",
+    "params": [
+      {
+        "name": "army",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "engine_nvid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "value",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "AddUnitLimit(int army, int engine_nvid, int value)",
+    "returnType": "void",
+    "description": "Adds a unit limit for an army and VID. Use 255 as a wildcard; pass -1 as value to remove a matching limit.",
+    "category": "AI and railway",
+    "source": "export.lgc",
+    "id": 249
+  },
+  {
+    "name": "SetEnemyCanAttackNeutralTrains",
+    "params": [
+      {
+        "name": "newval",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetEnemyCanAttackNeutralTrains(int newval)",
+    "returnType": "void",
+    "description": "Controls whether enemy units may attack neutral trains on the map.",
+    "category": "AI and railway",
+    "source": "export.lgc",
+    "id": 250
+  },
+  {
+    "name": "SetMoney",
+    "params": [
+      {
+        "name": "army",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "money",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetMoney(int army, int money)",
+    "returnType": "void",
+    "description": "Sets the money balance of the selected army.",
+    "category": "AI and railway",
+    "source": "export.lgc",
+    "id": 251
+  },
+  {
+    "name": "GetMoney",
+    "params": [
+      {
+        "name": "army",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetMoney(int army)",
+    "returnType": "int",
+    "description": "Returns the current money balance of the selected army.",
+    "category": "AI and railway",
+    "source": "export.lgc",
+    "id": 252
+  },
+  {
+    "name": "CanMoveEngineTo",
+    "params": [
+      {
+        "name": "engine",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "CanMoveEngineTo(int engine, int x, int y)",
+    "returnType": "int",
+    "description": "Checks whether a locomotive can reach the supplied world-coordinate point.",
+    "category": "AI and railway",
+    "source": "export.lgc",
+    "id": 253
+  },
+  {
+    "name": "CanAttackEngine",
+    "params": [
+      {
+        "name": "engine",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "enemy",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "CanAttackEngine(int engine, int enemy)",
+    "returnType": "int",
+    "description": "Checks whether a locomotive can reach a position from which it can attack the specified enemy.",
+    "category": "AI and railway",
+    "source": "export.lgc",
+    "id": 254
+  },
+  {
+    "name": "PrintText",
+    "params": [
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "z",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "text",
+        "type": "string",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "font",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "behave",
+        "type": "int",
+        "optional": true,
+        "default": "0"
+      }
+    ],
+    "signature": "PrintText(int x, int y, int z, string text, int font, int behave = 0)",
+    "returnType": "int",
+    "description": "Creates a text sprite at the supplied world coordinates and returns its sprite handle. The optional behavior flags control text alignment and loading mode.",
+    "category": "Compatibility and text helpers",
+    "source": "obsolete.lgc",
+    "id": null
+  },
+  {
+    "name": "PrintFile",
+    "params": [
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "z",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "filename",
+        "type": "string",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "font",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "PrintFile(int x, int y, int z, string filename, int font)",
+    "returnType": "int",
+    "description": "Creates a text sprite whose content is read from a file and returns its sprite handle.",
+    "category": "Compatibility and text helpers",
+    "source": "obsolete.lgc",
+    "id": null
+  },
+  {
+    "name": "CreateText",
+    "params": [
+      {
+        "name": "font_vid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "z",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "text",
+        "type": "string",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "behave",
+        "type": "int",
+        "optional": true,
+        "default": "0"
+      }
+    ],
+    "signature": "CreateText(int font_vid, int x, int y, int z, string text, int behave = 0)",
+    "returnType": "int",
+    "description": "Creates a B_TEXT sprite and assigns it the supplied text. The optional behavior flags control alignment and text loading.",
+    "category": "Compatibility and text helpers",
+    "source": "export.lgc",
+    "id": null
+  },
+  {
+    "name": "CreateTextFromFile",
+    "params": [
+      {
+        "name": "font_vid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "z",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "filename",
+        "type": "string",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "behave",
+        "type": "int",
+        "optional": true,
+        "default": "0"
+      }
+    ],
+    "signature": "CreateTextFromFile(int font_vid, int x, int y, int z, string filename, int behave = 0)",
+    "returnType": "int",
+    "description": "Creates a B_TEXT sprite and loads its text from a file. The font VID must use the B_TEXT sprite class.",
+    "category": "Compatibility and text helpers",
+    "source": "export.lgc",
+    "id": null
+  },
+  {
+    "name": "Create",
+    "params": [
+      {
+        "name": "nvid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "z",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "Create(int nvid, int x, int y, int z)",
+    "returnType": "int",
+    "description": "Legacy alias for CreateSprite(nvid, x, y, z).",
+    "category": "Compatibility and text helpers",
+    "source": "obsolete.lgc",
+    "id": null
+  },
+  {
+    "name": "CreateEx",
+    "params": [
+      {
+        "name": "nvid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "z",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "dir",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "CreateEx(int nvid, int x, int y, int z, int dir)",
+    "returnType": "int",
+    "description": "Legacy alias for CreateSprite with an explicit direction.",
+    "category": "Compatibility and text helpers",
+    "source": "obsolete.lgc",
+    "id": null
+  },
+  {
+    "name": "GetDir",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetDir(int unit)",
+    "returnType": "int",
+    "description": "Legacy alias for GetDirection(unit).",
+    "category": "Compatibility and text helpers",
+    "source": "obsolete.lgc",
+    "id": null
+  },
+  {
+    "name": "PlayWAV",
+    "params": [
+      {
+        "name": "filename",
+        "type": "string",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "PlayWAV(string filename)",
+    "returnType": "void",
+    "description": "Legacy helper that plays a music/audio file through PlayMusicFile().",
+    "category": "Compatibility and text helpers",
+    "source": "obsolete.lgc",
+    "id": null
+  },
+  {
+    "name": "MenuVid",
+    "params": [],
+    "signature": "MenuVid()",
+    "returnType": "int",
+    "description": "Returns the VID of the menu item clicked with the left mouse button, or zero when no menu item was clicked.",
+    "category": "Compatibility and text helpers",
+    "source": "obsolete.lgc",
+    "id": null
+  },
+  {
+    "name": "MenuDir",
+    "params": [],
+    "signature": "MenuDir()",
+    "returnType": "int",
+    "description": "Returns the direction value of the menu item under the cursor.",
+    "category": "Compatibility and text helpers",
+    "source": "obsolete.lgc",
+    "id": null
+  },
+  {
+    "name": "MenuSelectVid",
+    "params": [],
+    "signature": "MenuSelectVid()",
+    "returnType": "int",
+    "description": "Returns the VID of the menu item currently under the cursor.",
+    "category": "Compatibility and text helpers",
+    "source": "obsolete.lgc",
+    "id": null
+  },
+  {
+    "name": "ScrollLock",
+    "params": [
+      {
+        "name": "flag",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "ScrollLock(int flag)",
+    "returnType": "void",
+    "description": "Legacy helper that disables or enables edge and arrow-key scrolling while preserving other scroll flags.",
+    "category": "Compatibility and text helpers",
+    "source": "obsolete.lgc",
+    "id": null
+  },
+  {
+    "name": "SetAutoScroll",
+    "params": [
+      {
+        "name": "flag",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetAutoScroll(int flag)",
+    "returnType": "void",
+    "description": "Enables or disables automatic scrolling toward the flagman while preserving other scroll flags.",
+    "category": "Compatibility and text helpers",
+    "source": "obsolete.lgc",
+    "id": null
+  },
+  {
+    "name": "SetHpCoeff",
+    "params": [
+      {
+        "name": "nvid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "narmy",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "hp_percent",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetHpCoeff(int nvid, int narmy, int hp_percent)",
+    "returnType": "void",
+    "description": "Sets a per-army hit-point coefficient for a VID by writing the matching VID_HP_COEFF* property.",
+    "category": "Compatibility and text helpers",
+    "source": "obsolete.lgc",
+    "id": null
+  },
+  {
+    "name": "SetSound",
+    "params": [
+      {
+        "name": "volume",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetSound(int volume)",
+    "returnType": "void",
+    "description": "Legacy alias for SetSoundVolume(volume).",
+    "category": "Compatibility and text helpers",
+    "source": "obsolete.lgc",
+    "id": null
+  },
+  {
+    "name": "SetMusic",
+    "params": [
+      {
+        "name": "volume",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetMusic(int volume)",
+    "returnType": "void",
+    "description": "Legacy alias for SetMusicVolume(volume).",
+    "category": "Compatibility and text helpers",
+    "source": "obsolete.lgc",
+    "id": null
+  },
+  {
+    "name": "Message",
+    "params": [
+      {
+        "name": "text",
+        "type": "string",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "Message(string text, int x, int y)",
+    "returnType": "void",
+    "description": "Displays a localized message by combining its MessagePrefixes and Messages strings.ini entries.",
+    "category": "Compatibility and text helpers",
+    "source": "obsolete.lgc",
+    "id": null
+  },
+  {
+    "name": "GetVid",
+    "params": [
+      {
+        "name": "nvid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "type",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetVid(int nvid, int type)",
+    "returnType": "int",
+    "description": "Legacy macro alias for GetVidData(nvid, type).",
+    "category": "Legacy aliases and helper macros",
+    "source": "obsolete.lgc",
+    "id": null
+  },
+  {
+    "name": "SetVid",
+    "params": [
+      {
+        "name": "nvid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "type",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "var",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetVid(int nvid, int type, int var)",
+    "returnType": "void",
+    "description": "Legacy macro alias for SetVidData(nvid, type, var).",
+    "category": "Legacy aliases and helper macros",
+    "source": "obsolete.lgc",
+    "id": null
+  },
+  {
+    "name": "sprintf",
+    "params": [
+      {
+        "name": "format",
+        "type": "string",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "int_or_string",
+        "type": "unknown",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "sprintf(string format, unknown int_or_string)",
+    "returnType": "int",
+    "description": "Legacy macro alias for Printf(format, int_or_string). The format accepts one value argument.",
+    "category": "Legacy aliases and helper macros",
+    "source": "obsolete.lgc",
+    "id": null
+  },
+  {
+    "name": "GETSPRITE_ARMY",
+    "params": [
+      {
+        "name": "army",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GETSPRITE_ARMY(int army)",
+    "returnType": "int",
+    "description": "Builds the GETSPRITE_ARMY* bit mask for the supplied army index.",
+    "category": "Legacy aliases and helper macros",
+    "source": "export.lgc",
+    "id": null
+  },
+  {
+    "name": "GETSPRITE_TYPE",
+    "params": [
+      {
+        "name": "type",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GETSPRITE_TYPE(int type)",
+    "returnType": "int",
+    "description": "Builds a sprite-type filter mask for GetSprite() and FindNearestSprite().",
+    "category": "Legacy aliases and helper macros",
+    "source": "export.lgc",
+    "id": null
+  },
+  {
+    "name": "OneTimeInSecond",
+    "params": [],
+    "signature": "OneTimeInSecond()",
+    "returnType": "unknown",
+    "description": "Returns one on the first call in a game tick after approximately one second has elapsed; repeated calls in that tick return the same result.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "OneTimeInHalfSecond",
+    "params": [],
+    "signature": "OneTimeInHalfSecond()",
+    "returnType": "unknown",
+    "description": "Returns one approximately once every half-second, using the game timer.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "OneTimeInQuarterSecond",
+    "params": [],
+    "signature": "OneTimeInQuarterSecond()",
+    "returnType": "unknown",
+    "description": "Returns one approximately once every quarter-second, using the game timer.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "Time1In100",
+    "params": [],
+    "signature": "Time1In100()",
+    "returnType": "unknown",
+    "description": "Returns one at a throttled cadence of roughly one call per 128 milliseconds.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "Time1In50",
+    "params": [],
+    "signature": "Time1In50()",
+    "returnType": "unknown",
+    "description": "Returns one at a throttled cadence of roughly one call per 64 milliseconds.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "OneTimeIn5Second",
+    "params": [],
+    "signature": "OneTimeIn5Second()",
+    "returnType": "unknown",
+    "description": "Returns one approximately once every five seconds.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "OneTimeInNSecond1",
+    "params": [
+      {
+        "name": "N",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "OneTimeInNSecond1(int N)",
+    "returnType": "unknown",
+    "description": "Returns one once per N seconds. This is one of three independent timer slots available in the helper library.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "OneTimeInNSecond2",
+    "params": [
+      {
+        "name": "N",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "OneTimeInNSecond2(int N)",
+    "returnType": "unknown",
+    "description": "Returns one once per N seconds using the second independent timer slot.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "OneTimeInNSecond3",
+    "params": [
+      {
+        "name": "N",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "OneTimeInNSecond3(int N)",
+    "returnType": "unknown",
+    "description": "Returns one once per N seconds using the third independent timer slot.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "FReadText",
+    "params": [
+      {
+        "name": "f",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "FReadText(int f)",
+    "returnType": "unknown",
+    "description": "Reads the remaining contents of an opened file into a string, appending a line break after each read item.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "PrintTextAtCenter",
+    "params": [
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "z",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "s",
+        "type": "string",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "font",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "PrintTextAtCenter(int x, int y, int z, string s, int font)",
+    "returnType": "unknown",
+    "description": "Creates a text sprite centered around the supplied coordinates using the standard text dimensions.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "PrintTextAtCenter5x5",
+    "params": [
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "z",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "s",
+        "type": "string",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "font",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "PrintTextAtCenter5x5(int x, int y, int z, string s, int font)",
+    "returnType": "unknown",
+    "description": "Creates a text sprite centered around the supplied coordinates using the compact 5x5-style text height.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "GetRegDefaultPlayer",
+    "params": [],
+    "signature": "GetRegDefaultPlayer()",
+    "returnType": "unknown",
+    "description": "Reads the selected/default player index from the Locoland player registry settings.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "GetRegStateBar",
+    "params": [],
+    "signature": "GetRegStateBar()",
+    "returnType": "unknown",
+    "description": "Reads the saved state-bar preference for the currently selected player; returns a fallback when no player is selected.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "SetRegStateBar",
+    "params": [
+      {
+        "name": "state",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetRegStateBar(int state)",
+    "returnType": "unknown",
+    "description": "Saves the state-bar preference for the currently selected player when a player index is available.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "NoArmyUnits",
+    "params": [
+      {
+        "name": "army",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "NoArmyUnits(int army)",
+    "returnType": "unknown",
+    "description": "Counts units for an army using the NVID lists defined by the game scripts.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "GetDifficulty",
+    "params": [],
+    "signature": "GetDifficulty()",
+    "returnType": "unknown",
+    "description": "Reads the current player's difficulty setting from the Locoland registry keys.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "GetHoursByMSec",
+    "params": [
+      {
+        "name": "msec",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetHoursByMSec(int msec)",
+    "returnType": "unknown",
+    "description": "Converts a millisecond duration to whole hours.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "GetMinutesByMSec",
+    "params": [
+      {
+        "name": "msec",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetMinutesByMSec(int msec)",
+    "returnType": "unknown",
+    "description": "Returns the minute component of a millisecond duration after removing whole hours.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "GetSecondsByMSec",
+    "params": [
+      {
+        "name": "msec",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetSecondsByMSec(int msec)",
+    "returnType": "unknown",
+    "description": "Returns the seconds component of a millisecond duration after removing whole hours and minutes.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "SizeToZ",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SizeToZ(int unit, int x, int y)",
+    "returnType": "unknown",
+    "description": "Calculates the size/distance to a point after adding the unit's current Z coordinate and the configured rail height offset.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "PatrolEngineZ",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "PatrolEngineZ(int unit, int x, int y)",
+    "returnType": "unknown",
+    "description": "Orders a train to patrol at the supplied point with the configured rail height offset applied.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "MoveZ",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "MoveZ(int unit, int x, int y)",
+    "returnType": "unknown",
+    "description": "Issues a move action after adding terrain height and the configured rail height offset to the destination Z coordinate.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "CreateFly",
+    "params": [
+      {
+        "name": "nvid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "army",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "z",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "CreateFly(int nvid, int army, int z)",
+    "returnType": "unknown",
+    "description": "Creates a flying unit outside the map boundary, chooses a random edge position, then assigns it to the requested army.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "PrintObjectives",
+    "params": [],
+    "signature": "PrintObjectives()",
+    "returnType": "unknown",
+    "description": "Loads and displays the current level's objectives text when the LEVEL build symbol is enabled.",
+    "category": "Script library helper",
+    "source": "basefunctions.lgc",
+    "id": null
+  },
+  {
+    "name": "SizeBetween",
+    "params": [
+      {
+        "name": "unit1",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "unit2",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SizeBetween(int unit1, int unit2)",
+    "returnType": "unknown",
+    "description": "Returns the distance between two units using the first unit and the second unit's world coordinates.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "BuildTrain",
+    "params": [
+      {
+        "name": "depo",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "*train",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "BuildTrain(int depo, int *train)",
+    "returnType": "unknown",
+    "description": "Queues the unit VIDs from an integer array as build commands for a depot. The helper may swap the first two entries before building.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "MoveTrain",
+    "params": [
+      {
+        "name": "train",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "behave",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "MoveTrain(int train, int x, int y, int behave)",
+    "returnType": "unknown",
+    "description": "Sets a train's behavior and then issues a move order to the supplied world coordinates.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "PatrolTrain",
+    "params": [
+      {
+        "name": "train",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "beh_move",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "beh_patrol",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "PatrolTrain(int train, int x, int y, int beh_move, int beh_patrol)",
+    "returnType": "unknown",
+    "description": "Sets the patrol behavior and sends a train toward a patrol point.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "MyPatrolTrain",
+    "params": [
+      {
+        "name": "train",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "beh_patrol",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "MyPatrolTrain(int train, int x, int y, int beh_patrol)",
+    "returnType": "unknown",
+    "description": "Queues a train to move to its current position and then to the supplied point using the selected behavior.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "TrainHasWoundedUnit",
+    "params": [
+      {
+        "name": "train",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "TrainHasWoundedUnit(int train)",
+    "returnType": "unknown",
+    "description": "Counts train engines whose remaining hit points are below 50 percent.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "TrainHasWoundedRepair",
+    "params": [
+      {
+        "name": "train",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "TrainHasWoundedRepair(int train)",
+    "returnType": "unknown",
+    "description": "Returns the handle of a repair unit in the train when its hit points are below 50 percent, or zero when none is found.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "UnitInTrain",
+    "params": [
+      {
+        "name": "unit",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "train",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "UnitInTrain(int unit, int train)",
+    "returnType": "unknown",
+    "description": "Checks whether a unit belongs to a train. The helper special-cases factory VID 102.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "TrainHasUnitVid",
+    "params": [
+      {
+        "name": "train",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "type",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "TrainHasUnitVid(int train, int type)",
+    "returnType": "unknown",
+    "description": "Checks whether a train contains an engine of the requested VID and stores the matching unit handle in TrainHasUnitVid_unit.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "ArmyWeightCenter",
+    "params": [
+      {
+        "name": "army",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "ArmyWeightCenter(int army)",
+    "returnType": "unknown",
+    "description": "Calculates the hit-point-weighted center of an army and stores the result in WeightX and WeightY.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "IsTrainAtWeaponRadius",
+    "params": [
+      {
+        "name": "train",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "IsTrainAtWeaponRadius(int train)",
+    "returnType": "unknown",
+    "description": "Checks whether a train is inside the weapon range of enemy units and returns a TRADIUS_* state.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "IsTrainAtWeaponRadiusEx",
+    "params": [
+      {
+        "name": "train",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "IsTrainAtWeaponRadiusEx(int train)",
+    "returnType": "unknown",
+    "description": "Extended weapon-radius check using action-based weapon range values. Stores the last matching enemy unit in IsTrainAtWeaponRadiusEx_unit.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "RandomTrain",
+    "params": [
+      {
+        "name": "RandomTrain_army",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "RandomTrain(int RandomTrain_army)",
+    "returnType": "unknown",
+    "description": "Returns a pseudo-random train from the selected army, with a fallback to the player's captured depot where applicable.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "FortCaptured",
+    "params": [
+      {
+        "name": "army",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "FortCaptured(int army)",
+    "returnType": "unknown",
+    "description": "Returns the total count of captured fort structures for the selected army.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "NearTrain",
+    "params": [
+      {
+        "name": "train",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "NearTrain_army",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "NearTrain(int train, int NearTrain_army)",
+    "returnType": "unknown",
+    "description": "Finds the nearest engine belonging to army zero from the supplied train.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "SetPositionCenter",
+    "params": [
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetPositionCenter(int x, int y)",
+    "returnType": "unknown",
+    "description": "Moves the map viewport so the supplied point is centered where possible, clamping to map boundaries.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "DeactiveTrain",
+    "params": [
+      {
+        "name": "train",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "DeactiveTrain(int train)",
+    "returnType": "unknown",
+    "description": "Sets every engine in a train to passive behavior.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "GetLongestTrain",
+    "params": [
+      {
+        "name": "army",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetLongestTrain(int army)",
+    "returnType": "unknown",
+    "description": "Finds the longest train for an army; the selected train handle is stored in GetLongestTrain_unit and the function returns the engine count.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "UnitCountInTrain",
+    "params": [
+      {
+        "name": "train",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "UnitCountInTrain(int train)",
+    "returnType": "unknown",
+    "description": "Counts the engines in a train. Factory VID 102 is treated as having no train units.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "CountArmyUnit",
+    "params": [
+      {
+        "name": "army",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "CountArmyUnit(int army)",
+    "returnType": "unknown",
+    "description": "Counts all units belonging to the supplied army.",
+    "category": "Script library helper",
+    "source": "ai_functions.lgc",
+    "id": null
+  },
+  {
+    "name": "LDepoCapture",
+    "params": [
+      {
+        "name": "capture_x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "capture_y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "size_tocapture",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "army_tocapture",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "LDepoCapture(int capture_x, int capture_y, int size_tocapture, int army_tocapture)",
+    "returnType": "unknown",
+    "description": "Capture-script helper for assigning a depot to the requested army; see the implementation for the exact capture checks.",
+    "category": "Script library helper",
+    "source": "Captures.lgc",
+    "id": null
+  },
+  {
+    "name": "LMasterCapture",
+    "params": [
+      {
+        "name": "capture_x",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "capture_y",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "size_tocapture",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "army_tocapture",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "LMasterCapture(int capture_x, int capture_y, int size_tocapture, int army_tocapture)",
+    "returnType": "unknown",
+    "description": "Capture-script helper for assigning a master structure to the requested army.",
+    "category": "Script library helper",
+    "source": "Captures.lgc",
+    "id": null
+  },
+  {
+    "name": "Muxi",
+    "params": [
+      {
+        "name": "nvid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "count",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "Muxi(int nvid, int count)",
+    "returnType": "unknown",
+    "description": "Maintains the flying insect unit population on a map by spawning units when the count falls below the configured target.",
+    "category": "Script library helper",
+    "source": "civil.lgc",
+    "id": null
+  },
+  {
+    "name": "Tornado",
+    "params": [],
+    "signature": "Tornado()",
+    "returnType": "unknown",
+    "description": "Creates and updates a tornado-like environmental unit.",
+    "category": "Script library helper",
+    "source": "civil.lgc",
+    "id": null
+  },
+  {
+    "name": "SendCivilPatrolEngine",
+    "params": [],
+    "signature": "SendCivilPatrolEngine()",
+    "returnType": "unknown",
+    "description": "Sends a neutral/civilian patrol train using the helper's configured patrol path.",
+    "category": "Script library helper",
+    "source": "civil.lgc",
+    "id": null
+  },
+  {
+    "name": "ResendCivilPatrolEngine",
+    "params": [],
+    "signature": "ResendCivilPatrolEngine()",
+    "returnType": "unknown",
+    "description": "Restarts or redirects a civilian patrol train after its previous route is completed.",
+    "category": "Script library helper",
+    "source": "civil.lgc",
+    "id": null
+  },
+  {
+    "name": "CivilPatrol",
+    "params": [],
+    "signature": "CivilPatrol()",
+    "returnType": "unknown",
+    "description": "Updates civilian patrol behavior for the current logic tick.",
+    "category": "Script library helper",
+    "source": "civil.lgc",
+    "id": null
+  },
+  {
+    "name": "SetArmyVid",
+    "params": [
+      {
+        "name": "nvid",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "army",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetArmyVid(int nvid, int army)",
+    "returnType": "unknown",
+    "description": "Applies the configured VID-related values for the selected army.",
+    "category": "Script library helper",
+    "source": "daynight.lgc",
+    "id": null
+  },
+  {
+    "name": "GetGammaIntensive",
+    "params": [
+      {
+        "name": "gamma",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "GetGammaIntensive(int gamma)",
+    "returnType": "unknown",
+    "description": "Calculates a gamma/intensity value used by the day/night script.",
+    "category": "Script library helper",
+    "source": "daynight.lgc",
+    "id": null
+  },
+  {
+    "name": "GammaIntensive_print",
+    "params": [],
+    "signature": "GammaIntensive_print()",
+    "returnType": "unknown",
+    "description": "Debug helper that prints the current gamma/intensity values.",
+    "category": "Script library helper",
+    "source": "daynight.lgc",
+    "id": null
+  },
+  {
+    "name": "ChangeFonarState",
+    "params": [],
+    "signature": "ChangeFonarState()",
+    "returnType": "unknown",
+    "description": "Changes the state of a light/lantern effect for the day/night cycle.",
+    "category": "Script library helper",
+    "source": "daynight.lgc",
+    "id": null
+  },
+  {
+    "name": "SetDayNightGamma",
+    "params": [],
+    "signature": "SetDayNightGamma()",
+    "returnType": "unknown",
+    "description": "Updates the game palette according to the current day/night state.",
+    "category": "Script library helper",
+    "source": "daynight.lgc",
+    "id": null
+  },
+  {
+    "name": "StartRain",
+    "params": [],
+    "signature": "StartRain()",
+    "returnType": "unknown",
+    "description": "Starts the rain environment effect.",
+    "category": "Script library helper",
+    "source": "daynight.lgc",
+    "id": null
+  },
+  {
+    "name": "StopRain",
+    "params": [],
+    "signature": "StopRain()",
+    "returnType": "unknown",
+    "description": "Stops the rain environment effect.",
+    "category": "Script library helper",
+    "source": "daynight.lgc",
+    "id": null
+  },
+  {
+    "name": "Rain",
+    "params": [],
+    "signature": "Rain()",
+    "returnType": "unknown",
+    "description": "Updates rain timing and state for the environment logic.",
+    "category": "Script library helper",
+    "source": "daynight.lgc",
+    "id": null
+  },
+  {
+    "name": "Quake",
+    "params": [
+      {
+        "name": "time",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "sound",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "Quake(int time, int sound)",
+    "returnType": "unknown",
+    "description": "Starts or updates the earthquake effect using the environment script's timing constants.",
+    "category": "Script library helper",
+    "source": "environmenttact.lgc",
+    "id": null
+  },
+  {
+    "name": "EndQuake",
+    "params": [],
+    "signature": "EndQuake()",
+    "returnType": "unknown",
+    "description": "Stops the earthquake state and restores the affected environment values.",
+    "category": "Script library helper",
+    "source": "environmenttact.lgc",
+    "id": null
+  },
+  {
+    "name": "SetWindEx",
+    "params": [
+      {
+        "name": "w_speed",
+        "type": "int",
+        "optional": false,
+        "default": null
+      },
+      {
+        "name": "w_dir",
+        "type": "int",
+        "optional": false,
+        "default": null
+      }
+    ],
+    "signature": "SetWindEx(int w_speed, int w_dir)",
+    "returnType": "unknown",
+    "description": "Sets wind using the extended environment-script parameters.",
+    "category": "Script library helper",
+    "source": "environmenttact.lgc",
+    "id": null
+  },
+  {
+    "name": "Meteorites",
+    "params": [],
+    "signature": "Meteorites()",
+    "returnType": "unknown",
+    "description": "Spawns and updates meteorite events when enabled by the environment logic.",
+    "category": "Script library helper",
+    "source": "environmenttact.lgc",
+    "id": null
+  },
+  {
+    "name": "Clouds",
+    "params": [],
+    "signature": "Clouds()",
+    "returnType": "unknown",
+    "description": "Updates the cloud layer and its movement for the environment logic.",
+    "category": "Script library helper",
+    "source": "environmenttact.lgc",
+    "id": null
+  },
+  {
+    "name": "EnvironmentTact",
+    "params": [],
+    "signature": "EnvironmentTact()",
+    "returnType": "unknown",
+    "description": "Main per-tick update routine for the environment effects.",
+    "category": "Script library helper",
+    "source": "environmenttact.lgc",
+    "id": null
+  },
+  {
+    "name": "ReinforcementInit",
+    "params": [],
+    "signature": "ReinforcementInit()",
+    "returnType": "unknown",
+    "description": "Initializes the reinforcement counters and state for player and AI armies.",
+    "category": "Script library helper",
+    "source": "reinforcement.lgc",
+    "id": null
+  },
+  {
+    "name": "AddReinforcement",
+    "params": [],
+    "signature": "AddReinforcement()",
+    "returnType": "unknown",
+    "description": "Adds a reinforcement wave according to the configured player/AI schedule.",
+    "category": "Script library helper",
+    "source": "reinforcement.lgc",
+    "id": null
+  },
+  {
+    "name": "SetArmyGamma",
+    "params": [],
+    "signature": "SetArmyGamma()",
+    "returnType": "unknown",
+    "description": "Applies the palette gamma settings for all configured armies.",
+    "category": "Script library helper",
+    "source": "setarmygamma.lgc",
+    "id": null
+  }
+]

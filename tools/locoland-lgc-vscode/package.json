@@ -1,0 +1,215 @@
+{
+  "name": "locoland-lgc",
+  "displayName": "Locoland Logic Script",
+  "description": "Language support, IntelliSense and static checks for Locoland .lgc logic scripts.",
+  "version": "0.1.2",
+  "publisher": "community",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters"
+  ],
+  "keywords": [
+    "locoland",
+    "lgc",
+    "logic-script",
+    "game-scripting"
+  ],
+  "main": "./src/extension.js",
+  "activationEvents": [
+    "onLanguage:lgc",
+    "onCommand:lgc.formatDocument"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "lgc",
+        "aliases": [
+          "Locoland Logic Script",
+          "LGC"
+        ],
+        "extensions": [
+          ".lgc"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "lgc",
+        "scopeName": "source.lgc",
+        "path": "./syntaxes/lgc.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "lgc",
+        "path": "./snippets/lgc.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "lgc.analyzeCurrentFile",
+        "title": "LGC: Analyze Current File"
+      },
+      {
+        "command": "lgc.formatDocument",
+        "title": "LGC: Format Document"
+      }
+    ],
+    "configuration": {
+      "title": "Locoland Logic Script",
+      "properties": {
+        "lgc.format.indentStyle": {
+          "type": "string",
+          "enum": [
+            "editor",
+            "spaces",
+            "tabs"
+          ],
+          "default": "editor",
+          "description": "Use the active editor indentation settings, spaces, or tab characters."
+        },
+        "lgc.format.indentSize": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 8,
+          "description": "Spaces per indentation level. Use 0 to follow the editor tab size."
+        },
+        "lgc.format.braceStyle": {
+          "type": "string",
+          "enum": [
+            "sameLine",
+            "nextLine"
+          ],
+          "default": "sameLine",
+          "description": "Place opening braces on the same line as the declaration or control statement, or on the following line."
+        },
+        "lgc.format.spaceBeforeParens": {
+          "type": "string",
+          "enum": [
+            "control",
+            "always",
+            "never"
+          ],
+          "default": "control",
+          "description": "Spacing before parentheses: only control keywords, every parenthesis, or none."
+        },
+        "lgc.format.spaceInsideParentheses": {
+          "type": "boolean",
+          "default": false,
+          "description": "Insert spaces immediately inside parentheses."
+        },
+        "lgc.format.spaceInsideBrackets": {
+          "type": "boolean",
+          "default": false,
+          "description": "Insert spaces immediately inside array brackets."
+        },
+        "lgc.format.spaceAroundOperators": {
+          "type": "boolean",
+          "default": true,
+          "description": "Insert spaces around binary and assignment operators."
+        },
+        "lgc.format.spaceAfterComma": {
+          "type": "boolean",
+          "default": true,
+          "description": "Insert a space after commas."
+        },
+        "lgc.format.spaceBeforeColon": {
+          "type": "boolean",
+          "default": true,
+          "description": "Insert a space before the colon in ternary expressions."
+        },
+        "lgc.format.spaceAfterColon": {
+          "type": "boolean",
+          "default": true,
+          "description": "Insert a space after the colon in ternary expressions."
+        },
+        "lgc.format.blankLinesBetweenFunctions": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0,
+          "maximum": 3,
+          "description": "Number of blank lines between top-level braced declarations."
+        },
+        "lgc.format.preserveBlankLines": {
+          "type": "boolean",
+          "default": true,
+          "description": "Preserve blank lines already present in the source, up to maxBlankLines."
+        },
+        "lgc.format.maxBlankLines": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0,
+          "maximum": 5,
+          "description": "Maximum number of consecutive blank lines preserved from the source."
+        },
+        "lgc.format.indentCaseLabels": {
+          "type": "boolean",
+          "default": false,
+          "description": "Indent case and default labels one level inside switch blocks."
+        },
+        "lgc.format.keepEmptyBlocksSingleLine": {
+          "type": "boolean",
+          "default": true,
+          "description": "Keep empty blocks as {} instead of expanding them onto multiple lines."
+        },
+        "lgc.format.insertFinalNewline": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ensure formatted documents end with a newline."
+        },
+        "lgc.analysis.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable diagnostics for LGC documents."
+        },
+        "lgc.analysis.checkFunctionArity": {
+          "type": "boolean",
+          "default": true,
+          "description": "Report calls with too few or too many arguments when the signature is known."
+        },
+        "lgc.analysis.checkArgumentTypes": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check known int/string function parameter types when the expression type can be inferred safely."
+        },
+        "lgc.analysis.checkAssignments": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check assignments to explicitly typed local variables when both sides have known types."
+        },
+        "lgc.analysis.strictUnknownFunctions": {
+          "type": "boolean",
+          "default": false,
+          "description": "Report function calls that are not found in the engine API, bundled helper catalog or workspace scripts."
+        },
+        "lgc.analysis.severity": {
+          "type": "string",
+          "enum": [
+            "Error",
+            "Warning",
+            "Information"
+          ],
+          "default": "Warning",
+          "description": "Default severity used by static-analysis diagnostics."
+        },
+        "lgc.analysis.maxWorkspaceFiles": {
+          "type": "number",
+          "default": 500,
+          "minimum": 50,
+          "maximum": 5000,
+          "description": "Maximum number of .lgc files indexed from the current workspace."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "check": "node --check src/extension.js && node --check src/formatter.js",
+    "test": "node test/smoke.js"
+  }
+}
