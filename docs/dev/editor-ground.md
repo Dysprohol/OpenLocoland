@@ -715,8 +715,20 @@ picture and the GRID under the brush to the bed (the level - 25, the shore slopi
 adds the kind's tiles where missing on the 128 grid at the map's level of that kind, and when the
 stroke ends scatters its generators (water circles 504 and noise 510, swamp bubbles 206 and circles
 337, lava eruptions 441) as far apart as the missions have them and grows one region turning
-explosions there into splashes on water or lava; Shift takes it back, with the tiles and generators no
-longer over water. **Region**: drag its rectangle; it is picked at its dashed frame (inside it the
+explosions there into splashes on water or lava. Dragging one kind over another replaces it in the
+squares the brush reaches (that square's tiles and generators of the other kind go, a kind left without
+tiles loses its splash region). A kind new on the map begun in another kind's water takes that water's
+level, so its tiles cover all of the other's water in the squares it takes over - measured from the
+ground there, the other's bed, it came out below that bed, and around the brush the replaced squares
+showed their bed bare; a kind already on the map keeps its level (all its tiles stand at one). The right button or Shift takes the water of every kind back: the
+picture and the GRID inside the brush's circle go back to the original, and when the stroke ends a
+square it went over loses a kind's tiles - and that kind's generators there - only when no water of
+the kind is left in it (`square_wet`: none of its points below the level); the generators no longer
+over their water go too. v0.2.9 took the tiles of every square the brush's box touched while the
+ground came back only inside the circle, so the lake bed around the circle showed bare in 128 px
+squares (issue #9). Checked for the five kinds: a lake of three strokes, the right button in its middle
+and at its rim - only the brush's circle dry, no square; the next kind painted across it - the squares it
+took over all of the new kind; Shift over all of it - nothing left; every step undone in turn. **Region**: drag its rectangle; it is picked at its dashed frame (inside it the
 objects under it are), its panel sets the size, the explosions (as they are, on water, on lava), the
 fog (none or the missions' mist, dust, haze, glow, set around its level), over the region or the
 whole view, pulsing - all of it kept in the history (`Region_InitFog` for the fog, the VID pairs set
