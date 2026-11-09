@@ -20,6 +20,7 @@ void install_view_culling();
 void install_profile();
 void install_birth_animation();
 void install_adopt_command();
+void install_train_fold();
 void install_shadow_leak();
 void install_unit_limit();
 void install_factions();
@@ -132,6 +133,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         install_profile();
         install_birth_animation();
         install_adopt_command();
+        install_train_fold();
         install_shadow_leak();
         install_unit_limit();
         install_factions();

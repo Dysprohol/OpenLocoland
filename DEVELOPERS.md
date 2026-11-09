@@ -63,11 +63,11 @@ Sections: "Data formats".
 
 Paragraphs: Container; objects.res; Editing objects.res; Map; Demo; Editing maps and images; New maps; A map to play; The custom maps page; Map files; Rename or delete; The ground of a map; A picture painted as the editor paints; Editing a map.
 
-### [engine.md](docs/dev/engine.md) (~36 KB)
+### [engine.md](docs/dev/engine.md) (~41 KB)
 
 Sections: "Rendering"; "Script machine"; "Support library"; "Pictures and animations"; "Trains and rails"; "Player and the state bar".
 
-Paragraphs: Lost surfaces; The fog buffer; Loading; Language; Values and variables; Calls from the engine; Bytecode; String; The error log; CRC32; `File`; The ini file and the registry; `Picture`; `PictureImpl`; Three ways to animate; Screenshots; The VID converter; Compressed frames; The coder; The model; The rail network; A train; Commands; Driving; Repair car and arsenal; Factories; The balloon; One Player per army; The flagman; The state bar; Panels; The factory panels; Messages.
+Paragraphs: Lost surfaces; The fog buffer; Loading; Language; Values and variables; Calls from the engine; Bytecode; String; The error log; CRC32; `File`; The ini file and the registry; `Picture`; `PictureImpl`; Three ways to animate; Screenshots; The VID converter; Compressed frames; The coder; The model; The rail network; A train; Commands; Driving; How the cars follow; Repair car and arsenal; Factories; The balloon; One Player per army; The flagman; The state bar; Panels; The factory panels; Messages.
 
 ### [editor.md](docs/dev/editor.md) (~24 KB)
 
@@ -99,7 +99,7 @@ Sections: "Editor mode" (continued).
 
 Paragraphs: Map exchange; The texts of the editor; The Help and Menu buttons; Ctrl+R; No window menu; Full screen, 1920 x 1080; The frame and the profiler.
 
-### [changes.md](docs/dev/changes.md) (~39 KB)
+### [changes.md](docs/dev/changes.md) (~40 KB)
 
 Sections: "Changes from the original".
 

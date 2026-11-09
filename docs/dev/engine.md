@@ -406,6 +406,55 @@ the speeds are averaged by mass; ramming above `Options.crashSpeed` damages the 
 halving along the train; TrainClash). Finally `Train_MoveCars` moves every car behind the
 previous one and runs over objects with VID flag 0x4000 (5 damage).
 
+**How the cars follow** (`BUGS.md` F24, `train_fold.cpp`). The cars keep no path of their own. A
+car's two ends are `RailPos`es: the front end counts from the point behind it along the link ahead
+(`front.dot` is the point the front left), the rear end from the point on the car's front side along
+a link toward the back - so `Train_Reverse` only swaps the two. Each frame `Train_MoveCars` puts every
+following car's front end exactly on the rear end of the car in front (the same place, the link the
+other way round) and `Engine_UpdateRear` (0x40a310) lays its rear end `Weapon.length` (48 px) behind,
+from `front.dot`, the link back from it and the old `rear.dot`; `Engine_UpdatePosition` draws the
+car halfway between the two ends and turns it from the rear end to the front. Its branches: the front
+over 48 px along its link - the rear on the same link (`rear.dot` the link's far point,
+`rear.distance` = link length - front distance + 48, more than the link when the rear is past the
+end of the track: it goes on along the link's line); `rear.dot` is `front.dot` - 48 - front distance
+along `rear.link`; the front did not cross a point - the link from `front.dot` to `rear.dot` (none:
+`ENGINE n: 0 rail 1` and the link nearest the way back), on it when it is long enough, else 48 - its
+length - front distance beyond `rear.dot` along `rear.link`; the front crossed a point - the same
+from the point it left (`zmdots5` / `zmdots6`, which short curve pieces give in normal play too).
+This holds while every `rear.link` leads away from the car and there is track behind every rear end.
+Two cases broke it. A car with a car in front whose `front.dot` is a dead end (a point of one link: a
+buffer stop, the end of a factory's spur) - a car coupled behind a car hanging past a buffer stop -
+had its rear laid forward along the one link: turned round, its rear end under the car in front (a
+wagon 12 px past a buffer stop, coupled behind a train, came out 12 px from the car in front). And a
+`rear.link` leading from `rear.dot` back to `front.dot` while the rear belongs beyond `rear.dot` made
+"beyond" go back onto the car: at a dead end the one link is that way, and `Engine_PutOnRails` (each
+end on the link nearest to it, from the nearer point) leaves `rear.link` so for cars made on open
+track too - a factory standing on its spur's dead end (ten of the campaign's: l06, l08, l09 two, l10,
+l12, l15, l16, l18, l20) released every car 34 px long and drawn 12 px forward, and two carts made by
+a script `Create` 48 px apart on a main line came out 12 px apart, the second on the first. The
+engine noticed only the jump when such a car moved again and its rear was laid anew: a car more
+than 30 px from where it was in x logs `zm-error` (the authors' "the cars collapse") in `error.log`.
+`train_fold.cpp` runs `Engine_UpdateRear` and corrects only a result that is folded (the rear end
+nearer the car in front than the front end, or the ends under 40 px apart with the front end farther
+from the dead end or turning point than the rear end), in those two cases only: the rear end past the
+dead end on the line of its link, or beyond `rear.dot` on the link that goes on from it the
+straightest. A car alone or first in its train with its front at a dead end is left as the original
+lays it: the missions save single cars against a buffer stop with both ends laid on its link, drawn
+where they were placed (l06, l12, l15; a car made by script right on a buffer stop collapses the same
+way), and l12 a neutral train facing a buffer stop with its front end at it. Reproduced and checked on
+a test copy of POLIGON (`notes` of the train-fold session: three straight spurs with a buffer stop
+each, cars made by script at set distances from it, the factory moved onto its spur's dead end, cars
+made on the main line). What it does not touch: `Depo_ReleaseUnit` deletes whatever stands on the
+factory's place before it makes the next car (`AskPlace`), a car of its queue still at the door too (the
+train loses it); a train pushed out of a factory moves until its last car has left the push line and
+pushes whatever stands in its way (a train of another army, a braking locomotive), so the queue does
+not back up to the door in play; a pushed train stopped by a red light of its own army reverses there
+(`Train_Update`), and the next pushed cars can then roll onto it from behind; a script `Create` on an
+occupied point puts the car on the nearest free place (the authors' `StartCreateTrain` lays a train car
+by car that way); `Train_HandleContact` couples the moving train's first car behind the touched car
+(reversing the touched train for the contacts front-to-front and rear-to-rear, or when it has a car
+behind).
+
 **Repair car and arsenal**: once a second the repair car (VID 85) heals the most damaged car
 of its train by `Options.repairAmount` and rebuilds destroyed turrets; the arsenal (VID 45)
 gives `Options.arsenalAmmo` to the car missing the most ammo. The repair point (building

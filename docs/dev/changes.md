@@ -444,6 +444,14 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       at 2560x1440; up to 1024x1024 the engine's 256x256 grey texture as before) - a fog over the
       whole view (missions 7, 13, 18, the editor's OVER: THE WHOLE MAP) no longer crashes the game
       above 1024 pixels,
+  39. a car's rear end laid on its own side (`train_fold.cpp`, `BUGS.md` F24, "How the cars
+      follow"): `Engine_UpdateRear` laid the rear end of a car coupled behind a car hanging past a
+      buffer stop forward along the stop's one link - turned round, under the car in front - and
+      sent a rear end meant to lie beyond a point back onto the car when the rear's link led back
+      toward the front (at a dead end, and for cars `Engine_PutOnRails` made on open track); only a
+      result that comes out folded is corrected - the rear end laid past the dead end, or beyond the
+      point on the way on - and every other one is left as it was; LocoFix.log has a "train fold:"
+      line for each car it lays so,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
