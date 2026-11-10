@@ -10013,6 +10013,13 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
         }
         rows.push_back(fog);
         const uint32_t flags = at<uint32_t>(o, RG_FLAGS);
+        // flag 2: Graphics_DrawFog's source blend ZERO in place of ONE - the fog takes light away instead of
+        // adding its colour, as mission 1's and mission 7's do. Added light shows nothing on bright ground
+        // (a mist over snow), a darkening fog nothing on dark ground: the player chooses
+        rows.push_back({{"CtxFogLook", "FOG LOOK:"},
+                        {{{"CtxFogLightens", "LIGHTENS"}, !(flags & 2), [o] { region_change(o, [o] { at<uint32_t>(o, RG_FLAGS) &= ~2u; }); }},
+                         {{"CtxFogDarkens", "DARKENS"}, (flags & 2) != 0, [o] { region_change(o, [o] { at<uint32_t>(o, RG_FLAGS) |= 2u; }); }}},
+                        {"TipFogLook", "Fog look: LIGHTENS adds its colour (for dark ground); DARKENS takes light away (for snow and sand)"}});
         // flag 8: the fog over the whole view and the pairs anywhere on the map (Vid_GetTerrainVariant skips
         // the rectangle with it) - so OVER, not FOG OVER
         rows.push_back({{"CtxFogOver", "OVER:"},

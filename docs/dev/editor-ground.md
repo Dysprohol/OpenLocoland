@@ -905,7 +905,11 @@ values read back from the loaded level: the file holds them in `Region_Action`'s
 panel's size, EXPLOSIONS (as they are / on water / on lava: the pairs), FOG (none, or the missions'
 mist, dust, haze, glow around its level, in GRID levels: MIST 50-80 at level 70), OVER: THE REGION /
 THE WHOLE MAP (flag 8 - the fog and the pairs both; the row said FOG OVER: THE VIEW, which hid half of
-it) and FOG MOTION (STEADY, RISES AT THE START - flag 1, which the row called PULSING -, PULSES with its
+it), FOG LOOK (LIGHTENS / DARKENS - flag 2, `Graphics_DrawFog`'s source blend ZERO in place of ONE, which l01's
+and l07's fogs have: the fog takes its colour away from the picture instead of adding it; added light shows
+nothing on bright ground - a MIST over snow, on a player's winter map, was there and pulsing and could not be
+seen -, a darkening fog nothing on dark ground, and the tint seen is the colour's opposite: HAZE's pink leaves
+green, DUST's orange blue; the presets set no flag, the row does) and FOG MOTION (STEADY, RISES AT THE START - flag 1, which the row called PULSING -, PULSES with its
 row PULSE: SLOW, NORMAL, FAST: "A fog that rises or pulses"); the palette's Effects group places 750, 751 and 752 as rectangles sized in the
 panel; the image VID is the region's own and not set anywhere. FOG and OVER are rows of their own: a
 fog chosen stays over the region until OVER: THE WHOLE MAP is set (which says so when the region has
