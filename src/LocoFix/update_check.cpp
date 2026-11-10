@@ -48,6 +48,7 @@
 #include <winhttp.h>
 #include <cstdio>
 #include <cwchar>
+#include <exception>
 #include <vector>
 
 #ifndef WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3
@@ -631,7 +632,8 @@ bool unpack_setup_zip(const std::wstring& zip, const std::string& tag, const std
     }
     unsigned long long declared = 0;
     for (size_t at = zipfile::u32(z, end + 16), k = 0; k < count; ++k) {
-        if (zipfile::u32(z, at) != 0x02014b50) {
+        if (at > z.size() || z.size() - at < 46 || zipfile::u32(z, at) != 0x02014b50 ||
+            z.size() - at - 46 < zipfile::u16(z, at + 28)) {
             patch::log("update zip: a damaged zip file");
             return false;
         }
@@ -688,7 +690,40 @@ bool unpack_setup_zip(const std::wstring& zip, const std::string& tag, const std
     }
     patch::log("update zip: %u files (%llu bytes) unpacked into %ls", static_cast<unsigned>(entries.size()), declared,
                folder.c_str());
+    // the Setups unpacked before (setup\<an older tag>): only this one is needed now
+    const std::wstring base = folder.substr(0, folder.rfind(L'\\'));
+    WIN32_FIND_DATAW found;
+    HANDLE find = FindFirstFileW((base + L"\\*").c_str(), &found);
+    if (find != INVALID_HANDLE_VALUE) {
+        do {
+            const std::wstring name = found.cFileName, path = base + L"\\" + name;
+            if (name == L"." || name == L".." || _wcsicmp(path.c_str(), folder.c_str()) == 0 ||
+                !(found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || (found.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT))
+                continue;
+            remove_folder(path);
+            patch::log("update zip: the older %ls removed", path.c_str());
+        } while (FindNextFileW(find, &found));
+        FindClose(find);
+    }
     return true;
+}
+
+// `a` as one argument of a command line (CommandLineToArgvW's and the C runtime's rules): in quotes,
+// a backslash run before a quote or the end doubled, a quote escaped - "C:\" stays C:\.
+std::wstring quoted_argument(const std::wstring& a) {
+    std::wstring out = L"\"";
+    size_t backslashes = 0;
+    for (wchar_t c : a) {
+        if (c == L'\\') {
+            ++backslashes;
+            continue;
+        }
+        out.append(c == L'"' ? backslashes * 2 + 1 : backslashes, L'\\');
+        backslashes = 0;
+        out += c;
+    }
+    out.append(backslashes * 2, L'\\');
+    return out + L"\"";
 }
 
 // The asset a download of `release` takes: the zip (use_zip) or the exe, as a release of its own.
@@ -714,20 +749,29 @@ DWORD WINAPI download_thread(void* parameter) {
     result->path = result->shown = job->path;
     bool ok = false;
     if (job->release.use_zip) {
-        const Release zip = asset(job->release, true);
-        const std::wstring folder = job->path.substr(0, job->path.rfind(L'\\') + 1);
-        const std::wstring file = folder + widen(zip.setup_name);
-        ok = download_file(job, zip, file);
-        if (ok) {
-            const std::string zone = "[ZoneTransfer]\r\nZoneId=3\r\nHostUrl=" + zip.setup_url + "\r\n";
-            std::wstring unpacked, setup;
-            ok = !g_cancel && unpack_setup_zip(file, zip.tag, zone, unpacked, setup);
+        std::wstring unpacked, setup;
+        try {
+            const Release zip = asset(job->release, true);
+            const std::wstring folder = job->path.substr(0, job->path.rfind(L'\\') + 1);
+            const std::wstring file = folder + widen(zip.setup_name);
+            ok = download_file(job, zip, file);
             if (ok) {
-                result->path = setup;
-                result->shown = file;
-                result->folder = unpacked;
+                const std::string zone = "[ZoneTransfer]\r\nZoneId=3\r\nHostUrl=" + zip.setup_url + "\r\n";
+                ok = !g_cancel && unpack_setup_zip(file, zip.tag, zone, unpacked, setup);
+                if (ok) {
+                    result->path = setup;
+                    result->shown = file;
+                    result->folder = unpacked;
+                }
             }
+        } catch (const std::exception& e) {
+            patch::log("update zip: stopped (%s)", e.what());
+            ok = false;
+        } catch (...) {
+            patch::log("update zip: stopped");
+            ok = false;
         }
+        if (!ok && !unpacked.empty()) remove_folder(unpacked);
         if (!ok && !g_cancel && !job->release.setup_url.empty()) {
             patch::log("update: the zip did not work - the release's Setup.exe instead");
             result->release.use_zip = false;
@@ -1028,11 +1072,16 @@ void run_setup(HWND dialog) {
     // a zip's Setup: in its folder, told which install to update (the exe goes as up to v0.2.10)
     std::wstring arguments;
     if (!g_folder.empty()) {
-        wchar_t exe[MAX_PATH] = {};
+        wchar_t exe[MAX_PATH] = {}, test[MAX_PATH] = {};
         GetModuleFileNameW(nullptr, exe, MAX_PATH);
         std::wstring game = exe;
         game = game.substr(0, game.rfind(L'\\'));
-        arguments = L"--target \"" + game + L"\"";
+        // a test's game folder (LOCOFIX_UPDATE_TARGET, only with LOCOFIX_UPDATE_TEST): a drive root, a
+        // trailing backslash, spaces - how it reaches Setup
+        if (!update_test_file().empty() && GetEnvironmentVariableW(L"LOCOFIX_UPDATE_TARGET", test, MAX_PATH)) game = test;
+        while (game.size() > 3 && game.back() == L'\\') game.pop_back();
+        if (game.size() == 2 && game[1] == L':') game += L'\\';   // C: alone is the current folder on C
+        arguments = L"--target " + quoted_argument(game);
     }
     const INT_PTR started = reinterpret_cast<INT_PTR>(
         ShellExecuteW(dialog, L"open", g_file.c_str(), arguments.empty() ? nullptr : arguments.c_str(),
