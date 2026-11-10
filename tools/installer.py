@@ -182,6 +182,8 @@ TEXTS = {
         "cheats": "Cheats (developer keys: h, W, B, A, K, M, #, x)",
         "unlock": "All missions unlocked (your progress stays as it is)",
         "skip_verify": "Skip verification of the game files - install as it is",
+        "skip_verify_hint": "For versions of the game other than the Steam one. The game will install and run, but you "
+                            "may not get our fixes, the editor or custom maps.",
         "shortcuts": "Shortcuts",
         "desktop": "On the desktop",
         "start_menu": "In the Start menu",
@@ -253,6 +255,8 @@ TEXTS = {
         "cheats": "Cheats (Entwicklertasten: h, W, B, A, K, M, #, x)",
         "unlock": "Alle Missionen freigeschaltet (dein Fortschritt bleibt erhalten)",
         "skip_verify": "Prüfung der Spieldateien überspringen - so installieren, wie es ist",
+        "skip_verify_hint": "Für andere Versionen des Spiels als die von Steam. Das Spiel lässt sich installieren und "
+                            "starten, aber unsere Korrekturen, der Editor oder die eigenen Karten fehlen dann vielleicht.",
         "shortcuts": "Verknüpfungen",
         "desktop": "Auf dem Desktop",
         "start_menu": "Im Startmenü",
@@ -324,6 +328,8 @@ TEXTS = {
         "cheats": "Csalások (fejlesztői billentyűk: h, W, B, A, K, M, #, x)",
         "unlock": "Minden küldetés elérhető (az előrehaladásod nem változik)",
         "skip_verify": "A játékfájlok ellenőrzésének kihagyása - telepítés úgy, ahogy van",
+        "skip_verify_hint": "A Steames változattól eltérő kiadásokhoz. A játék feltelepül és elindul, de lehet, hogy nem "
+                            "kapod meg a javításainkat, a szerkesztőt és a saját térképeket.",
         "shortcuts": "Parancsikonok",
         "desktop": "Az asztalon",
         "start_menu": "A Start menüben",
@@ -394,6 +400,8 @@ TEXTS = {
         "cheats": "Kody (klawisze twórców: h, W, B, A, K, M, #, x)",
         "unlock": "Wszystkie misje odblokowane (Twoje postępy pozostają bez zmian)",
         "skip_verify": "Pomiń weryfikację plików gry - instaluj jak jest",
+        "skip_verify_hint": "Dla innych wersji gry niż ta ze Steama. Gra się zainstaluje i uruchomi, ale możesz nie "
+                            "dostać naszych poprawek, edytora ani własnych map.",
         "shortcuts": "Skróty",
         "desktop": "Na pulpicie",
         "start_menu": "W menu Start",
@@ -464,6 +472,8 @@ TEXTS = {
         "cheats": "Batotas (teclas de programador: h, W, B, A, K, M, #, x)",
         "unlock": "Todas as missões desbloqueadas (o teu progresso fica como está)",
         "skip_verify": "Ignorar a verificação dos ficheiros do jogo - instalar como está",
+        "skip_verify_hint": "Para versões do jogo que não sejam a do Steam. O jogo instala-se e funciona, mas podes "
+                            "ficar sem as nossas correções, o editor ou os mapas próprios.",
         "shortcuts": "Atalhos",
         "desktop": "No ambiente de trabalho",
         "start_menu": "No menu Iniciar",
@@ -534,6 +544,8 @@ TEXTS = {
         "cheats": "Читы (клавиши разработчиков: h, W, B, A, K, M, #, x)",
         "unlock": "Все миссии открыты (ваш прогресс не меняется)",
         "skip_verify": "Пропустить проверку файлов игры - установить как есть",
+        "skip_verify_hint": "Для версий игры не из Steam. Игра установится и запустится, но наших исправлений, редактора "
+                            "и своих карт может и не быть.",
         "shortcuts": "Ярлыки",
         "desktop": "На рабочем столе",
         "start_menu": "В меню «Пуск»",
@@ -604,6 +616,8 @@ TEXTS = {
         "cheats": "Cheaty (klávesy vývojářů: h, W, B, A, K, M, #, x)",
         "unlock": "Všechny mise odemčené (tvůj postup zůstane, jak je)",
         "skip_verify": "Přeskočit kontrolu souborů hry - instalovat, jak je",
+        "skip_verify_hint": "Pro jiné verze hry než tu ze Steamu. Hra se nainstaluje a spustí, ale možná nebudeš mít "
+                            "naše opravy, editor ani vlastní mapy.",
         "shortcuts": "Zástupci",
         "desktop": "Na ploše",
         "start_menu": "V nabídce Start",
@@ -1418,6 +1432,51 @@ def failure_text(lang, e, target, status):
 
 # ---- the window ----
 
+class Tooltip:
+    """A hint for a widget: after the mouse has rested on it for a moment, a small window with
+    `text()` (its current language) next to the pointer, kept inside the screen; gone when the mouse
+    leaves, a button is pressed or the widget is used by the keyboard."""
+    def __init__(self, widget, text, wrap):
+        self.widget, self.text, self.wrap = widget, text, wrap
+        self.window = None
+        self.pending = None
+        widget.bind("<Enter>", self.schedule, add="+")
+        widget.bind("<Leave>", self.hide, add="+")
+        widget.bind("<ButtonPress>", self.hide, add="+")
+        widget.bind("<KeyPress>", self.hide, add="+")
+
+    def schedule(self, _=None):
+        self.hide()
+        self.pending = self.widget.after(600, self.show)
+
+    def show(self):
+        self.pending = None
+        text = self.text()
+        if not text or self.window:
+            return
+        w = self.window = tk.Toplevel(self.widget)
+        w.wm_overrideredirect(True)
+        w.attributes("-topmost", True)
+        tk.Label(w, text=text, justify="left", wraplength=self.wrap, background="#ffffe1", foreground="black",
+                 relief="solid", borderwidth=1, padx=6, pady=4).pack()
+        w.update_idletasks()
+        x, y = self.widget.winfo_pointerx() + 12, self.widget.winfo_pointery() + 18
+        sw, sh = w.winfo_screenwidth(), w.winfo_screenheight()
+        width, height = w.winfo_reqwidth(), w.winfo_reqheight()
+        x = max(0, min(x, sw - width - 4))
+        if y + height > sh - 4:   # no room under the pointer: above it
+            y = max(0, self.widget.winfo_pointery() - height - 8)
+        w.wm_geometry(f"+{x}+{y}")
+
+    def hide(self, _=None):
+        if self.pending:
+            self.widget.after_cancel(self.pending)
+            self.pending = None
+        if self.window:
+            self.window.destroy()
+            self.window = None
+
+
 class LogWriter:
     """build.py prints its log: the lines go to the window through the queue."""
     def __init__(self, events):
@@ -1542,6 +1601,9 @@ class Installer:
         w["unlock"].grid(row=1, column=0, sticky="w")
         w["skip_verify"] = ttk.Checkbutton(w["options"], variable=self.skip_verify)
         w["skip_verify"].grid(row=2, column=0, sticky="w")
+        # what the box gives up, before the install: a hint under the mouse (and the log's first lines
+        # while it is ticked, show_language_note - the window does not grow for it)
+        self.skip_hint = Tooltip(w["skip_verify"], lambda: self.t("skip_verify_hint"), self.px(380))
 
         w["shortcuts"] = ttk.LabelFrame(frame, padding=6)
         w["shortcuts"].grid(row=5, column=0, columnspan=3, sticky="ew", pady=(6, 0))
@@ -1676,8 +1738,9 @@ class Installer:
         self.game_language.set(self.language_label(code) if code else "")
 
     def show_language_note(self):
-        """The log starts with how to get the game's other languages from Steam."""
-        lines = []
+        """The log starts with what the box "install as it is" gives up while it is ticked, then how to get
+        the game's other languages from Steam."""
+        lines = [self.t("skip_verify_hint"), ""] if self.skip_verify.get() else []
         if not self.buildable and is_game(self.steam.get().strip()):
             lines.append(self.t("no_language"))
         if self.missing:

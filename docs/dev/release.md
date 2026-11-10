@@ -155,7 +155,10 @@ the window, with its log in `logs\install.log` of the install folder and exit co
 `Setup.exe --auto [--target <folder>] [--no-shortcuts]` opens the window, which installs at once with what it
 shows and closes at the end (the same log and exit code - a test of the window
 itself, since Tk's buttons take no posted clicks). The Install / Update button has the focus,
-so Enter or Space installs.
+so Enter or Space installs. The box "Skip verification of the game files - install as it is" says before the install what it
+gives up (`skip_verify_hint`, seven languages): in a hint when the mouse rests on it (a small Tk
+window, `installer.Tooltip`) and, while it is ticked, in the first lines of the log area - the window
+does not grow for it; its label is as before.
 
 **Updating** is running a newer Setup over the install: `build.py` copies only what changed and
 leaves alone what it does not write, so the player keeps the high score tables (not
