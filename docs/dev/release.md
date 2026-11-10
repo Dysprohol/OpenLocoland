@@ -156,14 +156,19 @@ the window, with its log in `logs\install.log` of the install folder and exit co
 shows and closes at the end (the same log and exit code - a test of the window
 itself, since Tk's buttons take no posted clicks). The Install / Update button has the focus,
 so Enter or Space installs. The window started without `--target` (by the launcher of v0.2.10 and
-before, by a double-click) opens on the existing install (`installer.find_install`): the folder the
-last install finished through the window went to (remembered in `%LOCALAPPDATA%\OpenLocoland\last-install.json`
-next to the captures - not in the registry; `--silent` never writes it, `--auto` only into a
-`--state-folder <folder>` given for tests; Uninstall of that folder forgets it), else the folder of a
-running Locoland.exe, else the one the game's shortcut of the Start menu or of the desktop starts (read
-through IShellLink: installs of v0.2.0-v0.2.10 remembered nothing), each only when it holds an
-`OpenLocoland.json`, else the default folder; the player can change it as before. `--silent` and
-`--auto` without `--target` keep the default folder. The box "Skip verification of the game files - install as it is" says before the install what it
+before, by a double-click) opens on the existing install (`installer.find_install`): the folder of a
+running Locoland.exe (a player with two installs who updates one from its own launcher), else the
+folder the last install finished through the window went to (remembered in
+`%LOCALAPPDATA%\OpenLocoland\last-install.json` next to the captures - not in the registry;
+`--silent` never writes it, `--auto` only into a `--state-folder <folder>` given for tests; Uninstall
+of that folder forgets it, Uninstall of another install keeps it), else the one the game's shortcut of
+the Start menu or of the desktop starts (read through IShellLink: installs of v0.2.0-v0.2.10
+remembered nothing), each only when it is on a local drive (UNC paths and network drives are skipped
+untouched) and holds an `OpenLocoland.json`, else the default folder; a candidate whose check fails is
+skipped, so the lookup cannot stop Setup; the player can change the folder as before. `--silent` and
+`--auto` without `--target` keep the default folder. A file missing from or unreadable in the Steam
+copy (`source_missing`) and the game running from the install folder (`running`) are said in the
+window's language, in the window and the log alike. The box "Skip verification of the game files - install as it is" says before the install what it
 gives up (`skip_verify_hint`, seven languages): in a hint when the mouse rests on it (a small Tk
 window, `installer.Tooltip`) and, while it is ticked, in the first lines of the log area - the window
 does not grow for it; its label is as before. (The sentence says the game will install and run; one
