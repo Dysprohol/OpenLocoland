@@ -45,11 +45,57 @@ import os
 import queue
 import shutil
 import sys
-import threading
-import tkinter as tk
-import winreg
-from tkinter import filedialog, messagebox, ttk
-from tkinter.scrolledtext import ScrolledText
+
+
+def keep_modules_in_memory():
+    """Setup.exe (PyInstaller, one file) keeps its Python modules in an archive inside the exe and reads
+    each one from the exe the first time it is imported - so a module first needed half way through
+    the install failed when an antivirus had taken the exe meanwhile (the OSError of v0.2.10:
+    "[Errno 22] Invalid argument: '...Setup.exe'"). The archive's part with the modules is read into
+    memory once at the start, and the modules are taken from there: after the start Setup reads
+    nothing of its own exe. Returns the bytes kept, or 0 outside a frozen Setup (or when the
+    archive is not the kind this knows: then the modules are read from the exe as before)."""
+    importers = sys.modules.get("pyimod02_importers")
+    archive = getattr(importers, "pyz_archive", None)
+    reader = sys.modules.get("pyimod01_archive")
+    if archive is None or reader is None or not hasattr(archive, "_filename") or not hasattr(archive, "toc"):
+        return 0
+    import marshal
+    import zlib
+    toc = archive.toc
+    end = max((offset + length for _, offset, length in toc.values()), default=0)
+    with open(archive._filename, "rb") as f:
+        f.seek(archive._start_offset)
+        data = f.read(end)
+    if len(data) != end:
+        return 0
+    code_kinds = (reader.PYZ_ITEM_MODULE, reader.PYZ_ITEM_PKG)
+
+    def extract(name, raw=False):   # ZlibArchiveReader.extract, from memory
+        entry = toc.get(name)
+        if entry is None:
+            raise KeyError(f"No entry named {name!r} found in the archive!")
+        kind, offset, length = entry
+        if kind == reader.PYZ_ITEM_NSPKG:
+            return None
+        obj = zlib.decompress(data[offset:offset + length])
+        if kind in code_kinds and not raw:
+            try:
+                obj = marshal.loads(obj)
+            except EOFError as e:
+                raise ImportError(f"Failed to unmarshal PYZ entry {name!r}!") from e
+        return obj
+    archive.extract = extract
+    return len(data)
+
+
+MODULES_IN_MEMORY = keep_modules_in_memory()
+
+import threading  # noqa: E402
+import tkinter as tk  # noqa: E402
+import winreg  # noqa: E402
+from tkinter import filedialog, messagebox, ttk  # noqa: E402
+from tkinter.scrolledtext import ScrolledText  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build  # noqa: E402
@@ -964,6 +1010,9 @@ def install(steam, target, choices, ver, progress=None, skip_verify=False):
     locofix = os.path.join(BUNDLE, "LocoFix.dll") if BUNDLE else None
     os.makedirs(CAPTURED, exist_ok=True)
     print(f"OpenLocoland {ver}: {steam} -> {target}")
+    if BUNDLE:
+        print(f"Setup's modules: {MODULES_IN_MEMORY / 1e6:.1f} MB read into memory at the start"
+              if MODULES_IN_MEMORY else "Setup's modules: read from Setup.exe when first used")
     manifest = read_manifest(target)
     files = build.build(steam, target, locofix=locofix, captured=CAPTURED, progress=progress, skip_verify=skip_verify,
                         previous=(manifest or {}).get("files", []), clean=choices.get("clean", True))
