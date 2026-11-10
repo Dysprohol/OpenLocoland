@@ -1803,7 +1803,9 @@ def arguments_parser():
             message_box(text, error=True)
             sys.exit(2)
 
-    return Parser(prog="Setup.exe", description=APP + " installer")
+    # in a message box: lines short enough for its width (argparse wraps for an 80 column console)
+    narrow = (lambda prog: argparse.HelpFormatter(prog, width=58, max_help_position=20)) if sys.stderr is None else None
+    return Parser(prog="Setup.exe", description=APP + " installer", **({"formatter_class": narrow} if narrow else {}))
 
 
 def main():
