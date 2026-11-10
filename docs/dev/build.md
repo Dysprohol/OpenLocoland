@@ -17,7 +17,12 @@ permanent part of the game - it translates DirectX 7 to modern APIs. Settings in
 depth differs from the game's), `CenterAppWindow = true`, `Bilinear2DOperations = false`
 (with it on dgVoodoo filters every Blt and shifts the window's picture by a pixel, see
 LocoFix fix 23 below; the price is a nearest-pixel stretch of mission 1 and the menus in a
-window bigger than 1024x768).
+window bigger than 1024x768), `FullscreenAttributes = fake` (full screen is a window as big as the
+screen and not exclusive full screen: with exclusive full screen every Windows dialog of the editor -
+Mission settings, New map, Map size, Load - took the activation and the game went to the taskbar
+until the dialog closed; with the screen-size window the game stays behind the dialog. Checked by the
+maintainer in full screen on his machine, 2026-11-10; not checked by a script - a full-screen test
+started from a script draws nothing).
 
 **Configuration.** The game reads `<exe name>.cfg`, i.e. `Locoland.cfg`. Graphics settings
 (ScreenX, ScreenY, BPP, Device, FullScreen, SoundHighQuality, WindowPositionX/Y) are kept in

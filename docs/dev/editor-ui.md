@@ -153,8 +153,9 @@ long title JEDNOSTKI, ISTOTY, which the to-do list had outside the frame - it fi
 tool with the placing helps (beside the strip on one row at this width), of Paint, Ground height and
 Track, an object's panel, an enemy factory's panel, the Arrivals panel, and the dialogs Load, Mission
 settings, New map and Map size (opened from the Menu panel, closed with Cancel; the editor draws again
-after each). Not clean but not broken: while a dialog is open the game's window goes to the taskbar and
-comes back when it closes; an object's panel on a rail is titled "(VID 610)" without a name; the
+after each). While a dialog was open the game's window went to the taskbar and came back when it closed - gone since
+v0.2.10, where full screen is a screen-size window (`FullscreenAttributes = fake` in `game/dgVoodoo.conf`,
+"Graphics and dgVoodoo"). Not clean but not broken: an object's panel on a rail is titled "(VID 610)" without a name; the
 palette's list of categories starts right under its title and ends close to the bottom strip; the
 grid's points of the placing helps are faint on bright ground. 2560 x 1440 is not checked.
 
