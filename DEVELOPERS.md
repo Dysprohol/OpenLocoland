@@ -113,7 +113,7 @@ Sections: "Working with the code"; "Resolutions and widescreen"; "Status and kno
 
 Paragraphs: Frame rate at high resolutions; CI.
 
-### [release.md](docs/dev/release.md) (~29 KB)
+### [release.md](docs/dev/release.md) (~35 KB)
 
 Sections: "Release"; "Distribution"; "Next".
 

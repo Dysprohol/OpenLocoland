@@ -237,14 +237,30 @@ of it 25.2 MB deflated, 50.7 MB stored), shows its window after 0.3-0.5 s, runs 
 unpacks nothing. A small starter with the payload beside it does not work for the installed
 launchers, which download only the exe (it would have to download the payload itself, which looks
 worse); a self-extracting archive (IExpress, 7-Zip) unpacks into `%TEMP%` as PyInstaller does. The
-release stays the one-file exe. Not done, for the maintainer to choose: shipping the one-folder
-build as a second asset (`OpenLocoland-<version>-Setup.zip`) for players whose antivirus blocks the
-exe - no temporary files, one process, but it has to be unpacked before it runs -, and a launcher
-of a later version preferring that zip (it would unpack it with the zip reader of
-`editor_exchange.cpp` into `%LOCALAPPDATA%\OpenLocoland\setup\<tag>` and start Setup.exe there; the
-one-file exe would stay for the older installs); building PyInstaller's bootloader from its source
-(the exe then does not share the stock bootloader's bytes, which many unrelated programs carry);
-code signing, which needs a certificate.
+release stays the one-file exe. Ready for a later release to switch, the switch the maintainer's:
+`release.py --zip` (off by default) also builds the one-folder Setup and packs it into
+`build\release\Setup.zip` (Setup.exe at its root), and from this version on the launcher can take
+such an asset - one ending with `Setup.zip` - instead of the exe: `PREFER_SETUP_ZIP` in
+`update_check.cpp` says which a release with both gives (`false`, the default: the exe, as before;
+a release with only the zip gives the zip). The zip is downloaded and checked as the exe is (size,
+SHA-256, the zone mark, Downloads), its central directory is checked before anything is unpacked
+(at most 10000 files and 512 MB, the zip itself at most 256 MB, every entry a plain relative path -
+no drive, no root, no `..`, no name Windows reserves -, `Setup.exe` at the root), and it is
+unpacked with the map exchange's zip reader (`zip_read.cpp`, moved out of `editor_exchange.cpp`)
+into a new empty folder of its own, `%LOCALAPPDATA%\OpenLocoland\setup\<tag>` (`<tag>-2` ... when that
+is taken; Uninstall removes it with the captures); only that `Setup.exe` gets the zone mark (so
+Windows shows its "Open File - Security Warning" as for the exe) and is started, in its folder, with
+`--target <the game's folder>` - the exe is started as before, without arguments, so it opens on the
+default folder. Any failure removes the folder and falls back to the release's `Setup.exe`, or,
+without one, to "The download failed" with the GitHub link. The inflater has no limit of its own on
+what a stream unpacks to (each entry is checked against its declared size and CRC only when it is
+done): the bounds hold for the sizes the zip declares, and the archive is the one whose size and
+SHA-256 the release states. So the switch for a later release: build with `--zip`, upload
+`OpenLocoland-<version>-Setup.zip` next to the exe (the exe stays: installs up to this version find
+only it), and set `PREFER_SETUP_ZIP = true` in a version whose launchers should take the zip.
+`LOCOFIX_UPDATE_PREFER=zip|exe` overrides the constant in a test (only with `LOCOFIX_UPDATE_TEST`).
+Not done: building PyInstaller's bootloader from its source (the exe would not share the stock
+bootloader's bytes, which many unrelated programs carry); code signing, which needs a certificate.
 
 **Uninstalling**: the Uninstall button of Setup (after a question) removes the shortcuts, the
 install folder with everything in it and `%LOCALAPPDATA%\OpenLocoland`; deleting the install
@@ -298,7 +314,23 @@ their message box (v0.2.10's showed nothing). A custom Defender scan (`MpCmdRun 
 v0.2.10's - which says nothing of the cloud's judgement that quarantined v0.2.10 on a player's
 machine. Not checked: the window at a screen scale above 100 % (this screen is 96 DPI; DPI
 awareness is new), Uninstall, a CD edition or `--skip-verify` install, the launcher's update
-check against this Setup, other Windows versions.
+check against the one-file Setup through Windows' warning (below), other Windows versions.
+The zip path of the update check (LocoFix of v0.2.10-7-g6478b7d, stand-in releases through
+`LOCOFIX_UPDATE_TEST` with `file:///` assets, `LOCOFIX_UPDATE_PREFER=zip`): a good zip next to the
+exe - downloaded, SHA-256 checked, 1628 files unpacked into `setup\v9.9.9-test`, the same files as
+the one-folder build, only `Setup.exe` with the zone mark, and Run Setup asked to start it with
+`--target <the game's folder>`; Windows' "Open File - Security Warning" came up and was cancelled
+(not run), so the log says "did not start" - the unpacked Setup started directly with those
+arguments opened its window on the game's folder, one process, nothing in `%TEMP%`; a second run took
+`setup\v9.9.9-test-2`; a zip with a `../evil.txt` entry and one with `C:/evil.txt` - refused before
+anything was unpacked ("an entry that is not a plain path inside the folder"), no folder made, no
+`evil.txt` anywhere, the release's Setup.exe downloaded instead; a truncated zip without an exe -
+"not a zip file", "The download failed" with the link; a release with only the exe, and the good
+release without the override - the exe, as before. The one-folder Setup installs the same files as
+the one-file one. The map exchange with the moved zip reader: two reporters' zips imported, the
+imported map exported and imported again - the export's entries (packed bytes too) and the 24
+imported files the same as with the LocoFix before the move. The test downloads, the `setup`
+folder and `UpdateLastCheck` were put back afterwards.
 
 **By hand**, the player may have to: allow the unsigned `Setup.exe` past SmartScreen ("More info"
 > "Run anyway") or an antivirus that flags PyInstaller programs (in November 2026 a player's
