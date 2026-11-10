@@ -240,6 +240,55 @@ line goes on to x 1384 out of sight (7 rails; the one past 300 px, the fort and 
 the hill kept, `crop3.vid` of 1024 x 768, the ground object at 512, 384; `map_tool.py check`
 round-trips every map and image of the game folder.
 
+**How big a map can be** (measured 2026-11-10 on 3d284bf: a 1024 x 768 window, the frame limit at 60,
+test maps with a labelled ground picture of their own made outside the editor, otherwise empty; memory
+is the process's peak private bytes). The engine has no fixed map size - HEAD's size is a float, the
+GRID, the object hash (`ObjectMap_Construct`) and the minimap follow it - and what bounds a map is
+memory: the exe is not large-address-aware (PE characteristics 0x010F), so the game has 2 GB of
+address space, and the ground's picture is loaded whole, two 256 x 256 16-bit textures a tile
+(`GroundVid_LoadImage`). In play that is about 160 MB + 5.2 bytes a pixel: 4096 x 3072 228 MB,
+8192 x 6144 440 MB, 10240 x 10240 733 MB, 12288 x 12288 954 MB, 16384 x 16384 1553 MB (1917 MB of
+address space - it loads and scrolls, with nothing left for a mission), all at 60 fps, the grounds up
+to 10240 x 10240 loaded in 0.3 - 1 s from a warm disk cache; 18432 x 18432 ends the game at load
+(`Couldn't lock texture surface`, then the fatal `HASH_MAP: Enough memory`). A long map works too (12288 x 1536, 1536 x 12288, 32512 x 1024), and so does
+a crowded one (mission 13's rails and static objects laid 12 times on 9216 x 9216: 21,685 objects, 5508
+rails, 59.5 fps). Two limits of the engine come before memory. A side is at most 32767 px: the
+picture's size in the image's HEAD is 16-bit, and `RailPos_Save` writes a car's rail points as 16-bit
+x, y, z. And **rail crossings are marked only below 7500 px**: `RailMap_FindCrossings` sorts the rail
+points into `g_railGrid`, 100 x 100 cells of 75 px, and a point with x or y from 7500 goes into no
+cell - on the crowded map the copies of the track below 7500 had 49 - 56 links marked each
+(`RailLink.crossing`, read from the running game), the copies across the line half of that, the corner
+15; what trains do at a crossing left unmarked was not played.
+
+The editor needs far more than the game, and its limit is Save. The first use of a ground tool reads
+the picture (`ground_prepare`: the picture, its heights, the original of both and the texture of every
+pixel, then a copy for each stroke that `clear()` keeps allocated) - 13.4 bytes a pixel stay; the undo
+history keeps the strokes' rectangles (`trim_history`: 500 steps and 256 MB by its own count, which
+adds up the vectors' sizes, not what `push_back` allocated - when the first step was dropped, at 226
+strokes, the process had grown by 370 MB); and writing the picture (`ground_vid`, `write_res`, `write_ground_picture`:
+about seven whole copies of it, each one block) takes 22 - 30 bytes a pixel more for a moment - at
+Save, at Run the level (the run's copy) and in File > Map size. On a fresh map the whole round - the
+ground tools, track, a factory, Save, a reload, Run the level and back - works up to 5120 x 4096
+(21 MP, 1165 MB at the peak) and Save crashes from 5120 x 4608 (23.6 MP); at 10240 x 10240 the first
+click of a ground tool does. The crash is a C++ exception out of memory (`error.log`: `EXCEPTION!`
+at `KERNELBASE!RaiseException`; the crash log does not write those), raised when the process stands at
+1040 - 1180 MB and asks for one more block as long as the picture, which the 2 GB no longer have in one
+piece. Because `save_map` writes the `.map`, then marks the edits saved, then writes the picture, the
+map is left pointing at its old picture: the painting is lost with the session. **File > New's own
+largest map is not safe:** on a 4096 x 4096 meadow Save crashed after 112 ground strokes (with 352
+rails and 128 objects laid between them; the process at 761 MB before Save). On 4096 x 3072 the same
+spam with 160 strokes, and 305 strokes with the history at its cap, saved, ran and saved again with
+1117 and 1140 MB at the peak - inside the range where the others failed, so with little to spare; on
+3072 x 2304, the campaign's largest size, 304 strokes peaked at 854 MB. Without the ground tools the editor is as good as the game: on 10240 x 10240 792
+rails and 288 objects (trains of both armies, factories, repair points, forts) were laid, saved,
+loaded, run and saved again at 60 fps (784 MB). With the large-address-aware flag set on a private
+copy of the exe the rounds that crash passed (6144 x 4608, and 8192 x 6144 with 2554 MB) and
+18432 x 18432 played - one pass each, not a test of the game. None of this is fixed yet (the picture
+written before the map and as a stream of tiles, the failure caught and said instead of thrown, a
+bound on the area in File > New and Map size, a crossing grid as big as the map); until it is, a map
+to paint is safe at the campaign's sizes, 3072 x 2304 at most, and a map's track should stay within
+7500 px.
+
 **The map's frame.** The camera of a held level goes 300 px past the map, where nothing is drawn;
 the outside gets a dim 32 px grid and the map's edge a frame, so an empty map stands out - the track
 out there stays visible between the lines.

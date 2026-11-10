@@ -91,7 +91,7 @@ Paragraphs: Mission settings and push lines; The enemy's trains of the script; T
 
 Sections: "Editor mode" (continued).
 
-Paragraphs: Ground, gravel bed, decals; The relief and the heights of objects; A new map; The map's frame; The armies' colours; On the track; The object's panel, the guns' sockets, the palette; Wholes, fly nests and mines; Flags; The rows of the ground's tools; The gravel bed in the Paint tool; Wrecks on the track; Trains, the vehicles' palette, patrols; On the train's own track; Rail kinds and ramps; The ground's picture, water, regions; Paint the ground; Regions, reviewed; Sheets of water and lava.
+Paragraphs: Ground, gravel bed, decals; The relief and the heights of objects; A new map; How big a map can be; The map's frame; The armies' colours; On the track; The object's panel, the guns' sockets, the palette; Wholes, fly nests and mines; Flags; The rows of the ground's tools; The gravel bed in the Paint tool; Wrecks on the track; Trains, the vehicles' palette, patrols; On the train's own track; Rail kinds and ramps; The ground's picture, water, regions; Paint the ground; Regions, reviewed; Sheets of water and lava.
 
 ### [editor-ui.md](docs/dev/editor-ui.md) (~16 KB)
 
