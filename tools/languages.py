@@ -20,7 +20,7 @@ of the installed game and of every downloaded depot into captured/<code>/ (outsi
 keeps them there.
 
 A Czech edition of the game ("Steamland", US Action, 2003) was sold on CD and never on Steam:
-the Steam exe and files with Czech texts and fonts (notes/czech-edition.md). build.py knows it
+the Steam exe and files with Czech texts and fonts (docs/dev/czech-edition.md). build.py knows it
 by the SHA-256 of its strings.ini (EDITIONS) and captures it like a depot into captured/cs: from
 the game folder itself when that is the edition (a player without Steam gives it to build.py or
 Setup) or from a folder named Steamland (EDITION_FOLDER) in or next to the Steam game's. The
@@ -72,7 +72,7 @@ STEAM_APP_ID = 352130
 DEPOT_LANGUAGES = {352131: "en", 352132: "de", 352133: "hu", 352134: "pl", 352135: "pt", 352136: "ru"}
 # Editions of the game outside Steam, by the SHA-256 of their strings.ini: the Czech edition
 # "Steamland" (US Action, 2003) - the Steam exe and files with Czech texts, all its fonts with the
-# Czech letters, no vid\logo.bmp (notes/czech-edition.md).
+# Czech letters, no vid\logo.bmp (docs/dev/czech-edition.md).
 EDITIONS = {"85bec1a91b013ca0001a6917ade6dff771bf21e5707a6a1346e16b35788401c0": "cs"}
 EDITION_FOLDER = "Steamland"   # an edition's own folder name, looked for in and next to the Steam game's
 

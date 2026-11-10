@@ -57,6 +57,10 @@ Sections: "How the game is built".
 
 Paragraphs: Engine; Graphics and dgVoodoo; Configuration; Game logic in scripts; Data; Texts; Developer mode; Languages; Czech; The Czech letters; The Czech edition; Logs.
 
+### [czech-edition.md](docs/dev/czech-edition.md) (~7 KB)
+
+Sections: "The Czech edition of the game"; "What it is"; "The same as Steam"; "What differs"; "Slips in the edition's texts"; "What OpenLocoland does with it".
+
 ### [formats.md](docs/dev/formats.md) (~46 KB)
 
 Sections: "Data formats".

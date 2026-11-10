@@ -167,7 +167,7 @@ A pack that really needs its base's files (letters only those fonts have) says `
 ## A capture of the pack's own language
 
 When a player has an edition of the game in the pack's language that Steam does not ship (the
-Czech edition sold on CD, `notes/czech-edition.md`), `build.py` captures it into `captured/<code>`
+Czech edition sold on CD, `docs/dev/czech-edition.md`), `build.py` captures it into `captured/<code>`
 (`languages.EDITIONS` names such editions by the SHA-256 of their `strings.ini`; the folder is the
 game folder itself, or one named `Steamland` in or next to the Steam game's) and builds the pack
 on it instead of on `base=`. The edition's texts and fonts then stay: of the pack only its own

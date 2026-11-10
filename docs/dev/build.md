@@ -191,7 +191,7 @@ pack's copy (`language.cpp`), as the Polish pack's own fonts are.
 Czech `strings.ini`, menu pages and mission texts, and fonts that have every Czech letter in its
 CP1250 cell (the Cyrillic gone; no `vid\logo.bmp` - the root's English "Steamland" logo fits
 it). The inventory of a tester's copy, its slips and what was decided are in
-`notes/czech-edition.md`. `languages.py` knows the edition by the SHA-256 of its `strings.ini`
+`czech-edition.md`. `languages.py` knows the edition by the SHA-256 of its `strings.ini`
 (`EDITIONS`), and `build.py` and Setup capture it like a depot into `captured/cs` (`capture_all`,
 `edition_folders`): from the game folder itself when that is the edition - a player without Steam
 points `build.py --steam` or Setup's Steam folder at it, and the rest of the build is as with
