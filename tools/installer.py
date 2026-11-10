@@ -102,6 +102,25 @@ import build  # noqa: E402
 import languages  # noqa: E402
 
 BUNDLE = getattr(sys, "_MEIPASS", None)
+# what the bootloader unpacked, listed at the start, and the payload's list that release.py packs
+# (payload.txt): a failure can then name the file of Setup that went missing (shutil.copy2 and others
+# raise without the file's name), and the install checks the payload before it builds anything
+BUNDLE_FILES = [os.path.join(d, f) for d, _, fs in os.walk(BUNDLE) for f in fs] if BUNDLE else []
+PAYLOAD_LIST = "payload.txt"
+
+
+def missing_own_files():
+    """The files of Setup that are gone: its exe, the payload's (payload.txt) and what was unpacked at
+    the start - an antivirus may take them while Setup runs."""
+    if not BUNDLE:
+        return []
+    listed = []
+    try:
+        with open(os.path.join(BUNDLE, PAYLOAD_LIST), encoding="utf-8") as f:
+            listed = [os.path.join(BUNDLE, line.strip()) for line in f if line.strip()]
+    except OSError:
+        listed = [os.path.join(BUNDLE, PAYLOAD_LIST)]
+    return [f for f in [sys.executable] + listed + BUNDLE_FILES if not os.path.isfile(f)]
 REPO = build.REPO
 APP = "OpenLocoland"
 MANIFEST = "OpenLocoland.json"
@@ -192,6 +211,11 @@ TEXTS = {
         "game_name": "Locoland",
         "editor_name": "Locoland - map editor",
         "editor_desc": "The map editor of OpenLocoland",
+        "damaged": "Setup cannot read its own file:\n{file}\n\nAn antivirus program may have removed or blocked "
+                   "Setup.exe or the files it unpacked while it was running. Download Setup again from the "
+                   "project's page on GitHub and run it.",
+        "kept": "The game in {path} is as it was before this run.",
+        "resume": "The update of {path} stopped half way: run Setup again and it completes it.",
     },
     "de": {
         "name": "Deutsch",
@@ -256,6 +280,12 @@ TEXTS = {
         "game_name": "Locoland",
         "editor_name": "Locoland - Karteneditor",
         "editor_desc": "Der Karteneditor von OpenLocoland",
+        "damaged": "Setup kann eine eigene Datei nicht lesen:\n{file}\n\nVielleicht hat ein Virenschutzprogramm "
+                   "Setup.exe oder die von ihm entpackten Dateien während der Ausführung entfernt oder gesperrt. "
+                   "Lade Setup erneut von der Seite des Projekts auf GitHub herunter und starte es.",
+        "kept": "Das Spiel in {path} ist so wie vor diesem Lauf.",
+        "resume": "Die Aktualisierung von {path} ist mittendrin stehen geblieben: starte Setup erneut, dann wird "
+                  "sie abgeschlossen.",
     },
     "hu": {
         "name": "Magyar",
@@ -319,6 +349,11 @@ TEXTS = {
         "game_name": "Locoland",
         "editor_name": "Locoland - pályaszerkesztő",
         "editor_desc": "Az OpenLocoland pályaszerkesztője",
+        "damaged": "A telepítő nem tudja olvasni a saját fájlját:\n{file}\n\nLehet, hogy egy víruskereső futás "
+                   "közben eltávolította vagy zárolta a Setup.exe-t vagy az általa kicsomagolt fájlokat. Töltsd "
+                   "le újra a telepítőt a projekt GitHub-oldaláról, és futtasd.",
+        "kept": "A játék itt: {path} ugyanolyan, mint a futtatás előtt.",
+        "resume": "A(z) {path} frissítése félúton megállt: futtasd újra a telepítőt, és befejezi.",
     },
     "pl": {
         "name": "Polski",
@@ -382,6 +417,11 @@ TEXTS = {
         "game_name": "Locoland",
         "editor_name": "Locoland - edytor map",
         "editor_desc": "Edytor Map OpenLocoland",
+        "damaged": "Instalator nie może odczytać własnego pliku:\n{file}\n\nByć może program antywirusowy usunął "
+                   "lub zablokował Setup.exe albo rozpakowane przez niego pliki w trakcie działania. Pobierz "
+                   "instalator ponownie ze strony projektu na GitHubie i uruchom go.",
+        "kept": "Gra w {path} jest taka jak przed tym uruchomieniem instalatora.",
+        "resume": "Aktualizacja {path} zatrzymała się w połowie: uruchom instalator ponownie, a dokończy ją.",
     },
     "pt": {
         "name": "Português",
@@ -445,6 +485,11 @@ TEXTS = {
         "game_name": "Locoland",
         "editor_name": "Locoland - editor de mapas",
         "editor_desc": "O Editor de Mapas do OpenLocoland",
+        "damaged": "O Setup não consegue ler um ficheiro seu:\n{file}\n\nTalvez um antivírus tenha removido ou "
+                   "bloqueado o Setup.exe ou os ficheiros que ele extraiu enquanto corria. Descarrega o Setup de "
+                   "novo da página do projeto no GitHub e executa-o.",
+        "kept": "O jogo em {path} está como antes desta execução.",
+        "resume": "A atualização de {path} parou a meio: executa o Setup de novo e ele termina-a.",
     },
     "ru": {
         "name": "Русский",
@@ -508,6 +553,11 @@ TEXTS = {
         "game_name": "Locoland",
         "editor_name": "Locoland - редактор карт",
         "editor_desc": "Редактор Карт OpenLocoland",
+        "damaged": "Установщик не может прочитать собственный файл:\n{file}\n\nВозможно, антивирус удалил или "
+                   "заблокировал Setup.exe или распакованные им файлы во время работы. Скачайте установщик заново "
+                   "со страницы проекта на GitHub и запустите его.",
+        "kept": "Игра в {path} осталась такой же, как до этого запуска.",
+        "resume": "Обновление {path} остановилось на полпути: запустите установщик снова, и он его завершит.",
     },
     "cs": {
         "name": "Čeština",
@@ -570,6 +620,11 @@ TEXTS = {
         "game_name": "Locoland",
         "editor_name": "Locoland - editor map",
         "editor_desc": "Editor Map OpenLocoland",
+        "damaged": "Instalátor nemůže přečíst vlastní soubor:\n{file}\n\nMožná antivirový program během běhu "
+                   "odstranil nebo zablokoval Setup.exe nebo soubory, které rozbalil. Stáhni instalátor znovu ze "
+                   "stránky projektu na GitHubu a spusť ho.",
+        "kept": "Hra v {path} je taková jako před tímto spuštěním.",
+        "resume": "Aktualizace {path} se zastavila v polovině: spusť instalátor znovu a dokončí ji.",
     },
 }
 UI_LANGUAGES = [("en", TEXTS["en"]["name"])] + sorted(((c, t["name"]) for c, t in TEXTS.items() if c != "en"),
@@ -980,13 +1035,142 @@ def steam_files_check(steam, lang, skip_verify=False):
                   for name in modified]
 
 
-def install(steam, target, choices, ver, progress=None, skip_verify=False):
+# ---- a run that is stopped half way leaves a whole game ----
+#
+# The build goes into <target>\.openlocoland-setup\new, which nothing of the game reads. Only when it
+# has finished, the files that differ from the install's go in (commit): first their list is written
+# as a journal (commit.json, flushed to the disk), then each file goes in with one rename on the same
+# disk (milliseconds for the whole lot), then the folder is removed. So a run killed (or stopped by
+# a missing file of its own) while building leaves the game as it was, and only a run killed in the
+# middle of the renames leaves a mixed one - which the next run of this Setup or a later one finishes
+# from the journal before anything else (and any older Setup repairs by building over it). After the
+# commit come the clean-up of what earlier versions left, the options, the shortcuts and, last, the
+# record OpenLocoland.json.
+
+WORK = ".openlocoland-setup"   # in the install folder: the files a run prepares (new\) and its journal
+JOURNAL = "commit.json"
+TEST_STOP = None   # --test-stop <point> (tests): ends the process hard there, as a kill would
+
+
+def test_stop(point):
+    if TEST_STOP == point:
+        print(f"--test-stop {point}: the process ends here")
+        sys.stdout.flush()
+        os._exit(3)
+
+
+def work_folder(target):
+    return os.path.join(target, WORK)
+
+
+def record_stamp(target):
+    """The size and time of the install's record, or None: a journal written before another Setup
+    finished an install there is stale (that Setup built the whole game again)."""
+    try:
+        st = os.stat(os.path.join(target, MANIFEST))
+    except OSError:
+        return None
+    return [st.st_size, st.st_mtime_ns]
+
+
+def write_json_safely(path, data):
+    """`data` as JSON at `path` through a temporary file flushed to the disk and a rename: the file is
+    either the old one or the whole new one."""
+    temp = path + ".tmp"
+    with open(temp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(temp, path)
+
+
+def same_file(a, b):
+    """build.copy's test: the same size and date, or the same content."""
+    import filecmp
+    sa, sb = os.stat(a), os.stat(b)
+    return sa.st_size == sb.st_size and (int(sa.st_mtime) == int(sb.st_mtime) or filecmp.cmp(a, b, shallow=False))
+
+
+def move_in(target, moves):
+    """Puts each staged file of `moves` (relative paths) at its place in the install folder with a
+    rename; one moved before an interruption is skipped. Returns how many it moved."""
+    staged = os.path.join(work_folder(target), "new")
+    moved = 0
+    for i, rel in enumerate(moves):
+        if i == len(moves) // 2:
+            test_stop("moving")
+        src, dst = os.path.join(staged, rel), os.path.join(target, rel)
+        if not os.path.isfile(src):
+            continue
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        os.replace(src, dst)
+        moved += 1
+    return moved
+
+
+def finish_interrupted(target):
+    """What an earlier run left in the install folder's work folder: a journal (it was killed while
+    moving its files in) - the rest is moved in, so the game is that version's whole again, unless
+    another Setup has finished an install there since; no journal (killed while preparing) - the
+    prepared files are removed, the game was not changed. Returns the line for the log, or None."""
+    work = work_folder(target)
+    if not os.path.isdir(work):
+        return None
+    try:
+        with open(os.path.join(work, JOURNAL), encoding="utf-8") as f:
+            journal = json.load(f)
+    except (OSError, ValueError):
+        journal = None
+    if journal and journal.get("record") == record_stamp(target):
+        moved = move_in(target, journal.get("moves", []))
+        line = (f"An earlier run of Setup ({journal.get('version')}) stopped while putting its files in: "
+                f"the other {moved} of its {len(journal.get('moves', []))} files put in now")
+    elif journal:
+        line = ("An earlier run of Setup stopped while putting its files in, and another Setup has updated "
+                "the install since: its files removed")
+    else:
+        line = "An earlier run of Setup stopped while preparing its files: they are removed (the game was not changed)"
+    shutil.rmtree(work)
+    return line
+
+
+def commit(target, ver, status):
+    """Puts what the build prepared in the work folder into the install folder: the files that differ
+    from the install's (the same test as build.copy's; the high scores of an install stay the
+    player's, as build.py leaves them), through the journal and renames. The rest is removed with the
+    work folder."""
+    staged = os.path.join(work_folder(target), "new")
+    moves, same = [], 0
+    for directory, _, files in os.walk(staged):
+        for f in files:
+            rel = os.path.relpath(os.path.join(directory, f), staged)
+            dst = os.path.join(target, rel)
+            if os.path.isfile(dst) and (build.player_data(rel) or same_file(os.path.join(directory, f), dst)):
+                same += 1
+            else:
+                moves.append(rel)
+    moves.sort()
+    test_stop("before-journal")
+    write_json_safely(os.path.join(work_folder(target), JOURNAL),
+                      {"version": ver, "record": record_stamp(target), "moves": moves})
+    status["phase"] = "moving"
+    move_in(target, moves)
+    shutil.rmtree(work_folder(target))
+    status["phase"] = "moved"
+    print(f"Put into {target}: {len(moves)} files new or changed, {same} left as they were (the same, or the player's)")
+
+
+def install(steam, target, choices, ver, progress=None, skip_verify=False, status=None):
     """Assembles the game into `target`, writes the options (and the game's language when one is
     given), the shortcuts and the record of the install. `choices`: cheats, unlock, desktop,
     start_menu (bool), game_language (a code or None: keep the saved one) and lang (the language
     of the shortcuts' names). `skip_verify`: bypass Steam.exe version check and leave the Steam files
-    our changes do not fit as they are. Prints its log; stops with SystemExit and the reason. Returns
-    the warnings of the files left so (steam_files_check)."""
+    our changes do not fit as they are. The game is built in the work folder and put in at the end
+    (commit, above); `status["phase"]` says how far it got: "preparing" (the game as it was),
+    "moving" (half put in: the next run finishes it), "moved". Prints its log; stops with SystemExit
+    and the reason. Returns the warnings of the files left so (steam_files_check)."""
+    status = {} if status is None else status
+    status["phase"] = "preparing"
     if not is_game(steam):
         sys.exit(f"No Locoland from Steam in {steam}")
     if inside(target, steam):
@@ -1008,14 +1192,41 @@ def install(steam, target, choices, ver, progress=None, skip_verify=False):
     if game_running(target):
         sys.exit("Locoland is running from the install folder - close it first")
     locofix = os.path.join(BUNDLE, "LocoFix.dll") if BUNDLE else None
+    missing = missing_own_files()
+    if missing:   # taken before the build: stop at once, the game untouched (failure_text names it)
+        raise FileNotFoundError(2, f"{len(missing)} files of Setup are missing", missing[0])
     os.makedirs(CAPTURED, exist_ok=True)
     print(f"OpenLocoland {ver}: {steam} -> {target}")
     if BUNDLE:
         print(f"Setup's modules: {MODULES_IN_MEMORY / 1e6:.1f} MB read into memory at the start"
               if MODULES_IN_MEMORY else "Setup's modules: read from Setup.exe when first used")
+    line = finish_interrupted(target)
+    if line:
+        print(line)
     manifest = read_manifest(target)
-    files = build.build(steam, target, locofix=locofix, captured=CAPTURED, progress=progress, skip_verify=skip_verify,
-                        previous=(manifest or {}).get("files", []), clean=choices.get("clean", True))
+    staged = os.path.join(work_folder(target), "new")
+    os.makedirs(staged)
+    # the whole game into the work folder (nothing of the install is read or written meanwhile); the
+    # clean-up of what earlier versions left runs on the install folder after the commit
+    try:
+        files = build.build(steam, staged, locofix=locofix, captured=CAPTURED, skip_verify=skip_verify,
+                            progress=(lambda f: progress(0.95 * f)) if progress else None,
+                            clean=choices.get("clean", True))
+        test_stop("built")
+        if game_running(target):   # started while the game was being built
+            sys.exit("Locoland is running from the install folder - close it first")
+    except BaseException:   # stopped before the commit: the game is as it was, the prepared files go
+        shutil.rmtree(work_folder(target), ignore_errors=True)
+        raise
+    commit(target, ver, status)
+    build.WRITTEN.clear()   # what this build wrote, at its place in the install folder (build.clean_up)
+    build.wrote(*(os.path.join(target, rel) for rel in files))
+    if choices.get("clean", True):
+        game = os.path.join(build.REPO, "game")
+        ours = build.DGVOODOO + ["LocoFix.dll", build.OUTPUT_EXE] + os.listdir(game)
+        removed = build.clean_up(target, steam, (manifest or {}).get("files", []), False,
+                                 build.foreign_root_entries(steam), ours)
+        print(f"Clean-up of {target}: {len(removed)} files of earlier versions removed")
     if as_is:   # LocoFix's settings: nothing reads them in a game installed as it is
         print("Options and game language: not written (installed as it is - no LocoFix to read them)")
     else:
@@ -1027,9 +1238,10 @@ def install(steam, target, choices, ver, progress=None, skip_verify=False):
             print(f"Game language: {choices['game_language']}")
     remove_shortcuts(manifest)
     shortcuts = make_shortcuts(target, choices, ver, editor=not as_is)
-    with open(os.path.join(target, MANIFEST), "w", encoding="utf-8") as f:
-        json.dump({"version": ver, "steam": steam, "captured": CAPTURED, "shortcuts": shortcuts, "files": files}, f,
-                  indent=2)
+    test_stop("record")
+    write_json_safely(os.path.join(target, MANIFEST),
+                      {"version": ver, "steam": steam, "captured": CAPTURED, "shortcuts": shortcuts, "files": files})
+    status["phase"] = "done"
     for line in warnings:
         print(line)
     return warnings
@@ -1051,6 +1263,39 @@ def make_shortcuts(target, choices, ver, editor=True):
             made.append(path)
         print("Shortcuts: " + folder)
     return made
+
+
+def own_file(e):
+    """The file of Setup itself an error is about - the exe, or what its bootloader unpacked into the
+    temporary folder (sys._MEIPASS) - or None."""
+    exe = os.path.normcase(os.path.abspath(sys.executable))
+    names = [getattr(e, "filename", None), getattr(e, "filename2", None), getattr(e, "path", None)]
+    for name in names:
+        if isinstance(name, str) and name and (os.path.normcase(os.path.abspath(name)) == exe
+                                              or (BUNDLE and inside(name, BUNDLE))):
+            return name
+    # PyInstaller's own words when the exe is gone and a module has to be read from it
+    if BUNDLE and isinstance(e, SystemExit) and sys.executable in str(e.code):
+        return sys.executable
+    if BUNDLE and isinstance(e, (OSError, ImportError)):   # an error without a name: is a file of Setup gone?
+        return next(iter(missing_own_files()), None)
+    return None
+
+
+def failure_text(lang, e, target, status):
+    """What a failed run says, in the window's language: the reason - in plain words when Setup could
+    not read a file of its own (an antivirus took Setup.exe or what it unpacked) - and the state of the
+    game: as it was (stopped before the commit) or half put in (the next run finishes it)."""
+    texts = TEXTS[lang]
+    own = own_file(e)
+    technical = str(e.code) if isinstance(e, SystemExit) else f"{type(e).__name__}: {e}"
+    reason = texts["damaged"].format(file=own) + f"\n({technical})" if own else technical
+    phase = (status or {}).get("phase")
+    if phase in (None, "preparing"):
+        reason += "\n\n" + texts["kept"].format(path=target)
+    elif phase == "moving":
+        reason += "\n\n" + texts["resume"].format(path=target)
+    return reason
 
 
 # ---- the window ----
@@ -1409,7 +1654,8 @@ class Installer:
             return
         target = os.path.abspath(target)
         update = read_manifest(target) is not None
-        if os.path.isdir(target) and os.listdir(target) and not update and not self.auto:
+        unfinished = os.path.isdir(work_folder(target))   # a run that stopped: ours, finished by this one
+        if os.path.isdir(target) and os.listdir(target) and not update and not unfinished and not self.auto:
             if not messagebox.askyesno(APP, self.t("not_empty", path=target)):
                 return
         if game_running(target):
@@ -1430,15 +1676,14 @@ class Installer:
     def work(self, steam, target, choices):
         out, err = sys.stdout, sys.stderr
         sys.stdout = sys.stderr = LogWriter(self.events)
+        status = {}
         try:
             warnings = install(steam, target, choices, self.version,
                                lambda f: self.events.put(("progress", f)),
-                               skip_verify=choices.get("skip_verify", False))
+                               skip_verify=choices.get("skip_verify", False), status=status)
             self.events.put(("done", "\n\n".join([self.t("done", path=target)] + warnings)))
-        except SystemExit as e:
-            self.events.put(("failed", str(e.code)))
-        except Exception as e:   # anything else: shown, not lost in a closed console
-            self.events.put(("failed", f"{type(e).__name__}: {e}"))
+        except (SystemExit, Exception) as e:   # anything: shown in words, not lost in a closed console
+            self.events.put(("failed", failure_text(self.lang, e, target, status)))
         finally:
             sys.stdout, sys.stderr = out, err
 
@@ -1503,7 +1748,9 @@ def silent(a):
     language = a.game_lang or (None if update else first_game_language(buildable, False))
     choices = {"cheats": a.cheats == "1", "unlock": a.unlock == "1", "desktop": not a.no_shortcuts, "clean": not a.no_clean,
                "start_menu": not a.no_shortcuts, "lang": a.lang or first_ui_language(), "game_language": language, "skip_verify": skip_verify}
-    with open(os.path.join(target, LOG), "w", encoding="utf-8") as log:
+    status = {}
+    # line by line, so a run that is killed leaves its log up to that point
+    with open(os.path.join(target, LOG), "w", encoding="utf-8", buffering=1) as log:
         sys.stdout = sys.stderr = log
         try:
             if a.game_lang and a.game_lang not in buildable:
@@ -1514,21 +1761,55 @@ def silent(a):
                 else:
                     print("Not available yet (download_depot in the Steam console, then run Setup again):")
                     print("\n".join(depot_lines(missing)))
-            install(steam, target, choices, version(), skip_verify=getattr(a, "skip_verify", False))
-        except SystemExit as e:
-            print(f"FAILED: {e.code}")
-            return 1
-        except Exception as e:   # the log is all a silent install has
-            print(f"FAILED: {type(e).__name__}: {e}")
+            install(steam, target, choices, version(), skip_verify=getattr(a, "skip_verify", False), status=status)
+        except (SystemExit, Exception) as e:   # the log is all a silent install has
+            print("FAILED: " + failure_text(choices["lang"], e, target, status))
             return 1
         print("OK")
     return 0
 
 
+def message_box(text, error=False):
+    import ctypes
+    ctypes.windll.user32.MessageBoxW(None, text, APP + " Setup", 0x10 if error else 0x40)   # MB_ICONERROR / INFORMATION
+
+
+def arguments_parser():
+    """argparse, whose --help and errors go into a message box when Setup has no console to print
+    them into (Setup.exe is a windowed program: they were lost)."""
+    import argparse
+
+    class Parser(argparse.ArgumentParser):
+        def _print_message(self, message, file=None):
+            if not message:
+                return
+            stream = file or sys.stderr
+            if stream is not None:
+                try:
+                    stream.write(message)
+                    return
+                except (AttributeError, OSError, ValueError):
+                    pass
+            message_box(message)
+
+        def error(self, message):
+            text = f"{self.format_usage()}\n{self.prog}: error: {message}\n"
+            if sys.stderr is not None:
+                try:
+                    sys.stderr.write(text)
+                    sys.exit(2)
+                except (AttributeError, OSError, ValueError):
+                    pass
+            message_box(text, error=True)
+            sys.exit(2)
+
+    return Parser(prog="Setup.exe", description=APP + " installer")
+
+
 def main():
     import argparse
     codes = [c for c, _ in UI_LANGUAGES]
-    p = argparse.ArgumentParser(description=APP + " installer")
+    p = arguments_parser()
     p.add_argument("--steam", help="the Steam folder of Locoland (default: found through Steam)")
     p.add_argument("--target", help="the install folder (default: " + DEFAULT_TARGET + ")")
     p.add_argument("--silent", action="store_true", help="install without the window")
@@ -1547,10 +1828,15 @@ def main():
                    "; tests: a folder with only some languages)")
     # tests: the shortcuts go into <folder>\Desktop and <folder>\Programs\OpenLocoland, never the real ones
     p.add_argument("--shortcut-root", help=argparse.SUPPRESS)
+    # tests: the process ends hard at that point of the install, as a kill there would end it
+    p.add_argument("--test-stop", choices=["built", "before-journal", "moving", "record"], help=argparse.SUPPRESS)
     a = p.parse_args()
     if a.shortcut_root:
         global SHORTCUT_ROOT
         SHORTCUT_ROOT = os.path.abspath(a.shortcut_root)
+    if a.test_stop:
+        global TEST_STOP
+        TEST_STOP = a.test_stop
     if a.captured:
         global CAPTURED
         CAPTURED = languages.CAPTURED = os.path.abspath(a.captured)

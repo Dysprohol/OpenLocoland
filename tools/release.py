@@ -33,6 +33,7 @@ from safe_path import safe_relpath  # noqa: E402
 OUT = os.path.join(REPO, "build", "release")
 PAYLOAD = os.path.join(OUT, "payload")
 DGVOODOO = ["DDraw.dll", "D3DImm.dll", "NOTICE.md"]
+PAYLOAD_LIST = "payload.txt"   # installer.PAYLOAD_LIST
 # extensions of game files that never belong in the payload (our own files of these kinds are
 # .tsv/.json/.txt/.lgc tables, patches and texts; pictures are made at install time)
 GAME_KINDS = {".exe", ".res", ".vid", ".map", ".bmp", ".wav", ".ogg", ".avi", ".mpg", ".flc", ".tga", ".cur"}
@@ -68,6 +69,11 @@ def collect(dll, ver):
                 print(f"left out (not in git): {rel}")
             elif os.path.splitext(f)[1].lower() in GAME_KINDS:
                 sys.exit(f"{rel}: looks like a game file - not packed")
+    # the list of the payload's files, which Setup checks before it builds (installer.missing_own_files):
+    # a file an antivirus took from what the bootloader unpacked is then named at once
+    files = sorted(safe_relpath(os.path.join(d, f), PAYLOAD) for d, _, fs in os.walk(PAYLOAD) for f in fs)
+    with open(os.path.join(PAYLOAD, PAYLOAD_LIST), "w", encoding="utf-8") as f:
+        f.write("\n".join(files) + "\n")
 
 
 # The manifest of Setup.exe: PyInstaller's own (asInvoker, the Windows versions it is made for, long
