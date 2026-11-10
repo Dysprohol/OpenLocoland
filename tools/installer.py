@@ -1045,7 +1045,7 @@ def shortcut_target(path):
         buffer = ctypes.create_unicode_buffer(32768)
         com_method(link, 3, c_wchar_p, c_int, c_void_p, c_ulong)(buffer, 32768, None, 4)   # GetPath, SLGP_RAWPATH
         return buffer.value or None
-    except OSError:
+    except Exception:   # a damaged or odd .lnk: no target
         return None
     finally:
         for pointer in (persist, link):
@@ -1056,19 +1056,49 @@ def shortcut_target(path):
             ctypes.windll.ole32.CoUninitialize()
 
 
+def local_folder(folder):
+    """Whether `folder` is on a local drive (fixed, removable or RAM - GetDriveTypeW of its root, which
+    does not touch the folder): a network path (UNC or a mapped drive) is not looked at, so a server
+    that does not answer cannot hold Setup's start."""
+    import ctypes
+    folder = os.path.abspath(folder)
+    if folder.startswith("\\\\"):
+        return False
+    drive = os.path.splitdrive(folder)[0]
+    return bool(drive) and ctypes.windll.kernel32.GetDriveTypeW(drive + "\\") in (2, 3, 6)
+
+
 def find_install():
-    """The folder the window opens on without --target: the remembered one (the last install finished
-    through the window), the folder of a running Locoland.exe, the folder the game's shortcut of the
-    Start menu or of the desktop starts (installs of v0.2.0-v0.2.10 remembered nothing), else the
-    default - each only when it holds an install's record. Returns (folder, how it was found)."""
-    candidates = [(remembered_install(), "remembered")]
-    candidates += [(os.path.dirname(path), "a running game") for path in running_images("Locoland.exe")]
-    for folder in shortcut_folders(True, True)[::-1]:   # the Start menu's first, then the desktop's
-        target = shortcut_target(os.path.join(folder, "Locoland.lnk"))
-        candidates.append((os.path.dirname(target) if target else None, "a shortcut " + folder))
-    for folder, how in candidates:
-        if folder and os.path.isdir(folder) and read_manifest(folder) is not None:
-            return os.path.abspath(folder), how
+    """The folder the window opens on without --target: the folder of a running Locoland.exe (a player
+    with two installs who updates one from its own launcher lands on that one), the remembered one (the
+    last install finished through the window), the folder the game's shortcut of the Start menu or of
+    the desktop starts (installs of v0.2.0-v0.2.10 remembered nothing), else the default - each only
+    when it is on a local drive and holds an install's record. Nothing of it can stop Setup: a candidate
+    that cannot be read is skipped. Returns (folder, how it was found)."""
+    def candidates():
+        try:
+            for path in running_images("Locoland.exe"):
+                yield os.path.dirname(path), "a running game"
+        except Exception:
+            pass
+        yield remembered_install(), "remembered"
+        try:
+            folders = shortcut_folders(True, True)[::-1]   # the Start menu's first, then the desktop's
+        except Exception:
+            folders = []
+        for folder in folders:
+            target = shortcut_target(os.path.join(folder, "Locoland.lnk"))
+            yield (os.path.dirname(target) if target else None), "a shortcut " + folder
+
+    try:
+        for folder, how in candidates():
+            try:
+                if folder and local_folder(folder) and os.path.isdir(folder) and read_manifest(folder) is not None:
+                    return os.path.abspath(folder), how
+            except Exception:
+                continue
+    except Exception:
+        pass
     return DEFAULT_TARGET, "the default"
 
 
