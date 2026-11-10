@@ -166,7 +166,9 @@ through IShellLink: installs of v0.2.0-v0.2.10 remembered nothing), each only wh
 `--auto` without `--target` keep the default folder. The box "Skip verification of the game files - install as it is" says before the install what it
 gives up (`skip_verify_hint`, seven languages): in a hint when the mouse rests on it (a small Tk
 window, `installer.Tooltip`) and, while it is ticked, in the first lines of the log area - the window
-does not grow for it; its label is as before.
+does not grow for it; its label is as before. (The sentence says the game will install and run; one
+edition we know installs but does not start: the Italian CD, whose own exe ends at once without
+its disc - see "Every edition before the tag".)
 
 **Updating** is running a newer Setup over the install: `build.py` copies only what changed and
 leaves alone what it does not write, so the player keeps the high score tables (not
