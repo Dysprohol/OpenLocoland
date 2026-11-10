@@ -2817,6 +2817,20 @@ void end_drag() {
         MESSAGE("MsgDoorStays", "the factory's door - the factory deletes what stands there when it builds a unit; it stays where it was");
     } else if (g_drag.active && g_drag.moved) {
         uint8_t* o = g_drag.objects[0];
+        // a region's fog lies between two absolute levels, set from the ground where the region was made:
+        // dragged onto lower ground it stayed up there, the ground all under its full fog - nothing seen
+        // of a fog that rises or pulses -, and onto higher ground it was gone. The fog over the region goes
+        // with the region's height, as a sheet's does (a fog over the whole view keeps its levels)
+        for (size_t i = 0; i < g_drag.objects.size(); ++i) {
+            uint8_t* r = g_drag.objects[i];
+            const State& s = g_drag.before[i];
+            if (!is_region(r) || !s.region || s.fog_high <= s.fog_low || (s.region_flags & 8)) continue;
+            const int dz = static_cast<int>(std::lround(at<float>(r, O_Z) - s.z));
+            if (dz) {
+                set_region_fog(r, s.fog_low + dz, s.fog_high + dz, s.fog_colour);
+                patch::log("edit: region moved %d levels - its fog now %d-%d", dz, s.fog_low + dz, s.fog_high + dz);
+            }
+        }
         commit({"OpMove", "move"}, g_drag.objects, g_drag.before);
         MESSAGE("MsgMoved", "moved VID %d to %.0f,%.0f,%.0f", nvid_of(o), at<float>(o, O_X), at<float>(o, O_Y), at<float>(o, O_Z));
     }

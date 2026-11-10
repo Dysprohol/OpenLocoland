@@ -909,7 +909,11 @@ it) and FOG MOTION (STEADY, RISES AT THE START - flag 1, which the row called PU
 row PULSE: SLOW, NORMAL, FAST: "A fog that rises or pulses"); the palette's Effects group places 750, 751 and 752 as rectangles sized in the
 panel; the image VID is the region's own and not set anywhere. FOG and OVER are rows of their own: a
 fog chosen stays over the region until OVER: THE WHOLE MAP is set (which says so when the region has
-pairs - they go over the whole map with it). A fog over the region alone on flat ground is a rectangle
+pairs - they go over the whole map with it). A fog's two levels are absolute, taken from the region's
+height when the fog is chosen; a region dragged to ground of another height takes its fog along by the
+same number of levels (`end_drag`; before, the fog stayed at the old levels: on lower ground everything
+lay under its full fog and a rising or pulsing fog showed no motion, on higher ground it was gone) - a
+fog over the whole map keeps its levels. A fog over the region alone on flat ground is a rectangle
 of one tint with hard edges, while the missions' fogs lie over the whole map (l07, l13, l18) or in a
 hollow, a lake or river bed under a big region (l01, l05), where the fog takes the terrain's shape
 (`build\shots\_o_l*.png`: each mission held and run). The maintainer saw no fog after Run the level on
