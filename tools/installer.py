@@ -2,7 +2,8 @@ r"""The installer of OpenLocoland: a window around build.py, frozen into Setup.e
 tools/release.py (PyInstaller, one file).
 
     python tools\installer.py      (the same window from the repository, for trying it)
-    Setup.exe [--steam <folder>] [--target <folder>]      (the window with these folders)
+    Setup.exe [--steam <folder>] [--target <folder>]      (the window with these folders; without
+        --target it opens on the existing install: find_install)
     Setup.exe --silent [--steam <folder>] [--target <folder>] [--cheats 0|1] [--unlock 0|1]
               [--game-lang <code>] [--no-shortcuts] [--lang <code>] [--no-clean]
         installs without the window: the log goes to logs\install.log in the install folder and
@@ -137,6 +138,12 @@ SETTINGS_KEY = r"SOFTWARE\Gromada\Locoland"   # RegPath of Locoland.cfg: LocoFix
 DEFAULT_TARGET = os.path.join(os.environ.get("USERPROFILE", os.path.expanduser("~")), "Games", APP)
 DEFAULT_CAPTURED = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), APP, "captured")
 CAPTURED = DEFAULT_CAPTURED   # --captured <folder> for tests
+# Setup's own state on this machine (next to the captures): the folder of the last install finished
+# through the window, which the window opens on next time (find_install). --state-folder <folder>
+# (tests) keeps it elsewhere, so no test install becomes the folder the player's Setup opens on.
+STATE_FOLDER = os.path.dirname(DEFAULT_CAPTURED)
+STATE_GIVEN = False   # --state-folder given
+LAST_INSTALL = "last-install.json"
 EDITOR_MAP = r"maps\template\template.map"   # what the menu's "EDYTOR MAP" opens
 # the editor shortcut: the game in editor mode on the template, which opens a new empty map
 # (LocoFix editor.cpp), without the intro and the menu (test_map.cpp)
@@ -993,6 +1000,76 @@ def make_shortcut(path, target, arguments, folder, icon, description):
             ctypes.windll.ole32.CoUninitialize()
 
 
+def remembered_install():
+    """The folder the last install finished through the window went to, or None."""
+    try:
+        with open(os.path.join(STATE_FOLDER, LAST_INSTALL), encoding="utf-8") as f:
+            folder = json.load(f).get("install")
+        return folder if isinstance(folder, str) and folder else None
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+def remember_install(target):
+    os.makedirs(STATE_FOLDER, exist_ok=True)
+    write_json_safely(os.path.join(STATE_FOLDER, LAST_INSTALL), {"install": os.path.abspath(target)})
+    print(f"Remembered for the next run of Setup: {os.path.abspath(target)} ({os.path.join(STATE_FOLDER, LAST_INSTALL)})")
+
+
+def forget_install(target):
+    """Uninstall: the remembered folder is forgotten when it is the one removed."""
+    remembered = remembered_install()
+    if remembered and os.path.normcase(os.path.abspath(remembered)) == os.path.normcase(os.path.abspath(target)):
+        try:
+            os.remove(os.path.join(STATE_FOLDER, LAST_INSTALL))
+        except OSError:
+            pass
+
+
+def shortcut_target(path):
+    """The program a .lnk starts (IShellLinkW, in this process; nothing is written), or None."""
+    import ctypes
+    from ctypes import c_int, c_ulong, c_void_p, c_wchar_p
+    if not os.path.isfile(path):
+        return None
+    ole32 = ctypes.oledll.ole32
+    started = ctypes.windll.ole32.CoInitializeEx(None, 2)
+    link, persist = c_void_p(), c_void_p()
+    try:
+        ole32.CoCreateInstance(ctypes.byref(guid(CLSID_SHELL_LINK)), None, 1, ctypes.byref(guid(IID_SHELL_LINK_W)),
+                               ctypes.byref(link))
+        com_method(link, 0, c_void_p, c_void_p)(ctypes.byref(guid(IID_PERSIST_FILE)), ctypes.byref(persist))
+        com_method(persist, 5, c_wchar_p, c_ulong)(path, 0)   # IPersistFile::Load, STGM_READ
+        buffer = ctypes.create_unicode_buffer(32768)
+        com_method(link, 3, c_wchar_p, c_int, c_void_p, c_ulong)(buffer, 32768, None, 4)   # GetPath, SLGP_RAWPATH
+        return buffer.value or None
+    except OSError:
+        return None
+    finally:
+        for pointer in (persist, link):
+            if pointer.value:
+                ctypes.WINFUNCTYPE(ctypes.c_ulong, c_void_p)(
+                    ctypes.cast(pointer, ctypes.POINTER(ctypes.POINTER(c_void_p))).contents[2])(pointer)
+        if started in (0, 1):
+            ctypes.windll.ole32.CoUninitialize()
+
+
+def find_install():
+    """The folder the window opens on without --target: the remembered one (the last install finished
+    through the window), the folder of a running Locoland.exe, the folder the game's shortcut of the
+    Start menu or of the desktop starts (installs of v0.2.0-v0.2.10 remembered nothing), else the
+    default - each only when it holds an install's record. Returns (folder, how it was found)."""
+    candidates = [(remembered_install(), "remembered")]
+    candidates += [(os.path.dirname(path), "a running game") for path in running_images("Locoland.exe")]
+    for folder in shortcut_folders(True, True)[::-1]:   # the Start menu's first, then the desktop's
+        target = shortcut_target(os.path.join(folder, "Locoland.lnk"))
+        candidates.append((os.path.dirname(target) if target else None, "a shortcut " + folder))
+    for folder, how in candidates:
+        if folder and os.path.isdir(folder) and read_manifest(folder) is not None:
+            return os.path.abspath(folder), how
+    return DEFAULT_TARGET, "the default"
+
+
 def read_manifest(target):
     try:
         return json.load(open(os.path.join(target, MANIFEST), encoding="utf-8"))
@@ -1374,6 +1451,11 @@ def install(steam, target, choices, ver, progress=None, skip_verify=False, statu
     write_json_safely(os.path.join(target, MANIFEST),
                       {"version": ver, "steam": steam, "captured": CAPTURED, "shortcuts": shortcuts, "files": files})
     status["phase"] = "done"
+    if choices.get("remember"):
+        try:
+            remember_install(target)
+        except OSError as e:   # only the next run's starting folder: never a failed install
+            print(f"The install's folder could not be remembered ({e})")
     for line in warnings:
         print(line)
     return warnings
@@ -1849,6 +1931,8 @@ class Installer:
         self.say(self.t("working") + "\n")
         language = self.chosen_game_language()
         choices = {"cheats": self.cheats.get(), "unlock": self.unlock.get(), "desktop": self.desktop.get(), "clean": self.clean,
+                   # the window remembers its install for the next run; --auto (tests) only into a --state-folder
+                   "remember": not self.auto or STATE_GIVEN,
                    "start_menu": self.start_menu.get(), "lang": self.lang, "skip_verify": self.skip_verify.get(),
                    # a new install sets the game's language; an update only when it was changed here
                    "game_language": language if not update or language != self.first_language else None}
@@ -1880,6 +1964,7 @@ class Installer:
             return
         remove_shortcuts(manifest)
         shutil.rmtree(target, ignore_errors=True)
+        forget_install(target)
         if CAPTURED == DEFAULT_CAPTURED:   # a folder given with --captured stays
             shutil.rmtree(os.path.dirname(CAPTURED), ignore_errors=True)
         self.say(self.t("uninstalled", path=target) + "\n")
@@ -1989,6 +2074,16 @@ def arguments_parser():
     return Parser(prog="Setup.exe", description=APP + " installer", **({"formatter_class": narrow} if narrow else {}))
 
 
+def window_target(a):
+    """The folder the window opens on: --target; without it the existing install (find_install) - but
+    --auto, a test of the window, keeps the default folder as --silent does. (folder or None, how)."""
+    if a.target:
+        return a.target, "--target"
+    if a.auto:
+        return None, "the default (--auto)"
+    return find_install()
+
+
 def main():
     import argparse
     codes = [c for c, _ in UI_LANGUAGES]
@@ -2014,6 +2109,8 @@ def main():
     # tests: the process ends hard at that point of the install, as a kill there would end it
     p.add_argument("--test-stop", choices=["built", "before-journal", "moving", "record"], help=argparse.SUPPRESS)
     p.add_argument("--test-free-mb", type=int, help=argparse.SUPPRESS)   # tests: the free space the check sees
+    # tests: Setup's own state (the remembered install) in that folder instead of %LOCALAPPDATA%\OpenLocoland
+    p.add_argument("--state-folder", help=argparse.SUPPRESS)
     a = p.parse_args()
     if a.shortcut_root:
         global SHORTCUT_ROOT
@@ -2024,6 +2121,9 @@ def main():
     if a.test_free_mb is not None:
         global TEST_FREE_MB
         TEST_FREE_MB = a.test_free_mb
+    if a.state_folder:
+        global STATE_FOLDER, STATE_GIVEN
+        STATE_FOLDER, STATE_GIVEN = os.path.abspath(a.state_folder), True
     if a.captured:
         global CAPTURED
         CAPTURED = languages.CAPTURED = os.path.abspath(a.captured)
@@ -2035,7 +2135,7 @@ def main():
     icon = os.path.join(BUNDLE or os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon"), "openlocoland.ico")
     if os.path.exists(icon):
         root.iconbitmap(default=icon)
-    window = Installer(root, a.steam, a.target, a.auto, not a.no_shortcuts, not a.no_clean)
+    window = Installer(root, a.steam, window_target(a)[0], a.auto, not a.no_shortcuts, not a.no_clean)
     root.mainloop()
     if a.auto:
         sys.exit(0 if window.result else 1)
