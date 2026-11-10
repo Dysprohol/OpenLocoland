@@ -148,5 +148,19 @@ OpenLocoland is better thanks to the people who gave something of their own to i
 
 ## Credits
 
-Locoland is by Gromada and ESDigital Games. dgVoodoo2 is by Dege (see [NOTICE.md](external/dgVoodoo2/NOTICE.md)).
-OpenLocoland is a fan project, not affiliated with the rights holders of Locoland.
+* **Locoland** was originally developed by Gromada and published by ESDigital Games.
+* **dgVoodoo2** was created by Dege.
+
+## ☕ Support
+
+If you find this project useful and would like to support the time I dedicate to developing and maintaining it, you can buy me a coffee!
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/Dysprohol)
+
+## License
+
+OpenLocoland is an open-source project licensed under the **GNU GPLv3 License**.
+
+*Disclaimer: This is an independent, non-commercial fan project. It is strictly not affiliated with, endorsed by, or connected to Gromada or ESDigital Games. Locoland and all related assets are the property of their respective rights holders.*
+
+*dgVoodoo2 is subject to its own license terms. See [`external/dgVoodoo2/NOTICE.md`](external/dgVoodoo2/NOTICE.md) for details.*
