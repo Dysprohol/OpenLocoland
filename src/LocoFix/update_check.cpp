@@ -26,12 +26,28 @@
 // copied instead of downloaded with the same checks (size, SHA-256, the zone mark, the Downloads
 // folder): the whole flow - Download, Run Setup - against a Setup built by tools\release.py
 // (DEVELOPERS.md "Updates": the steps).
+//
+// A release may also carry Setup as one folder packed into a zip (an asset ending with Setup.zip:
+// Setup.exe at the zip's root and its _internal\ folder - tools\release.py --zip). Which of the two a
+// release with both gives is PREFER_SETUP_ZIP (the maintainer's choice; off: the exe, as up to
+// v0.2.10). The zip is downloaded as the exe is (size, SHA-256, the zone mark, Downloads) and then
+// unpacked (zip_read.cpp) into a new empty folder of its own, %LOCALAPPDATA%\OpenLocoland\setup\<tag>
+// (<tag>-2 ... when that is taken): every entry a plain relative path inside it - no drive, no root, no
+// "..", nothing else that leaves it -, at most ZIP_MAX_FILES files and ZIP_MAX_BYTES in all, and
+// Setup.exe at its root, which alone gets the zone mark and is the one started (with --target <this
+// game's folder>). Any failure removes that folder and falls back to the release's Setup.exe when it
+// has one, else to the line that the download failed, with the GitHub link. Releases up to v0.2.10
+// carry only the exe, which every launcher up to v0.2.10 finds as the first asset ending with
+// Setup.exe: that name pattern is unchanged. LOCOFIX_UPDATE_PREFER=zip|exe (only with
+// LOCOFIX_UPDATE_TEST) overrides the choice in a test.
 #include "patch.h"
+#include "zip_read.h"
 #include <bcrypt.h>
 #include <shellapi.h>
 #include <shlobj.h>
 #include <winhttp.h>
 #include <cstdio>
+#include <cwchar>
 #include <vector>
 
 #ifndef WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3
@@ -53,6 +69,12 @@ constexpr wchar_t API_URL[] = L"https://api.github.com/repos/Dysprohol/OpenLocol
 constexpr wchar_t RELEASES_URL[] = L"https://github.com/Dysprohol/OpenLocoland/releases";
 constexpr wchar_t DEFAULT_NOTICE[] = L"Cannot check for updates. Project page: github.com/Dysprohol/OpenLocoland";
 constexpr DWORD TIMEOUT_MS = 5000;
+// A release with both a Setup.exe and a Setup.zip asset: true takes the zip (one folder, nothing
+// unpacked into %TEMP% when it runs), false the exe (what every launcher up to v0.2.10 takes).
+constexpr bool PREFER_SETUP_ZIP = false;
+constexpr unsigned long long ZIP_MAX_DOWNLOAD = 256ull << 20;   // the zip itself
+constexpr unsigned long long ZIP_MAX_BYTES = 512ull << 20;      // all its files unpacked
+constexpr size_t ZIP_MAX_FILES = 10000;
 constexpr int ID_RESOLUTION = 1001;
 constexpr int ID_CHECK = 1130;
 constexpr int ID_AT_START = 1131;
@@ -73,6 +95,9 @@ struct Release {
     std::string setup_url, setup_name;       // the Setup.exe asset's browser_download_url and name
     std::string digest;                      // its "sha256:<hex>", when GitHub gives one
     unsigned long long size = 0;             // its size in bytes
+    std::string zip_url, zip_name, zip_digest;   // the same of the Setup.zip asset, when there is one
+    unsigned long long zip_size = 0;
+    bool use_zip = false;                    // the download takes the zip (PREFER_SETUP_ZIP)
 };
 
 enum class State { idle, checking, current, newer, dev, unreachable, downloading, downloaded, failed };
@@ -81,12 +106,16 @@ struct Result {   // what a thread hands to the dialog
     bool download = false;
     bool ok = false;
     Release release;
-    std::wstring path;   // the downloaded file
+    std::wstring path;    // the downloaded file (the unpacked Setup.exe of a zip)
+    std::wstring shown;   // the name the line shows: the file saved in Downloads
+    std::wstring folder;  // a zip's: the folder it was unpacked into
 };
 
 State g_state = State::idle;
 Release g_release;
-std::wstring g_file;                     // the downloaded Setup.exe
+std::wstring g_file;                     // the downloaded Setup.exe (a zip's, unpacked)
+std::wstring g_shown;                    // what was saved in Downloads (the line shows its name)
+std::wstring g_folder;                   // a zip's folder: Setup starts there, with --target
 unsigned long long g_done = 0, g_total = 0;
 volatile LONG g_cancel = 0;              // the dialog is gone or the download was cancelled
 bool g_at_start = true;                  // UpdateCheckAtStart: on unless the player turned it off
@@ -281,18 +310,37 @@ bool parse_release(const std::string& json, Release& r) {
         at = json_value(json, "browser_download_url", at);
         if (at == std::string::npos) break;
         const std::string url = json_string(json, at);
-        if (!ends_with(url, "Setup.exe") || (url.compare(0, 8, "https://") != 0 && !local_url(url))) continue;
-        r.setup_url = url;
-        r.setup_name = url.substr(url.rfind('/') + 1);
-        if (!plain_name(r.setup_name)) r.setup_name = "OpenLocoland-Setup.exe";
+        if (url.compare(0, 8, "https://") != 0 && !local_url(url)) continue;
+        const bool exe = ends_with(url, "Setup.exe") && r.setup_url.empty();
+        const bool zip = ends_with(url, "Setup.zip") && r.zip_url.empty();
+        if (!exe && !zip) continue;
+        std::string name = url.substr(url.rfind('/') + 1), digest;
+        if (!plain_name(name)) name = exe ? "OpenLocoland-Setup.exe" : "OpenLocoland-Setup.zip";
+        unsigned long long size = 0;
         for (size_t i = json_value(json, "size", block); i != std::string::npos && i < at;
              i = json_value(json, "size", i))
-            r.size = std::strtoull(json.c_str() + i, nullptr, 10);
+            size = std::strtoull(json.c_str() + i, nullptr, 10);
         for (size_t i = json_value(json, "digest", block); i != std::string::npos && i < at;
              i = json_value(json, "digest", i))
-            r.digest = json_string(json, i);
-        break;
+            digest = json_string(json, i);
+        if (exe) {
+            r.setup_url = url;
+            r.setup_name = name;
+            r.size = size;
+            r.digest = digest;
+        } else {
+            r.zip_url = url;
+            r.zip_name = name;
+            r.zip_size = size;
+            r.zip_digest = digest;
+        }
+        if (!r.setup_url.empty() && !r.zip_url.empty()) break;
     }
+    // the zip when it is preferred (or the only Setup) and not beyond the bound
+    wchar_t prefer[16] = {};
+    const bool test_prefer = !update_test_file().empty() && GetEnvironmentVariableW(L"LOCOFIX_UPDATE_PREFER", prefer, 16);
+    const bool zip_first = test_prefer ? _wcsicmp(prefer, L"zip") == 0 : PREFER_SETUP_ZIP;
+    r.use_zip = !r.zip_url.empty() && r.zip_size <= ZIP_MAX_DOWNLOAD && (zip_first || r.setup_url.empty());
     return true;
 }
 
@@ -448,26 +496,269 @@ struct Sha256 {
     }
 };
 
+// ---- a Setup packed as a zip ----
+
+// An entry's name as a relative path inside the folder (backslashes), or empty when it is not one:
+// a drive or a root, "..", ".", an empty part, a character Windows does not take in a name, a
+// name Windows reserves (CON, NUL...), a part ending with a dot or a space.
+std::wstring zip_entry_path(const std::string& name) {
+    if (name.empty() || name.size() > 240 || name[0] == '/' || name[0] == '\\') return {};
+    std::wstring path, part;
+    const std::wstring wide = widen(name) + L"/";
+    for (wchar_t c : wide) {
+        if (c == L'/' || c == L'\\') {
+            if (part.empty() || part == L"." || part == L".." || part.back() == L'.' || part.back() == L' ') return {};
+            std::wstring stem = part.substr(0, part.find(L'.'));
+            for (wchar_t& x : stem) x = static_cast<wchar_t>(towupper(x));
+            static const wchar_t* const reserved[] = {L"CON", L"PRN", L"AUX", L"NUL", L"COM1", L"COM2", L"COM3",
+                                                       L"COM4", L"COM5", L"COM6", L"COM7", L"COM8", L"COM9",
+                                                       L"LPT1", L"LPT2", L"LPT3", L"LPT4", L"LPT5", L"LPT6",
+                                                       L"LPT7", L"LPT8", L"LPT9"};
+            for (const wchar_t* r : reserved)
+                if (stem == r) return {};
+            path += (path.empty() ? L"" : L"\\") + part;
+            part.clear();
+        } else if (c < 32 || std::wcschr(L"<>:\"|?*", c)) {
+            return {};
+        } else {
+            part += c;
+        }
+    }
+    return path;
+}
+
+// Removes `folder` and everything in it (the folder this updater made for a zip; no links followed).
+void remove_folder(const std::wstring& folder) {
+    WIN32_FIND_DATAW found;
+    HANDLE find = FindFirstFileW((folder + L"\\*").c_str(), &found);
+    if (find != INVALID_HANDLE_VALUE) {
+        do {
+            const std::wstring name = found.cFileName;
+            if (name == L"." || name == L"..") continue;
+            const std::wstring path = folder + L"\\" + name;
+            if ((found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && !(found.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT))
+                remove_folder(path);
+            else if (found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+                RemoveDirectoryW(path.c_str());
+            else {
+                SetFileAttributesW(path.c_str(), FILE_ATTRIBUTE_NORMAL);
+                DeleteFileW(path.c_str());
+            }
+        } while (FindNextFileW(find, &found));
+        FindClose(find);
+    }
+    RemoveDirectoryW(folder.c_str());
+}
+
+// A new empty folder for the release's zip: %LOCALAPPDATA%\OpenLocoland\setup\<tag> (then <tag>-2 ...
+// -99), or empty.
+std::wstring new_setup_folder(const std::string& tag) {
+    PWSTR local = nullptr;
+    std::wstring base;
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &local))) base = local;
+    CoTaskMemFree(local);
+    if (base.empty()) return {};
+    base += L"\\OpenLocoland";
+    CreateDirectoryW(base.c_str(), nullptr);
+    base += L"\\setup";
+    CreateDirectoryW(base.c_str(), nullptr);
+    const std::wstring name = widen(plain_name(tag) ? tag : "release");
+    for (int n = 1; n < 100; ++n) {
+        const std::wstring folder = base + L"\\" + name + (n == 1 ? L"" : L"-" + std::to_wstring(n));
+        if (CreateDirectoryW(folder.c_str(), nullptr)) return folder;   // fails when it is there already
+        if (GetLastError() != ERROR_ALREADY_EXISTS) return {};
+    }
+    return {};
+}
+
+bool write_whole(const std::wstring& path, const std::string& data) {
+    HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return false;
+    size_t done = 0;
+    bool ok = true;
+    while (ok && done < data.size()) {
+        DWORD written = 0;
+        const DWORD n = static_cast<DWORD>(min(data.size() - done, static_cast<size_t>(1 << 20)));
+        ok = WriteFile(file, data.data() + done, n, &written, nullptr) && written == n;
+        done += written;
+    }
+    CloseHandle(file);
+    return ok;
+}
+
+// The zip `zip` (downloaded, checked) unpacked into a new folder of its own; true with `folder` and
+// `setup` (its Setup.exe, marked with `zone`), else false (logged) with nothing left behind.
+bool unpack_setup_zip(const std::wstring& zip, const std::string& tag, const std::string& zone, std::wstring& folder,
+                      std::wstring& setup) {
+    std::string z;
+    {
+        HANDLE file = CreateFileW(zip.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        LARGE_INTEGER size = {};
+        if (file == INVALID_HANDLE_VALUE || !GetFileSizeEx(file, &size) ||
+            static_cast<unsigned long long>(size.QuadPart) > ZIP_MAX_DOWNLOAD) {
+            if (file != INVALID_HANDLE_VALUE) CloseHandle(file);
+            patch::log("update zip: %ls cannot be read or is too big", zip.c_str());
+            return false;
+        }
+        z.resize(static_cast<size_t>(size.QuadPart));
+        DWORD read = 0;
+        size_t done = 0;
+        while (done < z.size() && ReadFile(file, &z[done], static_cast<DWORD>(min(z.size() - done, static_cast<size_t>(1 << 20))), &read, nullptr) && read)
+            done += read;
+        CloseHandle(file);
+        if (done != z.size()) {
+            patch::log("update zip: %ls cannot be read", zip.c_str());
+            return false;
+        }
+    }
+    // the central directory first: the count, the sizes declared and the names, before anything is unpacked
+    size_t end = std::string::npos;
+    for (size_t i = z.size() >= 22 ? z.size() - 22 : 0; i + 22 <= z.size() && i + 0x10000 + 22 >= z.size(); --i) {
+        if (zipfile::u32(z, i) == 0x06054b50) {
+            end = i;
+            break;
+        }
+        if (!i) break;
+    }
+    if (end == std::string::npos) {
+        patch::log("update zip: not a zip file");
+        return false;
+    }
+    const uint32_t count = zipfile::u16(z, end + 10);
+    if (count == 0 || count > ZIP_MAX_FILES) {
+        patch::log("update zip: %u entries (at most %u)", count, static_cast<unsigned>(ZIP_MAX_FILES));
+        return false;
+    }
+    unsigned long long declared = 0;
+    for (size_t at = zipfile::u32(z, end + 16), k = 0; k < count; ++k) {
+        if (zipfile::u32(z, at) != 0x02014b50) {
+            patch::log("update zip: a damaged zip file");
+            return false;
+        }
+        const uint32_t size = zipfile::u32(z, at + 24), name_len = zipfile::u16(z, at + 28);
+        const std::string name = z.substr(at + 46, name_len);
+        const bool is_folder = !name.empty() && (name.back() == '/' || name.back() == '\\');
+        if (zip_entry_path(is_folder ? name.substr(0, name.size() - 1) : name).empty()) {
+            patch::log("update zip: an entry that is not a plain path inside the folder: %s", name.c_str());
+            return false;
+        }
+        declared += size;
+        at += 46 + name_len + zipfile::u16(z, at + 30) + zipfile::u16(z, at + 32);
+    }
+    if (declared > ZIP_MAX_BYTES) {
+        patch::log("update zip: %llu bytes unpacked (at most %llu)", declared, ZIP_MAX_BYTES);
+        return false;
+    }
+    std::vector<zipfile::Entry> entries;
+    std::string error;
+    if (!zipfile::read_zip(z, entries, error)) {
+        patch::log("update zip: %s", error.c_str());
+        return false;
+    }
+    z.clear();
+    z.shrink_to_fit();
+    bool has_setup = false;
+    for (const zipfile::Entry& e : entries) has_setup |= _wcsicmp(zip_entry_path(e.name).c_str(), L"Setup.exe") == 0;
+    if (!has_setup) {
+        patch::log("update zip: no Setup.exe at its root");
+        return false;
+    }
+    folder = new_setup_folder(tag);
+    if (folder.empty()) {
+        patch::log("update zip: no folder of its own can be made in %%LOCALAPPDATA%%\\OpenLocoland\\setup");
+        return false;
+    }
+    for (const zipfile::Entry& e : entries) {
+        const std::wstring path = folder + L"\\" + zip_entry_path(e.name);
+        for (size_t slash = path.find(L'\\', folder.size() + 1); slash != std::wstring::npos; slash = path.find(L'\\', slash + 1))
+            CreateDirectoryW(path.substr(0, slash).c_str(), nullptr);
+        if (!write_whole(path, e.data)) {
+            patch::log("update zip: %ls cannot be written (error %lu)", path.c_str(), GetLastError());
+            remove_folder(folder);
+            return false;
+        }
+    }
+    setup = folder + L"\\Setup.exe";
+    // the zone mark of the download on the program that is started, as Explorer's unpacking gives it
+    HANDLE mark = CreateFileW((setup + L":Zone.Identifier").c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (mark != INVALID_HANDLE_VALUE) {
+        DWORD written = 0;
+        WriteFile(mark, zone.data(), static_cast<DWORD>(zone.size()), &written, nullptr);
+        CloseHandle(mark);
+    }
+    patch::log("update zip: %u files (%llu bytes) unpacked into %ls", static_cast<unsigned>(entries.size()), declared,
+               folder.c_str());
+    return true;
+}
+
+// The asset a download of `release` takes: the zip (use_zip) or the exe, as a release of its own.
+Release asset(const Release& release, bool zip) {
+    Release r = release;
+    if (zip) {
+        r.setup_url = release.zip_url;
+        r.setup_name = release.zip_name;
+        r.size = release.zip_size;
+        r.digest = release.zip_digest;
+    }
+    r.use_zip = zip;
+    return r;
+}
+
+bool download_file(Job* job, const Release& release, const std::wstring& path);
+
 DWORD WINAPI download_thread(void* parameter) {
     Job* job = static_cast<Job*>(parameter);
     Result* result = new Result;
     result->download = true;
     result->release = job->release;
-    result->path = job->path;
-    const std::wstring part = job->path + L".part";
+    result->path = result->shown = job->path;
+    bool ok = false;
+    if (job->release.use_zip) {
+        const Release zip = asset(job->release, true);
+        const std::wstring folder = job->path.substr(0, job->path.rfind(L'\\') + 1);
+        const std::wstring file = folder + widen(zip.setup_name);
+        ok = download_file(job, zip, file);
+        if (ok) {
+            const std::string zone = "[ZoneTransfer]\r\nZoneId=3\r\nHostUrl=" + zip.setup_url + "\r\n";
+            std::wstring unpacked, setup;
+            ok = !g_cancel && unpack_setup_zip(file, zip.tag, zone, unpacked, setup);
+            if (ok) {
+                result->path = setup;
+                result->shown = file;
+                result->folder = unpacked;
+            }
+        }
+        if (!ok && !g_cancel && !job->release.setup_url.empty()) {
+            patch::log("update: the zip did not work - the release's Setup.exe instead");
+            result->release.use_zip = false;
+            ok = download_file(job, asset(job->release, false), job->path);
+        }
+    } else {
+        ok = download_file(job, job->release, job->path);
+    }
+    result->ok = ok;
+    finish(job->dialog, result);
+    delete job;
+    return 0;
+}
+
+// Downloads (or, in a test, copies) the asset `release` names into `path`; false (logged) when it
+// fails, nothing left behind.
+bool download_file(Job* job, const Release& release, const std::wstring& path) {
+    const std::wstring part = path + L".part";
     Http h;
     DWORD status = 0;
     // the test's Setup (LOCOFIX_UPDATE_TEST, a file:/// address): read from the disk, the rest the same
-    const bool local = local_url(job->release.setup_url);
+    const bool local = local_url(release.setup_url);
     HANDLE source = INVALID_HANDLE_VALUE;
     bool ok;
     if (local) {
-        const std::wstring from = local_path(job->release.setup_url);
+        const std::wstring from = local_path(release.setup_url);
         source = CreateFileW(from.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
         ok = source != INVALID_HANDLE_VALUE;
         patch::log("update download: the test's Setup %ls%s", from.c_str(), ok ? "" : " cannot be read");
     } else {
-        ok = http_get(h, widen(job->release.setup_url), nullptr, status) && status == 200;
+        ok = http_get(h, widen(release.setup_url), nullptr, status) && status == 200;
         if (!ok && status) patch::log("update download: HTTP %lu", status);
     }
     HANDLE file = ok ? CreateFileW(part.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
@@ -487,7 +778,7 @@ DWORD WINAPI download_thread(void* parameter) {
         if (done - posted >= 256 * 1024) {
             posted = done;
             PostMessageW(job->dialog, WM_UPDATE_PROGRESS, static_cast<WPARAM>(done),
-                         static_cast<LPARAM>(job->release.size));
+                         static_cast<LPARAM>(release.size));
         }
         return true;
     };
@@ -503,18 +794,18 @@ DWORD WINAPI download_thread(void* parameter) {
     }
     if (source != INVALID_HANDLE_VALUE) CloseHandle(source);
     if (file != INVALID_HANDLE_VALUE) CloseHandle(file);
-    if (ok && job->release.size && done != job->release.size) {
-        patch::log("update download: %llu bytes, the release has %llu", done, job->release.size);
+    if (ok && release.size && done != release.size) {
+        patch::log("update download: %llu bytes, the release has %llu", done, release.size);
         ok = false;
     }
-    const std::string& digest = job->release.digest;
+    const std::string& digest = release.digest;
     if (ok && digest.compare(0, 7, "sha256:") == 0 && _stricmp(sha.hex().c_str(), digest.c_str() + 7) != 0) {
         patch::log("update download: SHA-256 %s, the release has %s", sha.hex().c_str(), digest.c_str() + 7);
         ok = false;
     }
     if (ok) {
         // marked as downloaded from the internet, as a browser marks it, so Windows checks it at the start
-        const std::string zone = "[ZoneTransfer]\r\nZoneId=3\r\nHostUrl=" + job->release.setup_url + "\r\n";
+        const std::string zone = "[ZoneTransfer]\r\nZoneId=3\r\nHostUrl=" + release.setup_url + "\r\n";
         HANDLE mark = CreateFileW((part + L":Zone.Identifier").c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
                                   FILE_ATTRIBUTE_NORMAL, nullptr);
         if (mark != INVALID_HANDLE_VALUE) {
@@ -522,19 +813,16 @@ DWORD WINAPI download_thread(void* parameter) {
             WriteFile(mark, zone.data(), static_cast<DWORD>(zone.size()), &written, nullptr);
             CloseHandle(mark);
         }
-        ok = MoveFileExW(part.c_str(), job->path.c_str(), MOVEFILE_REPLACE_EXISTING) != 0;
-        if (!ok) patch::log("update download: cannot write %ls (error %lu)", job->path.c_str(), GetLastError());
+        ok = MoveFileExW(part.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING) != 0;
+        if (!ok) patch::log("update download: cannot write %ls (error %lu)", path.c_str(), GetLastError());
     }
     if (!ok) {
         DeleteFileW(part.c_str());
         if (g_cancel) patch::log("update download: cancelled");
     } else
-        patch::log("update download: %ls (%llu bytes, SHA-256 checked: %s)", job->path.c_str(), done,
+        patch::log("update download: %ls (%llu bytes, SHA-256 checked: %s)", path.c_str(), done,
                     digest.empty() ? "no digest" : "yes");
-    result->ok = ok;
-    finish(job->dialog, result);
-    delete job;
-    return 0;
+    return ok;
 }
 
 bool start_thread(LPTHREAD_START_ROUTINE routine, Job* job) {
@@ -621,7 +909,7 @@ void set_texts(HWND dialog) {
         break;
     case State::newer:
         status = fill(launcher_text("update_new", L"New version %1 is available (you have %2)."), tag, version);
-        if (!g_release.setup_url.empty()) button = launcher_text("update_download", L"Download");
+        if (!g_release.setup_url.empty() || g_release.use_zip) button = launcher_text("update_download", L"Download");
         break;
     case State::dev:
         status = fill(launcher_text("update_dev", L"The latest version is %1 (this build: %2)."), tag, version);
@@ -638,8 +926,8 @@ void set_texts(HWND dialog) {
         button = launcher_text("cancel", L"Cancel");
         break;
     case State::downloaded: {
-        const size_t slash = g_file.rfind(L'\\');
-        status = fill(launcher_text("update_downloaded", L"Saved in Downloads: %1"), g_file.substr(slash + 1));
+        const size_t slash = g_shown.rfind(L'\\');
+        status = fill(launcher_text("update_downloaded", L"Saved in Downloads: %1"), g_shown.substr(slash + 1));
         button = launcher_text("update_run", L"Run Setup");
         break;
     }
@@ -688,8 +976,9 @@ void checked(const Result& result) {
     g_release = result.release;
     const std::vector<int> mine = version_numbers(LOCOFIX_VERSION), latest = version_numbers(g_release.tag);
     g_state = mine.empty() ? State::dev : compare_versions(latest, mine) > 0 ? State::newer : State::current;
-    patch::log("update check: the latest release is %s (%s), this build %s%s", g_release.tag.c_str(),
-               g_release.setup_name.empty() ? "no Setup.exe" : g_release.setup_name.c_str(), LOCOFIX_VERSION,
+    patch::log("update check: the latest release is %s (%s%s%s), this build %s%s", g_release.tag.c_str(),
+               g_release.setup_name.empty() ? "no Setup.exe" : g_release.setup_name.c_str(),
+               g_release.zip_url.empty() ? "" : ", ", g_release.zip_url.empty() ? "" : g_release.zip_name.c_str(), LOCOFIX_VERSION,
                g_state == State::newer ? " - newer" : g_state == State::current ? " - up to date" : "");
     SYSTEMTIME now;
     GetLocalTime(&now);
@@ -713,9 +1002,11 @@ void start_download(HWND dialog) {
         g_state = State::failed;
         return;
     }
-    g_file = folder + L"\\" + widen(g_release.setup_name);
+    g_file = g_shown = folder + L"\\" + widen(g_release.setup_name.empty() ? "OpenLocoland-Setup.exe" : g_release.setup_name);
+    g_folder.clear();
     g_done = 0;
-    g_total = g_release.size;
+    g_total = g_release.use_zip ? g_release.zip_size : g_release.size;
+    patch::log("update download: %s", g_release.use_zip ? "the Setup.zip (PREFER_SETUP_ZIP or the only Setup)" : "the Setup.exe");
     g_cancel = 0;
     g_state = State::downloading;
     if (!start_thread(download_thread, new Job{dialog, g_release, g_file})) g_state = State::failed;
@@ -734,10 +1025,21 @@ void run_setup(HWND dialog) {
         L"Setup starts now and the game closes, so Setup can update it. Your maps, scores and progress stay. Go on?");
     if (MessageBoxW(dialog, question.c_str(), L"OpenLocoland", MB_YESNO | MB_ICONQUESTION) != IDYES) return;
     const HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    // a zip's Setup: in its folder, told which install to update (the exe goes as up to v0.2.10)
+    std::wstring arguments;
+    if (!g_folder.empty()) {
+        wchar_t exe[MAX_PATH] = {};
+        GetModuleFileNameW(nullptr, exe, MAX_PATH);
+        std::wstring game = exe;
+        game = game.substr(0, game.rfind(L'\\'));
+        arguments = L"--target \"" + game + L"\"";
+    }
     const INT_PTR started = reinterpret_cast<INT_PTR>(
-        ShellExecuteW(dialog, L"open", g_file.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+        ShellExecuteW(dialog, L"open", g_file.c_str(), arguments.empty() ? nullptr : arguments.c_str(),
+                      g_folder.empty() ? nullptr : g_folder.c_str(), SW_SHOWNORMAL));
     if (SUCCEEDED(com)) CoUninitialize();
-    patch::log("update: Setup %ls %s", g_file.c_str(), started > 32 ? "started, the game closes" : "did not start");
+    patch::log("update: Setup %ls%s%ls %s", g_file.c_str(), arguments.empty() ? "" : " ", arguments.c_str(),
+               started > 32 ? "started, the game closes" : "did not start");
     if (started > 32) PostMessageW(dialog, WM_COMMAND, IDCANCEL, 0);
 }
 
@@ -872,7 +1174,12 @@ INT_PTR CALLBACK launcher_proc(HWND dialog, UINT m, WPARAM w, LPARAM l) {
             // an answer after the 5 s still counts, unless it is no answer
             if (g_state == State::checking || (g_state == State::unreachable && result->ok)) checked(*result);
         }
-        else if (result->ok) g_state = State::downloaded;
+        else if (result->ok) {
+            g_state = State::downloaded;
+            g_file = result->path;
+            g_shown = result->shown;
+            g_folder = result->folder;
+        }
         else g_state = g_cancel ? State::newer : State::failed;
         delete result;
         set_texts(dialog);
