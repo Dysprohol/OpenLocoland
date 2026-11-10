@@ -409,7 +409,9 @@ struct State {
 // formats") is a rectangle of the map: width and height around its place, the rectangle drawn at
 // y - z. What it does, as Region_Draw, Region_InitFog and Vid_GetTerrainVariant show:
 //  - fog: between two heights (low, high) of the ground's picture, in its colour (ARGB), over the
-//    rectangle or - flag 8 - over the whole view, pulsing with flag 1 (Graphics_DrawFog);
+//    rectangle or - flag 8 - over the whole view (Graphics_DrawFog); with flag 1 it rises once from
+//    the bottom to its level after the map is loaded, and with flag 0x10 as well it pulses
+//    (region_pulse.cpp; 0x20 slowly, 0x40 fast);
 //  - an image tiled over it (its VID's own: 750 is the light water's picture), drawn with the depth
 //    test: it shows only where the ground's picture is lower than the region's z, as the missions'
 //    lakes lie over a lowered bed - on flat ground at the region's own level only its frame shows
@@ -424,6 +426,9 @@ struct State {
 // No script refers to a region (GETSPRITE_REGION is declared and never used).
 // The missions' 41 kinds: plain markers (751 with nothing set), splash regions over lakes and lava
 // (751 with the pairs, often flag 8), fog regions (l01, l05, l07, l13, l18), rain circles (752).
+constexpr size_t RG_TOP = 0x70;   // the fog's top now, in eighths of a level (Region_Draw)
+constexpr uint32_t RG_RISES = 1, RG_PULSES = 0x10, RG_SLOW = 0x20, RG_FAST = 0x40;   // flag 1 and region_pulse.cpp's
+constexpr uint32_t RG_MOTION = RG_RISES | RG_PULSES | RG_SLOW | RG_FAST;
 constexpr size_t RG_FOG_TABLE = 0x78, RG_FLAGS = 0x7c, RG_HIGH = 0x80, RG_LOW = 0x84, RG_COLOUR = 0x88,
                  RG_WIDTH = 0x90, RG_HEIGHT = 0x94, RG_IMAGE = 0x98, RG_FROM = 0xa0, RG_TO = 0xb8;   // RG_IMAGE: the Vid tiled over it (750: the light water)
 constexpr uintptr_t REGION_INIT_FOG = 0x435c50;
@@ -9868,8 +9873,30 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
                               region_change(o, [o] { at<uint32_t>(o, RG_FLAGS) |= 8u; });
                               if (region_splash(o))   // flag 8 widens the pairs too (Vid_GetTerrainVariant)
                                   MESSAGE("MsgFogWholePairs", "region: over the whole map its explosions become splashes everywhere too");
+                          }}}});
+        // the fog's top: steady at its level; flag 1 - Region_Draw raises it once from 0 to its level and
+        // leaves it there (the row said PULSING); flags 1 + 0x10 - region_pulse.cpp swings it between
+        // the low and the high level, at one of three speeds
+        const int motion = !(flags & RG_RISES) ? 0 : flags & RG_PULSES ? 2 : 1;
+        auto set_motion = [o](uint32_t bits) {
+            region_change(o, [o, bits] { at<uint32_t>(o, RG_FLAGS) = (at<uint32_t>(o, RG_FLAGS) & ~RG_MOTION) | bits; });
+        };
+        const uint32_t speed = flags & (RG_SLOW | RG_FAST);
+        rows.push_back({{"CtxFogMotion", "FOG MOTION:"},
+                        {{{"CtxFogSteady", "STEADY"}, motion == 0, [set_motion] { set_motion(0); }},
+                         {{"CtxFogRises", "RISES AT THE START"}, motion == 1, [o, set_motion] {
+                              set_motion(RG_RISES);
+                              // in play it rises once after the map is loaded; here from now, to be seen
+                              at<int>(o, RG_TOP) = 0;
+                              MESSAGE("MsgFogRises", "region: the fog rises once from the bottom to its level - in play after the map is loaded");
                           }},
-                         {{"CtxPulse", "PULSING"}, (flags & 1) != 0, [o] { region_change(o, [o] { at<uint32_t>(o, RG_FLAGS) ^= 1u; }); }}}});
+                         {{"CtxPulse", "PULSES"}, motion == 2, [set_motion, speed] { set_motion(RG_RISES | RG_PULSES | speed); }}},
+                        {"TipFogMotion", "Fog motion: STEADY stays; RISES AT THE START comes up once after the map loads; PULSES rises and sinks"}});
+        if (motion == 2)
+            rows.push_back({{"CtxPulseSpeed", "PULSE:"},
+                            {{{"CtxPulseSlow", "SLOW"}, speed == RG_SLOW, [set_motion] { set_motion(RG_RISES | RG_PULSES | RG_SLOW); }},
+                             {{"CtxPulseNormal", "NORMAL"}, speed == 0, [set_motion] { set_motion(RG_RISES | RG_PULSES); }},
+                             {{"CtxPulseFast", "FAST"}, speed == RG_FAST, [set_motion] { set_motion(RG_RISES | RG_PULSES | RG_FAST); }}}});
         rows.push_back({{"CtxDelete", "DELETE (DEL):"},
                         {{{"CtxDeleteIt", "DELETE"}, false, [o] {
                               delete_objects({o});
