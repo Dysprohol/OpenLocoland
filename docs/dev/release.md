@@ -197,23 +197,34 @@ empty go too. The settings and the progress are in the registry, which the clean
 **A run stopped half way** - killed, the computer switched off, or a file of Setup taken by an
 antivirus - leaves a game that starts: the old version whole, or (only when it was stopped in
 the last moment) a half put in one that the next run finishes. Setup builds the whole game into
-`.openlocoland-setup\new` inside the install folder, which nothing of the game reads; only when
+`.openlocoland-setup\new-<n>` inside the install folder, which nothing of the game reads; only when
 that build has finished, the files that differ from the install's (`build.copy`'s test: the same
 size and date, or the same content; the high score tables of an install stay the player's) go in
 (`installer.commit`): their list is written first as a journal (`.openlocoland-setup\commit.json`,
 flushed to the disk), then each file goes in with one rename on the same disk - milliseconds for
-the whole lot -, and the folder is removed. After that come the clean-up, the options, the
+the whole lot; a read-only file of the install, as a game from a CD or a read-only copy has them, is
+replaced as any other -, the folders the build made are made (`logs\` and any empty one: the clean-up
+moves the logs of the root into `logs\`), and the folder is removed, read-only files too (their mark
+cleared); one that still cannot be removed does not fail the install - the log says so, the next run
+tries again and builds into a new `new-<n>` meanwhile. After that come the clean-up, the options, the
 shortcuts and, last, `OpenLocoland.json` (through a temporary file and a rename, so it is never
 half written). The next run of this Setup or a later one starts with what an earlier run left
 (`installer.finish_interrupted`, a line in the log): without a journal (stopped while building) the
 prepared files are removed - the game was not changed -, with one (stopped while renaming) the
 rest is put in from the journal, so the game is that version's whole again before this run builds
-its own; a journal older than the record (another Setup finished an install there since) is
-dropped. An older Setup (v0.2.10 and before) knows nothing of the folder and repairs by building
+its own (a failure while doing that says the game is half put in, not as it was); a journal older
+than the record (another Setup finished an install there since) is dropped. The files it puts in
+belong to no record until this run writes its own: when this run builds the same files (the same
+version run again, the usual case) nothing is left over, and the clean-up takes them as files of the
+previous record, so one this run does not write (another version's) is removed as any file a version
+stopped writing. An older Setup (v0.2.10 and before) knows nothing of the folder and repairs by building
 over the game, as any update does; the folder stays until a newer Setup or Uninstall removes it.
 Updates take longer than before - the whole game is copied into the work folder: v0.2.9 -> this
 version through the window (`--auto`) took 24 s instead of v0.2.10's 15 s here - and need the
-game's size (about 600 MB) free for a moment. A run that fails before the commit removes its work folder itself. When Setup cannot
+game's size free for a moment: before the build Setup checks the free space of the install's disk
+against the size of the Steam folder's files and 64 MB, and stops with a plain sentence when it is
+short (`no_space`, the seven languages of the window; `--test-free-mb <n>`, tests only, sets the free
+space it sees). A run that fails before the commit removes its work folder itself. When Setup cannot
 read a file of its own - its exe, or what its bootloader unpacked (`installer.own_file`: the
 error's file, or the first of the files listed at the start that is gone) - it says so in the
 window's language instead of the Python error (`damaged`: an antivirus may have taken Setup.exe
@@ -250,9 +261,13 @@ unpacked with the map exchange's zip reader (`zip_read.cpp`, moved out of `edito
 into a new empty folder of its own, `%LOCALAPPDATA%\OpenLocoland\setup\<tag>` (`<tag>-2` ... when that
 is taken; Uninstall removes it with the captures); only that `Setup.exe` gets the zone mark (so
 Windows shows its "Open File - Security Warning" as for the exe) and is started, in its folder, with
-`--target <the game's folder>` - the exe is started as before, without arguments, so it opens on the
-default folder. Any failure removes the folder and falls back to the release's `Setup.exe`, or,
-without one, to "The download failed" with the GitHub link. The inflater has no limit of its own on
+`--target <the game's folder>` - quoted by the command line's rules, so a game at a drive root reaches
+Setup as `C:\` and a folder with spaces as it is (`LOCOFIX_UPDATE_TARGET`, only with
+`LOCOFIX_UPDATE_TEST`, sets it in a test) -; the exe is started as before, without arguments, so it
+opens on the default folder. The Setups unpacked before are removed once a newer one is in. Any
+failure - an exception of the zip step too (a damaged zip, no memory in the 32-bit game) - removes the
+folder and falls back to the release's `Setup.exe`, or, without one, to "The download failed" with
+the GitHub link. The inflater has no limit of its own on
 what a stream unpacks to (each entry is checked against its declared size and CRC only when it is
 done): the bounds hold for the sizes the zip declares, and the archive is the one whose size and
 SHA-256 the release states. So the switch for a later release: build with `--zip`, upload
@@ -331,6 +346,27 @@ the one-file one. The map exchange with the moved zip reader: two reporters' zip
 imported map exported and imported again - the export's entries (packed bytes too) and the 24
 imported files the same as with the LocoFix before the move. The test downloads, the `setup`
 folder and `UpdateLastCheck` were put back afterwards.
+After the control's checks (Setup of v0.2.10-13-g93bb79b; v0.2.10's for comparison): an install
+without `logs\` and with `error.log` in its root, updated through the window (`--auto`) - v0.2.10's
+OK, the earlier build of this rework failed after its commit, this one OK with the log moved into
+`logs\`; a first install through the window ends with `logs\`; a game source with every file read-only
+(a copy of the Steam folder): three runs in a row OK and no work folder left (the earlier build failed
+from the second run on), and a real update over that install - a read-only Steam file and a read-only
+file of ours changed by hand - put both back (v0.2.10's stopped with "Permission denied"); a run
+stopped half way through the renames, then the next one made to fail while finishing them (a file
+held open): "stopped half way: run Setup again", and the run after that finished it to the same
+files as an uninterrupted update; the free-space check with the free space set to 100 MB
+(`--test-free-mb`, a mocked value - no small disk was made): the sentence in English and Polish, the
+game as it was, no work folder; `keep_modules_in_memory` from the source with PyInstaller's modules
+replaced by ones lacking the constants, the offset or with another table: 0, no exception. The zip
+path: a zip whose last central directory record is cut off - "a damaged zip file", the exe instead,
+the game kept running (the editor's import of such a zip ends the game: `read_zip` reads the record's
+name before checking it fits - a follow-up, the reader left as it was); `--target` for
+`C:\Games\Loco\`, `C:\` and a path with spaces parsed back by the C runtime and by
+`CommandLineToArgvW` as `C:\Games\Loco`, `C:\` and the path; the older unpacked Setup removed when a
+newer one was in. Again: a fresh install and an update the same files as v0.2.10's but `LocoFix.dll`,
+the same record, the process tree Setup's own two processes, a kill after 9 s the game all old,
+Defender's custom scan clean.
 
 **By hand**, the player may have to: allow the unsigned `Setup.exe` past SmartScreen ("More info"
 > "Run anyway") or an antivirus that flags PyInstaller programs (in November 2026 a player's
