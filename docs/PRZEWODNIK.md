@@ -387,8 +387,9 @@ W przyjeździe każdy wiersz to jedna rzecz (nowy to pociąg naszych, który jed
   **USUN** go zabiera. Przytrzymaj wagon (albo **+ WAGON**), a nad nim otworzą się jednostki: puść
   na jednej, by wstawić ją w miejsce tego wagonu (albo dodać). Lokomotywa może stać w dowolnym miejscu
   składu;
-- **WJAZD** - **WSKAZ**, potem kliknij główną linię **za zachodnią krawędzią**: tam powstaje
-  pociąg;
+- **WJAZD** - **WSKAZ**, potem kliknij główną linię **za zachodnią krawędzią**, co najmniej dwa
+  wagony od końca toru: tam powstaje pociąg, wagon za wagonem (bez świateł na wjeździe cały pociąg
+  stoi za nim), i rusza, gdy jest cały;
 - **KIEDY** - **NA POCZATKU**, **PO** czasie, **GDY GRACZ NIE MA POCIAGU** albo **GDY GRACZ ZAPLACI**
   kwotę (te dwa **NIE WCZESNIEJ NIZ** po czasie);
 - **POWTORZ** - **RAZ**, ileś **RAZY** albo **BEZ KONCA**, **CO** tyle sekund;

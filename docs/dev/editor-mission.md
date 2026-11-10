@@ -173,8 +173,9 @@ player pays n, the campaign's "no train and a neutral factory") that either gate
 then", as l01-l13) or brings the wave earlier ("also earlier", as l19), the task after it (the
 enemy's: `ATA_FIGHT`, `ATA_FIGHT_FORT`, `ATA_STANDn` at a point, `ATA_PATROLn` between two points -
 the AI of `TrainsTact` runs them, only army 1 has one -; ours, the neutrals' and the pirates':
-`ACT_MOVE` to a point on the last car, as the marker's order 33, a patrol - `ACT_MOVE` to its first
-point, then `PatrolEngine` to the other end once it is within 40 px of it (`ArrivalOnPoint`; the
+`ACT_MOVE` to a point on the train's first car once it is whole, a patrol - `ACT_MOVE` to its first
+point, then `PatrolEngine` to the other end once a car of it is within 40 px of it (`ArrivalOnPoint`,
+`MissionAt`: the train stops there with its front or its back, as `ACT_MOVE` brings it; the
 arrays `arrival_to2_x/y[]` and `arrival_unit[]`, task -3) - or "stays", no order: in play such a
 train stood behind the entry and held every later arrival at it, so the panel warns when another one
 comes from there), the enemy's raids
@@ -192,17 +193,37 @@ the block `// <editor arrivals>` after `header.lgc` - the same text in every map
 `editor_mission.cpp` and of `map_tool.py`, kept the same), so an exported map runs in any game -,
 called from the block `// <editor tact>` after main()'s `TrainsTact();`. Once a second `ArrivalTry`
 looks at each arrival: its time and condition; then it waits while a car stands within 180 px of the
-entry (`FindNearestSprite(GETSPRITE_CLASS+B_ENGINE, ...)`, as l13) or the AI has its 16 trains
-(`find_num()`); it makes the cars (up to 30: the scripts' `temp_array`, which `arr_cpp` fills) with
-`Create(vid, x, y+z, z)` in the army (behave | 1 for the
-other armies, as `StartCreateTrain`) one at a time - the next one once the last one has moved 36 px
-off the rail point (the entry's push line moves it; 5 s at most), `arrival_part/car[]` - because cars
-made on one point at once push each other apart out of their order (seen in play: 5,20,25 came as
-20,5,25 and 5,20,25,80,85 as 80,25,5,20,85) -,
-then registers the enemy's train in `ai_trains[]` (as l19 and
-`TrainsTact`'s start), gives the others' last car its drive, shows the message and logs `ARRIVAL n
-army a wave w at t s task k slot s cars <planned>` and a second later `ARRIVAL n made <the train's
-cars from its first one>` in `error.log`; a paid arrival is paid as its first car comes. `ArrivalsLeft(army)` counts the waves still to
+entry (`FindNearestSprite(GETSPRITE_CLASS+B_ENGINE, ...)`, as l13 - `ARRIVAL n wave w waits at t s: VID
+v of army a stands within 180 px of its entry`, once a wave) or the AI has its 16 trains (`find_num()`).
+It makes the cars (up to 30: the scripts' `temp_array`, which `arr_cpp` fills) in the army (behave | 1
+for the other armies) the way `StartCreateTrain` (`trainstactfunctions.lgc`) and `AddReinforcement` make
+a train: `Create` on an occupied place, where the engine lays the car on the nearest free track and
+couples it (engine.md "How the cars follow") - the first car with `Create(vid, x, y+z, z)` on the entry's
+rail point, each next one with `Create` on the place of the last car made (`arrival_head/car/at_x/at_y[]`).
+The authors put every car on the one point, and the engine lays a new car behind the train's last car
+only when it lies nearer that end, turning the train round when it lies nearer its first car - so their
+way gives 20,5,20 as 5,20,20 and 5,20,25,80,85 as 80,25,5,20,85 (seen in play, on the reporter's entry
+and on the map); on the last car's place every car is laid behind it and the train keeps its order. The
+next car comes at once while the train stands, and while the entry's push line moves it (`ACT_GET_SPEED`)
+only once the last car has left its place by 40 px, so a long train does not reach back past the end of
+the track behind the entry: a lone car is not pushed (seen: the first car stood on the reporter's entry
+until the second came), two are, and the cars are laid behind the entry - it needs the track of two
+cars behind it (48 px each, engine.md "How the cars follow"), of the whole train where no push line moves
+it. A car that did not couple (`ACT_IN_TRAIN` of the first car) is taken away and made again a second
+later; after 30 s without a car the train goes as it is. Once it is whole and stands - pushed off the
+entry's line, 30 s at most, as `OrderTry` waits for a train on a push line -, the runner registers the
+enemy's train in `ai_trains[]` (as l19 and `TrainsTact`'s start), gives the others' first car its drive,
+shows the message and logs `ARRIVAL n army a wave w at t s task k slot s cars <planned>` and `ARRIVAL n
+made <the train's cars from its first one>` in `error.log` (with `- not whole: k of its n cars, sent as it
+is` when a car never coupled; `lost` when a car was destroyed while it was made); a paid arrival is paid
+as its first car comes. The runner of v0.2.9 and before made a car once the last one had moved 36 px
+off the point and, after 5 s, on the last one: on the reporter's map (an entry past the west edge, issue
+W2 of the stabilization patch) the lone first car stood for 5 s, the second came on it and the two were
+pushed off, the third came after they had left - alone at the entry, not coupled - and got the drive,
+so the log said `ARRIVAL 1 made 20,` and the 20,5 stood at the end of the push line. A map saved by such
+a version keeps that runner in its script until it is saved again: Run the level writes its copy with
+the new one (`mission_save` writes the whole block at every save), a map played from the custom maps page
+runs the runner it was saved with - open it in the editor and save it once. `ArrivalsLeft(army)` counts the waves still to
 come (those of a gating condition only while it holds); the template's win and loss wait for it. The
 template (`map_tool.py new --script`) has both blocks, no arrivals and no reinforcement waves.
 The editor sets no limits of its own: any number of arrivals, waves and trains in the factory's queue;
@@ -557,15 +578,19 @@ AI's slot (`ATT_DEPO_CREATED`) and the train made; an enemy entry's type is its 
 two swapped (`declared_order`), so `BuildTrain` swaps them back, and never one ending in 5, so the
 difficulty does not change it. The others' factory is ordered car by car (`PlanBuild`): a car when
 the factory is free (`ACT_GET_COMMAND` not `COM_BUILD` and its `GetCommands` back to its length
-before) and the army has its price, then the train at the door (the last car within 160 px, once
-its cars are linked, 10 s at most) gets its order; an entry runs only while its factory stands and has its army, one entry at a time in a
+before) and the army has its price, then the train gets its order on its first car once it is whole
+(its last car of its army within 300 px of the factory, its cars linked) and stands - the factory's
+push line moves it until its last car is past the line's end, as `OrderTry` waits for a train on a
+push line -, 30 s at most (`- not whole` in the
+log when cars are missing then); a patrol starts from its first point once a car of it is within 40 px
+(`PlanOnPoint`, `MissionAt`); an entry runs only while its factory stands and has its army, one entry at a time in a
 factory and not while a train stands within 250 px of it - at its door or on its spur (seen in play: two entries started together
 mixed their cars, 5,20 and 5,25 came as 5,25,5,20, and the cars of the next train joined one that
 stayed at the door). Every
 wave is in `error.log`: the enemy's `ARRIVAL F<n> wave w queued ... cars <planned, as built>`,
 `taken ... slot k`, `built ... made <the cars from the first one>` or `lost` (the AI dropped it);
 the others' `ordered ... cars` and `built ... army a made` or `lost` (the factory gone); an
-arrival's line has its `cars` and a second later `ARRIVAL n made <the train's cars>`. A map that
+arrival's line has its `cars` and then `ARRIVAL n made <the train's cars>`. A map that
 does not run arrivals writes the enemy's entries into the authors' queue as before (each once, at
 its time; the panel offers no more there). Mission settings shows the number of the enemy's entries
 and opens an enemy factory's panel (Plan...); a test file's `queue:` lines still give the enemy's

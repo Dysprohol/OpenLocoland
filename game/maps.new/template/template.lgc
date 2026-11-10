@@ -89,6 +89,10 @@ int arrival_last[]={0};
 int arrival_unit[]={0};
 int arrival_part[]={0};
 int arrival_car[]={0};
+int arrival_head[]={0};
+int arrival_at_x[]={0};
+int arrival_at_y[]={0};
+int arrival_since[]={0};
 int order_vid[]={0};
 int order_x[]={0};
 int order_y[]={0};
@@ -175,11 +179,13 @@ int price_of[]={0};
 // arrival_every s after the one before, arrival_times of them or without end) and its condition
 // holds - or, with arrival_or, also earlier when the condition holds; a train the player pays for
 // comes only while the money is there and is paid as it starts to come. It waits while a train
-// stands at its entry (180 px) or the AI has its 16 trains. The cars are made on the entry's rail
-// point in the army, one at a time (ArrivalTry); the enemy's train goes to the AI (TrainsTact) with
-// its task, the others' last car gets the order to drive to arrival_to (arrival_part, arrival_car:
-// the cars made so far of a train under way, its last one). An arrival without its entry (0,0)
-// never comes.
+// stands at its entry (180 px) or the AI has its 16 trains. Its cars are made as StartCreateTrain
+// makes a train - each by Create on an occupied place, where the engine lays it on the nearest free
+// track and couples it -, the first on the entry's rail point, each next one on the place of the
+// last one, so the engine lays it behind the last car and the train keeps its order (ArrivalTry);
+// the train gets its order once all its cars are in it: the enemy's goes to the AI (TrainsTact)
+// with its task, the others' first car gets the order to drive to arrival_to. An arrival without
+// its entry (0,0) never comes.
 // ArrivalsLeft(army): the waves of an army still to come.
 ArrivalTrains(int army)
 {
@@ -253,47 +259,31 @@ MissionTypeCars(int type,int built)
   for( j=0; j<30 && temp_array[j]; j++ )
     mission_cars=mission_cars+itoa(temp_array[j])+",";
 }
-// ArrivalMade(u,i) and ArrivalsMade(): an arrival's train just made (its last car u) is logged with
-// its cars once they are all linked (10 s at most).
-int arrival_made[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-int arrival_made_i[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-int arrival_made_w[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-ArrivalMade(int u,int i)
+// MissionCarsFrom(u,h): mission_cars from the end of the train of u where its car h is - the cars in
+// the order they were made (the engine's first car is the one ahead as the train drives, so a
+// train made backwards from its first car lists them the other way round).
+MissionCarsFrom(int u,int h)
 {
-  int j;
-  for( j=0; j<16; j++ )
-    if( !arrival_made[j] )
-    {
-      arrival_made[j]=u;
-      arrival_made_i[j]=i+1;
-      arrival_made_w[j]=0;
-      return 1;
-    }
-  return 0;
+  int c;
+  string r;
+  MissionCars(u);
+  if( Action(u,ACT_FIRST_ENGINE)==h || Action(u,ACT_LAST_ENGINE)!=h )
+    return 0;
+  r="";
+  for( c=Action(u,ACT_FIRST_ENGINE); c; c=Action(c,ACT_NEXT_ENGINE) )
+    r=itoa(GetUnitVid(c))+","+r;
+  mission_cars=r;
+  return 1;
 }
-ArrivalsMade()
+// MissionAt(u,x,y): a car of the train of u is within 40 px of x, y - the train stands at the point
+// with its front, its back or its middle (ACT_MOVE stops it with either end there).
+MissionAt(int u,int x,int y)
 {
-  int j,k,n;
-  for( j=0; j<16; j++ )
-    if( arrival_made[j] )
-    {
-      if( GetUnitVid(arrival_made[j]) )
-      {
-        MissionCars(arrival_made[j]);
-        arr_gettype(temp_array,arrival_type[arrival_made_i[j]-1]);
-        n=0;
-        for( k=0; k<30 && temp_array[k]; k++ )
-          n++;
-        arrival_made_w[j]=arrival_made_w[j]+1;
-        if( mission_count>=n || arrival_made_w[j]>=10 )
-        {
-          Log("ARRIVAL "+itoa(arrival_made_i[j])+" made "+mission_cars);
-          arrival_made[j]=0;
-        }
-      }
-      else
-        arrival_made[j]=0;
-    }
+  int c;
+  for( c=Action(u,ACT_FIRST_ENGINE); c; c=Action(c,ACT_NEXT_ENGINE) )
+    if( SizeTo(c,x,y)<40 )
+      return 1;
+  return 0;
 }
 ArrivalsLeft(int army)
 {
@@ -306,28 +296,43 @@ ArrivalsLeft(int army)
           n++;
   return n;
 }
-// ArrivalCar(i,j): the car j of arrival i's train on its entry's rail point, in its army.
-ArrivalCar(int i,int j)
+// ArrivalCar(i,j,x,y,z): the car j of arrival i's train made at x, y (its height in it), z, in its
+// army; arrival_car and arrival_at_x/y: that car and where the engine laid it.
+ArrivalCar(int i,int j,int x,int y,int z)
 {
   int u;
   arr_gettype(temp_array,arrival_type[i]);
-  u=Create(temp_array[j],arrival_x[i],arrival_y[i]+arrival_z[i],arrival_z[i]);
+  u=Create(temp_array[j],x,y,z);
+  if( !u )
+    return 0;
   Action(u,ACT_SET_ARMY,arrival_army[i],0);
   if( arrival_army[i] )
     Action(u,ACT_SET_BEHAVE,Action(u,ACT_GET_BEHAVE)|1);
+  arrival_car[i]=u;
+  arrival_at_x[i]=GetX(u);
+  arrival_at_y[i]=GetY(u);
   return u;
 }
-// ArrivalDone(i,t): the train of arrival i is made (its last car arrival_car): its order, its message.
+// ArrivalDone(i,t): the train of arrival i is made (arrival_head is in it): its order, given to its
+// first car, its message and the log - the cars planned, then its cars from the first one made,
+// and when it is not whole, how many of them came.
 ArrivalDone(int i,int t)
 {
-  int j,k,u;
+  int j,k,n,u;
   string s;
-  u=arrival_car[i];
+  u=Action(arrival_head[i],ACT_FIRST_ENGINE);
+  if( !u )
+    u=arrival_head[i];
   arrival_part[i]=0;
+  arrival_since[i]=0;
   arr_gettype(temp_array,arrival_type[i]);
   s="";
+  n=0;
   for( j=0; j<30 && temp_array[j]; j++ )
+  {
     s=s+itoa(temp_array[j])+",";
+    n++;
+  }
   k=-1;
   if( arrival_army[i]==1 )
     k=find_num();
@@ -363,31 +368,64 @@ ArrivalDone(int i,int t)
   s=" cars "+s;
   s="ARRIVAL "+itoa(i+1)+" army "+itoa(arrival_army[i])+" wave "+itoa(arrival_done[i])+" at "+itoa(t)+" s task "+itoa(arrival_task[i])+" slot "+itoa(k)+s;
   Log(s);
-  ArrivalMade(u,i);
+  MissionCarsFrom(u,arrival_head[i]);
+  s="ARRIVAL "+itoa(i+1)+" made "+mission_cars;
+  if( mission_count<n )
+    s=s+" - not whole: "+itoa(mission_count)+" of its "+itoa(n)+" cars, sent as it is";
+  Log(s);
   return 1;
 }
-// ArrivalTry(i,t): a wave of arrival i when it is due; its cars one at a time, the next once the
-// last one has left the rail point (the entry's push line moves it on; 5 s at most) - cars made on
-// one point all at once push each other apart out of their order.
+// ArrivalTry(i,t): a wave of arrival i when it is due, made as StartCreateTrain makes a train (each
+// car by Create on an occupied place: the engine lays it on the nearest free track and couples it):
+// the first car on the entry's rail point, each next one on the place of the last one, so it is laid
+// behind it and the train keeps its order - at once while the train stands, and while the entry's
+// push line moves it on only once the last car has left its place (40 px), so a long train does not
+// reach back past the end of the track behind the entry. A car that did not couple is taken away and
+// made again a second later; after 30 s without a car the train goes as it is. The train gets its
+// order once it is whole and stands - pushed off the entry's line, 30 s at most. A wave waits while
+// a train stands within 180 px of the entry (the log says so once) or the AI has its 16 trains.
 ArrivalTry(int i,int t)
 {
-  int u,go;
-  if( arrival_part[i] )   // a train being made: its next car
+  int h,u,v,x,y,go;
+  if( arrival_part[i] )   // a train being made
   {
+    h=arrival_head[i];
     u=arrival_car[i];
-    if( GetUnitVid(u) )
-      if( SizeTo(u,arrival_x[i],arrival_y[i]+arrival_z[i])<36 && t-arrival_last[i]<5 )
-        return 0;
-    arr_gettype(temp_array,arrival_type[i]);
-    if( arrival_part[i]<30 && temp_array[arrival_part[i]] )
+    if( !GetUnitVid(h) || !GetUnitVid(u) )
     {
-      arrival_car[i]=ArrivalCar(i,arrival_part[i]);
-      arrival_part[i]=arrival_part[i]+1;
+      arrival_part[i]=0;
+      arrival_since[i]=0;
+      arrival_done[i]=arrival_done[i]+1;
       arrival_last[i]=t;
-      arr_gettype(temp_array,arrival_type[i]);
-      if( arrival_part[i]<30 && temp_array[arrival_part[i]] )
-        return 0;
+      Log("ARRIVAL "+itoa(i+1)+" wave "+itoa(arrival_done[i])+" lost at "+itoa(t)+" s: a car of it destroyed while it was made");
+      return 0;
     }
+    arr_gettype(temp_array,arrival_type[i]);
+    if( arrival_part[i]<30 && temp_array[arrival_part[i]] )   // its next car
+    {
+      if( Action(u,ACT_GET_SPEED) && SizeTo(u,arrival_at_x[i],arrival_at_y[i])<40 )
+        return 0;
+      x=arrival_at_x[i];
+      y=arrival_at_y[i];
+      v=ArrivalCar(i,arrival_part[i],GetX(u),GetY(u),GetZ(u));
+      if( v )
+        if( Action(h,ACT_IN_TRAIN,v,0) )
+        {
+          arrival_part[i]=arrival_part[i]+1;
+          arrival_since[i]=t;
+          return 0;
+        }
+      if( v )
+        Destroy(v);
+      arrival_car[i]=u;
+      arrival_at_x[i]=x;
+      arrival_at_y[i]=y;
+      if( t-arrival_since[i]<30 )
+        return 0;
+      Log("ARRIVAL "+itoa(i+1)+" at "+itoa(t)+" s: its car "+itoa(arrival_part[i]+1)+" did not couple to the train's end for 30 s - a train in the way?");
+    }
+    else if( Action(h,ACT_GET_SPEED) && t-arrival_since[i]<30 )   // whole: once it stands
+      return 0;
     return ArrivalDone(i,t);
   }
   if( !arrival_x[i] && !arrival_y[i] )
@@ -409,22 +447,28 @@ ArrivalTry(int i,int t)
     return 0;
   if( arrival_if[i]==8 && !ArrivalIf(i) )
     return 0;
-  if( FindNearestSprite(GETSPRITE_CLASS+B_ENGINE,arrival_x[i],arrival_y[i]+arrival_z[i],180) )
+  v=FindNearestSprite(GETSPRITE_CLASS+B_ENGINE,arrival_x[i],arrival_y[i]+arrival_z[i],180);
+  if( v )
+  {
+    if( !arrival_since[i] )
+    {
+      arrival_since[i]=t+1;
+      Log("ARRIVAL "+itoa(i+1)+" wave "+itoa(arrival_done[i]+1)+" waits at "+itoa(t)+" s: VID "+itoa(GetUnitVid(v))+" of army "+itoa(Action(v,act_getarmy,0,0))+" stands within 180 px of its entry");
+    }
     return 0;
+  }
   if( arrival_army[i]==1 )
     if( find_num()<0 )
       return 0;
-  arrival_car[i]=ArrivalCar(i,0);
-  if( !arrival_car[i] )
+  h=ArrivalCar(i,0,arrival_x[i],arrival_y[i]+arrival_z[i],arrival_z[i]);
+  if( !h )
     return 0;
   if( arrival_if[i]==8 )   // paid as the train starts to come
     SetMoney(0,GetMoney(0)-arrival_if_n[i]);
+  arrival_head[i]=h;
   arrival_part[i]=1;
-  arrival_last[i]=t;
-  arr_gettype(temp_array,arrival_type[i]);
-  if( temp_array[1] )
-    return 0;
-  return ArrivalDone(i,t);
+  arrival_since[i]=t;
+  return 1;
 }
 // PlanTact(t): the factories' plans (plan_*[], a factory's panel). A wave is due - the first one by
 // plan_when (0: plan_first s from the start, 1: plan_first s after the first train of the entry
@@ -575,7 +619,8 @@ PlanPrice(int v)
 // the runner orders the factory to build it car by car (AddCommand, as the AI's BuildTrain does, in
 // the train's order), a car once the factory is free and the army has its price - a car the money
 // does not cover would be left out -, then gives the train its order (plan_task -1 none, -2 drive
-// to plan_to, -3 drive there, then to and fro to plan_to2).
+// to plan_to, -3 drive there, then to and fro to plan_to2) once it is whole and stands: pushed off
+// the factory's push line, which moves it until its last car is past the line's end (30 s at most).
 PlanFactory(int i)
 {
   int f;
@@ -588,6 +633,7 @@ PlanFactory(int i)
 PlanBuild(int i,int t)
 {
   int f,v,u;
+  string s;
   f=plan_slot[i];
   if( GetUnitVid(f)!=102 )
     f=0;
@@ -604,17 +650,22 @@ PlanBuild(int i,int t)
     return 0;
   }
   arr_gettype(temp_array,plan_type[i]);
-  if( plan_state[i]==4 )   // all made: logged and sent off once the cars are linked (10 s at most)
+  if( plan_state[i]==4 )   // all ordered: logged and sent off once it is whole and stands (30 s at most)
   {
     if( t-plan_last[i]<3 )
       return 0;
-    u=FindNearestSprite(GETSPRITE_VID+temp_array[plan_next[i]-1],GetX(f),GetY(f),160);
+    u=FindNearestSprite(GETSPRITE_VID+temp_array[plan_next[i]-1],GetX(f),GetY(f),300);
+    if( u )
+      if( Action(u,act_getarmy,0,0)!=plan_army[i] )
+        u=0;
     if( u )
     {
       MissionCars(u);
-      if( mission_count<plan_next[i] && t-plan_last[i]<10 )
+      if( (mission_count<plan_next[i] || Action(u,ACT_GET_SPEED)) && t-plan_last[i]<30 )
         return 0;
     }
+    else if( t-plan_last[i]<30 )
+      return 0;
     plan_state[i]=0;
     plan_done[i]=plan_done[i]+1;
     plan_last[i]=t;
@@ -626,8 +677,15 @@ PlanBuild(int i,int t)
       PlanMade(i,0,t);
       return 0;
     }
-    MissionCars(u);
-    Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i])+" built at "+itoa(t)+" s army "+itoa(plan_army[i])+" made "+mission_cars);
+    u=Action(u,ACT_FIRST_ENGINE);
+    v=Action(u,ACT_LAST_ENGINE);   // its cars from the first one built, the one farthest from the factory
+    if( SizeTo(v,GetX(f),GetY(f))<SizeTo(u,GetX(f),GetY(f)) )
+      v=u;
+    MissionCarsFrom(u,v);
+    s="ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i])+" built at "+itoa(t)+" s army "+itoa(plan_army[i])+" made "+mission_cars;
+    if( mission_count<plan_next[i] )
+      s=s+" - not whole: "+itoa(mission_count)+" of its "+itoa(plan_next[i])+" cars, sent as it is";
+    Log(s);
     PlanMade(i,u,t);
     if( plan_task[i]==-2 || plan_task[i]==-3 )
       Action(u,ACT_MOVE,plan_to_x[i],plan_to_y[i]+plan_to_z[i]);
@@ -652,7 +710,8 @@ PlanBuild(int i,int t)
   plan_next[i]=plan_next[i]+1;
   return 0;
 }
-// PlanOnPoint(i): a factory's train of a patrol (-3) that reached its point patrols from there.
+// PlanOnPoint(i): a factory's train of a patrol (-3) that reached its point (MissionAt: either end
+// there) patrols from there.
 PlanOnPoint(int i)
 {
   if( plan_task[i]!=-3 || !plan_unit[i] )
@@ -662,7 +721,7 @@ PlanOnPoint(int i)
     plan_unit[i]=0;
     return 0;
   }
-  if( SizeTo(plan_unit[i],plan_to_x[i],plan_to_y[i]+plan_to_z[i])>=40 )
+  if( !MissionAt(plan_unit[i],plan_to_x[i],plan_to_y[i]+plan_to_z[i]) )
     return 0;
   PatrolEngine(plan_unit[i],plan_to2_x[i],plan_to2_y[i]);
   plan_unit[i]=0;
@@ -1044,7 +1103,8 @@ OrdersTact(int t)
     else if( order_state[i]==4 || order_state[i]==5 )
       OrderArea(i,t);
 }
-// ArrivalOnPoint(i): a train of a patrol (-3) that reached its point patrols to the other end from there.
+// ArrivalOnPoint(i): a train of a patrol (-3) that reached its point (MissionAt: either end there)
+// patrols to the other end from there.
 ArrivalOnPoint(int i)
 {
   if( arrival_task[i]!=-3 || !arrival_unit[i] )
@@ -1054,7 +1114,7 @@ ArrivalOnPoint(int i)
     arrival_unit[i]=0;
     return 0;
   }
-  if( SizeTo(arrival_unit[i],arrival_to_x[i],arrival_to_y[i]+arrival_to_z[i])>=40 )
+  if( !MissionAt(arrival_unit[i],arrival_to_x[i],arrival_to_y[i]+arrival_to_z[i]) )
     return 0;
   PatrolEngine(arrival_unit[i],arrival_to2_x[i],arrival_to2_y[i]);
   arrival_unit[i]=0;
@@ -1705,7 +1765,6 @@ ArrivalsTact()
   FactoryTact(t);
   PlanTact(t);
   CaptureTact();
-  ArrivalsMade();
   for( i=0; i<ARRIVALS; i++ )
   {
     ArrivalOnPoint(i);

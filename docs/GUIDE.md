@@ -385,8 +385,9 @@ An arrival has one thing a row (a new one comes as a train of ours that drives t
   **TEMPLATE...** lists the authors' trains by name; a click on a car chooses it - **<** and **>** move
   it, **REMOVE** takes it away. Hold a car (or **+ CAR**) down and the units open above it: let go on
   one to put it in that car's place (or add it). The locomotive may stand anywhere in the train;
-- **ENTRY** - **PICK**, then click the main line **past the west edge**: the train is made
-  there;
+- **ENTRY** - **PICK**, then click the main line **past the west edge**, at least two cars from the
+  end of the track: the train is made there, car behind car (without lights at the entry the whole
+  train lies behind it), and sets off once it is whole;
 - **WHEN** - **AT THE START**, **AFTER** a time, **WHEN THE PLAYER HAS NO TRAIN** or **WHEN THE PLAYER
   PAYS** an amount (those two **NOT BEFORE** a time);
 - **REPEAT** - **ONCE**, a number of **TIMES** or **WITHOUT END**, **EVERY** so many seconds;
