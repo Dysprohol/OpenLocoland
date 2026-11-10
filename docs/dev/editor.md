@@ -118,6 +118,26 @@ view at the save) and the time (0). The saved sandbox plays from `--test-map` li
 original. Outside editor mode a save loses the decals and holds the raised GRID and the
 running state (`BUGS.md`, Quirks).
 
+The editor's save (`save_map`, `write_map_files` in `editor.cpp`) writes a map and its ground image
+as one pair: the painted picture first - the step that needs memory - as `<image>.saving`, a 256 x 256
+tile at a time (`ground_write`, `write_ground_vid` in `editor_newmap.cpp`), then the level as
+`<map>.saving` (Level_Save as above, so it is written as `<map>.saving.saving` and renamed), the
+picture it is to point at set in it (the painted one, or another map's picture taken along as a copy
+of its own), and only then both are put in place (`replace_map_files`: the old image goes aside as
+`<image>.old`, the new one and the map take their names, the old one is deleted; when a step fails
+the steps before it are undone). The edits are marked saved after that. Any failure - out of
+memory, a disk full, a file in use - leaves the old map with its old picture and no temporary
+file. Before, the `.map` was written first, the edits marked saved, and the picture written after
+it from about seven whole copies in memory: on a big painted map that ran out of memory, the C++
+exception ended the game, and the map was left pointing at its old picture - the painting was lost
+with the session. Out of memory now is caught: the save says so in a box (`MsgSaveNoMemory`; Run the
+level's copy `RunNoMemory`), and when the undo history has steps - they hold the strokes'
+rectangles - it offers to clear them and try again (`SaveDropHistory`). A file that cannot be written or put in place
+(in use, read-only, a disk full) is said in a box too (`SaveNotWritten`); before, a picture that
+could not be written was only logged. Run the level writes its
+copy (`maps\_run\`) the same way; File > Map size writes the resized map and its new picture as
+`.saving` files and puts them in place the same way (`resize_map_file`).
+
 **Starting it and going back** (`src/LocoFix/restart.cpp`). The mode is fixed for a run, so the
 menu starts the editor by starting the game again: "EDYTOR MAP" on the custom maps page calls
 `StartEditor()` (`game/maps/menu.lgc.patch`), which calls `StartEditorMode("maps\\template\\

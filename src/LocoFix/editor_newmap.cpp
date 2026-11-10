@@ -16,7 +16,9 @@
 // Map size moves the right and the bottom edge of a saved map's file: HEAD's size, the GRID (a new
 // cell gets the height of the old cell nearest to it); growing writes a ground image of its own -
 // the old picture with its heights (read from its texture tiles, the map's own or the campaign's)
-// and a meadow beyond it - and puts the ground object in the middle; cropping keeps the image.
+// and a meadow beyond it - and puts the ground object in the middle; cropping cuts the image the same
+// way. The images are read and written a tile at a time (below), the resized map and its image put in
+// place together (replace_map_files, which the editor's Save uses too).
 #include "patch.h"
 #include "dialog_template.h"
 #include "editor_ground.h"
@@ -30,7 +32,9 @@ std::string language_file(const std::string& path);   // language.cpp: the pack'
 #include <cmath>
 #include <cwchar>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -201,10 +205,299 @@ struct Picture {
     std::vector<uint16_t> pixels, heights;
 };
 
+// ---- a ground image read and written a tile at a time ----
+//
+// A ground image holds the whole picture (4 bytes a pixel: the colours and the heights), and the
+// editor runs in the 2 GB of a 32-bit process (DEVELOPERS.md "How big a map can be"). Reading the
+// file whole, its chunks' records, SURF and then the picture, or building the file in memory as
+// a string grown chunk by chunk, took about seven whole copies of the picture at once - Save of a
+// painted 4096 x 4096 map ran out of memory that way. Here the file is read where it is needed
+// (the chunks' headers walked, each texture read when a tile shows it) and written as it is laid
+// out, one 256 x 256 tile at a time through a buffer: the picture itself is the only whole copy.
+
+// A file read at any place (a ground image can be hundreds of MB).
+class FileReader {
+public:
+    explicit FileReader(const std::string& path)
+        : f_(CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr)) {
+        if (f_ != INVALID_HANDLE_VALUE) size_ = GetFileSize(f_, nullptr);   // as read_file: the low 32 bits
+    }
+    ~FileReader() {
+        if (f_ != INVALID_HANDLE_VALUE) CloseHandle(f_);
+    }
+    FileReader(const FileReader&) = delete;
+    FileReader& operator=(const FileReader&) = delete;
+    bool open() const { return f_ != INVALID_HANDLE_VALUE && size_ != INVALID_FILE_SIZE; }
+    size_t size() const { return size_; }
+    // `n` bytes at `at`; false when they are not all there
+    bool read(size_t at, void* to, size_t n) {
+        if (at > size_ || n > size_ - at) return false;
+        if (!n) return true;
+        LARGE_INTEGER pos;
+        pos.QuadPart = static_cast<LONGLONG>(at);
+        DWORD got = 0;
+        return SetFilePointerEx(f_, pos, nullptr, FILE_BEGIN) && ReadFile(f_, to, static_cast<DWORD>(n), &got, nullptr) && got == n;
+    }
+    // u32 as read_res reads it: 0 where the 4 bytes are not inside the first `limit` bytes
+    uint32_t u32(size_t at, size_t limit) {
+        uint32_t v = 0;
+        if (at + 4 <= limit && read(at, &v, 4)) return v;
+        return 0;
+    }
+
+private:
+    HANDLE f_;
+    size_t size_ = 0;
+};
+
+// The first record of a RES file's chunks with an id, found as read_res would find it (the whole
+// container checked the same way, the last chunk of that id with a record wins) without reading
+// the records themselves: where it starts in the file and its size.
+struct RecordAt {
+    size_t at = 0, size = 0;
+    bool found = false;
+};
+
+bool find_records(FileReader& f, const char* kind, const char* const* ids, RecordAt* out, int count) {
+    char head[12];
+    if (!f.open() || f.size() < 12 || !f.read(0, head, 12) || std::memcmp(head, "RES ", 4) != 0 || std::memcmp(head + 8, kind, 4) != 0)
+        return false;
+    const size_t total = f.size();
+    for (size_t pos = 12; pos + 8 <= total;) {
+        char id[4];
+        if (!f.read(pos, id, 4)) return false;
+        const uint32_t size = f.u32(pos + 4, total);
+        const size_t end = pos + 8 + size;
+        if (end > total || end < pos) return false;
+        const uint32_t flags = f.u32(pos + 8, total);
+        uint32_t n = flags;
+        size_t at = pos + 12;
+        if (flags & CHUNK_FLAGS) {
+            n = f.u32(pos + 16, total);
+            at = pos + 20;
+        }
+        RecordAt first;
+        for (uint32_t i = 0; i < n; ++i) {
+            const uint32_t length = f.u32(at, total);
+            if (at + 4 + length > end || at + 4 + length < at) return false;
+            if (i == 0) first = {at + 4, length, true};
+            at += 4 + length;
+        }
+        if (first.found)
+            for (int k = 0; k < count; ++k)
+                if (std::memcmp(id, ids[k], 4) == 0) out[k] = first;
+        pos = end + (size & 1);
+    }
+    return true;
+}
+
 // The picture of a ground image (DEVELOPERS.md "Data formats": a texture image of one frame whose tiles
 // show whole textures; with imageFlags 4 every colour texture is followed by its heights, which a
-// tile's texture field counts; tiles are 9 ints with imageFlags 0x10, else an int and 8 shorts).
-bool read_ground(const std::string& path, Picture& p) {
+// tile's texture field counts; tiles are 9 ints with imageFlags 0x10, else an int and 8 shorts). The
+// result is what read_ground_whole (the reading of the whole file, kept for the tests) makes of it.
+bool read_ground_tiles(const std::string& path, Picture& p) {
+    memory_test_point("read");
+    FileReader f(path);
+    const char* const ids[] = {"HEAD", "SURF", "DATA"};
+    RecordAt rec[3];
+    if (!find_records(f, "VID ", ids, rec, 3)) return false;
+    std::string head(rec[0].found ? rec[0].size : 0, '\0'), data(rec[2].found ? rec[2].size : 0, '\0');
+    const size_t surf_at = rec[1].at, surf_size = rec[1].found ? rec[1].size : 0;
+    if (head.size() < 10 || surf_size < 2 || !f.read(rec[0].at, &head[0], head.size()) ||
+        (!data.empty() && !f.read(rec[2].at, &data[0], data.size())))
+        return false;
+    uint16_t flags, w, h;
+    std::memcpy(&flags, &head[0], 2);
+    std::memcpy(&w, &head[6], 2);
+    std::memcpy(&h, &head[8], 2);
+    if (!(flags & 0x20)) return false;
+    struct Texture {
+        int w, h;
+        size_t at, heights;   // the colours and the heights (0: none), from SURF's start
+    };
+    std::vector<Texture> colours;
+    uint16_t count = 0;
+    if (!f.read(surf_at, &count, 2)) return false;
+    size_t at = 2;
+    for (int k = 0; k < count && at + 8 <= surf_size; ++k) {
+        int16_t tw = 0, th = 0;
+        f.read(surf_at + at, &tw, 2);
+        f.read(surf_at + at + 2, &th, 2);
+        const uint32_t size = f.u32(surf_at + at + 4, surf_at + surf_size);
+        Texture texture = {tw, th, at + 8, 0};
+        at += 8 + size;
+        if (flags & 4) {   // the heights after the colours
+            ++k;
+            texture.heights = at + 4;
+            at += 4 + f.u32(surf_at + at, surf_at + surf_size);
+        }
+        colours.push_back(texture);
+    }
+    p.width = w;
+    p.height = h;
+    p.pixels.assign(static_cast<size_t>(w) * h, 0);
+    p.heights.assign(static_cast<size_t>(w) * h, FLAT_PICTURE_HEIGHT);
+    // the texture a tile shows, read once while the tiles after it show it too
+    std::vector<uint16_t> colour, height;
+    size_t height_count = 0;   // how many of `height` the file has (the rest is not read: past SURF)
+    int loaded = -1;
+    const size_t tile_size = (flags & 0x10) ? 36 : 20;
+    for (size_t t = 0; t + tile_size <= data.size(); t += tile_size) {
+        int v[8];   // texture, offsetX, offsetY, width, height, x, y, next
+        if (flags & 0x10) {
+            std::memcpy(v, &data[t + 4], 32);
+        } else {
+            int16_t s[8];
+            std::memcpy(s, &data[t + 4], 16);
+            for (int k = 0; k < 8; ++k) v[k] = s[k];
+        }
+        const int index = (flags & 4) ? v[0] / 2 : v[0];
+        if (index < 0 || index >= static_cast<int>(colours.size())) continue;
+        const Texture& tex = colours[index];
+        if (index != loaded) {
+            loaded = index;
+            const size_t n = static_cast<size_t>((std::max)(0, tex.w)) * (std::max)(0, tex.h);
+            colour.assign(n, 0);
+            height.assign(n, 0);
+            // the colours as far as SURF has them, the heights only where a whole one is inside it
+            const size_t colours_in = tex.at < surf_size ? (std::min)(n, (surf_size - tex.at) / 2) : 0;
+            f.read(surf_at + tex.at, colour.data(), colours_in * 2);
+            height_count = tex.heights && tex.heights < surf_size ? (std::min)(n, (surf_size - tex.heights) / 2) : 0;
+            f.read(surf_at + tex.heights, height.data(), height_count * 2);
+        }
+        for (int y = 0; y < v[4]; ++y)
+            for (int x = 0; x < v[3]; ++x) {
+                const int sx = v[1] + x, sy = v[2] + y, dx = v[5] + x, dy = v[6] + y;
+                if (sx < 0 || sy < 0 || sx >= tex.w || sy >= tex.h || dx < 0 || dy < 0 || dx >= w || dy >= h) continue;
+                const size_t to = static_cast<size_t>(dy) * w + dx, from = static_cast<size_t>(sy) * tex.w + sx;
+                p.pixels[to] = colour[from];
+                if (from < height_count) p.heights[to] = height[from];
+            }
+    }
+    return true;
+}
+
+// A file written from the start to the end through a buffer.
+class FileWriter {
+public:
+    explicit FileWriter(const std::string& path)
+        : path_(path), f_(CreateFileA(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)) {
+        buffer_.reserve(BUFFER);
+    }
+    ~FileWriter() {
+        if (f_ != INVALID_HANDLE_VALUE) {   // not closed: a failure on the way, the file goes
+            CloseHandle(f_);
+            DeleteFileA(path_.c_str());
+        }
+    }
+    FileWriter(const FileWriter&) = delete;
+    FileWriter& operator=(const FileWriter&) = delete;
+    bool open() const { return f_ != INVALID_HANDLE_VALUE; }
+    void put(const void* data, size_t n) {
+        const char* c = static_cast<const char*>(data);
+        while (n && ok_) {
+            const size_t room = (std::min)(n, BUFFER - buffer_.size());
+            buffer_.insert(buffer_.end(), c, c + room);
+            c += room;
+            n -= room;
+            if (buffer_.size() == BUFFER) flush();
+        }
+    }
+    void put32(uint32_t v) { put(&v, 4); }
+    void put16(uint16_t v) { put(&v, 2); }
+    void put(const std::string& s) { put(s.data(), s.size()); }
+    // the rest written and the file closed; false (and the file deleted) when anything failed
+    bool close() {
+        flush();
+        const bool ok = ok_ && CloseHandle(f_);
+        f_ = INVALID_HANDLE_VALUE;
+        if (!ok) DeleteFileA(path_.c_str());
+        return ok;
+    }
+
+private:
+    static constexpr size_t BUFFER = 1 << 20;
+    void flush() {
+        if (!ok_ || buffer_.empty()) return;
+        DWORD written = 0;
+        ok_ = WriteFile(f_, buffer_.data(), static_cast<DWORD>(buffer_.size()), &written, nullptr) && written == buffer_.size();
+        buffer_.clear();
+    }
+    std::string path_;
+    HANDLE f_;
+    std::vector<char> buffer_;
+    bool ok_ = true;
+};
+
+// A ground image of width x height (whole tiles) as ground_vid_whole lays it out and write_res
+// packs it - byte for byte -, written into `path`: map_tool.py ground's layout (256 x 256 R5G6B5
+// textures column by column, each with its height texture, imageFlags 0x35), the colour and the
+// height of every pixel from `pixel(px, py, colour, height)`. False when the file could not be written.
+template <typename F> bool write_ground_vid(const std::string& path, int width, int height, F pixel) {
+    memory_test_point("write");
+    const int columns = width / TILE, rows = height / TILE, count = columns * rows;
+    const uint32_t texture_bytes = TILE * TILE * 2;
+    // the three records and their chunks (write_res: flags, 0, the count, each record's size; every
+    // chunk padded to an even size but the last - these three are even)
+    const uint32_t head_size = 10, surf_size = 2 + static_cast<uint32_t>(count) * (8 + texture_bytes + 4 + texture_bytes),
+                   data_size = static_cast<uint32_t>(count) * 36;
+    const uint32_t unpadded = 4 + (8 + 16 + head_size) + (8 + 16 + surf_size) + (8 + 16 + data_size);
+    FileWriter out(path);
+    if (!out.open()) return false;
+    auto chunk = [&](const char* id, uint32_t size) {
+        out.put(id, 4);
+        out.put32(16 + size);
+        out.put32(CHUNK_FLAGS);
+        out.put32(0);
+        out.put32(1);
+        out.put32(size);
+    };
+    out.put("RES ", 4);
+    out.put32(unpadded);
+    out.put("VID ", 4);
+    chunk("HEAD", head_size);
+    out.put16(0x35);   // imageFlags: textures, height textures, tiles as ints
+    out.put16(71);     // frameSpeed
+    out.put16(1);      // frameCount
+    out.put16(static_cast<uint16_t>(width));
+    out.put16(static_cast<uint16_t>(height));
+    chunk("SURF", surf_size);
+    out.put16(static_cast<uint16_t>(count * 2));
+    std::vector<uint16_t> colours(TILE * TILE), heights(TILE * TILE);
+    for (int k = 0; k < count; ++k) {
+        const int x0 = k / rows * TILE, y0 = k % rows * TILE;   // column by column
+        for (int y = 0; y < TILE; ++y)
+            for (int x = 0; x < TILE; ++x) pixel(x0 + x, y0 + y, colours[y * TILE + x], heights[y * TILE + x]);
+        out.put16(TILE);
+        out.put16(TILE);
+        out.put32(texture_bytes);
+        out.put(colours.data(), texture_bytes);
+        out.put32(texture_bytes);
+        out.put(heights.data(), texture_bytes);
+    }
+    chunk("DATA", data_size);
+    for (int k = 0; k < count; ++k) {
+        const int32_t tile[9] = {0, 2 * k, 0, 0, TILE, TILE, k / rows * TILE, k % rows * TILE, (k + 1) % count};
+        out.put(tile, sizeof tile);
+    }
+    return out.close();
+}
+
+// A plain ground: a texture's 128 x 128 sample laid mirrored (no seams), its brightness varied in
+// soft patches a few hundred px wide so the repeat does not show as a pattern.
+uint16_t plain(const std::vector<uint16_t>& sample, int x, int y) {
+    int u = x & 255, v = y & 255;
+    if (u >= 128) u = 255 - u;
+    if (v >= 128) v = 255 - v;
+    const uint16_t c = sample[static_cast<size_t>(v) * 128 + u];
+    const float k = 0.9f + 0.2f * (noise(x, y, 300, 7) * 0.7f + noise(x, y, 90, 8) * 0.3f);
+    return rgb565((c >> 11) * 8.2f * k, ((c >> 5) & 63) * 4.05f * k, (c & 31) * 8.2f * k);
+}
+
+#if LOCOFIX_SAVE_TEST
+// The test build: the image read and built whole, the way of v0.2.9 - every image the editor reads
+// or writes is compared with it (LOCOFIX_VID_COMPARE=1; read_ground_whole below).
+bool read_ground_whole(const std::string& path, Picture& p) {
     std::vector<Chunk> chunks;
     if (!read_res(read_file(path), "VID ", chunks)) return false;
     std::string head, surf, data;
@@ -271,21 +564,10 @@ bool read_ground(const std::string& path, Picture& p) {
     return true;
 }
 
-// A plain ground: a texture's 128 x 128 sample laid mirrored (no seams), its brightness varied in
-// soft patches a few hundred px wide so the repeat does not show as a pattern.
-uint16_t plain(const std::vector<uint16_t>& sample, int x, int y) {
-    int u = x & 255, v = y & 255;
-    if (u >= 128) u = 255 - u;
-    if (v >= 128) v = 255 - v;
-    const uint16_t c = sample[static_cast<size_t>(v) * 128 + u];
-    const float k = 0.9f + 0.2f * (noise(x, y, 300, 7) * 0.7f + noise(x, y, 90, 8) * 0.3f);
-    return rgb565((c >> 11) * 8.2f * k, ((c >> 5) & 63) * 4.05f * k, (c & 31) * 8.2f * k);
-}
-
-// The ground image (DEVELOPERS.md "Data formats": texture tiles), as map_tool.py ground lays it out: the
+// The ground image built whole (DEVELOPERS.md "Data formats": texture tiles), as map_tool.py ground lays it out: the
 // picture of `old` where it reaches, elsewhere a meadow - or, with `sample` (a texture's 128 x 128,
 // editor_ground.cpp), that texture alone: an empty map's ground.
-std::string ground_vid(int width, int height, uint32_t seed, const Picture* old = nullptr,
+std::string ground_vid_whole(int width, int height, uint32_t seed, const Picture* old = nullptr,
                        const std::vector<uint16_t>* sample = nullptr) {
     const int columns = width / TILE, rows = height / TILE, count = columns * rows;
     std::string head;
@@ -322,6 +604,62 @@ std::string ground_vid(int width, int height, uint32_t seed, const Picture* old 
     return write_res("VID ", {{"HEAD", {head}}, {"SURF", {surf}}, {"DATA", {tiles}}});
 }
 
+
+// The test build's checks (LOCOFIX_VID_COMPARE=1): an image just written against the one the whole
+// way builds, a picture just read against the one the whole reading makes. Logged, never fatal.
+bool g_force_compare = false;   // vid_check_all
+bool vid_compare() {
+    char value[8] = "";
+    return g_force_compare || (GetEnvironmentVariableA("LOCOFIX_VID_COMPARE", value, sizeof value) && value[0] == '1');
+}
+
+void compare_written(const std::string& path, const std::string& whole) {
+    const std::string file = read_file(path);
+    size_t at = 0;
+    while (at < file.size() && at < whole.size() && file[at] == whole[at]) ++at;
+    if (file.size() == whole.size() && at == file.size())
+        patch::log("vid check: %s written tile by tile = built whole (%u bytes)", path.c_str(), static_cast<unsigned>(file.size()));
+    else
+        patch::log("vid check: %s DIFFERS from the whole build at byte %u (%u and %u bytes)", path.c_str(), static_cast<unsigned>(at),
+                   static_cast<unsigned>(file.size()), static_cast<unsigned>(whole.size()));
+}
+
+void compare_read(const std::string& path, bool ok, const Picture& p) {
+    Picture q;
+    const bool whole = read_ground_whole(path, q);
+    if (ok == whole && (!ok || (p.width == q.width && p.height == q.height && p.pixels == q.pixels && p.heights == q.heights)))
+        patch::log("vid check: %s read tile by tile = read whole (%dx%d%s)", path.c_str(), p.width, p.height, ok ? "" : ", both refuse it");
+    else
+        patch::log("vid check: %s read DIFFERS from the whole reading (%s / %s, %dx%d / %dx%d)", path.c_str(), ok ? "read" : "refused",
+                   whole ? "read" : "refused", p.width, p.height, q.width, q.height);
+}
+#endif
+
+bool read_ground(const std::string& path, Picture& p) {
+    const bool ok = read_ground_tiles(path, p);
+#if LOCOFIX_SAVE_TEST
+    if (vid_compare()) compare_read(path, ok, p);
+#endif
+    return ok;
+}
+
+// A ground image written by write_ground_vid; the test build compares it with what `whole` builds
+// (WHOLE(ground_vid_whole(...)) - only there, the shipped build has no whole way).
+#if LOCOFIX_SAVE_TEST
+#define WHOLE(...) [&] { return __VA_ARGS__; }
+#else
+#define WHOLE(...) [] { return std::string(); }
+#endif
+template <typename F, typename W> bool write_ground(const std::string& path, int width, int height, F pixel, W whole) {
+    const bool ok = write_ground_vid(path, width, height, pixel);
+#if LOCOFIX_SAVE_TEST
+    if (ok && vid_compare()) compare_written(path, whole());
+#else
+    (void)whole;
+#endif
+    return ok;
+}
+
 // ---- the map ----
 
 constexpr int MIN_SIZE = 512, MAX_SIZE = 4096;
@@ -329,6 +667,89 @@ constexpr int MIN_SIZE = 512, MAX_SIZE = 4096;
 bool valid_size(int w, int h) {
     return w % TILE == 0 && h % TILE == 0 && w >= MIN_SIZE && h >= MIN_SIZE && w <= MAX_SIZE && h <= MAX_SIZE;
 }
+
+}  // namespace
+
+#if LOCOFIX_SAVE_TEST
+// The test build's forced failures: LOCOFIX_FAIL=<place>[:<n>][,...] - the n-th time (1 by default)
+// the editor comes to that place a big allocation fails there (std::bad_alloc, as a real one).
+void memory_test_point(const char* place) {
+    static std::vector<std::pair<std::string, int>> plan = [] {
+        std::vector<std::pair<std::string, int>> p;
+        char value[256] = "";
+        if (!GetEnvironmentVariableA("LOCOFIX_FAIL", value, sizeof value)) return p;
+        for (char* item = std::strtok(value, ","); item; item = std::strtok(nullptr, ",")) {
+            char* colon = std::strchr(item, ':');
+            int n = 1;
+            if (colon) {
+                *colon = 0;
+                n = std::atoi(colon + 1);
+            }
+            p.push_back({item, n});
+        }
+        return p;
+    }();
+    for (auto& f : plan)
+        if (f.first == place && f.second > 0 && --f.second == 0) {
+            patch::log("save test: the allocation at %s fails (LOCOFIX_FAIL)", place);
+            throw std::bad_alloc();
+        }
+}
+#endif
+
+// Puts a saved map and its ground image in place as one step, after both were written whole as
+// temporary files next to them (`map_temp`, `image_temp`; no image: `image_temp` empty): the old
+// image goes aside as <image>.old, the new one and the map take their names, the old image is
+// deleted. When a step fails the steps before it are undone - the old map keeps the old image -
+// and no temporary file is left. False (with the reason in the log) when nothing was replaced.
+bool replace_map_files(const std::string& map_temp, const std::string& map, const std::string& image_temp, const std::string& image) {
+    const DWORD flags = MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH;
+    auto drop = [&] {
+        DeleteFileA(map_temp.c_str());
+        if (!image_temp.empty()) DeleteFileA(image_temp.c_str());
+    };
+    std::string aside;
+    if (!image_temp.empty()) {
+        if (GetFileAttributesA(image.c_str()) != INVALID_FILE_ATTRIBUTES) {
+            aside = image + ".old";
+            DeleteFileA(aside.c_str());
+            if (!MoveFileExA(image.c_str(), aside.c_str(), flags)) {
+                patch::log("save: %s could not be put aside (error %lu) - nothing replaced", image.c_str(), GetLastError());
+                drop();
+                return false;
+            }
+        }
+        if (!MoveFileExA(image_temp.c_str(), image.c_str(), flags)) {
+            patch::log("save: %s could not be replaced (error %lu) - nothing replaced", image.c_str(), GetLastError());
+            if (!aside.empty()) MoveFileExA(aside.c_str(), image.c_str(), flags);
+            drop();
+            return false;
+        }
+    }
+    bool map_moved = true;
+#if LOCOFIX_SAVE_TEST
+    try {
+        memory_test_point("commit");   // a map that cannot be replaced once the image is in place
+    } catch (const std::bad_alloc&) {
+        map_moved = false;
+        SetLastError(ERROR_ACCESS_DENIED);
+    }
+#endif
+    if (!map_moved || !MoveFileExA(map_temp.c_str(), map.c_str(), flags)) {
+        patch::log("save: %s could not be replaced (error %lu) - nothing replaced", map.c_str(), GetLastError());
+        if (!image_temp.empty()) {
+            DeleteFileA(image.c_str());
+            if (!aside.empty() && !MoveFileExA(aside.c_str(), image.c_str(), flags))
+                patch::log("save: %s could not be put back from %s (error %lu)", image.c_str(), aside.c_str(), GetLastError());
+        }
+        drop();
+        return false;
+    }
+    if (!aside.empty()) DeleteFileA(aside.c_str());
+    return true;
+}
+
+namespace {
 
 // The image file of the ground's OBJ record and where it starts.
 std::string ground_image(const std::string& record, size_t& start) {
@@ -467,12 +888,35 @@ std::string make_map(const std::string& name, bool generated, const Terrain& ter
     std::vector<Chunk> chunks;
     if (!new_map_chunks(source, image, w, h, chunks, error)) return "";
     CreateDirectoryA(folder.c_str(), nullptr);
-    if (generated && !write_file(image, ground_vid(w, h, GetTickCount(), nullptr, sample))) {
-        error = ui_printf(ui_format("NewNotWritten", "%s could not be written"), image.c_str());
-        return "";
+    // the ground (a meadow, or one texture laid as a plain ground) written a tile at a time; out of
+    // memory or not written, nothing of the new map stays
+    bool written = !generated;
+    try {
+        if (generated) {
+            memory_test_point("new");
+            const uint32_t seed = GetTickCount();
+            const bool textured = sample && sample->size() == 128 * 128;
+            written = write_ground(
+                image, w, h,
+                [&](int px, int py, uint16_t& colour, uint16_t& height) {
+                    colour = textured ? plain(*sample, px, py) : meadow(px, py, seed);
+                    height = FLAT_PICTURE_HEIGHT;
+                },
+                WHOLE(ground_vid_whole(w, h, seed, nullptr, sample)));
+            if (!written) error = ui_printf(ui_format("NewNotWritten", "%s could not be written"), image.c_str());
+        }
+        if (written && !write_file(map, write_res("MAP ", chunks))) {
+            written = false;
+            error = ui_printf(ui_format("NewNotWritten", "%s could not be written"), map.c_str());
+        }
+    } catch (const std::bad_alloc&) {
+        written = false;
+        error = ui_text("NewNoMemory", "Not enough memory to make the map: nothing was made.");
     }
-    if (!write_file(map, write_res("MAP ", chunks))) {
-        error = ui_printf(ui_format("NewNotWritten", "%s could not be written"), map.c_str());
+    if (!written) {
+        if (!image.empty()) DeleteFileA(image.c_str());
+        DeleteFileA(map.c_str());
+        RemoveDirectoryA(folder.c_str());
         return "";
     }
     // the template's mission under the new name (the editor writes its blocks anew on a save)
@@ -514,8 +958,16 @@ bool ground_place(std::vector<Chunk>& chunks, float& x, float& y) {
     return false;
 }
 
+// Where the top-left corner of a ground picture of w x h drawn centred on (gx, gy) lies on the map.
+void picture_corner(float gx, float gy, int w, int h, int& ox, int& oy) {
+    ox = static_cast<int>(std::lround(gx - w / 2.0f));
+    oy = static_cast<int>(std::lround(gy - h / 2.0f));
+}
+
+#if LOCOFIX_SAVE_TEST
 // The part w x h of the map from its top-left corner of a ground picture drawn centred on (gx, gy),
-// as a picture of its own; where the old one does not reach, a meadow at the flat ground's height.
+// as a picture of its own; where the old one does not reach, a meadow at the flat ground's height
+// (the test build's whole way; resize_map_file writes the same pixels a tile at a time).
 Picture picture_on_map(const Picture& old, float gx, float gy, int w, int h, uint32_t seed) {
     const int ox = static_cast<int>(std::lround(gx - old.width / 2.0f)), oy = static_cast<int>(std::lround(gy - old.height / 2.0f));
     Picture p;
@@ -537,12 +989,14 @@ Picture picture_on_map(const Picture& old, float gx, float gy, int w, int h, uin
         }
     return p;
 }
+#endif
 
 // The map file `map` (saved just before) at the size w x h: the right and the bottom edge move. The
 // map gets a ground image of its own, <map>.vid, of exactly its new size: the old picture (its own or
 // the campaign's) where it lay on the map - grown, a meadow where it did not reach; cropped, cut at
 // the new edge, so nothing of the old ground is left past it - with the ground object in the middle.
 bool resize_map_file(const std::string& map, int w, int h, std::string& error) {
+    memory_test_point("resize");
     std::vector<Chunk> chunks;
     if (!read_res(read_file(map), "MAP ", chunks)) {
         error = ui_printf(ui_format("SizeNotRead", "%s cannot be read"), map.c_str());
@@ -557,11 +1011,14 @@ bool resize_map_file(const std::string& map, int w, int h, std::string& error) {
     float f[2];
     std::memcpy(f, &head->records[0][0], 8);
     const int ow = static_cast<int>(f[0]), oh = static_cast<int>(f[1]);
+    // the new image and the map written as temporary files first, put in place together
+    const std::string map_temp = map + ".saving";
+    std::string image, image_temp;
     if (w != ow || h != oh) {
         std::string* record = nullptr;
         for (std::string& r : obj->records)
             if (static_cast<int>(u32(r, 0)) == GROUND_NVID) record = &r;
-        size_t start;
+        size_t start = std::string::npos;
         const std::string old_image = record ? ground_image(*record, start) : "";
         Picture old;
         float gx = ow / 2.0f, gy = oh / 2.0f;
@@ -571,17 +1028,41 @@ bool resize_map_file(const std::string& map, int w, int h, std::string& error) {
             return false;
         }
         const size_t dot = map.find_last_of('.');
-        const std::string image = map.substr(0, dot) + ".vid";
+        image = map.substr(0, dot) + ".vid";
+        image_temp = image + ".saving";
         const uint32_t seed = GetTickCount();
-        const Picture cut = picture_on_map(old, gx, gy, w, h, seed);
-        if (!write_file(image, ground_vid(w, h, seed, &cut))) {
+        int ox, oy;
+        picture_corner(gx, gy, old.width, old.height, ox, oy);
+        const bool written = write_ground(
+            image_temp, w, h,
+            [&](int px, int py, uint16_t& colour, uint16_t& height) {
+                const int sx = px - ox, sy = py - oy;
+                if (px < w && py < h && sx >= 0 && sy >= 0 && sx < old.width && sy < old.height) {
+                    colour = old.pixels[static_cast<size_t>(sy) * old.width + sx];
+                    height = old.heights[static_cast<size_t>(sy) * old.width + sx];
+                } else {
+                    colour = meadow(px, py, seed);
+                    height = FLAT_PICTURE_HEIGHT;
+                }
+            },
+            WHOLE([&] {
+                const Picture cut = picture_on_map(old, gx, gy, w, h, seed);
+                return ground_vid_whole(w, h, seed, &cut);
+            }()));
+        if (!written) {
             error = ui_printf(ui_format("NewNotWritten", "%s could not be written"), image.c_str());
             return false;
         }
         *record = record->substr(0, start) + image + '\0';
     }
     set_size(chunks, w, h, true);
-    if (!write_file(map, write_res("MAP ", chunks))) {
+    if (!write_file(map_temp, write_res("MAP ", chunks))) {
+        DeleteFileA(map_temp.c_str());
+        if (!image_temp.empty()) DeleteFileA(image_temp.c_str());
+        error = ui_printf(ui_format("NewNotWritten", "%s could not be written"), map.c_str());
+        return false;
+    }
+    if (!replace_map_files(map_temp, map, image_temp, image)) {
         error = ui_printf(ui_format("NewNotWritten", "%s could not be written"), map.c_str());
         return false;
     }
@@ -685,15 +1166,28 @@ bool read_sprite_frame(const std::string& image, int frame, int& w, int& h, std:
 }
 
 // Writes a picture as a ground image of its own (the layout of File > New's grounds).
+// Written a tile at a time straight from `pixels` and `heights` (the whole ground_vid_whole's bytes:
+// the size cut to whole tiles, every pixel of it inside the picture).
 bool write_ground_picture(const std::string& image, int w, int h, const std::vector<uint16_t>& pixels,
                           const std::vector<uint16_t>& heights) {
-    Picture p;
-    p.width = w;
-    p.height = h;
-    p.pixels = pixels;
-    p.heights = heights;
-    return write_file(image, ground_vid(w - w % TILE, h - h % TILE, 0, &p));
+    if (w <= 0 || h <= 0 || pixels.size() < static_cast<size_t>(w) * h || heights.size() < static_cast<size_t>(w) * h) return false;
+    return write_ground(
+        image, w - w % TILE, h - h % TILE,
+        [&](int px, int py, uint16_t& colour, uint16_t& height) {
+            const size_t i = static_cast<size_t>(py) * w + px;
+            colour = pixels[i];
+            height = heights[i];
+        },
+        WHOLE([&] {
+            Picture p;
+            p.width = w;
+            p.height = h;
+            p.pixels = pixels;
+            p.heights = heights;
+            return ground_vid_whole(w - w % TILE, h - h % TILE, 0, &p);
+        }()));
 }
+
 
 // The same for a map file's bytes (editor_exchange.cpp).
 std::string map_ground_image_of(const std::string& map_bytes) {
@@ -741,6 +1235,41 @@ bool set_map_ground_image(const std::string& map, const std::string& image) {
         }
     return done && write_file(map, write_res("MAP ", chunks));
 }
+
+#if LOCOFIX_SAVE_TEST
+// The test build's c40090: every ground image of maps\*\ (the campaign's and every custom map's) read
+// both ways and compared, and its picture written again both ways (into maps\_vidcheck.tmp, deleted).
+void vid_check_all() {
+    g_force_compare = true;
+    WIN32_FIND_DATAA folder;
+    HANDLE f = FindFirstFileA("maps\\*", &folder);
+    int images = 0;
+    for (BOOL more = f != INVALID_HANDLE_VALUE; more; more = FindNextFileA(f, &folder)) {
+        if (!(folder.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || folder.cFileName[0] == '.') continue;
+        WIN32_FIND_DATAA file;
+        const std::string dir = std::string("maps\\") + folder.cFileName + "\\";
+        HANDLE g = FindFirstFileA((dir + "*.vid").c_str(), &file);
+        for (BOOL m = g != INVALID_HANDLE_VALUE; m; m = FindNextFileA(g, &file)) {
+            const std::string image = dir + file.cFileName;
+            Picture p;
+            ++images;
+            if (!read_ground(image, p)) continue;   // compared too: both refuse it
+            const std::string out = "maps\\_vidcheck.tmp";
+            std::vector<uint16_t> pixels = p.pixels, heights = p.heights;
+            write_ground_picture(out, p.width, p.height, pixels, heights);
+            // an image the editor wrote (any version: the layout of File > New's grounds) comes out
+            // as the very file it was read from
+            const bool same = read_file(out) == read_file(image);
+            patch::log("vid check: %s written again %s its file", image.c_str(), same ? "= byte for byte" : "differs from (another layout)");
+            DeleteFileA(out.c_str());
+        }
+        if (g != INVALID_HANDLE_VALUE) FindClose(g);
+    }
+    if (f != INVALID_HANDLE_VALUE) FindClose(f);
+    g_force_compare = false;
+    patch::log("vid check: %d images", images);
+}
+#endif
 
 namespace {
 
@@ -1019,10 +1548,20 @@ bool map_size_dialog(HWND owner, int& w, int& h) {
 }
 
 // The resize of the saved map file (editor.cpp saves before and loads it again after).
+// Out of memory nothing is replaced (the map stays as saved before) and `error` says so.
 bool resize_map(const std::string& map, int w, int h, std::string& error) {
     if (!valid_size(w, h)) {
         error = ui_text("SizeError", "a map is 512 to 4096 px wide and high, in steps of 256");
         return false;
     }
-    return resize_map_file(map, w, h, error);
+    try {
+        return resize_map_file(map, w, h, error);
+    } catch (const std::bad_alloc&) {
+        DeleteFileA((map + ".saving").c_str());
+        DeleteFileA((map.substr(0, map.find_last_of('.')) + ".vid.saving").c_str());
+        patch::log("map size: %s - out of memory, nothing resized", map.c_str());
+        error = ui_text("ResizeNoMemory", "Not enough memory to resize the map. It stays saved at its old size, without the objects that were "
+                                          "outside the new one; its picture is as it was.");
+        return false;
+    }
 }

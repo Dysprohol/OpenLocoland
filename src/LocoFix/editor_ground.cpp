@@ -33,6 +33,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <new>
 
 // editor_newmap.cpp
 std::string map_ground_image(const std::string& map);
@@ -40,8 +41,8 @@ bool read_ground_picture(const std::string& image, int& w, int& h, std::vector<u
                          std::vector<uint16_t>& heights);
 bool write_ground_picture(const std::string& image, int w, int h, const std::vector<uint16_t>& pixels,
                           const std::vector<uint16_t>& heights);
-bool set_map_ground_image(const std::string& map, const std::string& image);
 bool read_sprite_frame(const std::string& image, int frame, int& w, int& h, std::vector<uint32_t>& argb);
+void edit_message_text(const char* key, const char* english);   // editor_edit.cpp: a line of the status strip
 
 namespace {
 
@@ -77,6 +78,8 @@ std::vector<uint16_t> g_pixels, g_heights, g_original_pixels, g_original_heights
 std::vector<uint16_t> g_stroke_pixels, g_stroke_heights;
 std::vector<uint8_t> g_textures_of, g_stroke_textures;   // the texture painted on each pixel (NO_TEXTURE: the original)
 bool g_stroke = false;
+bool g_prepare_failed = false;   // the last ground_prepare ran out of memory
+bool g_stroke_lost = false;      // the last ground_stroke_end had no memory for its patch
 int g_x0 = 0, g_y0 = 0, g_x1 = -1, g_y1 = -1;
 // the rectangle changed since the last frame, to be written into the textures (ground_flush)
 int g_pending_x0 = 0, g_pending_y0 = 0, g_pending_x1 = -1, g_pending_y1 = -1;
@@ -147,7 +150,13 @@ void read_textures() {
         int w = 0, h = 0;
         std::vector<uint16_t> pixels, heights;
         const std::string image = "maps\\" + m.first + "\\" + m.first + ".vid";
-        if (!read_ground_picture(image, w, h, pixels, heights)) {
+        bool read = false;
+        try {
+            read = read_ground_picture(image, w, h, pixels, heights);
+        } catch (const std::bad_alloc&) {   // a campaign ground read whole: 4 bytes a pixel for a moment
+            patch::log("ground: not enough memory to read %s", image.c_str());
+        }
+        if (!read) {
             patch::log("ground: %s cannot be read - its textures are left out", image.c_str());
             continue;
         }
@@ -465,19 +474,40 @@ uint16_t lit(uint16_t c, float f) {
     return static_cast<uint16_t>((r << 11) | (g << 5) | b);
 }
 
+template <typename V> void release(V& v) { V().swap(v); }   // clear() keeps the memory
+
 }  // namespace
 
-bool ground_prepare(const std::string& map, float x, float y, void* vid, std::string& why) {
+// The picture and everything kept of it: 13 bytes a pixel (the picture, its heights, their originals,
+// the texture of each pixel, and the stroke's copy of them, reserved here so that a stroke never asks
+// for that much memory again). Out of memory, all of it is given back and the tools stay off.
+bool ground_prepare(const std::string& map, float x, float y, void* vid, std::string& why, bool& no_memory) {
+    no_memory = false;
     if (g_ready) return true;
     const std::string image = map_ground_image(map);
-    if (image.empty() || !read_ground_picture(image, g_w, g_h, g_pixels, g_heights)) {
-        why = image.empty() ? map : image;
+    try {
+        memory_test_point("prepare");
+        if (image.empty() || !read_ground_picture(image, g_w, g_h, g_pixels, g_heights)) {
+            why = image.empty() ? map : image;
+            return false;
+        }
+        const size_t n = g_pixels.size();
+        g_textures_of.assign(n, NO_TEXTURE);
+        g_original_pixels = g_pixels;
+        g_original_heights = g_heights;
+        g_stroke_pixels.reserve(n);
+        g_stroke_heights.reserve(n);
+        g_stroke_textures.reserve(n);
+    } catch (const std::bad_alloc&) {
+        const int w = g_w, h = g_h;
+        ground_reset();
+        no_memory = g_prepare_failed = true;
+        why = image;
+        patch::log("ground: %s (%dx%d) - not enough memory to paint it, the ground tools stay off", image.c_str(), w, h);
         return false;
     }
+    g_prepare_failed = false;
     g_image = image;
-    g_textures_of.assign(g_pixels.size(), NO_TEXTURE);
-    g_original_pixels = g_pixels;
-    g_original_heights = g_heights;
     g_left = x - g_w / 2.0f;
     g_top = y - g_h / 2.0f;
     g_vid = static_cast<uint8_t*>(vid);
@@ -487,6 +517,7 @@ bool ground_prepare(const std::string& map, float x, float y, void* vid, std::st
 }
 
 bool ground_ready() { return g_ready; }
+bool ground_prepare_failed() { return g_prepare_failed; }
 
 void ground_flush() {
     if (g_pending_x1 < g_pending_x0) return;
@@ -505,14 +536,15 @@ void ground_reset() {
     g_pending_x0 = g_pending_y0 = 0;
     g_pending_x1 = g_pending_y1 = -1;
     g_image.clear();
-    g_pixels.clear();
-    g_heights.clear();
-    g_original_pixels.clear();
-    g_original_heights.clear();
-    g_stroke_pixels.clear();
-    g_stroke_heights.clear();
-    g_textures_of.clear();
-    g_stroke_textures.clear();
+    release(g_pixels);
+    release(g_heights);
+    release(g_original_pixels);
+    release(g_original_heights);
+    release(g_stroke_pixels);
+    release(g_stroke_heights);
+    release(g_textures_of);
+    release(g_stroke_textures);
+    g_prepare_failed = false;
 }
 
 void ground_keep() {
@@ -523,9 +555,12 @@ void ground_keep() {
     g_kept.image = g_image;
     g_kept.w = g_w;
     g_kept.h = g_h;
-    g_kept.original_pixels = g_original_pixels;
-    g_kept.original_heights = g_original_heights;
-    g_kept.textures_of = g_textures_of;
+    // moved, not copied (5 bytes a pixel less at the run's start); the picture goes with the level
+    // the run loads, so the rest is freed now and the run has that memory too
+    g_kept.original_pixels = std::move(g_original_pixels);
+    g_kept.original_heights = std::move(g_original_heights);
+    g_kept.textures_of = std::move(g_textures_of);
+    ground_reset();
 }
 
 bool ground_kept() { return g_kept.valid; }
@@ -854,26 +889,52 @@ bool campaign_ground_image(const std::string& image) {
 
 bool ground_own() { return g_ready && (g_painted || !campaign_ground_image(g_image)); }
 
+bool ground_stroke_lost() {   // asked once: the answer is taken
+    const bool lost = g_stroke_lost;
+    g_stroke_lost = false;
+    return lost;
+}
+
 std::shared_ptr<PaintPatch> ground_stroke_end() {
+    g_stroke_lost = false;
     if (!g_stroke) return nullptr;
     g_stroke = false;
     std::shared_ptr<PaintPatch> p;
     if (g_x1 >= g_x0) {
-        p = std::make_shared<PaintPatch>();
-        p->x = g_x0;
-        p->y = g_y0;
-        p->w = g_x1 - g_x0 + 1;
-        p->h = g_y1 - g_y0 + 1;
-        for (int y = 0; y < p->h; ++y)
-            for (int x = 0; x < p->w; ++x) {
-                const size_t i = static_cast<size_t>(p->y + y) * g_w + p->x + x;
-                p->colour_before.push_back(g_stroke_pixels[i]);
-                p->height_before.push_back(g_stroke_heights[i]);
-                p->colour_after.push_back(g_pixels[i]);
-                p->height_after.push_back(g_heights[i]);
-                p->texture_before.push_back(g_stroke_textures.empty() ? NO_TEXTURE : g_stroke_textures[i]);
-                p->texture_after.push_back(g_textures_of[i]);
-            }
+        // the rectangle before and after: each vector allocated to its size at once (the history counts
+        // the sizes - grown by push_back they held up to half as much again)
+        try {
+            memory_test_point("stroke");
+            p = std::make_shared<PaintPatch>();
+            p->x = g_x0;
+            p->y = g_y0;
+            p->w = g_x1 - g_x0 + 1;
+            p->h = g_y1 - g_y0 + 1;
+            const size_t n = static_cast<size_t>(p->w) * p->h;
+            p->colour_before.resize(n);
+            p->height_before.resize(n);
+            p->colour_after.resize(n);
+            p->height_after.resize(n);
+            p->texture_before.resize(n);
+            p->texture_after.resize(n);
+            size_t k = 0;
+            for (int y = 0; y < p->h; ++y)
+                for (int x = 0; x < p->w; ++x, ++k) {
+                    const size_t i = static_cast<size_t>(p->y + y) * g_w + p->x + x;
+                    p->colour_before[k] = g_stroke_pixels[i];
+                    p->height_before[k] = g_stroke_heights[i];
+                    p->colour_after[k] = g_pixels[i];
+                    p->height_after[k] = g_heights[i];
+                    p->texture_before[k] = g_stroke_textures.empty() ? NO_TEXTURE : g_stroke_textures[i];
+                    p->texture_after[k] = g_textures_of[i];
+                }
+        } catch (const std::bad_alloc&) {
+            p.reset();   // the stroke stays on the picture, without a step of the history
+            g_stroke_lost = true;
+            patch::log("ground: not enough memory for the stroke's step of the history (%dx%d) - it cannot be undone", g_x1 - g_x0 + 1,
+                       g_y1 - g_y0 + 1);
+            edit_message_text("MsgStrokeNoMemory", "not enough memory to keep this stroke in the history: it cannot be undone");
+        }
         g_painted = true;
     }
     g_stroke_pixels.clear();
@@ -915,8 +976,9 @@ GroundTimes ground_times(bool reset) {
     return t;
 }
 
-bool ground_save(const std::string& map) {
-    if (!g_ready || !g_painted) return true;
+bool ground_save_needed() { return g_ready && g_painted; }
+
+std::string ground_save_image(const std::string& map) {
     // <folder>\<name>.vid next to the map - never over a campaign ground of the player's game
     std::string image = map.substr(0, map.find_last_of('.'));
     const size_t slash = image.find_last_of('\\');
@@ -924,11 +986,10 @@ bool ground_save(const std::string& map) {
     if (name.size() == 3 && name[0] == 'l' && std::isdigit(static_cast<unsigned char>(name[1])) &&
         std::isdigit(static_cast<unsigned char>(name[2])))
         image += "_painted";
-    image += ".vid";
-    if (!write_ground_picture(image, g_w, g_h, g_pixels, g_heights) || !set_map_ground_image(map, image)) {
-        patch::log("ground: %s could not be written", image.c_str());
-        return false;
-    }
-    patch::log("ground: the painted picture saved as %s", image.c_str());
-    return true;
+    return image + ".vid";
+}
+
+bool ground_write(const std::string& file) {
+    memory_test_point("save");
+    return g_ready && write_ground_picture(file, g_w, g_h, g_pixels, g_heights);
 }

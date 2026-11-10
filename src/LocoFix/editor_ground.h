@@ -27,14 +27,18 @@ struct GroundTexture {
 
 // Makes the held level's ground paintable: its picture read from the image of the map file `map`,
 // drawn centred on the ground object at (x, y) with the live image `vid`. False (with the reason
-// in `why`) when the image cannot be read.
-bool ground_prepare(const std::string& map, float x, float y, void* vid, std::string& why);
+// in `why`) when the image cannot be read, or - `no_memory` - when the picture and its copies do not
+// fit in memory (then nothing of it is kept, and ground_prepare_failed() says so until the next
+// level or ground_prepare).
+bool ground_prepare(const std::string& map, float x, float y, void* vid, std::string& why, bool& no_memory);
+bool ground_prepare_failed();
 bool ground_ready();
-// The level goes: everything forgotten.
+// The level goes: everything forgotten (and its memory given back).
 void ground_reset();
 // Run the level writes the map's copy and loads it, so the picture is read again from the copy: before
 // the run, ground_keep keeps what the copy cannot tell - the original picture the right button or Shift
-// restores, the textures painted on it, whether it was painted (nothing when the picture was not read);
+// restores, the textures painted on it, whether it was painted (nothing when the picture was not read) -
+// moved out, not copied, and the rest of the picture freed for the run (the level goes next);
 // back, once the picture is ready again, ground_take_kept puts that back (ground_kept: there is any).
 void ground_keep();
 bool ground_kept();
@@ -90,6 +94,9 @@ int ground_bed_at(float x, float y);
 // with a texture (-1: none); `restore` puts the original heights and colours back.
 void ground_lower(float x, float y, float radius, int bed, int texture, bool restore);
 std::shared_ptr<PaintPatch> ground_stroke_end();
+// The last ground_stroke_end had no memory for the patch (it said so in the status line): the caller
+// keeps no step of the history for the stroke. Asked once (the answer is taken).
+bool ground_stroke_lost();
 // The picture's changes into the live image's textures: the brushes and the relief only note the
 // rectangle they changed, and a frame writes it once (a texture locked once a frame, not once a dab).
 void ground_flush();
@@ -108,9 +115,26 @@ bool campaign_ground_image(const std::string& image);
 void ground_apply(const PaintPatch& patch, bool after);
 // The picture's height at a screen point of the map (0 outside).
 int ground_level_at(float x, float y);
-// After the map was saved as `map` (a game path): when the picture was painted, it is written as
-// <map's folder>\<name>.vid and the map points at it. False when that failed.
-bool ground_save(const std::string& map);
+// Saving (editor.cpp save_map): whether the picture was painted and has to be written with the map;
+// the image file it is written as for the map file `map` (a game path) - <map's folder>\<name>.vid,
+// never a campaign ground's name; ground_write writes the picture into `file` a tile at a time (the
+// temporary file of the save: editor.cpp puts it in place with the map). ground_write may throw
+// std::bad_alloc; false when the file could not be written.
+bool ground_save_needed();
+std::string ground_save_image(const std::string& map);
+bool ground_write(const std::string& file);
+
+// Puts a map and its ground image, written whole as temporary files, in place as one step
+// (editor_newmap.cpp; nothing replaced and the temporary files gone when it fails).
+bool replace_map_files(const std::string& map_temp, const std::string& map, const std::string& image_temp, const std::string& image);
+
+// The test build (LOCOFIX_SAVE_TEST, a define given to the compiler: never in a release) makes the
+// n-th pass of a named place fail as an allocation does (LOCOFIX_FAIL, editor_newmap.cpp).
+#if LOCOFIX_SAVE_TEST
+void memory_test_point(const char* place);
+#else
+inline void memory_test_point(const char*) {}
+#endif
 
 // The clock for the editor's timings (ms, QueryPerformanceCounter).
 double ground_clock();

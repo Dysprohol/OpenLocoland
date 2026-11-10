@@ -3299,6 +3299,7 @@ uint8_t* fit_gun(uint8_t* host, const Socket& s, int nvid, int army) {
 
 std::vector<GridChange> flatten_under(uint8_t* o);   // the ground, below
 std::shared_ptr<PaintPatch> relief_for(const std::vector<GridChange>& changes);   // the ground's picture, below
+void step_paint(std::shared_ptr<PaintPatch> patch);   // below
 std::string g_place_status;   // why the object to place cannot go where the cursor is
 void set_piece(uint8_t* host, size_t i, int nvid, int army = -1);   // wholes' panel rows, below
 
@@ -3636,7 +3637,7 @@ void place(POINT p) {
     // a building: the ground under it at its height, the ring around half way (map_tool.py place)
     if (class_of(o) == B_BUILDING || class_of(o) == B_DEPO) {
         g_undo.back().grid = flatten_under(o);
-        g_undo.back().paint = relief_for(g_undo.back().grid);
+        step_paint(relief_for(g_undo.back().grid));
     }
     const bool on_track = pl.how == Placed::Track;
     if ((nvid == VID_DEPOT || nvid == VID_WORKSHOP) && on_track) {   // its push line and posts
@@ -3745,7 +3746,7 @@ void paste_at(const std::vector<Clip>& clip, float x, float y, const UiText& wha
     commit(what, made, before);
     if (class_of(made[0]) == B_BUILDING || class_of(made[0]) == B_DEPO) {   // as placed: the ground under it at its height
         g_undo.back().grid = flatten_under(made[0]);
-        g_undo.back().paint = relief_for(g_undo.back().grid);
+        step_paint(relief_for(g_undo.back().grid));
     }
     choose_entry(0);   // Select: the copy can be dragged at once
     g_selection = group_of(made[0]);
@@ -4214,7 +4215,7 @@ void lay_step() {
     for (State& b : before) b.present = false;
     commit({"OpTrack", "track"}, made, before);
     g_undo.back().grid = changes;
-    g_undo.back().paint = relief_for(changes);
+    step_paint(relief_for(changes));
 }
 
 // The rail under a point of the map (screen coordinates plus the camera): the one whose way - the
@@ -4419,6 +4420,7 @@ bool relief_on(bool height_tool) {
 // The picture drawn again for changes of the GRID already made (the track's, a building's
 // footprint): the patch for the step's history, or null.
 std::shared_ptr<PaintPatch> relief_for(const std::vector<GridChange>& changes) {
+    ground_stroke_lost();   // an answer of a stroke before is not this one's
     if (changes.empty() || !grid() || !relief_on(false)) return nullptr;
     const int w = grid_width(), h = grid_height();
     std::vector<short> to(grid(), grid() + w * h), from = to;
@@ -4489,7 +4491,13 @@ bool follows_ground(uint8_t* o) {
 
 bool in_grid(const rail::Cell& c) { return c.first >= 0 && c.first < grid_width() && c.second >= 0 && c.second < grid_height(); }
 
-void start_height_stroke(bool right) {
+// The Ground height tool raises the GRID and redraws the picture with it (the relief); when the
+// picture does not fit in memory, the tool refuses the stroke with the message (the GRID alone would
+// leave the picture's relief behind). False then.
+bool start_height_stroke(bool right) {
+    if (grid() && !ground_ready()) {
+        if (!ground_paintable(true) && ground_prepare_failed()) return false;   // it said MsgGroundNoMemory
+    }
     g_stroke = Stroke();
     g_stroke.active = true;
     stroke_timing_begin();
@@ -4524,6 +4532,7 @@ void start_height_stroke(bool right) {
         g_stroke.lift.push_back(at<float>(o, O_Z) - ground_z(vid_of(o), at<float>(o, O_X), at<float>(o, O_Y)));
         g_stroke.object_before.push_back(state_of(o));
     });
+    return true;
 }
 
 uint32_t mix(uint32_t h) {
@@ -4715,9 +4724,22 @@ void end_height_stroke() {
     }
     commit({"OpHeight", "ground height"}, moved, moved_before);
     g_undo.back().grid = changes;
-    g_undo.back().paint = relief;
+    step_paint(relief);
     MESSAGE("MsgGround", "ground: %s - %u cells, %u objects on them", brush_name(g_stroke.brush),
             static_cast<unsigned>(changes.size()), static_cast<unsigned>(moved.size()));
+}
+
+// The picture's patch of the step just recorded. When there was no memory to keep it (ground_stroke_end
+// said so in the status line) the step goes: undoing its other half - the GRID, the objects - would leave
+// the picture and the ground apart. The change stays; it cannot be undone.
+void step_paint(std::shared_ptr<PaintPatch> patch) {
+    if (g_undo.empty()) return;
+    if (ground_stroke_lost()) {
+        g_undo.pop_back();
+        patch::log("edit: the step is not kept - no memory for its picture");
+        return;
+    }
+    g_undo.back().paint = std::move(patch);
 }
 
 // A building's footprint flattened at the height under its middle (ground.h), as grid changes.
@@ -4936,7 +4958,13 @@ bool ground_paintable(bool quiet) {
     });
     const char* map = at<const char*>(world(), W_LEVEL_FILE);
     std::string why;
-    if (!ground || !map || !ground_prepare(map, at<float>(ground, O_X), at<float>(ground, O_Y), vid_of(ground), why)) {
+    bool no_memory = false;
+    if (!ground || !map || !ground_prepare(map, at<float>(ground, O_X), at<float>(ground, O_Y), vid_of(ground), why, no_memory)) {
+        if (no_memory) {   // said also for the quiet calls: each one is an action of the player
+            MESSAGE("MsgGroundNoMemory", "not enough memory to paint the ground of this map (%s): the ground tools are off, track and "
+                                         "objects work and save", why.c_str());
+            return false;
+        }
         if (quiet) {
             patch::log("edit: the ground's picture cannot be read (%s) - no relief", why.empty() ? "no ground object" : why.c_str());
             return false;
@@ -5436,6 +5464,10 @@ void end_ground_stroke() {
     op.paint = paint;
     for (const auto& c : g_gstroke.grid_before)
         op.grid.push_back({c.first.first, c.first.second, c.second, ground_cell(c.first.first, c.first.second)});
+    if (ground_stroke_lost()) {   // no memory for the picture's half of the step: none of it is kept
+        g_undo.pop_back();
+        patch::log("edit: the step is not kept - no memory for its picture");
+    }
     if (g_gstroke.water)
         MESSAGE("MsgWater", "%s: level %d, %u tiles, %u effects, %u cells of ground, %u taken away", ui_text(WATER_KINDS[g_gstroke.kind].key, WATER_KINDS[g_gstroke.kind].english),
                 g_gstroke.level, static_cast<unsigned>(g_gstroke.made.size()), effects, static_cast<unsigned>(g_gstroke.grid_before.size()), gone);
@@ -10750,12 +10782,13 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
                 MESSAGE("MsgTextureOriginal", "the picture here is the original (or painted before this session)");
             }
         } else if (tool() == Tool::Height) {
-            start_height_stroke(false);
-            height_step();
-            g_window = window;
-            SetTimer(window, HEIGHT_TIMER, HEIGHT_REPEAT, nullptr);
+            if (start_height_stroke(false)) {
+                height_step();
+                g_window = window;
+                SetTimer(window, HEIGHT_TIMER, HEIGHT_REPEAT, nullptr);
+                patch::log("edit: stroke: ground height (%s) begun at %ld,%ld", BRUSH_NAMES[static_cast<int>(g_stroke.brush)], g_mouse.x, g_mouse.y);
+            }
             if (!g_test) SetCapture(window);
-            patch::log("edit: stroke: ground height (%s) begun at %ld,%ld", BRUSH_NAMES[static_cast<int>(g_stroke.brush)], g_mouse.x, g_mouse.y);
         } else if (tool() == Tool::Decals && bed_brush()) {   // a bed picked: the swap of the rails' bed
             start_bed_brush(shift_down());
             ground_step(true);
@@ -10856,12 +10889,14 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             // the right button stays with these tools (Esc leaves them): Raise lowers, the brushes of
             // the picture put the original back
             if (tool() == Tool::Height && g_brush == Brush::Raise) {
-                start_height_stroke(true);
-                height_step();
-                g_window = window;
-                SetTimer(window, HEIGHT_TIMER, HEIGHT_REPEAT, nullptr);
+                if (start_height_stroke(true)) {
+                    height_step();
+                    g_window = window;
+                    SetTimer(window, HEIGHT_TIMER, HEIGHT_REPEAT, nullptr);
+                    patch::log("edit: stroke: ground height (%s, the right button) begun at %ld,%ld", BRUSH_NAMES[static_cast<int>(g_stroke.brush)],
+                               g_mouse.x, g_mouse.y);
+                }
                 if (!g_test) SetCapture(window);
-                patch::log("edit: stroke: ground height (%s, the right button) begun at %ld,%ld", BRUSH_NAMES[static_cast<int>(g_stroke.brush)], g_mouse.x, g_mouse.y);
             } else if (tool() != Tool::Height) {
                 start_ground_stroke(tool() == Tool::Water, true);
                 ground_step(true);
@@ -11317,6 +11352,16 @@ void keep_position(const int* pos, const std::set<uint8_t*>& dots) {
     if (dot && dots.count(dot) && !g_kept_dots.count({dot, pos[3]})) g_kept_dots[{dot, pos[3]}] = dot_key(dot, pos[3]);
 }
 
+// editor.cpp's Save out of memory: how many steps the history holds, and all of them dropped when the
+// player says so (a stroke's step keeps its rectangle before and after, 10 bytes a pixel).
+unsigned edit_history_steps() { return static_cast<unsigned>(g_undo.size() + g_redo.size()); }
+void edit_drop_history() {
+    const unsigned steps = edit_history_steps();
+    std::vector<Operation>().swap(g_undo);
+    std::vector<Operation>().swap(g_redo);
+    patch::log("edit: the history dropped (%u steps) to free memory", steps);
+}
+
 void edit_keep_history() {
     g_kept.clear();
     g_kept_dots.clear();
@@ -11341,6 +11386,15 @@ void edit_keep_history() {
     g_kept_valid = true;
     patch::log("edit: run - %u objects and %u steps of the history kept", static_cast<unsigned>(g_kept.size()),
                static_cast<unsigned>(g_undo.size() + g_redo.size()));
+}
+
+void edit_drop_kept() {
+    g_kept.clear();
+    g_kept_dots.clear();
+    std::vector<Operation>().swap(g_kept_undo);
+    std::vector<Operation>().swap(g_kept_redo);
+    g_kept_grid_original.clear();
+    g_kept_valid = false;
 }
 
 void edit_restore_history() {

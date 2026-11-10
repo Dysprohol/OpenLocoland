@@ -73,6 +73,9 @@
 #include <cstring>
 
 bool level_save_succeeded();   // level_save.cpp
+#if LOCOFIX_SAVE_TEST
+void vid_check_all();   // editor_newmap.cpp, the test build
+#endif
 void editor_feed_sound(bool on);   // below: the sound while a modal loop runs
 bool restart_game(bool editor, const std::string& map, bool back_to_editor);   // restart.cpp
 // editor_edit.cpp: editing the objects of the held level
@@ -83,8 +86,11 @@ bool edit_dirty();
 void edit_remember_selection();   // editor_edit.cpp: Run the level's way back
 void edit_restore_selection();
 void edit_keep_history();
+void edit_drop_kept();   // what edit_keep_history kept, forgotten (it ran out of memory)
 void edit_restore_history();
 void edit_saved();
+unsigned edit_history_steps();   // the steps of undo and redo
+void edit_drop_history();        // all of them gone (a save out of memory, asked)
 void edit_before_save();   // the cars standing backwards keep it over the save
 void edit_end_strokes(const char* why);   // editor_edit.cpp: a stroke of the brushes under way ends
 void edit_message_saved(const std::string& map);
@@ -160,6 +166,9 @@ constexpr int TEST_RENAME = 40048;    // test mode: WM_COPYDATA <name> - the map
 constexpr int TEST_DELETE = 40049;    // test mode: WM_COPYDATA - the map deleted (Rename or delete)
 constexpr int TEST_FACTORY = 40047;   // test mode: WM_COPYDATA "x y" - the panel of the factory there
 constexpr int TEST_PICK = 40050;      // test mode: WM_COPYDATA "nvid army" - that object of the palette to place
+#if LOCOFIX_SAVE_TEST
+constexpr int TEST_VID_CHECK = 40090;   // the test build: c40090 reads and writes every ground image both ways (editor_newmap.cpp)
+#endif
 constexpr UINT WM_SAVE_AFTER_RUN = WM_APP + 0x52;   // Run the level's copy held again: save it (wParam 1: then end the game)
 constexpr uintptr_t SET_POSITION = 0x41c680;   // SetPosition: the centre of the view, clamped
 constexpr uintptr_t G_SOUND = 0x5d3a54;        // g_sound: the sound object
@@ -550,16 +559,127 @@ bool ask_without_ground(HWND window, const std::string& image) {
     return ui_message_box(window, text.c_str(), ui_text("FileSaveTitle", "Save map"), MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) == IDYES;
 }
 
+bool g_save_said = false;   // the last save_map failed and said so in a box (out of memory, a file not written)
+
+// Temporary files of a save, deleted when it ends whichever way (the ones put in place are gone already).
+struct TempFiles {
+    std::vector<std::string> files;
+    ~TempFiles() {
+        for (const std::string& f : files) DeleteFileA(f.c_str());
+    }
+};
+
+// The files of a save of the level as `target` (a game path), all-or-nothing: the painted picture
+// first - the step that needs memory - as <image>.saving, then the map as <map>.saving (Level_Save
+// writes it as <map>.saving.saving and renames it, level_save.cpp), the picture it is to point at
+// set in it (the painted one, or another map's taken along as a copy of its own), and only then
+// both put in place together (replace_map_files). Before, the map was written first and marked
+// saved, and the picture after it: when the picture ran out of memory the game ended and the map
+// was left pointing at its old picture. Any failure leaves the old map with its old picture and no
+// temporary file. `no_memory` when an allocation failed; the image written (empty: the map points
+// at the one it pointed at) in `image`, `along` when it is another map's picture taken along.
+// `failed` names the file that could not be written or put in place (empty when Level_Save failed: it
+// has said so itself).
+bool write_map_files(uint8_t* w, const std::string& target, bool scratch, std::string& image, bool& along, std::string& failed) {
+    TempFiles temps;
+    const std::string map_temp = target + ".saving";
+    temps.files = {map_temp, map_temp + ".saving"};
+    image.clear();
+    along = false;
+    std::string image_temp;
+    edit_before_save();   // a stroke under way ends first: the picture written is whole
+    if (ground_save_needed()) {
+        image = ground_save_image(target);
+        image_temp = image + ".saving";
+        temps.files.push_back(image_temp);
+        if (!ground_write(image_temp)) {
+            patch::log("ground: %s could not be written - the map is not saved", image.c_str());
+            failed = image;
+            return false;
+        }
+    }
+    memory_test_point("map");
+    DeleteFileA(map_temp.c_str());
+    char* name = reinterpret_cast<New_t>(CRT_NEW)(map_temp.size() + 1);
+    if (!name) return false;
+    std::memcpy(name, map_temp.c_str(), map_temp.size() + 1);
+    const auto save = *reinterpret_cast<SaveLevel_t*>(*reinterpret_cast<uint8_t**>(w) + WORLD_VTABLE_SAVE_LEVEL);
+    save(w, nullptr, name);   // Level_Save frees the name
+    if (!level_save_succeeded()) return false;
+    // a map saved under a new name takes its ground image along when the picture lies in another
+    // map's folder - the new map's scratch folder (it goes when the editor leaves it), POLIGON's or
+    // another custom map's (renamed or deleted, it would take the picture with it); a campaign
+    // terrain stays the game's maps\lNN\lNN.vid
+    if (image.empty() && !scratch) {
+        const std::string pointed = map_ground_image(map_temp);
+        const std::string image_folder = lower_path(folder_of(pointed));
+        const bool campaign_ground = image_folder.size() == 8 && image_folder.compare(0, 6, "maps\\l") == 0 &&
+                                     std::isdigit(static_cast<unsigned char>(image_folder[6])) &&
+                                     std::isdigit(static_cast<unsigned char>(image_folder[7]));
+        if (!pointed.empty() && !campaign_ground && image_folder != lower_path(folder_of(target)) &&
+            GetFileAttributesA(pointed.c_str()) != INVALID_FILE_ATTRIBUTES) {
+            const std::string own = target.substr(0, target.find_last_of('.')) + ".vid";
+            temps.files.push_back(own + ".saving");
+            if (CopyFileA(pointed.c_str(), (own + ".saving").c_str(), FALSE)) {
+                image = own;
+                image_temp = own + ".saving";
+                along = true;
+            } else {
+                patch::log("editor: %s could not take its ground %s along (error %lu) - it keeps pointing at it", target.c_str(),
+                           pointed.c_str(), GetLastError());
+            }
+        }
+    }
+    if (!image.empty() && !set_map_ground_image(map_temp, image)) {
+        patch::log("editor: %s could not be pointed at %s - the map is not saved", map_temp.c_str(), image.c_str());
+        failed = target;
+        return false;
+    }
+    if (replace_map_files(map_temp, target, image_temp, image)) return true;
+    failed = target;
+    return false;
+}
+
+// A save that ran out of memory: a box the player cannot miss (the strip's line is gone in 6 s).
+// With steps in the undo history - they hold the strokes' rectangles - it offers to drop them and try
+// again; true for that Yes. Tests (no questions asked) get the text in LocoFix.log only.
+bool save_no_memory(HWND window, bool run) {
+    auto text = [&]() -> std::string {
+        return run ? ui_text("RunNoMemory", "Not enough memory to write the copy of the map that runs, so the level is not run. Nothing "
+                                            "of your map was written; your changes are still in the editor.")
+                   : ui_text("MsgSaveNoMemory", "Not enough memory to write the painted ground, so nothing was saved: the map and its "
+                                                "picture on disk are as they were at the last save. Your changes are still in the editor.");
+    };
+    const bool was = ui_english(true);
+    patch::log("editor: %s", text().c_str());
+    ui_english(was);
+    if (!asks() || !window) return false;
+    const unsigned steps = edit_history_steps();
+    DialogScope scope;
+    if (!steps) {
+        ui_message_box(window, text().c_str(), ui_text(run ? "RunTitle" : "FileSaveTitle", run ? "Quick test" : "Save map"),
+                       MB_OK | MB_ICONERROR);
+        return false;
+    }
+    const std::string ask = text() + "\n\n" +
+                            ui_printf(ui_format("SaveDropHistory", "The undo history uses memory too (%u steps). Clear it - they can no "
+                                                                   "longer be undone - and try again?"),
+                                      steps);
+    if (ui_message_box(window, ask.c_str(), ui_text(run ? "RunTitle" : "FileSaveTitle", run ? "Quick test" : "Save map"),
+                       MB_YESNO | MB_ICONERROR) != IDYES)
+        return false;
+    edit_drop_history();
+    return true;
+}
+
 bool save_map(const std::string& path) {
     uint8_t* w = world();
     if (!w) return false;
+    const HWND window = *reinterpret_cast<HWND*>(w + WORLD_HWND);
     const std::string lost = missing_ground();
     if (!lost.empty() && !auto_folder(folder_of(game_path(path)))) {
         bool go = false;
-        if (asks()) {
-            const HWND window = *reinterpret_cast<HWND*>(w + WORLD_HWND);
-            go = ask_without_ground(window, lost);
-        }
+        if (asks()) go = ask_without_ground(window, lost);
         if (!go) {
             patch::log("editor: not saved - the ground image %s is missing, the save would have no ground", lost.c_str());
             return false;
@@ -568,38 +688,48 @@ bool save_map(const std::string& path) {
     // a new map's folder (maps\<name>\ for the custom maps page)
     const size_t slash = path.find_last_of('\\');
     if (slash != std::string::npos && slash > 0) CreateDirectoryA(path.substr(0, slash).c_str(), nullptr);
-    char* name = reinterpret_cast<New_t>(CRT_NEW)(path.size() + 1);
-    if (!name) return false;
-    std::memcpy(name, path.c_str(), path.size() + 1);
-    const auto save = *reinterpret_cast<SaveLevel_t*>(*reinterpret_cast<uint8_t**>(w) + WORLD_VTABLE_SAVE_LEVEL);
-    edit_before_save();
-    save(w, nullptr, name);   // Level_Save frees the name
-    if (!level_save_succeeded()) return false;
-    g_current = path;
+    const std::string target = game_path(path);
     // Run the level's copy in its scratch folder: nothing is saved for the user, and it stays off the
     // custom maps page
-    const bool scratch = auto_folder(folder_of(game_path(path)));
-    if (!scratch) edit_saved();
-    // a painted ground: its own image next to the map, the map pointing at it
-    ground_save(game_path(path));
-    // a map saved under a new name takes its ground image along when the picture lies in another
-    // map's folder - the new map's scratch folder (it goes when the editor leaves it), POLIGON's or
-    // another custom map's (renamed or deleted, it would take the picture with it); a campaign
-    // terrain stays the game's maps\lNN\lNN.vid
-    const std::string image = map_ground_image(game_path(path));
-    const std::string image_folder = lower_path(folder_of(image));
-    const bool campaign_ground = image_folder.size() == 8 && image_folder.compare(0, 6, "maps\\l") == 0 &&
-                                 std::isdigit(static_cast<unsigned char>(image_folder[6])) && std::isdigit(static_cast<unsigned char>(image_folder[7]));
-    if (!scratch && !image.empty() && !campaign_ground && image_folder != lower_path(folder_of(game_path(path))) &&
-        GetFileAttributesA(image.c_str()) != INVALID_FILE_ATTRIBUTES) {
-        const std::string base = game_path(path), own = base.substr(0, base.find_last_of('.')) + ".vid";
-        if (CopyFileA(image.c_str(), own.c_str(), FALSE) && set_map_ground_image(base, own))
-            patch::log("editor: %s takes its ground along as %s", base.c_str(), own.c_str());
+    const bool scratch = auto_folder(folder_of(target));
+    std::string image;
+    bool along = false;
+    g_save_said = false;
+    for (int attempt = 0;; ++attempt) {
+        bool written = false, no_memory = false;
+        std::string failed;
+        try {
+            written = write_map_files(w, target, scratch, image, along, failed);
+        } catch (const std::bad_alloc&) {
+            no_memory = true;
+        }
+        if (written) break;
+        if (!no_memory) {
+            // a file that could not be written or put in place (Level_Save says its own failures)
+            if (!failed.empty() && asks() && window) {
+                g_save_said = true;
+                DialogScope scope;
+                ui_message_box(window,
+                               ui_printf(ui_format("SaveNotWritten", "The map could not be saved: %s could not be written or replaced (is it "
+                                                                     "in use or read-only?). The files on disk are as they were."),
+                                         failed.c_str())
+                                   .c_str(),
+                               ui_text("FileSaveTitle", "Save map"), MB_OK | MB_ICONWARNING);
+            }
+            return false;
+        }
+        g_save_said = true;
+        patch::log("editor: %s not saved - out of memory; the files on disk are as they were", target.c_str());
+        if (attempt || !save_no_memory(window, scratch)) return false;
     }
+    g_current = path;
+    if (!scratch) edit_saved();
+    if (!image.empty() && !along) patch::log("ground: the painted picture saved as %s", image.c_str());
+    if (along) patch::log("editor: %s takes its ground along as %s", target.c_str(), image.c_str());
     // its mission: the script (a new map gets one), the texts, the custom maps page
-    mission_save(game_path(path));
-    if (!scratch) edit_message_saved(game_path(path));
-    if (!scratch) panel_saved(game_path(path));   // SAVED in the middle of the view
+    mission_save(target);
+    if (!scratch) edit_message_saved(target);
+    if (!scratch) panel_saved(target);   // SAVED in the middle of the view
     return true;
 }
 
@@ -835,7 +965,7 @@ bool run_level(HWND window) {
         written = written && save_map(run);
         g_current = map;   // the editor stays on its map (save_map took the copy's name)
         if (!written) {
-            if (asks()) {
+            if (asks() && !g_save_said) {   // the save has said why already
                 DialogScope scope;
                 ui_message_box(window, ui_printf(ui_format("RunFailed", "The map could not be written (%s): it is not run."), run.c_str()).c_str(),
                                ui_text("RunTitle", "Quick test"), MB_OK | MB_ICONWARNING);
@@ -848,7 +978,15 @@ bool run_level(HWND window) {
         g_run_view_y = *reinterpret_cast<float*>(w + 0x48);
     }
     edit_remember_selection();
-    edit_keep_history();
+    try {
+        memory_test_point("keep");
+        edit_keep_history();
+    } catch (const std::bad_alloc&) {
+        // the history could not be kept over the run: the run goes on (the copy is written), the
+        // history starts again when the editor is back
+        edit_drop_kept();
+        patch::log("editor: run - not enough memory to keep the history over the run; it starts again when the level is held again");
+    }
     g_run_back = true;
     g_run_map = run;
     g_run_dirty = edit_dirty();
@@ -1218,6 +1356,12 @@ void handle_command(HWND window, int id) {
     // while the level runs only Ctrl+R (the accelerators still post the rest): a load or a save would
     // take the running state, and a load would leave Run the level's copy that the way back holds
     if (g_running && id != ID_RUN && id != ID_ABOUT) return;
+#if LOCOFIX_SAVE_TEST
+    if (id == TEST_VID_CHECK) {
+        vid_check_all();
+        return;
+    }
+#endif
     if (id == ID_LOAD) {
         if (!ask_save(window)) return;
         const std::string map = choose_map(window, false);
@@ -1309,6 +1453,12 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
         leave_map("");
         break;
     case WM_COMMAND:
+#if LOCOFIX_SAVE_TEST
+        if (HIWORD(w) <= 1 && LOWORD(w) == TEST_VID_CHECK) {
+            handle_command(window, TEST_VID_CHECK);
+            return 0;
+        }
+#endif
         if (HIWORD(w) <= 1 && (LOWORD(w) == ID_LOAD || LOWORD(w) == ID_SAVE || LOWORD(w) == ID_ABOUT ||
                                (LOWORD(w) >= ID_RUN && LOWORD(w) <= ID_FILES) ||
                                (LOWORD(w) >= ID_UNDO && LOWORD(w) <= ID_SEMAPHORE))) {
@@ -1550,6 +1700,9 @@ void install_editor() {
     char value[8] = {};
     g_test = GetEnvironmentVariableA("LOCOFIX_TEST", value, sizeof value) && value[0] == '1';
     g_test_ask = GetEnvironmentVariableA("LOCOFIX_TEST_ASK", value, sizeof value) && value[0] == '1';
+#if LOCOFIX_SAVE_TEST
+    patch::log("editor: THE SAVE TEST BUILD (LOCOFIX_SAVE_TEST) - LOCOFIX_FAIL, LOCOFIX_NO_BOUND and LOCOFIX_VID_COMPARE are read");
+#endif
 
     const uint8_t read_flags[] = {0x8B, 0x91, 0x20, 0x02, 0x00, 0x00};   // mov edx,[ecx+0x220]
     const uint8_t menu_name[] = {0x25, 0xE8, 0xB7, 0x47, 0x00};           // and eax,0x47b7e8
