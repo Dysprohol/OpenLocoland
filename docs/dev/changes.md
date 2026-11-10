@@ -471,6 +471,11 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       a pause and moves in the held editor; a region without both flags is drawn exactly as before,
       and without the hook such a map shows the one rise; `LOCOFIX_REGION_LOG=1` logs the top of
       every region with flag 1,
+  41. a region's fog table freed twice (`region_fog.cpp`, `BUGS.md` F25): `Region_InitFog` frees the fog
+      table of a region and keeps the pointer when the new fog is none, so choosing a fog again - or
+      deleting the region - freed it a second time and the game crashed a little later (the editor:
+      FOG: MIST, FOG: NONE or an undo, FOG: MIST); the pointer is cleared after the original ran with
+      no fog to make,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
