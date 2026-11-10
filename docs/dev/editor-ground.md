@@ -829,7 +829,31 @@ stroke ends scatters its generators (water circles 504 and noise 510, swamp bubb
 337, lava eruptions 441) as far apart as the missions have them and grows one region turning
 explosions there into splashes on water or lava. Dragging one kind over another replaces it in the
 squares the brush reaches (that square's tiles and generators of the other kind go, a kind left without
-tiles loses its splash region). A kind new on the map begun in another kind's water takes that water's
+tiles loses its splash region). One kind a square is the engine's rule, not the editor's: a tile shows
+wherever the ground's picture is below its level, so two kinds in one 128 px square would show each
+other, the higher covering the lower - and none of the 20 campaign maps has two kinds of water at all.
+So the tool shows it first: while the cursor is over the map (no Shift, no stroke of the right
+button), every square a dab there would take from another kind is outlined in magenta on a dark edge
+(it reads on water, swamp and lava), where that kind's tile lies - on the 128 grid at its own level,
+on its water -, and the status line adds "replaces the other water in the outlined squares"; squares
+of the chosen kind or without water get none. One function decides it for the outline and for the
+stroke (`water_dab_squares`: the brush's box on the 128 grid at the stroke's level, on the map, no tile
+of the kind yet; taken when another kind's tile is there), with the level the stroke would take
+(`water_stroke_level`) and the map's tiles in one pass (`water_squares`), so the outline cannot
+disagree with the stroke: checked in the game by `map_tool.py list` of the map saved before and
+after a click - dark water in a light lake's middle (2 squares) and at its edge (4, mostly grass, a
+corner of their tile in the box), lava where light, dark and swamp water meet (4), the 8 px and the
+200 px brush (2 and 14), dark water over lava standing 8 above the others (the outline on the lava
+tile), a lake on raised ground at 166, the view scrolled, 1920 x 1080 (6), after Run the level and
+back; Polish and English; 60 fps over a big lake with 16 squares outlined, the tool's part of the
+frame 0.06 ms (0.03 before). During a held stroke the outline seldom shows: each dab replaces the
+squares as the cursor reaches them, so a dab at the cursor finds them taken already. Two things the
+rule does that the outline cannot show: the squares are taken at the new kind's level, so where it
+differs from the other kind's (a kind new on the map begun on dry ground lies k.below under that
+ground - lava begun on a lake's shore came out at 58 over water at 50) the replaced tiles stand that
+many pixels off the old ones and a strip of the old lake bed as high shows bare along one edge; and
+a higher kind's bed is kept above a lower kind's level, so replacing that higher kind with the lower
+one leaves its bed (lava's, at 52 over water at 50) bare where the lower water does not reach. A kind new on the map begun in another kind's water takes that water's
 level, so its tiles cover all of the other's water in the squares it takes over - measured from the
 ground there, the other's bed, it came out below that bed, and around the brush the replaced squares
 showed their bed bare; a kind already on the map keeps its level (all its tiles stand at one). The right button or Shift takes the water of every kind back: the

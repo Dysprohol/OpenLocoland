@@ -279,7 +279,7 @@ się razem z mapą.
 
 ### 3. Woda, bagno, lawa
 
-**Woda i lawa** z listwy: w rzędzie **RODZAJ** (jasna woda, ciemna woda, bagno, bagno 2, lawa; `W` je przełącza) i **ROZMIAR**; przeciągaj, żeby ją położyć. Przeciągnięcie jednym rodzajem po drugim podmienia go; prawy przycisk albo Shift zabiera każdą wodę. Obniża teren
+**Woda i lawa** z listwy: w rzędzie **RODZAJ** (jasna woda, ciemna woda, bagno, bagno 2, lawa; `W` je przełącza) i **ROZMIAR**; przeciągaj, żeby ją położyć. Przeciągnięcie jednym rodzajem po drugim podmienia go w całych kwadratach 128 px - jeden rodzaj na kwadrat, tak gra rysuje wodę -; kwadraty, które pociągnięcie podmieni, są obrysowane, zanim zaczniesz malować. Prawy przycisk albo Shift zabiera każdą wodę. Obniża teren
 w nieckę z brzegiem, kładzie powierzchnię wody i dodaje jej efekty (kręgi na wodzie, bąble, wybuchy
 lawy) oraz region, w którym wybuchy rozpryskują wodę. Shift+przeciąganie ją usuwa. Jeden rodzaj
 wody ma na mapie jeden poziom, tak jak w misjach.

@@ -280,7 +280,7 @@ patches of other textures. The painted picture is saved with the map.
 
 ### 3. Water, swamp, lava
 
-The strip's **Water and lava**: its row's **KIND** (light water, dark water, swamp, swamp 2, lava; `W` cycles them) and **SIZE**; drag to lay it. Dragging one kind over another replaces it; the right button or Shift takes any water away. It lowers the
+The strip's **Water and lava**: its row's **KIND** (light water, dark water, swamp, swamp 2, lava; `W` cycles them) and **SIZE**; drag to lay it. Dragging one kind over another replaces it in whole 128 px squares - one kind a square, as the game draws water -; the squares a stroke would replace are outlined before you paint. The right button or Shift takes any water away. It lowers the
 ground into a basin with a shore, lays the water's surface and adds its effects (circles on the
 water, bubbles, lava eruptions) and a region where explosions splash. Shift+drag takes it away.
 One kind of water has one level on a map, as in the missions.
