@@ -5146,6 +5146,73 @@ std::pair<int, int> tile_square(float sx, float sy, int level) {   // the tile o
     return {static_cast<int>(std::floor(sx / 128)), static_cast<int>(std::floor((sy + level) / 128))};
 }
 
+// The map's water by 128 px square, in one pass over the objects: each kind's level (its tiles' VID
+// -> the level of the first tile, as water_level_of finds it; a kind not on the map is missing) and
+// the kinds with a tile in each square.
+struct WaterSquares {
+    std::map<int, int> levels;
+    std::map<std::pair<int, int>, std::vector<int>> kinds;
+    int level(int nvid) const {
+        const auto it = levels.find(nvid);
+        return it == levels.end() ? -1 : it->second;
+    }
+};
+
+WaterSquares water_squares() {
+    WaterSquares m;
+    for_each_object([&](uint8_t* o) {
+        if (removed(o) || !is_water_tile(nvid_of(o))) return;
+        const int n = nvid_of(o);
+        m.levels.emplace(n, static_cast<int>(std::lround(at<float>(o, O_Z))));
+        m.kinds[{static_cast<int>(std::floor(at<float>(o, O_X) / 128)), static_cast<int>(std::floor(at<float>(o, O_Y) / 128))}].push_back(n);
+    });
+    return m;
+}
+
+// The level of a stroke of the kind k begun at the mouse: the map's level of the kind; a kind new on
+// the map begun in another kind's water takes that water's level - its tiles then cover all of the
+// other's water in the squares it takes over; measured from the ground there (the other's bed) it
+// came out below that bed, and around the brush the replaced squares showed their bed bare -,
+// elsewhere it lies k.below under the ground there. start_ground_stroke and the tool's preview.
+int water_stroke_level(const WaterKind& k, const WaterSquares& m) {
+    if (m.level(k.nvid) >= 0) return m.level(k.nvid);
+    float x, y, z;
+    map_point(g_mouse, vid_by_number(VID_SEMAPHORE), x, y, z);
+    const int cx = (std::max)(0, (std::min)(grid_width() - 1, static_cast<int>(x) / 8));
+    const int cy = (std::max)(0, (std::min)(grid_height() - 1, static_cast<int>(y) / 8));
+    float sx, sy;
+    mouse_on_map(sx, sy);
+    int over = -1;
+    for (const WaterKind& other : WATER_KINDS) {
+        const int l = other.nvid == k.nvid ? -1 : m.level(other.nvid);
+        if (l > over && under_water(sx, sy, l, 0)) over = l;
+    }
+    return over >= 0 ? over : (std::max)(3, ground_cell(cx, cy) - k.below);
+}
+
+// The squares a dab of the Water tool at the screen point sx, sy (brush r) of a stroke at `level`
+// lays its kind's tile in: those of the brush's box on the 128 grid at that level, on the map, without
+// a tile of the kind (`tiles`); f(i, j, taken) for each, `taken` when the square has another kind's
+// tile (`others`) - two kinds in one square would show each other (a tile shows wherever the picture
+// is below its level), so the dab replaces that square's water. The one rule for both: ground_dab lays
+// and replaces by it, the tool's preview outlines the taken squares by it.
+template <typename F>
+void water_dab_squares(float sx, float sy, float r, int level, const std::set<std::pair<int, int>>& tiles,
+                       const std::set<std::pair<int, int>>& others, F f) {
+    const auto a = tile_square(sx - r, sy - r, level), b = tile_square(sx + r, sy + r, level);
+    for (int j = a.second; j <= b.second; ++j)
+        for (int i = a.first; i <= b.first; ++i) {
+            if (i < 0 || j < 0 || i * 128 >= grid_width() * 8 || j * 128 >= grid_height() * 8 || tiles.count({i, j})) continue;
+            f(i, j, others.count({i, j}) > 0);
+        }
+}
+
+// The squares of the map with a tile of the kind `nvid` (tiles) and with another kind's (others).
+void split_water_squares(const WaterSquares& m, int nvid, std::set<std::pair<int, int>>& tiles, std::set<std::pair<int, int>>& others) {
+    for (const auto& s : m.kinds)
+        for (int n : s.second) (n == nvid ? tiles : others).insert(s.first);
+}
+
 void start_ground_stroke(bool water, bool erase = false) {
     if (!water && g_paint_bed && g_paint_objects) {   // LAYS: OBJECTS - the bed objects swapped, the picture untouched
         g_gstroke = GroundStroke();
@@ -5165,38 +5232,17 @@ void start_ground_stroke(bool water, bool erase = false) {
     if (water) {
         g_gstroke.kind = g_water_kind;
         const WaterKind& k = WATER_KINDS[g_water_kind];
-        float x, y, z;
-        map_point(g_mouse, vid_by_number(VID_SEMAPHORE), x, y, z);
-        const int cx = (std::max)(0, (std::min)(grid_width() - 1, static_cast<int>(x) / 8));
-        const int cy = (std::max)(0, (std::min)(grid_height() - 1, static_cast<int>(y) / 8));
-        g_gstroke.level = water_level_of(k.nvid);
-        if (g_gstroke.level < 0) {
-            // a kind new on the map, begun in another kind's water: at that water's level - its tiles then
-            // cover all of the other's water in the squares it takes over; measured from the ground there
-            // (the other's bed) it came out below that bed, and around the brush the replaced squares
-            // showed their bed bare
-            float sx, sy;
-            mouse_on_map(sx, sy);
-            int over = -1;
-            for (const WaterKind& other : WATER_KINDS) {
-                const int l = other.nvid == k.nvid ? -1 : water_level_of(other.nvid);
-                if (l > over && under_water(sx, sy, l, 0)) over = l;
-            }
-            g_gstroke.level = over >= 0 ? over : (std::max)(3, ground_cell(cx, cy) - k.below);
-        }
+        const WaterSquares m = water_squares();
+        g_gstroke.level = water_stroke_level(k, m);
         g_gstroke.bed = (std::max)(0, g_gstroke.level - WATER_BED);
         // a water of another kind lower than this one would show through where its tiles reach:
         // the bed stays above its level (a tile is drawn wherever the picture is below its level)
         for (const WaterKind& other : WATER_KINDS) {
-            const int l = other.nvid == k.nvid ? -1 : water_level_of(other.nvid);
+            const int l = other.nvid == k.nvid ? -1 : m.level(other.nvid);
             if (l >= 0 && l < g_gstroke.level) g_gstroke.bed = (std::max)(g_gstroke.bed, (std::min)(l + 2, g_gstroke.level - 2));
         }
-        for_each_object([&](uint8_t* o) {
-            if (removed(o) || !is_water_tile(nvid_of(o))) return;
-            const std::pair<int, int> s{static_cast<int>(std::floor(at<float>(o, O_X) / 128)), static_cast<int>(std::floor(at<float>(o, O_Y) / 128))};
-            (nvid_of(o) == k.nvid ? g_gstroke.tiles : g_gstroke.others).insert(s);
-        });
-        for (const WaterKind& other : WATER_KINDS) g_gstroke.levels[other.nvid] = other.nvid == k.nvid ? g_gstroke.level : water_level_of(other.nvid);
+        split_water_squares(m, k.nvid, g_gstroke.tiles, g_gstroke.others);
+        for (const WaterKind& other : WATER_KINDS) g_gstroke.levels[other.nvid] = other.nvid == k.nvid ? g_gstroke.level : m.level(other.nvid);
     }
     ground_stroke_begin();
 }
@@ -5297,22 +5343,18 @@ void ground_dab(float sx, float sy, bool first) {
         }
     // the right button or Shift: the tiles of the squares left dry go when the stroke ends
     if (g_gstroke.erase) return;
-    const auto a = tile_square(sx - r, sy - r, g_gstroke.level), b = tile_square(sx + r, sy + r, g_gstroke.level);
     // the tiles of the kind over the brush, where missing; a square with another kind's tile loses it
-    // (two kinds in one square would show each other: a tile shows wherever the picture is below its
-    // level), so painting one water over another replaces it
-    for (int j = a.second; j <= b.second; ++j)
-        for (int i = a.first; i <= b.first; ++i) {
-            if (i < 0 || j < 0 || i * 128 >= grid_width() * 8 || j * 128 >= grid_height() * 8 || g_gstroke.tiles.count({i, j})) continue;
-            if (g_gstroke.others.count({i, j})) {
-                take_water_in_square(i, j, &k);
-                g_gstroke.others.erase({i, j});
-            }
-            if (uint8_t* t = create(k.nvid, 64.0f + 128 * i, 64.0f + 128 * j, static_cast<float>(g_gstroke.level), 0, 0)) {
-                g_gstroke.made.push_back(t);
-                g_gstroke.tiles.insert({i, j});
-            }
+    // (water_dab_squares), so painting one water over another replaces it
+    water_dab_squares(sx, sy, r, g_gstroke.level, g_gstroke.tiles, g_gstroke.others, [&](int i, int j, bool taken) {
+        if (taken) {
+            take_water_in_square(i, j, &k);
+            g_gstroke.others.erase({i, j});
         }
+        if (uint8_t* t = create(k.nvid, 64.0f + 128 * i, 64.0f + 128 * j, static_cast<float>(g_gstroke.level), 0, 0)) {
+            g_gstroke.made.push_back(t);
+            g_gstroke.tiles.insert({i, j});
+        }
+    });
 }
 
 // Water at a screen point: the picture lower than the level there.
@@ -8039,6 +8081,46 @@ void draw_paint_tool() {
     const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
     const float mx = static_cast<float>(g_mouse.x), my = static_cast<float>(g_mouse.y), r = static_cast<float>(g_paint_radius);
     const bool erase = shift_down();
+    // Water: the squares a dab at the cursor would take from another kind (water_dab_squares, the rule
+    // ground_dab replaces by; in a stroke its own squares, level and kind), each outlined where that
+    // kind's tile lies - on the 128 grid at its level, on its water -, before and during a stroke; none
+    // while the water is taken away (Shift, a stroke of the right button)
+    WaterSquares water;
+    int replaced = 0;
+    if (tool() == Tool::Water) {
+        water = water_squares();
+        if (!erase && !(g_gstroke.active && g_gstroke.erase)) {
+            const bool stroke = g_gstroke.active && g_gstroke.water;
+            const WaterKind& k = WATER_KINDS[stroke ? g_gstroke.kind : g_water_kind];
+            std::set<std::pair<int, int>> tiles, others;
+            if (!stroke) split_water_squares(water, k.nvid, tiles, others);
+            float sx, sy;
+            mouse_on_map(sx, sy);
+            uint8_t* w = world();
+            const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
+            FillBatch batch;
+            auto frame = [&](float l, float t, float rr, float b, float width, uint32_t argb) {
+                fill_rect(l, t, rr, t + width, argb);
+                fill_rect(l, b - width, rr, b, argb);
+                fill_rect(l, t + width, l + width, b - width, argb);
+                fill_rect(rr - width, t + width, rr, b - width, argb);
+            };
+            water_dab_squares(sx, sy, r, stroke ? g_gstroke.level : water_stroke_level(k, water), stroke ? g_gstroke.tiles : tiles,
+                              stroke ? g_gstroke.others : others, [&](int i, int j, bool taken) {
+                                  if (!taken) return;
+                                  ++replaced;
+                                  const auto in = water.kinds.find({i, j});
+                                  if (in == water.kinds.end()) return;
+                                  for (int n : in->second) {
+                                      if (n == k.nvid) continue;
+                                      const int l = water.level(n);
+                                      const float x0 = 128.0f * i - cam_x, y0 = 128.0f * j - l - cam_y;
+                                      frame(x0 + 1, y0 + 1, x0 + 127, y0 + 127, 5, 0xd0000000);   // a dark edge: it reads on water, swamp and lava
+                                      frame(x0 + 2, y0 + 2, x0 + 126, y0 + 126, 3, 0xffff40ff);
+                                  }
+                              });
+        }
+    }
     for (int k = 0; k < 32; ++k) {
         const float a = k * 6.2831853f / 32;
         fill(graphics(), nullptr, mx + r * std::cos(a) - 1.5f, my + r * std::sin(a) - 1.5f, mx + r * std::cos(a) + 1.5f,
@@ -8066,9 +8148,13 @@ void draw_paint_tool() {
                       g_paint_hard ? ui_text("WordHard", "hard") : ui_text("WordSoft", "soft"));
     } else {
         const WaterKind& k = WATER_KINDS[g_water_kind];
-        const int level = water_level_of(k.nvid);
+        const int level = water.level(k.nvid);
         std::snprintf(text, sizeof text, ui_format("StatusWater", "Water: %s (W), level %s, brush %d px (wheel, + -) - Shift takes it away"),
                       ui_text(k.key, k.english), level >= 0 ? std::to_string(level).c_str() : ui_text("WordNew", "new"), g_paint_radius);
+        if (replaced) {
+            const size_t used = std::strlen(text);
+            std::snprintf(text + used, sizeof text - used, "%s", ui_text("StatusWaterReplaces", " - replaces the other water in the outlined squares"));
+        }
     }
     g_ground_status = text;
 }
