@@ -34,6 +34,7 @@ void install_mouse_pan();
 void install_screen_scaling();
 void install_lost_surfaces();
 void install_fog_buffer();
+void install_region_pulse();
 void install_frame_limit();
 void install_test_map();
 void frame_limit_exit();
@@ -155,6 +156,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         install_screen_scaling();
         install_lost_surfaces();
         install_fog_buffer();
+        install_region_pulse();
         install_editor();   // after screen scaling: its window procedure goes in front
         install_level_save();
         install_test_map();
