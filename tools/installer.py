@@ -1028,6 +1028,29 @@ def forget_install(target):
             pass
 
 
+def remove_setup_state(folder):
+    """Uninstall: %LOCALAPPDATA%\\OpenLocoland goes with the captures and unpacked Setups in it - but the
+    remembered folder stays when it names another install that is still there (forget_install has
+    already dropped it when it named the one removed)."""
+    remembered = remembered_install()
+    keep = (remembered and os.path.normcase(os.path.abspath(folder)) == os.path.normcase(os.path.abspath(STATE_FOLDER))
+            and os.path.isdir(remembered) and read_manifest(remembered) is not None)
+    if not keep:
+        shutil.rmtree(folder, ignore_errors=True)
+        return
+    for name in os.listdir(folder) if os.path.isdir(folder) else []:
+        path = os.path.join(folder, name)
+        if name == LAST_INSTALL:
+            continue
+        if os.path.isdir(path):
+            shutil.rmtree(path, ignore_errors=True)
+        else:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
+
 def shortcut_target(path):
     """The program a .lnk starts (IShellLinkW, in this process; nothing is written), or None."""
     import ctypes
@@ -1998,7 +2021,7 @@ class Installer:
         shutil.rmtree(target, ignore_errors=True)
         forget_install(target)
         if CAPTURED == DEFAULT_CAPTURED:   # a folder given with --captured stays
-            shutil.rmtree(os.path.dirname(CAPTURED), ignore_errors=True)
+            remove_setup_state(os.path.dirname(CAPTURED))
         self.say(self.t("uninstalled", path=target) + "\n")
         self.refresh()
 
