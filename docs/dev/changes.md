@@ -461,6 +461,16 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       result that comes out folded is corrected - the rear end laid past the dead end, or beyond the
       point on the way on - and every other one is left as it was; LocoFix.log has a "train fold:"
       line for each car it lays so,
+  40. a region's fog that pulses (`region_pulse.cpp`, `BUGS.md` Quirks, "A fog that rises or
+      pulses"): the engine's flag 1 of a region only lets its fog rise once after the map is loaded
+      (kept as it is), so a pulse is added on flag bits the engine does not read - with flags 1 and
+      0x10 the Region vtable's Draw (0x4759a0 -> `Region_Draw`) goes through a hook that sets the
+      fog's top (+0x70) from the game time before the original runs, swinging between the fog's low
+      and high level once in 6 s (flag 0x20: 12 s, 0x40: 3 s), and the last count (+0x74) to 0, so
+      the original leaves the top alone and draws as ever; it follows the game speed, stands under
+      a pause and moves in the held editor; a region without both flags is drawn exactly as before,
+      and without the hook such a map shows the one rise; `LOCOFIX_REGION_LOG=1` logs the top of
+      every region with flag 1,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that

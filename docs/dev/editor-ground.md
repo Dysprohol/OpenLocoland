@@ -790,7 +790,7 @@ and at its rim - only the brush's circle dry, no square; the next kind painted a
 took over all of the new kind; Shift over all of it - nothing left; every step undone in turn. **Region**: drag its rectangle; it is picked at its dashed frame (inside it the
 objects under it are), its panel sets the size, the explosions (as they are, on water, on lava), the
 fog (none or the missions' mist, dust, haze, glow, set around its level), over the region or the
-whole view, pulsing - all of it kept in the history (`Region_InitFog` for the fog, the VID pairs set
+whole view, steady, rising once at the start or pulsing ("A fog that rises or pulses") - all of it kept in the history (`Region_InitFog` for the fog, the VID pairs set
 as `Region_Action` loads them). The palette's Effects group has the generators (water circles and
 noise, bubbles, ripples, polar bears, lava eruptions, chimney smoke, sparks, fire, glows) and the
 three regions. Checked in the game in Polish and English: an empty 768 x 512 map of grass in its
@@ -807,10 +807,11 @@ its place, at its z. No script refers to one (`GETSPRITE_REGION` of `export.lgc`
 used; `daynight.lgc` only gives VIDs 750 and 752 rain circles as their child while it rains). The engine
 does four things with it: `Region_Draw` tiles its own VID's picture over it (750: the light water's
 tiles - a lake's look without the Water tool's bed) and draws the fog between its low and high levels
-in its colour (`Graphics_DrawFog`; flag 1 pulses it, flag 8 lays it over the whole view): per pixel
+in its colour (`Graphics_DrawFog`; flag 1 lets it rise once from the bottom, flag 2 darkens with it, flag 8
+lays it over the whole view - "A fog that rises or pulses"): per pixel
 of a quarter-resolution mask the depth buffer less 0x400 - the ground's picture is 1026 + 8 a GRID level,
 so 2 + 8 a level, an object's pixels higher - against the levels times 8 (`Region_Draw` passes them,
-`Graphics_DrawFog` multiplies: its pulse + (low - high) * 8): full fog below low, fading out up to high,
+`Graphics_DrawFog` multiplies: the fog's top - high * 8 when it stands - + (low - high) * 8): full fog below low, fading out up to high,
 none above, clipped to the rectangle unless flag 8 (l05's mist 5-35 lies on its river bed, picture
 depth 58-182 under the region; l18's 70-120 on ground at 563-579; l13's 7-20 on the lava at 1; l07's
 30-45, flags 10, over the whole view);
@@ -827,7 +828,8 @@ values read back from the loaded level: the file holds them in `Region_Action`'s
 panel's size, EXPLOSIONS (as they are / on water / on lava: the pairs), FOG (none, or the missions'
 mist, dust, haze, glow around its level, in GRID levels: MIST 50-80 at level 70), OVER: THE REGION /
 THE WHOLE MAP (flag 8 - the fog and the pairs both; the row said FOG OVER: THE VIEW, which hid half of
-it) and PULSING (flag 1); the palette's Effects group places 750, 751 and 752 as rectangles sized in the
+it) and FOG MOTION (STEADY, RISES AT THE START - flag 1, which the row called PULSING -, PULSES with its
+row PULSE: SLOW, NORMAL, FAST: "A fog that rises or pulses"); the palette's Effects group places 750, 751 and 752 as rectangles sized in the
 panel; the image VID is the region's own and not set anywhere. FOG and OVER are rows of their own: a
 fog chosen stays over the region until OVER: THE WHOLE MAP is set (which says so when the region has
 pairs - they go over the whole map with it). A fog over the region alone on flat ground is a rectangle
@@ -859,6 +861,58 @@ read in the editor (the log line of a selected region: size, flags, fog, image, 
 of a run (golems do not walk by themselves - l13's stand at its script's places), so the creature area
 rests on the engine's code and the missions' dragons, not on a run; the pairs on the code path only
 (an explosion inside a splash region was not provoked).
+
+**A fog that rises or pulses** (2026-11-10; `Region_Draw` 0x435770, `src/LocoFix/region_pulse.cpp`,
+`BUGS.md` Quirks). `Region_Draw` keeps the fog's top at +0x70, in eighths of a GRID level, and gives it
+to `Graphics_DrawFog`: full fog below top + (low - high) * 8, fading out up to the top. Without flag 1
+the top is set to high * 8 every frame. With flag 1 each frame takes `g_gameTime & 7` and, when that is
+smaller than the frame before (+0x74: the 3-bit count wrapped), a top below high * 8 grows by 2 and one
+above it becomes 0. So flag 1 - which the editor's panel called PULSING - is one rise: the fog comes up
+from 0 to its level after the map is loaded and stays there for good; nothing takes it down again. No
+map of the game has the flag. Measured in the game at the frame limit of 60 (the top logged every time
+it changed, a region with levels 60-80 over the sandbox): 0 to 640 in 44.4 s at game speed 1 - 14.4
+units a second, 0.56 s a level - and in 26.1 s of real time (51.8 s of game time) at speed 2: the rise
+goes by the frames' lengths in ms, not by the time alone. On flat ground at level 70 nothing shows until
+the top passes the ground's depth (562: 39 s), then the fog fades in. It rises the same while the game
+is paused and in the held editor (the game's clock runs on under a pause), and it did not move in the
+40 s after it arrived. The other flags, read in the exe's listing (every access to +0x7c, the beta's
+too): 2 makes `Graphics_DrawFog` blend with source ZERO in place of ONE - the fog darkens the picture by
+its colour instead of adding it (l01's dust, flags 2, and l07's haze, flags 10; the editor's presets
+take those fogs' colours and levels but not this flag) -, 8 is the whole view (and the pairs and the
+rain circles over the whole map: `Vid_GetTerrainVariant`, `Object_SpawnChildren`, `Object_Update`); no
+other bit is read, the 126 regions of the game's maps have only 0, 2, 8 and 10, and `Region_Action` loads and
+saves the whole dword.
+The panel's row FOG MOTION has the three choices, one at a time: STEADY (none of the flags), RISES AT
+THE START (flag 1; the editor sets the top to 0 when it is chosen, so the rise is seen at once - in play
+it happens once after the map is loaded - and says so in the status line) and PULSES (flags 1 + 0x10),
+which opens the row PULSE: SLOW (+ 0x20), NORMAL, FAST (+ 0x40). The pulse is LocoFix's
+(`region_pulse.cpp`, "Changes from the original" 40): the Region vtable's Draw goes through a hook that,
+for a region with flags 1 and 0x10 and a fog, writes the top - low * 8 + (high - low) * 8 *
+(1 - cos(2 pi t / T)) / 2, t the game time, T 6 s (12 s slow, 3 s fast) - and a last count of 0 before
+the original runs; with flag 1 set and no count below 0 the original leaves the top as it is and draws.
+So the fog swings between "full below 2 low - high, none above low" and its steady look, all pulsing
+regions in step. The time is the game's clock: the pulse follows the game speed and stands still under
+a pause (the time the pause began at is used; the clock is put back to it when the pause ends), and the
+held editor, which holds by that pause, shows it moving by the running clock. The bits 0x10, 0x20 and
+0x40 were taken because nothing reads them and no map has them; 4 was left alone as the one gap in the
+authors' own 1, 2, 8. A map with a pulsing region in a game without the hook (the original, an older
+OpenLocoland) has flag 1 and bits it ignores: the one rise. Checked in the game (1024 x 768, limit 60,
+`LOCOFIX_REGION_LOG=1`: the top of every region with flag 1 in LocoFix.log): a pulsing region over its
+rectangle and one over the whole view through five tops each, 6.0 s apart (5.93-6.07),
+the top between low * 8 and high * 8, the tint of the ground coming and going in the screenshots -; at
+speed 2 seven tops 6.0 s of game time apart, 3.0 s real; under the Esc menu's pause the top stood for
+7.9 s and went on from where it was; in the held editor the same swing; every choice of the panel
+clicked with the top following (FAST 3 s, SLOW 12 s, THE WHOLE MAP, the fogs' presets, RISES from 0,
+STEADY, undo and redo); a region saved as PULSES SLOW has flags 0x31 in the file (`map_tool.py`) and
+pulsed in Run the level, held again and loaded again; the same map on a build without the hook (main's LocoFix) showed no
+fog in the screenshots of the first 35 s and the full steady tint from 45 s on; at 1920 x 1080 once, over the
+whole view (the fog buffer 512 x 512): four tops 6.0 s apart, the tint over the whole window, no error. A map
+without such a region is drawn as before: the held pictures of l05, l07, l13, l18 and of a steady fog on the
+sandbox differ between the build without the hook and the one with it by no more than two runs of the same
+build do (2 px on l05; the animated objects elsewhere), the mean colour of the fogged view equal within 0.2
+of a level; `test_missions.ps1` passed 20 of 20. The panel was seen in Polish and English (the rows inside
+the panel, the row's hint whole in the status line); the other four packs' rows are at most 34 characters
+of choices, the panel's width, by count only.
 
 **Sheets of water and lava** (the Region tool's MAKES; `editor_edit.cpp` "sheets of water and lava";
 issue #5, paulevsGitch: regions of water and lava like the vanilla maps', which can be raised and

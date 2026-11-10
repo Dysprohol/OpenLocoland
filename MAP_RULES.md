@@ -80,7 +80,8 @@ the editor of the game (DEVELOPERS.md "Editor mode", `editor_edit.cpp`) applies 
   over it; a new water's level is the ground - 20 (swamp - 16, lava - 12).
 - **Regions** (B_REGION, VID 751 plain, 752 with rain circles, 750 with the light water's image; 41
   kinds on 17 maps): a rectangle (width, height around its place, drawn at y - z). Its 80 bytes of
-  SPRD: flags (8: the fog over the whole view, 1: pulsing), the fog's high and low level and colour
+  SPRD: flags (8: the fog over the whole view; 1: the fog rises once after the map is loaded; 2: it
+  darkens; 0x10 with 1: it pulses - OpenLocoland's, 0x20 slowly, 0x40 fast), the fog's high and low level and colour
   (ARGB), width, height, an int, its image VID and six VID pairs. **Fog** (`Graphics_DrawFog`): the
   ground whose depth - 1024 (8 a level) is below `low` is fully fogged, fading out up to `high` - the
   missions' fogs: l05 blue mist 5-35, l01 dust 20-60, l07 red haze 30-45 (flag 8), l13 lava glow 7-20,
@@ -90,7 +91,7 @@ the editor of the game (DEVELOPERS.md "Editor mode", `editor_edit.cpp`) applies 
   grow rain circles (VID 339) while it rains (`daynight.lgc`). Most of the 114 regions are markers
   with nothing set. **[editor]** The Region tool drags one; its panel sets the size, the explosions
   (as they are, on water, on lava), a fog (none, mist, dust, haze, glow - the missions' colours, around
-  the region's level), over the region or the view, pulsing.
+  the region's level), over the region or the view, steady, rising once at the start or pulsing.
 - The colours of the armies come from the mission script (`SetArmyGamma`); **[editor]** the editor
   sets the same on a held level, so the buildings' flags (VID 175, linked) show the army.
 

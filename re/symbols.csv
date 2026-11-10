@@ -1244,7 +1244,7 @@
 0x435680;f;Region_Delete;Region vtable slot 0.
 0x4356a0;f;Region_Destruct;Region destructor.
 0x435710;f;Region_DrawDebug;Region vtable slot 6: draws the region frame.
-0x435770;f;Region_Draw;Region vtable slot 5.
+0x435770;f;Region_Draw;Region vtable slot 5: tiles the region's own Vid over its rectangle, then the fog - its top (+0x70, eighths of a level) is high * 8, or with flag 1 (+0x7c) grows by 2 from 0 up to that each time g_gameTime & 7 wraps (last count +0x74) - by Graphics_DrawFog over the rectangle or, flag 8, the view; flag 2 goes to Graphics_DrawFog (source blend ZERO).
 0x435b30;f;Vid_GetTerrainVariant;Given a Vid with flag 0x2000000 and a position (x, y, z), searches layer 7 for terrain sprites (spriteClass 0x17) whose bounding box contains (x, y) with z < sprite.z + 25; if found, looks up the Vid in the sprite's 6-entry array and returns the matching Vid (or the original Vid). Used by World_CreateObject and CivRobot_Action.
 0x435c50;f;Region_InitFog;Region method: sets the fog parameters (+0x80/+0x84/+0x88) and allocates/fills the fog table at +0x78 (Log_Fatal "Enough memory for DrawFog" on allocation failure). Called from Region_Action.
 0x435d70;f;Region_Action;Region vtable slot 1; ACT_SAVE adds 80 bytes (sizes, colours, VID and 6 pairs of object ids).

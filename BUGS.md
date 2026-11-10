@@ -109,6 +109,16 @@ Engine:
   with the unit information switched on (GitHub issue #10).
 - There is no line of sight: `Object_CanSee` (0x44b4a0), which `Object_FindTarget` asks, always
   returns 1, so a unit sees every target within its range whatever stands between them.
+- A region's flag 1 is not a pulse: with it `Region_Draw` (0x435770) does not set the fog's top to
+  its level every frame but raises it by 2 (eighths of a GRID level) each time `g_gameTime & 7` is
+  smaller than the frame before, from 0 up to the level, and sets a top above the level to 0 - so
+  the fog comes up once after the map is loaded and stays, and how fast goes by the frames' lengths
+  (at 60 frames a second 14.4 units a second at game speed 1 - level 80 after 44 s -, at speed 2
+  the same rise in 26 s; measured). Nothing takes it down again, and no map of the game has the
+  flag. Kept as it is; the editor names it RISES AT THE START (it said PULSING), and a real pulse
+  is LocoFix's own on the unused bits 0x10, 0x20, 0x40 (DEVELOPERS.md "A fog that rises or
+  pulses", "Changes from the original" 40). Flag 2 makes the fog darken the picture instead of
+  adding its colour (`Graphics_DrawFog`: source blend ZERO for ONE; l01 and l07).
 - `Effect` 4 (`EFF_OPEN_WINDOW`) and 8 (`EFF_SCALE_WINDOW`) do nothing, and 6
   (`EFF_PIXELAPPEAR`) and 7 (`EFF_LINESHIFT`) only stop `Graphics_EndScene` from presenting
   (0x414000.c:651): `Graphics_DrawEffects` has no code for them, so the picture stays frozen

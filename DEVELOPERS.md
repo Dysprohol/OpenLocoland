@@ -87,11 +87,11 @@ Sections: "Editor mode" (continued).
 
 Paragraphs: Mission settings and push lines; The enemy's trains of the script; Train arrivals; Capturing; The AI and the trains of an editor map - the review of 2026-11-05; The trains' orders; A train placed on a light's line did nothing; A target and a start; Every army the same orders; guarding an area; AREA watches from where the train stands; The armies' fight rules; What a row does, and click-and-hold; The templates; The panel; A factory's build options; A factory's plan; The data; The script; Rebuilt when lost; The AI's knobs.
 
-### [editor-ground.md](docs/dev/editor-ground.md) (~74 KB)
+### [editor-ground.md](docs/dev/editor-ground.md) (~95 KB)
 
 Sections: "Editor mode" (continued).
 
-Paragraphs: Ground, gravel bed, decals; The relief and the heights of objects; A new map; How big a map can be; The map's frame; The armies' colours; On the track; The object's panel, the guns' sockets, the palette; Wholes, fly nests and mines; Flags; The rows of the ground's tools; The gravel bed in the Paint tool; Wrecks on the track; Trains, the vehicles' palette, patrols; On the train's own track; Rail kinds and ramps; The ground's picture, water, regions; Paint the ground; Regions, reviewed; Sheets of water and lava.
+Paragraphs: Ground, gravel bed, decals; The relief and the heights of objects; A new map; How big a map can be; The map's frame; The armies' colours; On the track; The object's panel, the guns' sockets, the palette; Wholes, fly nests and mines; Flags; The rows of the ground's tools; The gravel bed in the Paint tool; Wrecks on the track; Trains, the vehicles' palette, patrols; On the train's own track; Rail kinds and ramps; The ground's picture, water, regions; Paint the ground; Regions, reviewed; A fog that rises or pulses; Sheets of water and lava.
 
 ### [editor-ui.md](docs/dev/editor-ui.md) (~16 KB)
 
@@ -99,7 +99,7 @@ Sections: "Editor mode" (continued).
 
 Paragraphs: Map exchange; The texts of the editor; The Help and Menu buttons; Ctrl+R; No window menu; Full screen, 1920 x 1080; The frame and the profiler.
 
-### [changes.md](docs/dev/changes.md) (~40 KB)
+### [changes.md](docs/dev/changes.md) (~43 KB)
 
 Sections: "Changes from the original".
 

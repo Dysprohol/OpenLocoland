@@ -617,7 +617,11 @@ A **Region** (strip): drag its rectangle; its panel sets fog (mist, dust, haze, 
 it or the whole map (**OVER**, a row of its own); a creature placed inside keeps to it. A click inside a region where nothing else stands selects it (the Delete tool and `Del` delete it, the right button opens its panel). A fog is
 thickest low down, objects rise out of it: over the region it takes the shape of a hollow (a lake bed),
 on flat ground it is a tinted rectangle; **OVER: THE WHOLE MAP** makes it a haze over the whole view, as
-in missions 7, 13 and 18 (it also turns a region's explosions into splashes everywhere). The **Effects** theme of All objects has the region of light water and the
+in missions 7, 13 and 18 (it also turns a region's explosions into splashes everywhere). **FOG MOTION** says what
+the fog does: **STEADY**, **RISES AT THE START** (it comes up once from the bottom after the map is loaded -
+about half a second for each level of height - and stays; the editor shows the rise when you choose it) or
+**PULSES** (it swells and sinks for as long as the map runs: **PULSE: SLOW, NORMAL, FAST** - once in 12, 6 or
+3 seconds of game time). The **Effects** theme of All objects has the region of light water and the
 one with rain circles; the water shows only where the ground under it is lower than the region, so the
 light water's region is placed above the ground (see 3. Water, swamp, lava).
 

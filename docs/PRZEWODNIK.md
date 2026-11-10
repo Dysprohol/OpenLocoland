@@ -617,7 +617,10 @@ opar, poświata) i rozpryski, nad nim albo nad całą mapą; stworzenie postawio
 Mgła (wiersz **NAD** osobno) jest najgęstsza nisko, obiekty z niej wystają: nad regionem przybiera
 kształt zagłębienia (dna jeziora), na płaskim terenie to zabarwiony prostokąt; **NAD: CALA MAPA** robi z
 niej mgiełkę nad całym widokiem, jak w misjach 7, 13 i 18 (zamienia też wybuchy regionu w pluski na całej
-mapie). Temat **Efekty** we Wszystkich obiektach ma region
+mapie). **RUCH MGLY** mówi, co mgła robi: **STOI**, **NARASTA NA STARCIE** (podnosi się raz od dołu po
+wczytaniu mapy - około pół sekundy na każdy poziom wysokości - i zostaje; edytor pokazuje narastanie, gdy
+to wybierzesz) albo **PULSUJE** (wzbiera i opada, dopóki mapa działa: **PULS: WOLNY, ZWYKLY, SZYBKI** - raz
+na 12, 6 albo 3 sekundy czasu gry). Temat **Efekty** we Wszystkich obiektach ma region
 jasnej wody i region z kręgami w deszczu; wodę widać tylko tam, gdzie teren pod nią jest niżej niż
 region, więc region jasnej wody stawia się nad terenem (zob. 3. Woda, bagno, lawa).
 
