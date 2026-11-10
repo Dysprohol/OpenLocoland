@@ -216,6 +216,8 @@ TEXTS = {
                    "project's page on GitHub and run it.",
         "kept": "The game in {path} is as it was before this run.",
         "resume": "The update of {path} stopped half way: run Setup again and it completes it.",
+        "no_space": "There is not enough free space on {drive} - Setup needs about {need} MB while it works, "
+                    "{free} MB are free. Free some space there and run Setup again.",
     },
     "de": {
         "name": "Deutsch",
@@ -286,6 +288,8 @@ TEXTS = {
         "kept": "Das Spiel in {path} ist so wie vor diesem Lauf.",
         "resume": "Die Aktualisierung von {path} ist mittendrin stehen geblieben: starte Setup erneut, dann wird "
                   "sie abgeschlossen.",
+        "no_space": "Auf {drive} ist nicht genug Platz frei: Setup braucht während der Arbeit etwa {need} MB, "
+                    "frei sind {free} MB. Schaffe dort Platz und starte Setup erneut.",
     },
     "hu": {
         "name": "Magyar",
@@ -354,6 +358,8 @@ TEXTS = {
                    "le újra a telepítőt a projekt GitHub-oldaláról, és futtasd.",
         "kept": "A játék itt: {path} ugyanolyan, mint a futtatás előtt.",
         "resume": "A(z) {path} frissítése félúton megállt: futtasd újra a telepítőt, és befejezi.",
+        "no_space": "Nincs elég szabad hely itt: {drive}. A telepítőnek futás közben körülbelül {need} MB "
+                    "kell, szabad {free} MB. Szabadíts fel helyet, és futtasd újra a telepítőt.",
     },
     "pl": {
         "name": "Polski",
@@ -422,6 +428,8 @@ TEXTS = {
                    "instalator ponownie ze strony projektu na GitHubie i uruchom go.",
         "kept": "Gra w {path} jest taka jak przed tym uruchomieniem instalatora.",
         "resume": "Aktualizacja {path} zatrzymała się w połowie: uruchom instalator ponownie, a dokończy ją.",
+        "no_space": "Za mało wolnego miejsca na {drive} - instalator potrzebuje w trakcie pracy około {need} "
+                    "MB, wolne jest {free} MB. Zwolnij tam trochę miejsca i uruchom instalator ponownie.",
     },
     "pt": {
         "name": "Português",
@@ -490,6 +498,8 @@ TEXTS = {
                    "novo da página do projeto no GitHub e executa-o.",
         "kept": "O jogo em {path} está como antes desta execução.",
         "resume": "A atualização de {path} parou a meio: executa o Setup de novo e ele termina-a.",
+        "no_space": "Não há espaço livre suficiente em {drive} - o Setup precisa de cerca de {need} MB enquanto "
+                    "trabalha e há {free} MB livres. Liberta espaço e executa o Setup de novo.",
     },
     "ru": {
         "name": "Русский",
@@ -558,6 +568,8 @@ TEXTS = {
                    "со страницы проекта на GitHub и запустите его.",
         "kept": "Игра в {path} осталась такой же, как до этого запуска.",
         "resume": "Обновление {path} остановилось на полпути: запустите установщик снова, и он его завершит.",
+        "no_space": "Недостаточно свободного места на {drive} - установщику во время работы нужно около {need} "
+                    "МБ, свободно {free} МБ. Освободите место и запустите установщик снова.",
     },
     "cs": {
         "name": "Čeština",
@@ -625,6 +637,8 @@ TEXTS = {
                    "stránky projektu na GitHubu a spusť ho.",
         "kept": "Hra v {path} je taková jako před tímto spuštěním.",
         "resume": "Aktualizace {path} se zastavila v polovině: spusť instalátor znovu a dokončí ji.",
+        "no_space": "Na {drive} není dost volného místa: instalátor během práce potřebuje asi {need} MB, "
+                    "volných je {free} MB. Uvolni tam místo a spusť instalátor znovu.",
     },
 }
 UI_LANGUAGES = [("en", TEXTS["en"]["name"])] + sorted(((c, t["name"]) for c, t in TEXTS.items() if c != "en"),
@@ -1037,19 +1051,21 @@ def steam_files_check(steam, lang, skip_verify=False):
 
 # ---- a run that is stopped half way leaves a whole game ----
 #
-# The build goes into <target>\.openlocoland-setup\new, which nothing of the game reads. Only when it
-# has finished, the files that differ from the install's go in (commit): first their list is written
+# The build goes into <target>\.openlocoland-setup\new-<n>, which nothing of the game reads. Only when
+# it has finished, the files that differ from the install's go in (commit): first their list is written
 # as a journal (commit.json, flushed to the disk), then each file goes in with one rename on the same
-# disk (milliseconds for the whole lot), then the folder is removed. So a run killed (or stopped by
+# disk (milliseconds for the whole lot) and the folders the build made are made, then the folder is
+# removed (read-only files too; one that cannot be removed waits for the next run). So a run killed (or stopped by
 # a missing file of its own) while building leaves the game as it was, and only a run killed in the
 # middle of the renames leaves a mixed one - which the next run of this Setup or a later one finishes
 # from the journal before anything else (and any older Setup repairs by building over it). After the
 # commit come the clean-up of what earlier versions left, the options, the shortcuts and, last, the
 # record OpenLocoland.json.
 
-WORK = ".openlocoland-setup"   # in the install folder: the files a run prepares (new\) and its journal
+WORK = ".openlocoland-setup"   # in the install folder: the files a run prepares (new-<n>\) and its journal
 JOURNAL = "commit.json"
 TEST_STOP = None   # --test-stop <point> (tests): ends the process hard there, as a kill would
+TEST_FREE_MB = None   # --test-free-mb <n> (tests): the free space the check sees instead of the disk's
 
 
 def test_stop(point):
@@ -1081,7 +1097,46 @@ def write_json_safely(path, data):
         json.dump(data, f, indent=2)
         f.flush()
         os.fsync(f.fileno())
-    os.replace(temp, path)
+    replace_file(temp, path)
+
+
+def writable(path):
+    """Clears the read-only mark of `path` (files copied from a CD or a read-only copy keep it)."""
+    import stat
+    try:
+        os.chmod(path, stat.S_IWRITE | stat.S_IREAD)
+    except OSError:
+        pass
+
+
+def replace_file(src, dst):
+    """os.replace, also over a read-only file of the install (an update replaces it, as a player expects)."""
+    try:
+        os.replace(src, dst)
+    except PermissionError:
+        if not os.path.isfile(dst):
+            raise
+        writable(dst)
+        os.replace(src, dst)
+
+
+def remove_tree(folder):
+    """Removes `folder` with everything in it, read-only files too (their mark cleared and the removal
+    tried again). True when it is gone; False (the reason printed) when something of it stays."""
+    def again(function, path, _):
+        writable(path)
+        function(path)
+    if not os.path.exists(folder):
+        return True
+    try:
+        if sys.version_info >= (3, 12):
+            shutil.rmtree(folder, onexc=again)
+        else:
+            shutil.rmtree(folder, onerror=again)
+        return True
+    except OSError as e:
+        print(f"{folder} could not be removed ({type(e).__name__}: {e}) - the next run of Setup tries again")
+        return False
 
 
 def same_file(a, b):
@@ -1091,10 +1146,10 @@ def same_file(a, b):
     return sa.st_size == sb.st_size and (int(sa.st_mtime) == int(sb.st_mtime) or filecmp.cmp(a, b, shallow=False))
 
 
-def move_in(target, moves):
+def move_in(target, staged, moves, folders=()):
     """Puts each staged file of `moves` (relative paths) at its place in the install folder with a
-    rename; one moved before an interruption is skipped. Returns how many it moved."""
-    staged = os.path.join(work_folder(target), "new")
+    rename - over a read-only file too; one moved before an interruption is skipped - and makes the
+    `folders` the build made (logs\\ and any other, empty ones too). Returns how many it moved."""
     moved = 0
     for i, rel in enumerate(moves):
         if i == len(moves) // 2:
@@ -1103,45 +1158,75 @@ def move_in(target, moves):
         if not os.path.isfile(src):
             continue
         os.makedirs(os.path.dirname(dst), exist_ok=True)
-        os.replace(src, dst)
+        replace_file(src, dst)
         moved += 1
+    for rel in folders:
+        path = os.path.join(target, rel)
+        if not os.path.exists(path):
+            os.makedirs(path)
     return moved
 
 
-def finish_interrupted(target):
+def finish_interrupted(target, status):
     """What an earlier run left in the install folder's work folder: a journal (it was killed while
     moving its files in) - the rest is moved in, so the game is that version's whole again, unless
-    another Setup has finished an install there since; no journal (killed while preparing) - the
-    prepared files are removed, the game was not changed. Returns the line for the log, or None."""
+    another Setup has finished an install there since; no journal (killed while preparing, or a work
+    folder that could not be removed) - the prepared files are removed, the game was not changed.
+    `status["phase"]` is "moving" while the rest goes in (a failure there leaves a half put in game).
+    Returns (the line for the log or None, the files it put in: the previous record's for the
+    clean-up, as what an earlier version may have left)."""
     work = work_folder(target)
     if not os.path.isdir(work):
-        return None
+        return None, []
     try:
         with open(os.path.join(work, JOURNAL), encoding="utf-8") as f:
             journal = json.load(f)
     except (OSError, ValueError):
         journal = None
+    put = []
     if journal and journal.get("record") == record_stamp(target):
-        moved = move_in(target, journal.get("moves", []))
+        moves = journal.get("moves", [])
+        status["phase"] = "moving"
+        moved = move_in(target, os.path.join(work, journal.get("staged", "new")), moves, journal.get("folders", []))
+        status["phase"] = "preparing"
+        put = moves
         line = (f"An earlier run of Setup ({journal.get('version')}) stopped while putting its files in: "
-                f"the other {moved} of its {len(journal.get('moves', []))} files put in now")
+                f"the other {moved} of its {len(moves)} files put in now")
     elif journal:
         line = ("An earlier run of Setup stopped while putting its files in, and another Setup has updated "
                 "the install since: its files removed")
     else:
-        line = "An earlier run of Setup stopped while preparing its files: they are removed (the game was not changed)"
-    shutil.rmtree(work)
-    return line
+        line = ("An earlier run of Setup left its work folder (it stopped while preparing its files, or the "
+                "folder could not be removed): removed (the game was not changed by it)")
+    try:
+        os.remove(os.path.join(work, JOURNAL))   # first: what stays of the folder is then only leftovers
+    except OSError:
+        pass
+    remove_tree(work)
+    return line, put
 
 
-def commit(target, ver, status):
-    """Puts what the build prepared in the work folder into the install folder: the files that differ
-    from the install's (the same test as build.copy's; the high scores of an install stay the
-    player's, as build.py leaves them), through the journal and renames. The rest is removed with the
-    work folder."""
-    staged = os.path.join(work_folder(target), "new")
-    moves, same = [], 0
-    for directory, _, files in os.walk(staged):
+def new_stage(target):
+    """A new folder for this run's build in the work folder: new-1, new-2 ... (one that an earlier run
+    could not remove is left for the next run to try again)."""
+    for n in range(1, 1000):
+        staged = os.path.join(work_folder(target), f"new-{n}")
+        if not os.path.exists(staged):
+            os.makedirs(staged)
+            return staged
+    sys.exit(f"{work_folder(target)}: no room for a new work folder")
+
+
+def commit(target, staged, ver, status):
+    """Puts what the build prepared in `staged` into the install folder: the files that differ from
+    the install's (the same test as build.copy's; the high scores of an install stay the player's, as
+    build.py leaves them) and the folders it made, through the journal and renames. Then the work
+    folder goes - when it cannot (a file held), the install is done all the same and the next run
+    tries again."""
+    moves, folders, same = [], [], 0
+    for directory, subdirs, files in os.walk(staged):
+        for d in subdirs:
+            folders.append(os.path.relpath(os.path.join(directory, d), staged))
         for f in files:
             rel = os.path.relpath(os.path.join(directory, f), staged)
             dst = os.path.join(target, rel)
@@ -1151,13 +1236,36 @@ def commit(target, ver, status):
                 moves.append(rel)
     moves.sort()
     test_stop("before-journal")
-    write_json_safely(os.path.join(work_folder(target), JOURNAL),
-                      {"version": ver, "record": record_stamp(target), "moves": moves})
+    journal = os.path.join(work_folder(target), JOURNAL)
+    write_json_safely(journal, {"version": ver, "record": record_stamp(target), "staged": os.path.basename(staged),
+                                "moves": moves, "folders": sorted(folders)})
     status["phase"] = "moving"
-    move_in(target, moves)
-    shutil.rmtree(work_folder(target))
+    move_in(target, staged, moves, sorted(folders))
+    os.remove(journal)
     status["phase"] = "moved"
     print(f"Put into {target}: {len(moves)} files new or changed, {same} left as they were (the same, or the player's)")
+    remove_tree(work_folder(target))
+
+
+def free_space_check(steam, target, lang):
+    """Stops (in the window's language) when the install folder's disk has less free space than the
+    game takes - the build is made whole in the work folder before it goes in: the size of the Steam
+    folder's files and 64 MB."""
+    need = 64 << 20
+    for directory, _, files in os.walk(steam):
+        for f in files:
+            try:
+                need += os.path.getsize(os.path.join(directory, f))
+            except OSError:
+                pass
+    existing = os.path.abspath(target)
+    while not os.path.isdir(existing) and os.path.dirname(existing) != existing:
+        existing = os.path.dirname(existing)
+    free = TEST_FREE_MB << 20 if TEST_FREE_MB is not None else shutil.disk_usage(existing).free
+    drive = os.path.splitdrive(existing)[0] + os.sep if os.path.splitdrive(existing)[0] else existing
+    print(f"Free space on {drive}: {free >> 20} MB, needed about {need >> 20} MB")
+    if free < need:
+        sys.exit(TEXTS[lang]["no_space"].format(drive=drive, need=need >> 20, free=free >> 20))
 
 
 def install(steam, target, choices, ver, progress=None, skip_verify=False, status=None):
@@ -1167,7 +1275,7 @@ def install(steam, target, choices, ver, progress=None, skip_verify=False, statu
     of the shortcuts' names). `skip_verify`: bypass Steam.exe version check and leave the Steam files
     our changes do not fit as they are. The game is built in the work folder and put in at the end
     (commit, above); `status["phase"]` says how far it got: "preparing" (the game as it was),
-    "moving" (half put in: the next run finishes it), "moved". Prints its log; stops with SystemExit
+    "moving" (half put in, here or by finish_interrupted: the next run finishes it), "moved". Prints its log; stops with SystemExit
     and the reason. Returns the warnings of the files left so (steam_files_check)."""
     status = {} if status is None else status
     status["phase"] = "preparing"
@@ -1200,12 +1308,12 @@ def install(steam, target, choices, ver, progress=None, skip_verify=False, statu
     if BUNDLE:
         print(f"Setup's modules: {MODULES_IN_MEMORY / 1e6:.1f} MB read into memory at the start"
               if MODULES_IN_MEMORY else "Setup's modules: read from Setup.exe when first used")
-    line = finish_interrupted(target)
+    line, put = finish_interrupted(target, status)
     if line:
         print(line)
+    free_space_check(steam, target, choices["lang"])
     manifest = read_manifest(target)
-    staged = os.path.join(work_folder(target), "new")
-    os.makedirs(staged)
+    staged = new_stage(target)
     # the whole game into the work folder (nothing of the install is read or written meanwhile); the
     # clean-up of what earlier versions left runs on the install folder after the commit
     try:
@@ -1216,16 +1324,17 @@ def install(steam, target, choices, ver, progress=None, skip_verify=False, statu
         if game_running(target):   # started while the game was being built
             sys.exit("Locoland is running from the install folder - close it first")
     except BaseException:   # stopped before the commit: the game is as it was, the prepared files go
-        shutil.rmtree(work_folder(target), ignore_errors=True)
+        remove_tree(work_folder(target))
         raise
-    commit(target, ver, status)
+    commit(target, staged, ver, status)
     build.WRITTEN.clear()   # what this build wrote, at its place in the install folder (build.clean_up)
     build.wrote(*(os.path.join(target, rel) for rel in files))
     if choices.get("clean", True):
         game = os.path.join(build.REPO, "game")
         ours = build.DGVOODOO + ["LocoFix.dll", build.OUTPUT_EXE] + os.listdir(game)
-        removed = build.clean_up(target, steam, (manifest or {}).get("files", []), False,
-                                 build.foreign_root_entries(steam), ours)
+        # what the record lists and what an interrupted run put in (no record lists those yet)
+        previous = sorted(set((manifest or {}).get("files", [])) | set(put))
+        removed = build.clean_up(target, steam, previous, False, build.foreign_root_entries(steam), ours)
         print(f"Clean-up of {target}: {len(removed)} files of earlier versions removed")
     if as_is:   # LocoFix's settings: nothing reads them in a game installed as it is
         print("Options and game language: not written (installed as it is - no LocoFix to read them)")
@@ -1832,6 +1941,7 @@ def main():
     p.add_argument("--shortcut-root", help=argparse.SUPPRESS)
     # tests: the process ends hard at that point of the install, as a kill there would end it
     p.add_argument("--test-stop", choices=["built", "before-journal", "moving", "record"], help=argparse.SUPPRESS)
+    p.add_argument("--test-free-mb", type=int, help=argparse.SUPPRESS)   # tests: the free space the check sees
     a = p.parse_args()
     if a.shortcut_root:
         global SHORTCUT_ROOT
@@ -1839,6 +1949,9 @@ def main():
     if a.test_stop:
         global TEST_STOP
         TEST_STOP = a.test_stop
+    if a.test_free_mb is not None:
+        global TEST_FREE_MB
+        TEST_FREE_MB = a.test_free_mb
     if a.captured:
         global CAPTURED
         CAPTURED = languages.CAPTURED = os.path.abspath(a.captured)
