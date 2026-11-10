@@ -1075,15 +1075,19 @@ void run_setup(HWND dialog) {
     std::wstring arguments;
     {
         wchar_t exe[MAX_PATH] = {}, test[MAX_PATH] = {};
-        GetModuleFileNameW(nullptr, exe, MAX_PATH);
-        std::wstring game = exe;
-        game = game.substr(0, game.rfind(L'\\'));
+        // a path that does not fit (the length reaches the buffer: cut) gives no --target at all, as up
+        // to v0.2.10, rather than a cut folder
+        const DWORD length = GetModuleFileNameW(nullptr, exe, MAX_PATH);
+        std::wstring game = length && length < MAX_PATH ? exe : L"";
+        const size_t slash = game.rfind(L'\\');
+        game = slash == std::wstring::npos ? std::wstring() : game.substr(0, slash);
         // a test's game folder (LOCOFIX_UPDATE_TARGET, only with LOCOFIX_UPDATE_TEST): a drive root, a
         // trailing backslash, spaces - how it reaches Setup
         if (!update_test_file().empty() && GetEnvironmentVariableW(L"LOCOFIX_UPDATE_TARGET", test, MAX_PATH)) game = test;
         while (game.size() > 3 && game.back() == L'\\') game.pop_back();
         if (game.size() == 2 && game[1] == L':') game += L'\\';   // C: alone is the current folder on C
-        arguments = L"--target " + quoted_argument(game);
+        if (!game.empty()) arguments = L"--target " + quoted_argument(game);
+        else patch::log("update: the game's path does not fit - Setup starts without --target");
     }
     const INT_PTR started = reinterpret_cast<INT_PTR>(
         ShellExecuteW(dialog, L"open", g_file.c_str(), arguments.empty() ? nullptr : arguments.c_str(),
