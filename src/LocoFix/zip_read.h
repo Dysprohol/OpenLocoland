@@ -1,7 +1,7 @@
 // The zip reader shared by the map exchange (editor_exchange.cpp: File > Import map) and the launcher's
 // update check (update_check.cpp: a one-folder Setup packed as a zip): CRC-32, inflate (RFC 1951:
 // stored, fixed and dynamic blocks) and a whole zip read in memory (stored or deflated entries, each
-// checked by its size and CRC). Moved here from editor_exchange.cpp unchanged.
+// checked by its size and CRC). Moved here from editor_exchange.cpp.
 #pragma once
 #include <cstddef>
 #include <cstdint>
@@ -30,7 +30,8 @@ uint32_t u32(const std::string& d, size_t at);
 bool inflate(const std::string& in, std::string& out, size_t expected);
 
 // Every file of the zip `z` (folders left out), in the order of its central directory; false with
-// `error` ("not a zip file", "a damaged zip file", "a file of the zip ... ") when it cannot be read.
+// `error` ("not a zip file", "a damaged zip file", "a file of the zip ... ") when it cannot be read -
+// every record and every file's data checked to lie inside `z`, no exception thrown.
 bool read_zip(const std::string& z, std::vector<Entry>& entries, std::string& error);
 
 }  // namespace zipfile

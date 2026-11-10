@@ -10,7 +10,10 @@ over 32 KB, fixed Huffman codes; a painted 1536 x 1024 ground of 6 MB packs into
 campaign terrain into a few KB, since its ground stays the player's own `maps\lNN\lNN.vid`). The save
 dialog starts on the Desktop; unsaved edits are offered to be saved first, and a campaign map or the
 template is not exported. File > Import map (IMPORT MAP) reads a `.zip` - ours or one made again by
-Windows or any tool: stored and deflate entries, fixed and dynamic Huffman blocks, CRC checked -
+Windows or any tool: stored and deflate entries, fixed and dynamic Huffman blocks, CRC checked; a
+damaged one (a record cut off, data past the end of the file, a size its data cannot hold) is
+refused with Import's failure message - the reader, `zip_read.cpp`, checks every record against
+the file's end and lets no exception out (a cut-off zip ended the game up to v0.2.10) -
 takes the folder that holds its `.map`, only the files directly in it and by their names alone (so
 nothing is written outside `maps\<folder>\`), and checks that a map with a ground of its own carries
 it. A folder of that name on the custom maps page is overwritten when the player answers Yes

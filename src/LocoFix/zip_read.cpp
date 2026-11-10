@@ -1,8 +1,12 @@
-// The zip reader (zip_read.h), moved here from editor_exchange.cpp unchanged.
+// The zip reader (zip_read.h), moved here from editor_exchange.cpp; read_zip checks that every record
+// it reads lies inside the file and that no size is beyond what its data can hold, and lets no
+// exception out (a cut-off zip used to end the game on File > Import map).
 #include "zip_read.h"
 
 #include <algorithm>
+#include <exception>
 #include <iterator>
+#include <new>
 
 namespace zipfile {
 
@@ -174,7 +178,10 @@ bool inflate(const std::string& in, std::string& out, size_t expected) {
 uint32_t u16(const std::string& d, size_t at) { return at + 2 <= d.size() ? static_cast<unsigned char>(d[at]) | static_cast<unsigned char>(d[at + 1]) << 8 : 0; }
 uint32_t u32(const std::string& d, size_t at) { return at + 4 <= d.size() ? u16(d, at) | u16(d, at + 2) << 16 : 0; }
 
-bool read_zip(const std::string& z, std::vector<Entry>& entries, std::string& error) {
+// `n` bytes from `at` lie inside `z`.
+bool fits(const std::string& z, size_t at, size_t n) { return at <= z.size() && z.size() - at >= n; }
+
+bool read_zip_checked(const std::string& z, std::vector<Entry>& entries, std::string& error) {
     size_t end = std::string::npos;
     for (size_t i = z.size() >= 22 ? z.size() - 22 : 0; i + 22 <= z.size() && i + 0x10000 + 22 >= z.size(); --i) {
         if (u32(z, i) == 0x06054b50) {
@@ -190,7 +197,9 @@ bool read_zip(const std::string& z, std::vector<Entry>& entries, std::string& er
     const uint32_t count = u16(z, end + 10);
     size_t at = u32(z, end + 16);
     for (uint32_t k = 0; k < count; ++k) {
-        if (u32(z, at) != 0x02014b50) {
+        // the record's fixed part and its name, extra field and comment inside the file
+        if (!fits(z, at, 46) || u32(z, at) != 0x02014b50 ||
+            !fits(z, at + 46, static_cast<size_t>(u16(z, at + 28)) + u16(z, at + 30) + u16(z, at + 32))) {
             error = "a damaged zip file";
             return false;
         }
@@ -200,19 +209,26 @@ bool read_zip(const std::string& z, std::vector<Entry>& entries, std::string& er
         e.name = z.substr(at + 46, name_len);
         at += 46 + name_len + extra + comment;
         if (e.name.empty() || e.name.back() == '/' || e.name.back() == '\\') continue;   // a folder
-        if (u32(z, local) != 0x04034b50) {
+        // the local header, its name and extra field, and the data inside the file
+        if (!fits(z, local, 30) || u32(z, local) != 0x04034b50) {
             error = "a damaged zip file";
             return false;
         }
-        const size_t data = local + 30 + u16(z, local + 26) + u16(z, local + 28);
-        if (data + packed > z.size()) {
+        const size_t data = static_cast<size_t>(local) + 30 + u16(z, local + 26) + u16(z, local + 28);
+        if (!fits(z, data, packed)) {
             error = "a damaged zip file";
             return false;
         }
+        // a size no data of that length can unpack to (deflate packs at most about 1032 : 1)
+        if ((method == 0 && size != packed) || (method == 8 && size > static_cast<unsigned long long>(packed) * 1032 + 1024)) {
+            error = "a file of the zip is damaged: " + e.name;
+            return false;
+        }
+        // inflate reserves room for what is usual, not for the declared size: that is checked against the result
         const std::string raw = z.substr(data, packed);
         if (method == 0) {
             e.data = raw;
-        } else if (method != 8 || !inflate(raw, e.data, size)) {
+        } else if (method != 8 || !inflate(raw, e.data, std::min<size_t>(size, raw.size() * 16 + 1024))) {
             error = "a file of the zip cannot be unpacked: " + e.name;
             return false;
         }
@@ -223,6 +239,20 @@ bool read_zip(const std::string& z, std::vector<Entry>& entries, std::string& er
         entries.push_back(e);
     }
     return true;
+}
+
+// read_zip_checked, and no exception out of it: a zip of another player is untrusted input, and the
+// map import reports a failure instead of ending the game (no memory for it is one too).
+bool read_zip(const std::string& z, std::vector<Entry>& entries, std::string& error) {
+    try {
+        return read_zip_checked(z, entries, error);
+    } catch (const std::bad_alloc&) {
+        error = "the zip is too big to read";
+    } catch (const std::exception&) {
+        error = "a damaged zip file";
+    }
+    entries.clear();
+    return false;
 }
 
 }  // namespace zipfile
