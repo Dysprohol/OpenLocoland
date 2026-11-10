@@ -1071,6 +1071,7 @@ class LogWriter:
 class Installer:
     def __init__(self, root, steam=None, target=None, auto=False, shortcuts=True, clean=True):
         self.root = root
+        self.scale = max(1.0, root.winfo_fpixels("1i") / 96)   # 1.5 at a scale of 150 %
         self.lang = first_ui_language()
         self.version = version()
         self.events = queue.Queue()
@@ -1104,6 +1105,11 @@ class Installer:
         if auto:
             self.root.after(1000, self.install)
 
+    def px(self, size):
+        """A size in pixels at the screen's scale: Setup is DPI aware (its manifest), Tk scales the fonts
+        (points) itself, the sizes given in pixels are scaled here (1.0 at 100 %)."""
+        return round(size * self.scale)
+
     def t(self, key, **values):
         return TEXTS[self.lang][key].format(version=self.version, **values)
 
@@ -1117,7 +1123,7 @@ class Installer:
         w = self.widgets
         # the header: our wordmark across the whole width, else the game's logo, else the name
         # (a canvas, so the picture drawn for the current width does not fix the window's size)
-        w["header"] = tk.Canvas(r, height=84, background="black", bd=0, highlightthickness=0)
+        w["header"] = tk.Canvas(r, height=self.px(84), background="black", bd=0, highlightthickness=0)
         w["header"].grid(row=0, column=0, sticky="ew")
         w["header"].bind("<Configure>", self.header_resized)
         self.header_item = w["header"].create_text(0, 42, text=APP, font=("Segoe UI", 18, "bold"),
@@ -1131,7 +1137,7 @@ class Installer:
         top = ttk.Frame(frame)
         top.grid(row=0, column=0, columnspan=3, sticky="ew")
         top.columnconfigure(0, weight=1)
-        w["intro"] = ttk.Label(top, wraplength=520, justify="left")
+        w["intro"] = ttk.Label(top, wraplength=self.px(520), justify="left")
         w["intro"].grid(row=0, column=0, sticky="w")
         w["language"] = ttk.Label(top)
         w["language"].grid(row=0, column=1, sticky="e", padx=(12, 4))
@@ -1243,7 +1249,7 @@ class Installer:
         self.logo = image
         if self.header_item is not None:
             header.delete(self.header_item)
-        header.configure(height=max(image.height(), 84))
+        header.configure(height=max(image.height(), self.px(84)))
         self.header_item = header.create_image(0, 0, image=image, anchor="center")
         header.coords(self.header_item, header.winfo_width() // 2, header.winfo_height() // 2)
 
@@ -1251,7 +1257,7 @@ class Installer:
         header = self.widgets["header"]
         if self.header_item is not None:
             header.delete(self.header_item)
-        header.configure(height=84)
+        header.configure(height=self.px(84))
         self.header_item = header.create_text(0, 0, text=APP, font=("Segoe UI", 18, "bold"),
                                               fill="white", anchor="center")
         header.coords(self.header_item, header.winfo_width() // 2, header.winfo_height() // 2)
@@ -1264,7 +1270,7 @@ class Installer:
             self.banner_width = 0
             self.show_banner(self.widgets["header"].winfo_width())
         else:
-            image = logo_image(steam)
+            image = logo_image(steam, self.px(56))
             if image:
                 self.show_header_image(image)
             else:

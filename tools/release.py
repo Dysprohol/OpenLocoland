@@ -14,9 +14,13 @@ r"""Builds the release: build\release\Setup.exe, the installer of OpenLocoland.
    game's file names and extensions before it is packed,
 4. PyInstaller freezes tools\installer.py (with build.py and the modules it imports, Pillow
    included) and the payload into one Setup.exe (--onefile --windowed), which needs neither
-   Python nor Visual Studio on the player's machine.
+   Python nor Visual Studio on the player's machine. The exe gets a Windows version resource
+   (version_resource: the version's numbers, "OpenLocoland Setup", the company "OpenLocoland" -
+   the project, never a person) and its own manifest (MANIFEST: asInvoker, system DPI aware, long
+   paths, the common controls), and no UPX (--noupx: a packed exe looks like what packers hide).
 """
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -66,6 +70,75 @@ def collect(dll, ver):
                 sys.exit(f"{rel}: looks like a game file - not packed")
 
 
+# The manifest of Setup.exe: PyInstaller's own (asInvoker, the Windows versions it is made for, long
+# paths, the common controls 6) and DPI awareness for the whole system's scale, which Tk follows (its
+# fonts are in points; installer.py scales the few sizes given in pixels): without it Windows
+# stretches the window as a picture on a screen with a scale above 100 %, blurred.
+MANIFEST = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <supportedOS Id="{e2011457-1546-43c5-a5fe-008deee3d3f0}"/>
+      <supportedOS Id="{35138b9a-5d96-4fbd-8e2d-a2440225f93a}"/>
+      <supportedOS Id="{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}"/>
+      <supportedOS Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}"/>
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+    </application>
+  </compatibility>
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">system</dpiAwareness>
+      <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
+    </windowsSettings>
+  </application>
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity type="win32" name="Microsoft.Windows.Common-Controls" version="6.0.0.0" processorArchitecture="*" publicKeyToken="6595b64144ccf1df" language="*"/>
+    </dependentAssembly>
+  </dependency>
+</assembly>
+"""
+
+
+def version_numbers(ver):
+    """The four numbers of a version resource: v0.2.11 -> (0, 2, 11, 0), v0.2.11-3-gabc1234 -> (0, 2, 11, 3)
+    (the commits after the tag); a version without a tag (a short hash) -> (0, 0, 0, 0)."""
+    m = re.match(r"v?(\d+)\.(\d+)\.(\d+)(?:-(\d+)-g)?", ver)
+    return tuple(int(n or 0) for n in m.groups()) if m else (0, 0, 0, 0)
+
+
+def version_resource(ver, path):
+    """Writes PyInstaller's description of the version resource (--version-file) to `path`."""
+    numbers = version_numbers(ver)
+    strings = [("CompanyName", "OpenLocoland"),
+               ("FileDescription", f"OpenLocoland {ver} Setup"),
+               ("FileVersion", ver),
+               ("InternalName", "Setup"),
+               ("LegalCopyright", "OpenLocoland project; Locoland is a trademark of its owners"),
+               ("OriginalFilename", f"OpenLocoland-{ver}-Setup.exe"),
+               ("ProductName", "OpenLocoland Setup"),
+               ("ProductVersion", ver),
+               ("Comments", "Builds OpenLocoland from the player's own Steam copy of Locoland")]
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(f"""VSVersionInfo(
+  ffi=FixedFileInfo(filevers={numbers}, prodvers={numbers}, mask=0x3f, flags=0x0, OS=0x40004,
+                    fileType=0x1, subtype=0x0, date=(0, 0)),
+  kids=[
+    StringFileInfo([StringTable('040904B0', [{", ".join(f"StringStruct({k!r}, {v!r})" for k, v in strings)}])]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)
+""")
+
+
 def main():
     ver = version()
     print(f"OpenLocoland {ver}")
@@ -75,7 +148,13 @@ def main():
     tools = os.path.join(REPO, "tools")
     work = os.path.join(OUT, "pyinstaller")
     icon = os.path.join(tools, "icon", "openlocoland.ico")   # tools/make_icon.py
+    os.makedirs(work, exist_ok=True)
+    version_file, manifest = os.path.join(work, "version.txt"), os.path.join(work, "Setup.manifest")
+    version_resource(ver, version_file)
+    with open(manifest, "w", encoding="utf-8") as f:
+        f.write(MANIFEST)
     subprocess.run([sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile", "--windowed",
+                    "--noupx", "--version-file", version_file, "--manifest", manifest,
                     "--name", "Setup", "--distpath", OUT, "--workpath", work, "--specpath", work,
                     "--paths", tools, "--add-data", f"{PAYLOAD}{os.pathsep}.",
                     "--icon", icon, "--add-data", f"{icon}{os.pathsep}.",
