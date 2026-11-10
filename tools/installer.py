@@ -47,7 +47,7 @@ import shutil
 import sys
 
 
-def keep_modules_in_memory():
+def _keep_modules_in_memory():
     """Setup.exe (PyInstaller, one file) keeps its Python modules in an archive inside the exe and reads
     each one from the exe the first time it is imported - so a module first needed half way through
     the install failed when an antivirus had taken the exe meanwhile (the OSError of v0.2.10:
@@ -87,6 +87,15 @@ def keep_modules_in_memory():
         return obj
     archive.extract = extract
     return len(data)
+
+
+def keep_modules_in_memory():
+    """_keep_modules_in_memory, and when anything of PyInstaller's internals is not as it knows them
+    (an attribute, a constant, the archive's layout): 0, the modules read from the exe as before."""
+    try:
+        return _keep_modules_in_memory()
+    except Exception:
+        return 0
 
 
 MODULES_IN_MEMORY = keep_modules_in_memory()

@@ -1,2 +1,2 @@
 -r requirements.txt
-pyinstaller
+pyinstaller==6.22.3   # installer.keep_modules_in_memory reads its internals: tested with this version
