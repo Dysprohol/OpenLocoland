@@ -34,12 +34,13 @@
 // unpacked (zip_read.cpp) into a new empty folder of its own, %LOCALAPPDATA%\OpenLocoland\setup\<tag>
 // (<tag>-2 ... when that is taken): every entry a plain relative path inside it - no drive, no root, no
 // "..", nothing else that leaves it -, at most ZIP_MAX_FILES files and ZIP_MAX_BYTES in all, and
-// Setup.exe at its root, which alone gets the zone mark and is the one started (with --target <this
-// game's folder>). Any failure removes that folder and falls back to the release's Setup.exe when it
-// has one, else to the line that the download failed, with the GitHub link. Releases up to v0.2.10
-// carry only the exe, which every launcher up to v0.2.10 finds as the first asset ending with
-// Setup.exe: that name pattern is unchanged. LOCOFIX_UPDATE_PREFER=zip|exe (only with
-// LOCOFIX_UPDATE_TEST) overrides the choice in a test.
+// Setup.exe at its root, which alone gets the zone mark and is the one started. Any failure removes
+// that folder and falls back to the release's Setup.exe when it has one, else to the line that the
+// download failed, with the GitHub link. Either Setup is started with --target <this game's folder>
+// (quoted by the command line's rules), so it opens on this install. Releases up to v0.2.10 carry only
+// the exe, which every launcher up to v0.2.10 finds as the first asset ending with Setup.exe: that
+// name pattern is unchanged. LOCOFIX_UPDATE_PREFER=zip|exe (only with LOCOFIX_UPDATE_TEST) overrides
+// the choice in a test.
 #include "patch.h"
 #include "zip_read.h"
 #include <bcrypt.h>
@@ -1069,9 +1070,10 @@ void run_setup(HWND dialog) {
         L"Setup starts now and the game closes, so Setup can update it. Your maps, scores and progress stay. Go on?");
     if (MessageBoxW(dialog, question.c_str(), L"OpenLocoland", MB_YESNO | MB_ICONQUESTION) != IDYES) return;
     const HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-    // a zip's Setup: in its folder, told which install to update (the exe goes as up to v0.2.10)
+    // Setup is told which install to update (--target, the game's folder: up to v0.2.10 it was started
+    // without arguments and opened on the default folder); a zip's Setup starts in its own folder
     std::wstring arguments;
-    if (!g_folder.empty()) {
+    {
         wchar_t exe[MAX_PATH] = {}, test[MAX_PATH] = {};
         GetModuleFileNameW(nullptr, exe, MAX_PATH);
         std::wstring game = exe;
