@@ -225,7 +225,11 @@ the chosen object (found again by VID and place) and the tool as they were, and 
 the run the editor keeps it with every object of the level in the world's order and the rail points
 its cars stand on (their places and their links' other points); after the load held again
 (`edit_restore_history`) the new objects are matched by that order, VID and place (the save keeps the
-order), a deleted one the history can bring back is made again and hidden, and the history's objects,
+order), a deleted one the history can bring back is made again and hidden (an object taken away is out
+of the layer lists, so `edit_keep_history` takes those from the history's own changes; until 2026-11-10 it
+walked only the lists, every change of such an object was dropped - "N changes lost" in the log - and an
+undo after the run left a hole where one water had been painted over another and did not bring a
+deleted object back), and the history's objects,
 the cars' couplings and rail positions and the later units' factories point at the new ones. The
 ground's picture is read again from the copy as soon as the level is held again (`edit_restore_history`),
 and what the copy cannot tell is kept over the run (`ground_keep`, `ground_take_kept`): the original

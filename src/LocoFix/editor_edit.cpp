@@ -11471,6 +11471,19 @@ void edit_keep_history() {
         g_kept.push_back({o, nvid_of(o), at<float>(o, O_X), at<float>(o, O_Y), at<float>(o, O_Z), at<int>(o, O_DIRECTION), army_of(o),
                           removed(o)});
     });
+    // an object taken away is out of the layer lists (ACT_UNDO_REMOVE), so the walk above never meets
+    // it: the ones the history can bring back are kept from the history's own changes (they stay
+    // allocated while a step refers to them), to be made again, hidden, after the load. Without them an
+    // undo after the run lost every change of such an object - one water painted over another came back
+    // as a hole, a deleted object did not come back
+    std::set<uint8_t*> listed;
+    for (const KeptObject& o : g_kept) listed.insert(o.old);
+    for (auto* ops : {&g_undo, &g_redo})
+        for (const Operation& op : *ops)
+            for (const Change& c : op.changes)
+                if (c.object && listed.insert(c.object).second)
+                    g_kept.push_back({c.object, nvid_of(c.object), at<float>(c.object, O_X), at<float>(c.object, O_Y),
+                                      at<float>(c.object, O_Z), at<int>(c.object, O_DIRECTION), army_of(c.object), true});
     const std::vector<uint8_t*> all = rail_dots();
     const std::set<uint8_t*> dots(all.begin(), all.end());
     for (auto* ops : {&g_undo, &g_redo})
