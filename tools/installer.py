@@ -238,6 +238,9 @@ TEXTS = {
         "resume": "The update of {path} stopped half way: run Setup again and it completes it.",
         "no_space": "There is not enough free space on {drive} - Setup needs about {need} MB while it works, "
                     "{free} MB are free. Free some space there and run Setup again.",
+        "source_missing": "Your Steam copy of the game is missing {file}, or Setup cannot read it. Let Steam check "
+                          "the game's files (Verify integrity of game files, in the game's properties) and run Setup "
+                          "again.",
     },
     "de": {
         "name": "Deutsch",
@@ -312,6 +315,9 @@ TEXTS = {
                   "sie abgeschlossen.",
         "no_space": "Auf {drive} ist nicht genug Platz frei: Setup braucht während der Arbeit etwa {need} MB, "
                     "frei sind {free} MB. Schaffe dort Platz und starte Setup erneut.",
+        "source_missing": "In deiner Steam-Kopie des Spiels fehlt {file}, oder Setup kann die Datei nicht lesen. "
+                          "Lass Steam die Spieldateien prüfen (Dateien auf Fehler überprüfen, in den Eigenschaften des "
+                          "Spiels) und starte Setup erneut.",
     },
     "hu": {
         "name": "Magyar",
@@ -384,6 +390,9 @@ TEXTS = {
         "resume": "A(z) {path} frissítése félúton megállt: futtasd újra a telepítőt, és befejezi.",
         "no_space": "Nincs elég szabad hely itt: {drive}. A telepítőnek futás közben körülbelül {need} MB "
                     "kell, szabad {free} MB. Szabadíts fel helyet, és futtasd újra a telepítőt.",
+        "source_missing": "A játék Steames példányából hiányzik a(z) {file}, vagy a telepítő nem tudja olvasni. "
+                          "Ellenőriztesd a Steammel a játékfájlokat (Játékfájlok sértetlenségének ellenőrzése, a játék "
+                          "tulajdonságaiban), és futtasd újra a telepítőt.",
     },
     "pl": {
         "name": "Polski",
@@ -456,6 +465,9 @@ TEXTS = {
         "resume": "Aktualizacja {path} zatrzymała się w połowie: uruchom instalator ponownie, a dokończy ją.",
         "no_space": "Za mało wolnego miejsca na {drive} - instalator potrzebuje w trakcie pracy około {need} "
                     "MB, wolne jest {free} MB. Zwolnij tam trochę miejsca i uruchom instalator ponownie.",
+        "source_missing": "W Twojej kopii gry ze Steama brakuje pliku {file} albo instalator nie może go odczytać. "
+                          "Niech Steam sprawdzi pliki gry (Sprawdź spójność plików gry, we właściwościach gry), a potem "
+                          "uruchom instalator ponownie.",
     },
     "pt": {
         "name": "Português",
@@ -528,6 +540,9 @@ TEXTS = {
         "resume": "A atualização de {path} parou a meio: executa o Setup de novo e ele termina-a.",
         "no_space": "Não há espaço livre suficiente em {drive} - o Setup precisa de cerca de {need} MB enquanto "
                     "trabalha e há {free} MB livres. Liberta espaço e executa o Setup de novo.",
+        "source_missing": "Falta {file} na tua cópia do jogo do Steam, ou o Setup não o consegue ler. Pede ao Steam "
+                          "para verificar os ficheiros do jogo (Verificar a integridade dos ficheiros do jogo, nas "
+                          "propriedades do jogo) e executa o Setup de novo.",
     },
     "ru": {
         "name": "Русский",
@@ -600,6 +615,9 @@ TEXTS = {
         "resume": "Обновление {path} остановилось на полпути: запустите установщик снова, и он его завершит.",
         "no_space": "Недостаточно свободного места на {drive} - установщику во время работы нужно около {need} "
                     "МБ, свободно {free} МБ. Освободите место и запустите установщик снова.",
+        "source_missing": "В вашей копии игры из Steam нет файла {file}, или установщик не может его прочитать. "
+                          "Пусть Steam проверит файлы игры («Проверить целостность файлов игры» в свойствах игры), а "
+                          "потом запустите установщик снова.",
     },
     "cs": {
         "name": "Čeština",
@@ -671,6 +689,9 @@ TEXTS = {
         "resume": "Aktualizace {path} se zastavila v polovině: spusť instalátor znovu a dokončí ji.",
         "no_space": "Na {drive} není dost volného místa: instalátor během práce potřebuje asi {need} MB, "
                     "volných je {free} MB. Uvolni tam místo a spusť instalátor znovu.",
+        "source_missing": "Ve tvé kopii hry ze Steamu chybí {file}, nebo ho instalátor nemůže přečíst. Nech Steam "
+                          "zkontrolovat soubory hry (Ověřit integritu herních souborů ve vlastnostech hry) a pak spusť "
+                          "instalátor znovu.",
     },
 }
 UI_LANGUAGES = [("en", TEXTS["en"]["name"])] + sorted(((c, t["name"]) for c, t in TEXTS.items() if c != "en"),
@@ -1453,7 +1474,7 @@ def install(steam, target, choices, ver, progress=None, skip_verify=False, statu
         if stop:
             sys.exit(stop)
     if game_running(target):
-        sys.exit("Locoland is running from the install folder - close it first")
+        sys.exit(TEXTS[choices["lang"]]["running"])
     locofix = os.path.join(BUNDLE, "LocoFix.dll") if BUNDLE else None
     missing = missing_own_files()
     if missing:   # taken before the build: stop at once, the game untouched (failure_text names it)
@@ -1477,7 +1498,7 @@ def install(steam, target, choices, ver, progress=None, skip_verify=False, statu
                             clean=choices.get("clean", True))
         test_stop("built")
         if game_running(target):   # started while the game was being built
-            sys.exit("Locoland is running from the install folder - close it first")
+            sys.exit(TEXTS[choices["lang"]]["running"])
     except BaseException:   # stopped before the commit: the game is as it was, the prepared files go
         remove_tree(work_folder(target))
         raise
@@ -1551,14 +1572,30 @@ def own_file(e):
     return None
 
 
-def failure_text(lang, e, target, status):
+def source_file(e, steam):
+    """The file of the game's Steam copy an error is about (missing or unreadable), relative, or None."""
+    if not steam or not isinstance(e, OSError):
+        return None
+    for name in (getattr(e, "filename", None), getattr(e, "filename2", None)):
+        if isinstance(name, str) and name and inside(name, steam):
+            return os.path.relpath(os.path.abspath(name), os.path.abspath(steam))
+    return None
+
+
+def failure_text(lang, e, target, status, steam=None):
     """What a failed run says, in the window's language: the reason - in plain words when Setup could
     not read a file of its own (an antivirus took Setup.exe or what it unpacked) - and the state of the
     game: as it was (stopped before the commit) or half put in (the next run finishes it)."""
     texts = TEXTS[lang]
     own = own_file(e)
+    source = None if own else source_file(e, steam)
     technical = str(e.code) if isinstance(e, SystemExit) else f"{type(e).__name__}: {e}"
-    reason = texts["damaged"].format(file=own) + f"\n({technical})" if own else technical
+    if own:
+        reason = texts["damaged"].format(file=own) + f"\n({technical})"
+    elif source:
+        reason = texts["source_missing"].format(file=source) + f"\n({technical})"
+    else:
+        reason = technical
     phase = (status or {}).get("phase")
     if phase in (None, "preparing"):
         reason += "\n\n" + texts["kept"].format(path=target)
@@ -2003,7 +2040,7 @@ class Installer:
                                skip_verify=choices.get("skip_verify", False), status=status)
             self.events.put(("done", "\n\n".join([self.t("done", path=target)] + warnings)))
         except (SystemExit, Exception) as e:   # anything: shown in words, not lost in a closed console
-            self.events.put(("failed", failure_text(self.lang, e, target, status)))
+            self.events.put(("failed", failure_text(self.lang, e, target, status, steam)))
         finally:
             sys.stdout, sys.stderr = out, err
 
@@ -2084,7 +2121,7 @@ def silent(a):
                     print("\n".join(depot_lines(missing)))
             install(steam, target, choices, version(), skip_verify=getattr(a, "skip_verify", False), status=status)
         except (SystemExit, Exception) as e:   # the log is all a silent install has
-            print("FAILED: " + failure_text(choices["lang"], e, target, status))
+            print("FAILED: " + failure_text(choices["lang"], e, target, status, steam))
             return 1
         print("OK")
     return 0
