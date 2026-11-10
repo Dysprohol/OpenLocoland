@@ -44,7 +44,6 @@ import json
 import os
 import queue
 import shutil
-import subprocess
 import sys
 import threading
 import tkinter as tk
@@ -791,17 +790,69 @@ def special_folder(csidl):
     return buffer.value
 
 
+SHORTCUT_ROOT = None   # --shortcut-root <folder> (tests): Desktop\ and Programs\ in it instead of the real ones
+
+
+def shortcut_folders(desktop, start_menu):
+    """The folders the shortcuts go into: the desktop and the Start menu's Programs\\OpenLocoland."""
+    folders = []
+    if desktop:
+        folders.append(os.path.join(SHORTCUT_ROOT, "Desktop") if SHORTCUT_ROOT
+                       else special_folder(0x10))   # CSIDL_DESKTOPDIRECTORY
+    if start_menu:
+        folders.append(os.path.join(os.path.join(SHORTCUT_ROOT, "Programs") if SHORTCUT_ROOT
+                                    else special_folder(0x02), APP))   # CSIDL_PROGRAMS
+    return folders
+
+
+def com_method(pointer, index, *argtypes):
+    """Method `index` of the vtable of the COM interface `pointer` (HRESULT: a failure raises OSError)."""
+    import ctypes
+    vtable = ctypes.cast(pointer, ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))).contents
+    prototype = ctypes.WINFUNCTYPE(ctypes.HRESULT, ctypes.c_void_p, *argtypes)
+    return lambda *args: prototype(vtable[index])(pointer, *args)
+
+
+def guid(text):
+    import ctypes
+    value = (ctypes.c_byte * 16)()
+    ctypes.oledll.ole32.CLSIDFromString(text, ctypes.byref(value))
+    return value
+
+
+CLSID_SHELL_LINK = "{00021401-0000-0000-C000-000000000046}"
+IID_SHELL_LINK_W = "{000214F9-0000-0000-C000-000000000046}"
+IID_PERSIST_FILE = "{0000010B-0000-0000-C000-000000000046}"
+
+
 def make_shortcut(path, target, arguments, folder, icon, description):
-    """A .lnk through the shell's WScript.Shell (PowerShell is on every Windows 10 and 11)."""
-    def quoted(s):
-        return "'" + s.replace("'", "''") + "'"
-    script = ("$s = (New-Object -ComObject WScript.Shell).CreateShortcut({}); $s.TargetPath = {}; "
-              "$s.Arguments = {}; $s.WorkingDirectory = {}; $s.IconLocation = {}; $s.Description = {}; "
-              "$s.WindowStyle = 1; $s.Save()").format(quoted(path), quoted(target), quoted(arguments), quoted(folder),
-                                                      quoted(icon + ",0"), quoted(description))
+    """A .lnk through the shell's own ShellLink object (IShellLinkW and IPersistFile, in this process -
+    what WScript.Shell's CreateShortcut does inside): the target, its arguments, the working folder, the
+    icon (`icon`, index 0), the description and a normal window (SW_SHOWNORMAL)."""
+    import ctypes
+    from ctypes import c_int, c_void_p, c_wchar_p
+    ole32 = ctypes.oledll.ole32
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script], check=True,
-                   capture_output=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    started = ctypes.windll.ole32.CoInitializeEx(None, 2)   # COINIT_APARTMENTTHREADED; S_FALSE: already
+    link, persist = c_void_p(), c_void_p()
+    try:
+        ole32.CoCreateInstance(ctypes.byref(guid(CLSID_SHELL_LINK)), None, 1,   # CLSCTX_INPROC_SERVER
+                               ctypes.byref(guid(IID_SHELL_LINK_W)), ctypes.byref(link))
+        com_method(link, 20, c_wchar_p)(target)                   # SetPath
+        com_method(link, 11, c_wchar_p)(arguments)                # SetArguments
+        com_method(link, 9, c_wchar_p)(folder)                    # SetWorkingDirectory
+        com_method(link, 17, c_wchar_p, c_int)(icon, 0)           # SetIconLocation
+        com_method(link, 7, c_wchar_p)(description)               # SetDescription
+        com_method(link, 15, c_int)(1)                            # SetShowCmd(SW_SHOWNORMAL)
+        com_method(link, 0, c_void_p, c_void_p)(ctypes.byref(guid(IID_PERSIST_FILE)), ctypes.byref(persist))
+        com_method(persist, 6, c_wchar_p, c_int)(path, 1)         # IPersistFile::Save(path, remember)
+    finally:
+        for pointer in (persist, link):
+            if pointer.value:
+                ctypes.WINFUNCTYPE(ctypes.c_ulong, c_void_p)(
+                    ctypes.cast(pointer, ctypes.POINTER(ctypes.POINTER(c_void_p))).contents[2])(pointer)   # Release
+        if started in (0, 1):   # S_OK, S_FALSE: this call's to undo; RPC_E_CHANGED_MODE: not ours
+            ctypes.windll.ole32.CoUninitialize()
 
 
 def read_manifest(target):
@@ -811,16 +862,54 @@ def read_manifest(target):
         return None
 
 
+def running_images(name):
+    """The full paths of the running processes whose program is `name` (Locoland.exe): the system's
+    process list (Toolhelp) and each one's image path (QueryFullProcessImageNameW), in this process.
+    A process that cannot be opened (another user's) is left out, as Get-Process gave it no path."""
+    import ctypes
+    from ctypes import wintypes
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+
+    class ProcessEntry(ctypes.Structure):   # PROCESSENTRY32W
+        _fields_ = [("dwSize", wintypes.DWORD), ("cntUsage", wintypes.DWORD), ("th32ProcessID", wintypes.DWORD),
+                    ("th32DefaultHeapID", ctypes.c_size_t), ("th32ModuleID", wintypes.DWORD),
+                    ("cntThreads", wintypes.DWORD), ("th32ParentProcessID", wintypes.DWORD),
+                    ("pcPriClassBase", wintypes.LONG), ("dwFlags", wintypes.DWORD),
+                    ("szExeFile", wintypes.WCHAR * 260)]
+
+    snapshot = kernel32.CreateToolhelp32Snapshot(0x2, 0)   # TH32CS_SNAPPROCESS
+    if not snapshot or snapshot == wintypes.HANDLE(-1).value:
+        raise OSError(ctypes.get_last_error(), "the list of processes cannot be read")
+    paths = []
+    try:
+        entry = ProcessEntry()
+        entry.dwSize = ctypes.sizeof(entry)
+        more = kernel32.Process32FirstW(snapshot, ctypes.byref(entry))
+        while more:
+            if entry.szExeFile.lower() == name.lower():
+                process = kernel32.OpenProcess(0x1000, False, entry.th32ProcessID)   # QUERY_LIMITED_INFORMATION
+                if process:
+                    try:
+                        buffer = ctypes.create_unicode_buffer(32768)
+                        size = wintypes.DWORD(len(buffer))
+                        if kernel32.QueryFullProcessImageNameW(process, 0, buffer, ctypes.byref(size)):
+                            paths.append(buffer.value)
+                    finally:
+                        kernel32.CloseHandle(process)
+            more = kernel32.Process32NextW(snapshot, ctypes.byref(entry))
+    finally:
+        kernel32.CloseHandle(snapshot)
+    return paths
+
+
 def game_running(target):
-    """Whether Locoland.exe of this folder runs (tasklist does not give paths: PowerShell does)."""
+    """Whether Locoland.exe of this folder runs (the processes' image paths: running_images)."""
     exe = os.path.join(target, "Locoland.exe")
     if not os.path.isfile(exe):
         return False
-    result = subprocess.run(
-        ["powershell", "-NoProfile", "-NonInteractive", "-Command",
-         "Get-Process Locoland -ErrorAction SilentlyContinue | ForEach-Object { $_.Path }"],
-        capture_output=True, text=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-    return any(os.path.normcase(line.strip()) == os.path.normcase(exe) for line in result.stdout.splitlines())
+    return any(os.path.normcase(path) == os.path.normcase(os.path.abspath(exe)) for path in running_images("Locoland.exe"))
 
 
 def remove_shortcuts(manifest):
@@ -902,13 +991,8 @@ def make_shortcuts(target, choices, ver, editor=True):
     editor's in the folders chosen; returns their paths."""
     texts = TEXTS[choices["lang"]]
     exe = os.path.join(target, "Locoland.exe")   # actual exe name (for config/registry)
-    folders = []
-    if choices["desktop"]:
-        folders.append(special_folder(0x10))   # CSIDL_DESKTOPDIRECTORY
-    if choices["start_menu"]:
-        folders.append(os.path.join(special_folder(0x02), APP))   # CSIDL_PROGRAMS
     made = []
-    for folder in folders:
+    for folder in shortcut_folders(choices["desktop"], choices["start_menu"]):
         game = os.path.join(folder, texts["game_name"] + ".lnk")
         make_shortcut(game, exe, "", target, exe, APP + " " + ver)
         made.append(game)
@@ -1322,7 +1406,7 @@ class Installer:
 
     def run_game(self):
         target = self.target.get().strip()
-        subprocess.Popen([os.path.join(target, "Locoland.exe")], cwd=target)
+        os.startfile(os.path.join(target, "Locoland.exe"), cwd=target)   # as a double-click starts it
 
     def poll(self):
         try:
@@ -1406,7 +1490,12 @@ def main():
                    help="go on with a Steam.exe of another version (CD/beta-demo) and leave the Steam files our changes do not fit as they are, with a warning")
     p.add_argument("--captured", help="the folder of the language captures (default: " + DEFAULT_CAPTURED +
                    "; tests: a folder with only some languages)")
+    # tests: the shortcuts go into <folder>\Desktop and <folder>\Programs\OpenLocoland, never the real ones
+    p.add_argument("--shortcut-root", help=argparse.SUPPRESS)
     a = p.parse_args()
+    if a.shortcut_root:
+        global SHORTCUT_ROOT
+        SHORTCUT_ROOT = os.path.abspath(a.shortcut_root)
     if a.captured:
         global CAPTURED
         CAPTURED = languages.CAPTURED = os.path.abspath(a.captured)
