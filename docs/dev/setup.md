@@ -31,7 +31,8 @@ under the frame limit - the launcher's choice counts from that start on, nothing
 
 **Updates.** "Sprawdź aktualizacje" / "Check for updates" in the launcher asks GitHub for the latest
 release; a newer one than the running version is offered with its Setup.exe, downloaded into the
-Downloads folder and started on a click (LocoFix fix 33); the box "przy starcie" / "at start" next to
+Downloads folder and started on a click (LocoFix fix 33) - on the folder the game is installed in, as
+Setup started by itself opens on the existing install too; the box "przy starcie" / "at start" next to
 it (on by default; unticked, it stays off) checks as the launcher opens, at most once a day.
 Nothing is updated by itself.
 

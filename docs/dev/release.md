@@ -155,7 +155,15 @@ the window, with its log in `logs\install.log` of the install folder and exit co
 `Setup.exe --auto [--target <folder>] [--no-shortcuts]` opens the window, which installs at once with what it
 shows and closes at the end (the same log and exit code - a test of the window
 itself, since Tk's buttons take no posted clicks). The Install / Update button has the focus,
-so Enter or Space installs. The box "Skip verification of the game files - install as it is" says before the install what it
+so Enter or Space installs. The window started without `--target` (by the launcher of v0.2.10 and
+before, by a double-click) opens on the existing install (`installer.find_install`): the folder the
+last install finished through the window went to (remembered in `%LOCALAPPDATA%\OpenLocoland\last-install.json`
+next to the captures - not in the registry; `--silent` never writes it, `--auto` only into a
+`--state-folder <folder>` given for tests; Uninstall of that folder forgets it), else the folder of a
+running Locoland.exe, else the one the game's shortcut of the Start menu or of the desktop starts (read
+through IShellLink: installs of v0.2.0-v0.2.10 remembered nothing), each only when it holds an
+`OpenLocoland.json`, else the default folder; the player can change it as before. `--silent` and
+`--auto` without `--target` keep the default folder. The box "Skip verification of the game files - install as it is" says before the install what it
 gives up (`skip_verify_hint`, seven languages): in a hint when the mouse rests on it (a small Tk
 window, `installer.Tooltip`) and, while it is ticked, in the first lines of the log area - the window
 does not grow for it; its label is as before.
@@ -266,8 +274,10 @@ is taken; Uninstall removes it with the captures); only that `Setup.exe` gets th
 Windows shows its "Open File - Security Warning" as for the exe) and is started, in its folder, with
 `--target <the game's folder>` - quoted by the command line's rules, so a game at a drive root reaches
 Setup as `C:\` and a folder with spaces as it is (`LOCOFIX_UPDATE_TARGET`, only with
-`LOCOFIX_UPDATE_TEST`, sets it in a test) -; the exe is started as before, without arguments, so it
-opens on the default folder. The Setups unpacked before are removed once a newer one is in. Any
+`LOCOFIX_UPDATE_TEST`, sets it in a test) -; the exe is given the same `--target` from this version on
+(up to v0.2.10 the launcher started it without arguments, so it opened on the default folder;
+v0.2.10's Setup itself, started with `--target <folder>` alone, opens its window on that folder). The
+Setups unpacked before are removed once a newer one is in. Any
 failure - an exception of the zip step too (a damaged zip, no memory in the 32-bit game) - removes the
 folder and falls back to the release's `Setup.exe`, or, without one, to "The download failed" with
 the GitHub link. The inflater has no limit of its own on

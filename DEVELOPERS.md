@@ -45,7 +45,7 @@ a reference such as `DEVELOPERS.md "Editor mode"` or `see "Updating"` (in the co
 find the name here and open its file. New findings go into the part they belong to, not here;
 a new section or bold lead is added to this list.
 
-### [setup.md](docs/dev/setup.md) (~15 KB)
+### [setup.md](docs/dev/setup.md) (~16 KB)
 
 Sections: "Quick start"; "Repository layout".
 
@@ -113,7 +113,7 @@ Sections: "Working with the code"; "Resolutions and widescreen"; "Status and kno
 
 Paragraphs: Frame rate at high resolutions; CI.
 
-### [release.md](docs/dev/release.md) (~39 KB)
+### [release.md](docs/dev/release.md) (~40 KB)
 
 Sections: "Release"; "Distribution"; "Next".
 
