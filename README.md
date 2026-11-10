@@ -125,6 +125,13 @@ rest around it: the bar, the tools and the help in the look of the game.
 Nothing of the game is in this repository: game files are taken from the player's own Steam copy
 when the game is put together, and our changes to them are kept as patches.
 
+## Contributing
+
+Bug reports, maps that show a problem and ideas are welcome in Issues, translations as described in
+[TRANSLATING.md](docs/TRANSLATING.md). Bigger changes are agreed with the maintainer before the work
+starts, and tools built around the game stay in their authors' own repositories - see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Discord
 https://discord.gg/NG5DnHFvYM
 
