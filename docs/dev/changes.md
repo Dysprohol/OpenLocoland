@@ -427,7 +427,16 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       swap ends when it turns round and trains couple in play. Checked in play on a POLIGON copy: a
       neutral train north of the player's repair point, ordered south against its line - with the
       rule off it drove round the loop's other leg (937,864 at 5 s), with `PASS_RED_LIGHTS 4` straight
-      down the repair point's line (674,1164 at 5 s); both reached the point,
+      down the repair point's line (674,1164 at 5 s); both reached the point.
+      A factory's exit line keeps the engine's rule (2026-11-10): a train of a chosen army ordered to a
+      point on its factory's line drove up it to the door (a copy of a reporter's map with the pirates'
+      factory at 501,1500 and its line 479,1424 -> 621,1424: with `PASS_RED_LIGHTS 8` the pirate train
+      stood at 503..551,1500, without it past the line's end at 644..692,1500), where it holds the
+      factory's next car. Both tests follow the point the train would enter back along its line to the
+      line's first point, and a line starting within 100 px of a factory (VID 102; the campaign's start
+      22-79 px from theirs) is not passed - LocoFix.log: `red lights: the line from x,y is the exit of
+      the factory at x,y`, once a line. With it the pirate train stops past the line's end as without
+      the rule. A repair point's line, which runs through the building, stays passable.
   36. lost surfaces (`lost_surfaces.cpp`, `BUGS.md` F22, "Rendering"): a frame waits until lost
       surfaces can be restored, and a lock that fails in the middle of a frame gets a stand-in
       buffer instead of the null pointer the software sprites drew through - Alt+Tab in full screen

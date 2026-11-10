@@ -317,8 +317,9 @@ patrol from a point inside a factory's spur could never come back into it: the l
 enemy's AI patrol gets that end as its first point. The second way a train "does nothing": an order whose
 point lies past a one-way line the train may not enter (`RailDot_CanPass`) - the engine drives to the point
 nearest to the goal it can reach and stops at the line. The editor walks the network as the lines allow
-(`reachable`, every link both ways but against a line, the red lights of `PASS_RED_LIGHTS` counted; a
-reversal's room is not) and says it when the order is given and in the ORDERS row's tip ("319,1000 cannot
+(`reachable`, every link both ways but against a line, the red lights of `PASS_RED_LIGHTS` counted - in
+play a factory's exit line keeps the rule for every army since 2026-11-10, changes.md 35, which
+`reachable` does not know yet; a reversal's room is not) and says it when the order is given and in the ORDERS row's tip ("319,1000 cannot
 be reached: the one-way line 319,936 -> 319,1061 is in the way - the train stops at it"; the line named is
 the one without which the point would be reached), and "it stands on the line ..., which pushes it to ...
 first". Checked in play: a neutral train on the player's repair point line with a patrol - found, ordered at

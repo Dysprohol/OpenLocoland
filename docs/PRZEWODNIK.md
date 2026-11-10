@@ -556,7 +556,8 @@ panelu Przyjazdy nie wybierzesz **PRZESTAW NA PRZYJAZDY**):
   skrypty zabierają na starcie (oznacza posiłki).
 - **NA CZERWONYM: STAJE** (jak każdy pociąg) albo **JEDZIE** - wtedy każdy pociąg tej armii może jechać
   linią jednokierunkową pod prąd, tam gdzie twoje pociągi i pociągi wroga są zatrzymywane (wyjazd z
-  poziomu wypuszcza go też poza mapę, na ukryty tor). Jedna zasada dla całej armii.
+  poziomu wypuszcza go też poza mapę, na ukryty tor) - ale nie linią fabryki pod jej bramę. Jedna
+  zasada dla całej armii.
 - **STRZELA: SAMO** albo **NA ROZKAZ** - ten wiersz ma każda uzbrojona jednostka (neutralna: **W
   ODPOWIEDZI** albo **NIGDY**).
 

@@ -557,7 +557,8 @@ only, until **CONVERT TO ARRIVALS** in the Arrivals panel):
   pirate locomotive 5 away at the start (it marks the reinforcement).
 - **AT RED LIGHTS: STOPS** (as every train) or **DRIVES ON** - then every train of that army may run
   along a one-way line against its arrow, where your and the enemy's trains are held (the level's exit
-  lets them off the map too, onto the hidden track). One rule for the whole army.
+  lets them off the map too, onto the hidden track) - but not up a factory's line to its door. One rule
+  for the whole army.
 - **IT FIRES: ON ITS OWN** or **ONLY WHEN TOLD** - every armed unit has this row (a neutral one:
   **WHEN ATTACKED** or **NEVER**).
 
