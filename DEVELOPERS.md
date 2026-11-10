@@ -113,8 +113,8 @@ Sections: "Working with the code"; "Resolutions and widescreen"; "Status and kno
 
 Paragraphs: Frame rate at high resolutions; CI.
 
-### [release.md](docs/dev/release.md) (~21 KB)
+### [release.md](docs/dev/release.md) (~29 KB)
 
 Sections: "Release"; "Distribution"; "Next".
 
-Paragraphs: Every edition before the tag; What Setup does; Updating; Uninstalling; Checked; By hand; Rights holders; Working on one's own copy; What can be shared; What must not be shared; Published that way.
+Paragraphs: Every edition before the tag; What Setup does; Updating; A run stopped half way; The package's shape; Uninstalling; Checked; By hand; Rights holders; Working on one's own copy; What can be shared; What must not be shared; Published that way.

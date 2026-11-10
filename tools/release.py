@@ -9,7 +9,8 @@ r"""Builds the release: build\release\Setup.exe, the installer of OpenLocoland.
    Visual Studio) - the player gets it prebuilt,
 3. the payload in build\release\payload: our files only, in the repository's layout - game\
    (patches, our files, the new maps, the editor's tables), lang\, external\dgVoodoo2\ (the
-   two DLLs and the notice), LocoFix.dll and version.txt. Nothing of the game: the installer
+   two DLLs and the notice), LocoFix.dll, version.txt and payload.txt (the list of its files,
+   which Setup checks before it builds). Nothing of the game: the installer
    assembles it from the player's Steam copy (build.py); the payload is checked against the
    game's file names and extensions before it is packed,
 4. PyInstaller freezes tools\installer.py (with build.py and the modules it imports, Pillow

@@ -25,11 +25,18 @@ from their own Steam copy, as `build.py` does it for a developer.
    `lang\` and `tools\` (only files git knows; the packs stay in the `lang/<code>/game/` layout
    and are assembled at install time, `lang\_template` is carried but not built),
    `external\dgVoodoo2\` (the two DLLs and the notice),
-   `LocoFix.dll` and `version.txt`; a file with an extension of the game's files (`.exe`, `.res`,
+   `LocoFix.dll`, `version.txt` and `payload.txt` (the list of the payload's files, which Setup checks before it builds); a file with an extension of the game's files (`.exe`, `.res`,
    `.vid`, `.map`, `.bmp`, `.wav`, `.ogg` ...) stops the release,
-4. PyInstaller (`--onefile --windowed`) freezes `tools/installer.py` - the window - with
+4. PyInstaller (`--onefile --windowed --noupx`) freezes `tools/installer.py` - the window - with
    `build.py` and every module it imports (Pillow for the generated pictures included) and the
-   payload, which the frozen modules find in `sys._MEIPASS` (`build.REPO`, `languages.REPO`).
+   payload, which the frozen modules find in `sys._MEIPASS` (`build.REPO`, `languages.REPO`). The
+   exe gets a Windows version resource (`release.version_resource`: the numbers of the tag -
+   v0.2.11 is 0.2.11.0, three commits after it 0.2.11.3 -, FileDescription "OpenLocoland <version>
+   Setup", ProductName "OpenLocoland Setup", CompanyName "OpenLocoland", OriginalFilename
+   `OpenLocoland-<version>-Setup.exe`: the project, never a person) and its own manifest
+   (`release.MANIFEST`: PyInstaller's - asInvoker, the Windows versions, long paths, the common
+   controls - and system DPI awareness, so on a scaled screen the window is drawn sharp instead
+   of stretched; the window's few sizes in pixels follow the scale, `Installer.px`); no UPX.
 
 **Every edition before the tag.** `python tools\editions.py check --run` builds the game from
 every edition of it we know and starts each one (an hour or so for all of them); a release waits
@@ -87,20 +94,36 @@ brass look of the game, our own drawing - `tools/make_icon.py` writes it as an S
 sizes; the cog is plain (its rings and the axle, no windows) so it reads down to 16 px.
 
 The contents can be listed with `.venv\Scripts\pyi-archive_viewer --list build\release\Setup.exe`:
-the Python runtime, Tcl/Tk, Pillow, the payload - no game file.
+the Python runtime, Tcl/Tk, Pillow, the payload - no game file. At every start the one-file exe's
+bootloader unpacks them (1626 files, 47 MB) into `%TEMP%\_MEI<n>` and runs Python from there in a
+second process of the same exe, which it waits for and which removes the folder at the end (a
+killed Setup leaves it). The Python modules stay in an archive inside the exe, which PyInstaller
+reads each one from the first time it is imported; Setup reads that archive into memory at the
+start (`installer.keep_modules_in_memory`, about 3 MB; `install.log`: "Setup's modules: 2.9 MB read
+into memory at the start"), so after the start it never reads its own exe again - v0.2.10 stopped
+half way with "OSError: [Errno 22] Invalid argument: '...Setup.exe'" when a player's Defender took
+the exe while it ran, at the first module imported after that. Setup starts no other program: the
+shortcuts and the check whether the game runs are made in its own process (below), Play starts
+the game through the shell, the GitHub link opens the browser through it - both only on a click.
 
 **What Setup does** (`tools/installer.py`): it finds the game through Steam's registry key
 (`HKCU\Software\Valve\Steam` `SteamPath`, then HKLM `InstallPath`) and the libraries of
 `steamapps\libraryfolders.vdf` (`steamapps\common\Locoland\Steam.exe`), or takes a folder chosen
 by hand; it refuses an install folder that is the Steam game folder or inside it, asks before
 using a non-empty folder without an install, and refuses while `Locoland.exe` of that folder
-runs. Then `build.build(steam, target, locofix=<the prebuilt DLL>, captured=...)` (the same steps
-as for a developer, the log and a progress bar in the window), the two options into the registry
+runs (the process list and each process's image path through the Windows API,
+`installer.running_images`). Then `build.build(steam, <target>\.openlocoland-setup\new,
+locofix=<the prebuilt DLL>, captured=...)` (the same steps as for a developer, the log and a
+progress bar in the window) and the build's files put into the install folder at the end (see "A
+run stopped half way"), the clean-up of what earlier versions left (`build.clean_up` on the
+install folder, as before), the two options into the registry
 (`Cheats`, `UnlockMissions` next to LocoFix's settings - Setup shows their current values, so
 running it again keeps them), the game's language (`Language`: a new install sets the one chosen -
 the system's display language when there is a pack for it, else English; an update writes it only
 when it was changed in the window, so the language chosen in the game's launcher stays), the
-shortcuts (through PowerShell's `WScript.Shell`; the editor's
+shortcuts (in Setup's own process through the shell's ShellLink object - IShellLinkW and
+IPersistFile through `ctypes`, `installer.make_shortcut`: the same calls WScript.Shell makes, and the
+`.lnk` files are byte for byte the ones PowerShell's `WScript.Shell` made up to v0.2.10; the editor's
 runs `Locoland.exe --editor --test-map maps\template\template.map` - the template is what the
 menu's "EDYTOR MAP" opens, and both open a new empty map in its place) and `OpenLocoland.json` in the install folder (the
 version, the Steam folder, the captures' folder, the shortcuts, so an update or uninstall
@@ -171,6 +194,58 @@ time - a player's map, a pack whose language could not be built - is left alone 
 scratch above), so a missing capture never takes a working pack with it. Folders the removals leave
 empty go too. The settings and the progress are in the registry, which the clean-up never touches.
 
+**A run stopped half way** - killed, the computer switched off, or a file of Setup taken by an
+antivirus - leaves a game that starts: the old version whole, or (only when it was stopped in
+the last moment) a half put in one that the next run finishes. Setup builds the whole game into
+`.openlocoland-setup\new` inside the install folder, which nothing of the game reads; only when
+that build has finished, the files that differ from the install's (`build.copy`'s test: the same
+size and date, or the same content; the high score tables of an install stay the player's) go in
+(`installer.commit`): their list is written first as a journal (`.openlocoland-setup\commit.json`,
+flushed to the disk), then each file goes in with one rename on the same disk - milliseconds for
+the whole lot -, and the folder is removed. After that come the clean-up, the options, the
+shortcuts and, last, `OpenLocoland.json` (through a temporary file and a rename, so it is never
+half written). The next run of this Setup or a later one starts with what an earlier run left
+(`installer.finish_interrupted`, a line in the log): without a journal (stopped while building) the
+prepared files are removed - the game was not changed -, with one (stopped while renaming) the
+rest is put in from the journal, so the game is that version's whole again before this run builds
+its own; a journal older than the record (another Setup finished an install there since) is
+dropped. An older Setup (v0.2.10 and before) knows nothing of the folder and repairs by building
+over the game, as any update does; the folder stays until a newer Setup or Uninstall removes it.
+Updates take longer than before - the whole game is copied into the work folder: v0.2.9 -> this
+version through the window (`--auto`) took 24 s instead of v0.2.10's 15 s here - and need the
+game's size (about 600 MB) free for a moment. A run that fails before the commit removes its work folder itself. When Setup cannot
+read a file of its own - its exe, or what its bootloader unpacked (`installer.own_file`: the
+error's file, or the first of the files listed at the start that is gone) - it says so in the
+window's language instead of the Python error (`damaged`: an antivirus may have taken Setup.exe
+or its files, download Setup again), with the error itself in brackets, and every failure ends
+with the state of the game (`kept`: as it was before this run; `resume`: stopped half way, run
+Setup again). The log of `--silent` is written line by line, so a killed run leaves it up to that
+point (the window's log, `--auto`, is written at the end, as before). `--test-stop built |
+before-journal | moving | record` (tests, not in `--help`) ends the process hard at that point.
+
+**The package's shape.** An installed game updates itself through the launcher (LocoFix fix 33,
+`update_check.cpp`): it takes, of the latest release's assets, the first whose
+`browser_download_url` is an https address ending with `Setup.exe`, checks its size and SHA-256
+against the release's, saves it in the Downloads folder under its own name with the internet zone
+mark, and on Run Setup starts it with `ShellExecuteW(open)` - no arguments, no other file - and
+closes the game. So every release needs one exe ending with `Setup.exe` that works alone, as long
+as installs of v0.2.0 and later are to update; another asset (a `.zip`) is ignored by them.
+Measured with this version (2026-11-10): the one-file Setup.exe is 25.1 MB, shows its window after
+about 1.5 s, runs as two processes and unpacks 1626 files (47 MB) into `%TEMP%` at every start; the
+same Setup built as one folder (`--onedir`) is a 3.5 MB exe with 1626 files beside it (51 MB; a zip
+of it 25.2 MB deflated, 50.7 MB stored), shows its window after 0.3-0.5 s, runs as one process and
+unpacks nothing. A small starter with the payload beside it does not work for the installed
+launchers, which download only the exe (it would have to download the payload itself, which looks
+worse); a self-extracting archive (IExpress, 7-Zip) unpacks into `%TEMP%` as PyInstaller does. The
+release stays the one-file exe. Not done, for the maintainer to choose: shipping the one-folder
+build as a second asset (`OpenLocoland-<version>-Setup.zip`) for players whose antivirus blocks the
+exe - no temporary files, one process, but it has to be unpacked before it runs -, and a launcher
+of a later version preferring that zip (it would unpack it with the zip reader of
+`editor_exchange.cpp` into `%LOCALAPPDATA%\OpenLocoland\setup\<tag>` and start Setup.exe there; the
+one-file exe would stay for the older installs); building PyInstaller's bootloader from its source
+(the exe then does not share the stock bootloader's bytes, which many unrelated programs carry);
+code signing, which needs a certificate.
+
 **Uninstalling**: the Uninstall button of Setup (after a question) removes the shortcuts, the
 install folder with everything in it and `%LOCALAPPDATA%\OpenLocoland`; deleting the install
 folder by hand does the same apart from the shortcuts and the captures. The registry is left as
@@ -190,8 +265,45 @@ the en, hu and pl packs from the captures there were (de and ru listed with thei
 kept `pl`, kept the high score tables (one marked by hand stayed as it was) and passed all 20
 missions.
 
+**Checked** for the installer's rework (2026-11-10, Setup.exe of v0.2.10-4-g48d2c5a and the commit
+after it, against v0.2.10's released Setup; registry key exported before and restored after,
+the shortcuts only into a folder of the worktree - `--shortcut-root` - and every `.lnk` of the real
+desktop and Start menu compared before and after: unchanged): a fresh `--silent --no-shortcuts`
+install and an `--auto --no-shortcuts` update over a copy of a v0.2.9 install give the same files
+with the same SHA-256 as v0.2.10's Setup (2067 and 2139 files; only `LocoFix.dll` differs, by the
+version compiled into it) and the same `files` in `OpenLocoland.json`; an update with leftovers
+(D3D8.dll, a root log, an editor scratch folder, a file the old record lists) removes the same
+four things with the same log lines and keeps a marked high score table; mission 1 loads in a
+1024 x 768 window from both installs, with the three `!!!ERROR` lines of the original that an
+install of v0.2.10 has too. During an install the new Setup's process tree is its own two
+processes and nothing else (v0.2.10's: two `powershell.exe` with their `conhost.exe`, even with
+`--no-shortcuts`). The shortcuts made in Setup's process have every property of the PowerShell
+ones (target, arguments, working folder, icon, description, window style, hotkey) and the same
+bytes but the copy of the target's last access time in the header. The game-running check refuses
+the folder a running Locoland.exe is from and not another one. Killed (the whole process tree)
+after 2, 5, 6, 9, 13 and 16 s of an update and stopped at `built` and `before-journal`, the game
+was the v0.2.9 one file for file; stopped half way through the renames, mixed (5 of 10 files) -
+the next run put the other 5 in ("An earlier run of Setup ... stopped while putting its files in");
+stopped before the record, the new game whole with the old record; after each, a run of the new
+Setup gave the same files as an uninterrupted update, and v0.2.10's Setup over a half put in game
+gave its own update whole (the journal it leaves is then dropped by the next new run).
+v0.2.10's Setup killed after 3, 7 and 11 s left 3, 7 and 9 of the 10 files new - a mixed game.
+Setup.exe renamed 4 s into an install: the new one finished, v0.2.10's stopped ("appears to have
+been moved or deleted"); `LocoFix.dll` deleted from `%TEMP%\_MEI...` right after the start: the
+install stopped before building with the plain message, in English (`--silent --lang en`) and in
+Polish (the window, `--auto`), and the folder as before. The window looked at in Polish (the
+frozen Setup) and English (the same code from the repository); `--help` and a wrong argument show
+their message box (v0.2.10's showed nothing). A custom Defender scan (`MpCmdRun -Scan -ScanType 3
+-File ... -DisableRemediation`, definitions 1.463.226.0) finds nothing in the new Setup nor in
+v0.2.10's - which says nothing of the cloud's judgement that quarantined v0.2.10 on a player's
+machine. Not checked: the window at a screen scale above 100 % (this screen is 96 DPI; DPI
+awareness is new), Uninstall, a CD edition or `--skip-verify` install, the launcher's update
+check against this Setup, other Windows versions.
+
 **By hand**, the player may have to: allow the unsigned `Setup.exe` past SmartScreen ("More info"
-> "Run anyway") or an antivirus that flags PyInstaller programs; download another language's
+> "Run anyway") or an antivirus that flags PyInstaller programs (in November 2026 a player's
+Defender quarantined v0.2.10's Setup while it ran - "Trojan", a judgement of the cloud that a scan
+of the same file here did not repeat; a false-positive report went to Microsoft); download another language's
 Steam depot (`download_depot`, "Quick start" above; Setup's window lists the lines) and run Setup
 again to get its pack - Setup captures only the language Steam has installed and the depots
 downloaded, and the launcher lists only the packs that were built.
