@@ -1,7 +1,7 @@
 r"""Builds the release: build\release\Setup.exe, the installer of OpenLocoland.
 
     .venv\Scripts\pip install -r tools\requirements-release.txt
-    .venv\Scripts\python tools\release.py
+    .venv\Scripts\python tools\release.py [--zip]
 
 1. the version: `git describe --tags --always --dirty` (a commit without a tag gives its
    short hash),
@@ -19,7 +19,13 @@ r"""Builds the release: build\release\Setup.exe, the installer of OpenLocoland.
    (version_resource: the version's numbers, "OpenLocoland Setup", the company "OpenLocoland" -
    the project, never a person) and its own manifest (MANIFEST: asInvoker, system DPI aware, long
    paths, the common controls), and no UPX (--noupx: a packed exe looks like what packers hide).
+5. with --zip (off by default) also the same Setup as one folder (PyInstaller --onedir: Setup.exe and
+   its _internal\ folder, nothing unpacked into %TEMP% when it runs) packed into
+   build\release\Setup.zip - Setup.exe at the zip's root, as the launcher's update check
+   (update_check.cpp, PREFER_SETUP_ZIP) expects it. Not a release asset unless the maintainer makes
+   it one; the one-file Setup.exe stays the asset every installed launcher finds.
 """
+import argparse
 import os
 import re
 import shutil
@@ -146,7 +152,21 @@ def version_resource(ver, path):
 """)
 
 
+def pack_zip(folder, zip_path):
+    """The one-folder Setup `folder` (Setup.exe, _internal\\) as a deflated zip, Setup.exe at its root."""
+    import zipfile
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+        for directory, _, files in os.walk(folder):
+            for f in sorted(files):
+                path = os.path.join(directory, f)
+                z.write(path, safe_relpath(path, folder).replace(os.sep, "/"))
+
+
 def main():
+    p = argparse.ArgumentParser(description="Builds build\\release\\Setup.exe (and with --zip Setup.zip).")
+    p.add_argument("--zip", action="store_true",
+                   help="also the one-folder Setup packed as build\\release\\Setup.zip (not a release asset by default)")
+    a = p.parse_args()
     ver = version()
     print(f"OpenLocoland {ver}")
     dll = build_locofix.build(os.path.join(OUT, "LocoFix"), ver)
@@ -160,14 +180,22 @@ def main():
     version_resource(ver, version_file)
     with open(manifest, "w", encoding="utf-8") as f:
         f.write(MANIFEST)
-    subprocess.run([sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile", "--windowed",
-                    "--noupx", "--version-file", version_file, "--manifest", manifest,
-                    "--name", "Setup", "--distpath", OUT, "--workpath", work, "--specpath", work,
-                    "--paths", tools, "--add-data", f"{PAYLOAD}{os.pathsep}.",
-                    "--icon", icon, "--add-data", f"{icon}{os.pathsep}.",
-                    os.path.join(tools, "installer.py")], check=True)
+    def freeze(shape, dist, workpath):
+        subprocess.run([sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", shape, "--windowed",
+                        "--noupx", "--version-file", version_file, "--manifest", manifest,
+                        "--name", "Setup", "--distpath", dist, "--workpath", workpath, "--specpath", workpath,
+                        "--paths", tools, "--add-data", f"{PAYLOAD}{os.pathsep}.",
+                        "--icon", icon, "--add-data", f"{icon}{os.pathsep}.",
+                        os.path.join(tools, "installer.py")], check=True)
+    freeze("--onefile", OUT, work)
     setup = os.path.join(OUT, "Setup.exe")
     print(f"{setup}: {os.path.getsize(setup) / 1e6:.1f} MB, version {ver}")
+    if a.zip:
+        onedir = os.path.join(OUT, "onedir")
+        freeze("--onedir", onedir, os.path.join(OUT, "pyinstaller-onedir"))
+        zip_path = os.path.join(OUT, "Setup.zip")
+        pack_zip(os.path.join(onedir, "Setup"), zip_path)
+        print(f"{zip_path}: {os.path.getsize(zip_path) / 1e6:.1f} MB (one folder; not a release asset by default)")
 
 
 if __name__ == "__main__":
