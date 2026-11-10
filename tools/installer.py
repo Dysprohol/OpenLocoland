@@ -70,14 +70,16 @@ def _keep_modules_in_memory():
         data = f.read(end)
     if len(data) != end:
         return 0
-    code_kinds = (reader.PYZ_ITEM_MODULE, reader.PYZ_ITEM_PKG)
+    # every constant read here, once: a PyInstaller without one falls back now, not at a later import
+    code_kinds = (int(reader.PYZ_ITEM_MODULE), int(reader.PYZ_ITEM_PKG))
+    namespace_kind = int(reader.PYZ_ITEM_NSPKG)
 
     def extract(name, raw=False):   # ZlibArchiveReader.extract, from memory
         entry = toc.get(name)
         if entry is None:
             raise KeyError(f"No entry named {name!r} found in the archive!")
         kind, offset, length = entry
-        if kind == reader.PYZ_ITEM_NSPKG:
+        if kind == namespace_kind:
             return None
         obj = zlib.decompress(data[offset:offset + length])
         if kind in code_kinds and not raw:
