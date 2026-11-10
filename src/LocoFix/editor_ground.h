@@ -33,6 +33,9 @@ struct GroundTexture {
 bool ground_prepare(const std::string& map, float x, float y, void* vid, std::string& why, bool& no_memory);
 bool ground_prepare_failed();
 bool ground_ready();
+// The picture of the map file `map` is too big as a whole to be painted (map_area_band 2): its size
+// in w, h. Read from the image's HEAD once a level.
+bool ground_too_big(const std::string& map, int& w, int& h);
 // The level goes: everything forgotten (and its memory given back).
 void ground_reset();
 // Run the level writes the map's copy and loads it, so the picture is read again from the copy: before
@@ -124,6 +127,14 @@ bool ground_save_needed();
 std::string ground_save_image(const std::string& map);
 bool ground_write(const std::string& file);
 
+// The bound on a map's area (editor_newmap.cpp; DEVELOPERS.md "How big a map can be"): the band of
+// w x h - 0 nothing to say, 1 a big map, 2 over the bound -, the bound itself, and whether a size is
+// one the editor makes (File > New: `ow` = `oh` = 0) or resizes the map ow x oh to.
+int map_area_band(int w, int h);
+void map_area_limit(int& w, int& h);
+bool map_size_allowed(int w, int h, int ow, int oh);
+// The size of a ground image's picture from its HEAD (false when it is not a ground image).
+bool ground_image_size(const std::string& image, int& w, int& h);
 // Puts a map and its ground image, written whole as temporary files, in place as one step
 // (editor_newmap.cpp; nothing replaced and the temporary files gone when it fails).
 bool replace_map_files(const std::string& map_temp, const std::string& map, const std::string& image_temp, const std::string& image);

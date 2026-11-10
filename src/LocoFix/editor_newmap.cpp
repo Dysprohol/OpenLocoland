@@ -5,7 +5,8 @@
 // (the ground's VID 1024, whose image stays maps\lNN\lNN.vid of the game: nothing is copied), GRPH,
 // HEAD, GRID, SPR and SPRD with the ground alone, no players (PLAY) and no groups (GROU). Or with a
 // ground of its own: a meadow drawn here (value noise, the colours of the sandbox's ground) of any
-// size from 512 to 4096 px in steps of 256 (the ground's tile), written as <name>.vid the way
+// size from 512 to 4096 px a side in steps of 256 (the ground's tile; at most 4096 x 3072 as a
+// whole), written as <name>.vid the way
 // map_tool.py ground lays a ground out (a 256 x 256 R5G6B5 texture per tile, column by column, each
 // followed by its height texture), on the structure of mission 1's map with the size set, its GRID
 // flat at 70, the picture's height that of a campaign ground at 70 (FLAT_PICTURE_HEIGHT) and the
@@ -18,7 +19,8 @@
 // the old picture with its heights (read from its texture tiles, the map's own or the campaign's)
 // and a meadow beyond it - and puts the ground object in the middle; cropping cuts the image the same
 // way. The images are read and written a tile at a time (below), the resized map and its image put in
-// place together (replace_map_files, which the editor's Save uses too).
+// place together (replace_map_files, which the editor's Save uses too), and the sizes the editor makes
+// are bounded in area (map_area_band; DEVELOPERS.md "How big a map can be").
 #include "patch.h"
 #include "dialog_template.h"
 #include "editor_ground.h"
@@ -288,6 +290,23 @@ bool find_records(FileReader& f, const char* kind, const char* const* ids, Recor
                 if (std::memcmp(id, ids[k], 4) == 0) out[k] = first;
         pos = end + (size & 1);
     }
+    return true;
+}
+
+// The size of a ground image's picture (its HEAD), without reading the picture.
+bool ground_size(const std::string& path, int& w, int& h) {
+    FileReader f(path);
+    const char* const ids[] = {"HEAD"};
+    RecordAt head;
+    uint8_t bytes[10];
+    if (!find_records(f, "VID ", ids, &head, 1) || !head.found || head.size < 10 || !f.read(head.at, bytes, 10)) return false;
+    uint16_t flags, pw, ph;
+    std::memcpy(&flags, bytes, 2);
+    std::memcpy(&pw, bytes + 6, 2);
+    std::memcpy(&ph, bytes + 8, 2);
+    if (!(flags & 0x20)) return false;
+    w = pw;
+    h = ph;
     return true;
 }
 
@@ -662,13 +681,63 @@ template <typename F, typename W> bool write_ground(const std::string& path, int
 
 // ---- the map ----
 
+// A side of a map the editor makes: 512 to 4096 px in steps of 256 (the ground's tile).
 constexpr int MIN_SIZE = 512, MAX_SIZE = 4096;
+// Its area, in three bands (DEVELOPERS.md "How big a map can be": the editor keeps the ground's
+// picture in memory several times over, so what runs out is the area). Up to LARGE_W x LARGE_H as a
+// whole (the campaign's largest) nothing is said; over it, up to LIMIT_W x LIMIT_H, the dialogs and a
+// load say it is a big map; over that File > New and a growing File > Map size refuse it, and a map
+// that comes so big from elsewhere keeps the ground tools off.
+constexpr int LARGE_W = 3072, LARGE_H = 2304;
+constexpr int LIMIT_W = 4096, LIMIT_H = 3072;
 
-bool valid_size(int w, int h) {
+bool valid_side(int w, int h) {
     return w % TILE == 0 && h % TILE == 0 && w >= MIN_SIZE && h >= MIN_SIZE && w <= MAX_SIZE && h <= MAX_SIZE;
 }
 
+// Whether a size grows the map `ow` x `oh` on a side (File > Map size; File > New grows from nothing).
+bool grows(int w, int h, int ow, int oh) { return w > ow || h > oh; }
+
 }  // namespace
+
+// The area's band of w x h: 0 up to LARGE, 1 up to LIMIT, 2 over it. The test build's
+// LOCOFIX_NO_BOUND=1 lifts the bound (2 is never given) for the tests that make bigger maps.
+int map_area_band(int w, int h) {
+    const long long area = static_cast<long long>(w) * h;
+    if (area <= static_cast<long long>(LARGE_W) * LARGE_H) return 0;
+#if LOCOFIX_SAVE_TEST
+    static const bool lifted = [] {
+        char value[8] = "";
+        return GetEnvironmentVariableA("LOCOFIX_NO_BOUND", value, sizeof value) && value[0] == '1';
+    }();
+    if (lifted) return 1;
+#endif
+    return area <= static_cast<long long>(LIMIT_W) * LIMIT_H ? 1 : 2;
+}
+
+void map_area_limit(int& w, int& h) {
+    w = LIMIT_W;
+    h = LIMIT_H;
+}
+
+// A size the editor makes (File > New: `ow` = `oh` = 0) or resizes the map `ow` x `oh` to: the sides
+// as valid_side, and the area within the bound - or, in File > Map size, no side growing (cropping a
+// map that is over the bound is its way out).
+bool map_size_allowed(int w, int h, int ow, int oh) {
+    return valid_side(w, h) && (map_area_band(w, h) < 2 || !grows(w, h, ow, oh));
+}
+
+std::string size_error() {
+    return ui_printf(ui_format("SizeError", "a map is 512 to 4096 px wide and high, in steps of 256, and no bigger than %d x %d as a whole"),
+                     LIMIT_W, LIMIT_H);
+}
+
+std::string english_size_error() {   // for LocoFix.log
+    const bool was = ui_english(true);
+    const std::string e = size_error();
+    ui_english(was);
+    return e;
+}
 
 #if LOCOFIX_SAVE_TEST
 // The test build's forced failures: LOCOFIX_FAIL=<place>[:<n>][,...] - the n-th time (1 by default)
@@ -880,8 +949,8 @@ std::string make_map(const std::string& name, bool generated, const Terrain& ter
         error = ui_printf(ui_format("NewExists", "%s is there already"), folder.c_str());
         return "";
     }
-    if (generated && !valid_size(w, h)) {
-        error = ui_text("SizeError", "a map is 512 to 4096 px wide and high, in steps of 256");
+    if (generated && !map_size_allowed(w, h, 0, 0)) {
+        error = size_error();
         return "";
     }
     const std::string image = generated ? folder + "\\" + name + ".vid" : "";
@@ -1011,6 +1080,10 @@ bool resize_map_file(const std::string& map, int w, int h, std::string& error) {
     float f[2];
     std::memcpy(f, &head->records[0][0], 8);
     const int ow = static_cast<int>(f[0]), oh = static_cast<int>(f[1]);
+    if (!map_size_allowed(w, h, ow, oh)) {
+        error = size_error();
+        return false;
+    }
     // the new image and the map written as temporary files first, put in place together
     const std::string map_temp = map + ".saving";
     std::string image, image_temp;
@@ -1188,6 +1261,8 @@ bool write_ground_picture(const std::string& image, int w, int h, const std::vec
         }()));
 }
 
+// The size of a ground image's picture, read from its HEAD alone.
+bool ground_image_size(const std::string& image, int& w, int& h) { return ground_size(image, w, h); }
 
 // The same for a map file's bytes (editor_exchange.cpp).
 std::string map_ground_image_of(const std::string& map_bytes) {
@@ -1280,10 +1355,13 @@ namespace {
 // here, then the terrains of the 20 missions. The size (of an empty map or a meadow; a mission's
 // terrain has its own) is set with - and + (256 px a step, 512 to 4096: the ground's tiles are
 // 256 x 256 and the engine's GRID and camera handle up to 4096) or a preset button, the result shown
-// in pixels and in tiles. File > Map size has the same row.
+// in pixels and in tiles, and a note under the presets gives the area's band: nothing, a big map, or
+// too big as a whole (OK refuses it). File > Map size has the same row; it crops a map whatever its
+// area and grows one only within the bound.
 
 enum : int {
     IDC_NAME = 100, IDC_GROUND, IDC_WIDTH, IDC_HEIGHT, IDC_W_MINUS, IDC_W_PLUS, IDC_H_MINUS, IDC_H_PLUS, IDC_SIZE_INFO,
+    IDC_SIZE_NOTE,   // the line under the presets: a big map, or one too big as a whole
     IDC_PRESET = 120   // IDC_PRESET + i: the presets
 };
 constexpr int CAMPAIGN_COUNT = static_cast<int>(sizeof CAMPAIGN / sizeof CAMPAIGN[0]);
@@ -1303,16 +1381,48 @@ struct Choice {
 
 int clamp_size(int v) { return (std::max)(MIN_SIZE, (std::min)(MAX_SIZE, (v + TILE / 2) / TILE * TILE)); }
 
+// The size the open dialog starts from: File > Map size's map (a crop of it is allowed whatever its
+// area), 0 x 0 in File > New; and whether File > New's ground has the size row (an empty map, a meadow).
+int g_from_w = 0, g_from_h = 0;
+bool g_size_row = true;
+
+// SizeBad's box: what a size may be.
+void size_refused(HWND dialog) {
+    MessageBoxW(dialog,
+                ui_wide(ui_printf(ui_format("SizeBad", "The size: 512 to 4096 px wide and high, in steps of 256, and as a whole no bigger "
+                                                       "than %d x %d. The campaign's maps are 1024 x 768, 2048 x 1536 and 3072 x 2304."),
+                                  LIMIT_W, LIMIT_H))
+                    .c_str(),
+                ui_wtext("ResizeTitle", "Map size").c_str(), MB_OK | MB_ICONWARNING);
+}
+
 // The line under the size: "= 2048 x 1536 px, 8 x 6 tiles of 256 px" (or why it is not a size).
 void show_size(HWND dialog) {
     BOOL ok1 = FALSE, ok2 = FALSE;
     const int w = static_cast<int>(GetDlgItemInt(dialog, IDC_WIDTH, &ok1, FALSE));
     const int h = static_cast<int>(GetDlgItemInt(dialog, IDC_HEIGHT, &ok2, FALSE));
     const std::wstring text =
-        ok1 && ok2 && valid_size(w, h)
+        ok1 && ok2 && valid_side(w, h)
             ? ui_wide(ui_printf(ui_format("SizeInfo", "= %d x %d px, %d x %d tiles of 256 px"), w, h, w / TILE, h / TILE))
             : ui_wtext("SizeInfoBad", "512 to 4096 px, in steps of 256");
     SetDlgItemTextW(dialog, IDC_SIZE_INFO, text.c_str());
+    // the line under the presets, by the area's band: nothing, a big map, too big (OK refuses it); a
+    // crop of a map that is over the bound is allowed and says its ground cannot be painted
+    std::wstring note;
+    if (g_size_row && ok1 && ok2 && valid_side(w, h)) {
+        const int band = map_area_band(w, h);
+        if (band == 2 && !grows(w, h, g_from_w, g_from_h)) {
+            note = ui_wide(ui_printf(ui_format("MsgGroundTooBig", "the ground of a map this big cannot be painted (at most %d x %d px as a whole)"),
+                                     LIMIT_W, LIMIT_H));
+            if (!note.empty()) CharUpperBuffW(&note[0], 1);
+        } else if (band == 2) {
+            note = ui_wide(ui_printf(ui_format("SizeNoteOver", "Too big as a whole: at most %d x %d px in area (a wider map must be lower)."),
+                                     LIMIT_W, LIMIT_H));
+        } else if (band == 1) {
+            note = ui_wtext("SizeNoteLarge", "A big map: painting its ground uses a lot of memory. Save often.");
+        }
+    }
+    SetDlgItemTextW(dialog, IDC_SIZE_NOTE, note.c_str());
 }
 
 // The commands of the size row: - and + (a step of 256 within the limits), the presets.
@@ -1337,7 +1447,8 @@ bool size_command(HWND dialog, int id, int code) {
     return false;
 }
 
-// The size row at `y`: width - + x height - +, the line with the result, the presets below.
+// The size row at `y`: width - + x height - +, the line with the result, the presets below and the
+// note under them (42 units in all).
 void size_items(dialog::DialogTemplate& t, short x, short y) {
     using namespace dialog;
     t.item(EDIT, L"", IDC_WIDTH, LINE | ES_NUMBER, x, y, 34, 12);
@@ -1354,23 +1465,22 @@ void size_items(dialog::DialogTemplate& t, short x, short y) {
         t.item(BUTTON, label, IDC_PRESET + i, BS_PUSHBUTTON | WS_TABSTOP, static_cast<short>(x + i * 56), static_cast<short>(y + 16), 52,
                12);
     }
+    t.item(STATIC, L"", IDC_SIZE_NOTE, SS_LEFT | SS_NOPREFIX, x, static_cast<short>(y + 31), 284, 8);
 }
 
 bool read_size(HWND dialog, int& w, int& h) {
     BOOL ok1 = FALSE, ok2 = FALSE;
     w = static_cast<int>(GetDlgItemInt(dialog, IDC_WIDTH, &ok1, FALSE));
     h = static_cast<int>(GetDlgItemInt(dialog, IDC_HEIGHT, &ok2, FALSE));
-    if (ok1 && ok2 && valid_size(w, h)) return true;
-    MessageBoxW(dialog,
-                ui_wtext("SizeBad", "The size: 512 to 4096 px wide and high, in steps of 256 (the campaign's maps are "
-                                    "1024 x 768, 2048 x 1536 and 3072 x 2304).").c_str(),
-                ui_wtext("ResizeTitle", "Map size").c_str(), MB_OK | MB_ICONWARNING);
+    if (ok1 && ok2 && map_size_allowed(w, h, g_from_w, g_from_h)) return true;
+    patch::log("size: %d x %d refused - %s", w, h, english_size_error().c_str());
+    size_refused(dialog);
     return false;
 }
 
 // The size row is for an empty map and the meadow; a mission's terrain has its size.
 void enable_size(HWND dialog, bool on) {
-    for (int id = IDC_WIDTH; id <= IDC_SIZE_INFO; ++id)
+    for (int id = IDC_WIDTH; id <= IDC_SIZE_NOTE; ++id)
         if (HWND item = GetDlgItem(dialog, id)) EnableWindow(item, on);
     for (int i = 0; i < PRESET_COUNT; ++i)
         if (HWND item = GetDlgItem(dialog, IDC_PRESET + i)) EnableWindow(item, on);
@@ -1410,7 +1520,9 @@ INT_PTR CALLBACK new_map_proc(HWND dialog, UINT m, WPARAM w, LPARAM l) {
     }
     if (m != WM_COMMAND) return FALSE;
     if (LOWORD(w) == IDC_GROUND && HIWORD(w) == CBN_SELCHANGE) {
-        enable_size(dialog, chosen_ground(dialog) >= MEADOW);
+        g_size_row = chosen_ground(dialog) >= MEADOW;
+        enable_size(dialog, g_size_row);
+        show_size(dialog);   // a mission's terrain has its own size: no note
         return TRUE;
     }
     if (size_command(dialog, LOWORD(w), HIWORD(w))) return TRUE;
@@ -1476,7 +1588,7 @@ INT_PTR CALLBACK size_proc(HWND dialog, UINT m, WPARAM w, LPARAM l) {
 // File > New... (editor.cpp runs it as a dialog of the game; the Menu panel's New map too).
 void new_map_dialog(HWND owner) {
     using namespace dialog;
-    DialogTemplate t(ui_wtext("NewTitle", "New map").c_str(), 300, 140);
+    DialogTemplate t(ui_wtext("NewTitle", "New map").c_str(), 300, 152);
     t.item(STATIC, ui_wtext("NewFolder", "Name (its folder in maps\\):").c_str(), -1, SS_LEFT, 8, 10, 150, 8);
     t.item(EDIT, L"", IDC_NAME, LINE, 160, 8, 132, 12);
     t.item(STATIC, ui_wtext("NewGround", "Ground:").c_str(), -1, SS_LEFT, 8, 30, 40, 8);
@@ -1484,9 +1596,11 @@ void new_map_dialog(HWND owner) {
     t.item(STATIC, ui_wtext("NewSize", "Size (an empty map, a meadow):").c_str(), -1, SS_LEFT, 8, 48, 284, 8);
     size_items(t, 8, 60);
     t.item(STATIC, ui_wtext("NewGroundNote", "An empty map is flat and bare, one texture to paint over; a mission's terrain stays the game's own picture.").c_str(),
-           -1, SS_LEFT, 8, 94, 284, 16);
-    t.item(BUTTON, ui_wtext("ButtonOk", "OK").c_str(), IDOK, BS_DEFPUSHBUTTON | WS_TABSTOP, 184, 118, 50, 14);
-    t.item(BUTTON, ui_wtext("ButtonCancel", "Cancel").c_str(), IDCANCEL, BS_PUSHBUTTON | WS_TABSTOP, 242, 118, 50, 14);
+           -1, SS_LEFT, 8, 106, 284, 16);
+    t.item(BUTTON, ui_wtext("ButtonOk", "OK").c_str(), IDOK, BS_DEFPUSHBUTTON | WS_TABSTOP, 184, 130, 50, 14);
+    t.item(BUTTON, ui_wtext("ButtonCancel", "Cancel").c_str(), IDCANCEL, BS_PUSHBUTTON | WS_TABSTOP, 242, 130, 50, 14);
+    g_from_w = g_from_h = 0;   // a new map grows from nothing: the bound holds
+    g_size_row = true;         // the first ground is an empty map
     Choice c;
     if (DialogBoxIndirectParamW(GetModuleHandleW(nullptr), t.get(), owner, new_map_proc, reinterpret_cast<LPARAM>(&c)) == 1)
         create(c, owner);
@@ -1533,12 +1647,15 @@ bool new_map_for_test(const std::string& text) {
 // File > Map size... (editor.cpp): the new size asked for; false when cancelled.
 bool map_size_dialog(HWND owner, int& w, int& h) {
     using namespace dialog;
-    DialogTemplate t(ui_wtext("ResizeTitle", "Map size").c_str(), 300, 86);
+    DialogTemplate t(ui_wtext("ResizeTitle", "Map size").c_str(), 300, 98);
     t.item(STATIC, ui_wtext("SizeLabel", "The map's size (px, steps of 256; the right and the bottom edge move):").c_str(), -1, SS_LEFT,
            8, 8, 284, 16);
     size_items(t, 8, 28);
-    t.item(BUTTON, ui_wtext("ButtonOk", "OK").c_str(), IDOK, BS_DEFPUSHBUTTON | WS_TABSTOP, 184, 64, 50, 14);
-    t.item(BUTTON, ui_wtext("ButtonCancel", "Cancel").c_str(), IDCANCEL, BS_PUSHBUTTON | WS_TABSTOP, 242, 64, 50, 14);
+    t.item(BUTTON, ui_wtext("ButtonOk", "OK").c_str(), IDOK, BS_DEFPUSHBUTTON | WS_TABSTOP, 184, 76, 50, 14);
+    t.item(BUTTON, ui_wtext("ButtonCancel", "Cancel").c_str(), IDCANCEL, BS_PUSHBUTTON | WS_TABSTOP, 242, 76, 50, 14);
+    g_from_w = w;   // cropping the map is allowed whatever its area, growing it only within the bound
+    g_from_h = h;
+    g_size_row = true;
     int size[2] = {w, h};
     if (DialogBoxIndirectParamW(GetModuleHandleW(nullptr), t.get(), owner, size_proc, reinterpret_cast<LPARAM>(size)) != 1)
         return false;
@@ -1550,8 +1667,8 @@ bool map_size_dialog(HWND owner, int& w, int& h) {
 // The resize of the saved map file (editor.cpp saves before and loads it again after).
 // Out of memory nothing is replaced (the map stays as saved before) and `error` says so.
 bool resize_map(const std::string& map, int w, int h, std::string& error) {
-    if (!valid_size(w, h)) {
-        error = ui_text("SizeError", "a map is 512 to 4096 px wide and high, in steps of 256");
+    if (!valid_side(w, h)) {
+        error = size_error();
         return false;
     }
     try {

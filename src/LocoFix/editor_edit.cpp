@@ -4491,11 +4491,17 @@ bool follows_ground(uint8_t* o) {
 
 bool in_grid(const rail::Cell& c) { return c.first >= 0 && c.first < grid_width() && c.second >= 0 && c.second < grid_height(); }
 
-// The Ground height tool raises the GRID and redraws the picture with it (the relief); when the
-// picture does not fit in memory, the tool refuses the stroke with the message (the GRID alone would
-// leave the picture's relief behind). False then.
+// The Ground height tool raises the GRID and redraws the picture with it (the relief); on a map whose
+// picture is too big to paint, or when it does not fit in memory, the tool refuses the stroke with
+// the message (the GRID alone would leave the picture's relief behind). False then.
 bool start_height_stroke(bool right) {
     if (grid() && !ground_ready()) {
+        const char* map = at<const char*>(world(), W_LEVEL_FILE);
+        int pw = 0, ph = 0;
+        if (map && ground_too_big(map, pw, ph)) {
+            ground_paintable(false);   // says MsgGroundTooBig
+            return false;
+        }
         if (!ground_paintable(true) && ground_prepare_failed()) return false;   // it said MsgGroundNoMemory
     }
     g_stroke = Stroke();
@@ -4957,6 +4963,16 @@ bool ground_paintable(bool quiet) {
         if (!ground && nvid_of(o) == VID_GROUND) ground = o;
     });
     const char* map = at<const char*>(world(), W_LEVEL_FILE);
+    // a picture too big as a whole is not read at all (its copies would not fit in the 2 GB): the
+    // ground tools stay off, the rest of the editor works (DEVELOPERS.md "How big a map can be")
+    int pw = 0, ph = 0;
+    if (map && ground_too_big(map, pw, ph)) {
+        int lw, lh;
+        map_area_limit(lw, lh);
+        if (quiet) return false;
+        MESSAGE("MsgGroundTooBig", "the ground of a map this big cannot be painted (at most %d x %d px as a whole)", lw, lh);
+        return false;
+    }
     std::string why;
     bool no_memory = false;
     if (!ground || !map || !ground_prepare(map, at<float>(ground, O_X), at<float>(ground, O_Y), vid_of(ground), why, no_memory)) {
@@ -11531,6 +11547,8 @@ void edit_message_text(const char* key, const char* english) { message_by([&] { 
 // editor.cpp: the map was saved as `map`.
 void edit_message_saved(const std::string& map) { MESSAGE("MsgSaved", "saved as %s", map.c_str()); }
 void edit_message_line(const std::string& text) { message_by([&] { return text; }); }
+// editor.cpp: a message with a size in it (a map loaded that is big, or too big to paint).
+void edit_message_size(const char* key, const char* english, int w, int h) { MESSAGE(key, english, w, h); }
 
 void install_editor_edit() {
     char value[8] = {};

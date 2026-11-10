@@ -106,7 +106,7 @@ and the tester's "how do I change an object's height" had no answer either. Now:
   tool; for the track and buildings only when the picture is the map's own (an empty map, a meadow, a
   grown map, a painted one, or one the tool already redrew): a campaign terrain's `lNN.vid` is left
   as it came until the tool is used there, and then the map gets `<name>.vid` when saved, as a painted
-  one does (`ground_save`: never over `lNN.vid`). The Water tool keeps its own way (it lowers the
+  one does (`ground_save_image`: never over `lNN.vid`). The Water tool keeps its own way (it lowers the
   picture's heights where it paints, MAP_RULES.md 2). Chosen over an overlay alone because it shows
   in the game too: the hill is in the saved picture, the objects stand on what is seen, the depth hides
   what is behind it; the cost is a picture of the map's own (a few MB) once the ground is shaped.
@@ -203,11 +203,18 @@ hill; `test_missions.ps1` all 20, `test_rail_rules.py` 3000 of 3000.
 `maps\` and its ground: an empty map - a plain ground of one of the painting's textures (grass,
 sand, snow, rock ...; the 128 px sample laid mirrored, its brightness varied in soft patches so the
 repeat does not show), flat at 70, nothing on it, ready to paint -, a meadow, or the terrain of one of
-the 20 campaign maps (its size with it). An empty map or a meadow is any size from 512 to 4096 px in
-steps of 256 (the ground's tile; the camera, the GRID and the ground's tiles handle that): - and +
-beside the width and the height step by 256 within those limits, five buttons set the campaign's sizes
+the 20 campaign maps (its size with it). An empty map or a meadow is 512 to 4096 px a side in
+steps of 256 (the ground's tile; the camera, the GRID and the ground's tiles handle that), and at most
+4096 x 3072 as a whole (12.6 million pixels: the bound on the area, "How big a map can be"): - and +
+beside the width and the height step by 256 within the sides' limits, five buttons set the campaign's sizes
 1024 x 768, 2048 x 1536, 3072 x 2304 and 1536 x 1024, 4096 x 3072, and the line beside them shows the
-result in pixels and in tiles. File > Map size has the same row. The map is made the way `map_tool.py new` makes one: the chunks of the
+result in pixels and in tiles. A line under the presets (`IDC_SIZE_NOTE`) gives the area's band
+(`map_area_band`, the constants `LARGE_W` x `LARGE_H` and `LIMIT_W` x `LIMIT_H` next to `MIN_SIZE` /
+`MAX_SIZE` in `editor_newmap.cpp`): empty up to 3072 x 2304 as a whole, `SizeNoteLarge` above it,
+`SizeNoteOver` over the bound, where OK refuses with `SizeBad` (`SizeError` in the log and for the test
+steps N and Z). File > Map size has the same row; it allows any crop of the map - no side growing -
+whatever its area (the way out for a map that is over the bound: its line then says the ground of
+such a map cannot be painted), and growing only within the bound. The map is made the way `map_tool.py new` makes one: the chunks of the
 campaign map with only the ground object (VID 1024 in OBJ, SPR and SPRD; no players, no groups), the
 ground's image staying the game's own `maps\lNN\lNN.vid` (nothing is copied). A meadow is written as
 `maps\<name>\<name>.vid` - value noise in two greens with drier patches, laid out as `map_tool.py
@@ -220,7 +227,7 @@ ground (a bed's slope) is hidden as on the campaign's maps. The template's scrip
 editor's blocks) and texts are copied under the new name, and the editor loads the map.
 
 File > Map size... resizes the saved map: the right and the bottom edge move, from 512 to 4096 px in
-steps of 256. The objects that would fall outside are deleted - rails, beds and cars up to 300 px
+steps of 256 (within the area's bound when the map grows). The objects that would fall outside are deleted - rails, beds and cars up to 300 px
 past the new edge stay, the main line goes on out of sight - after a question with their count;
 then the map is saved, its file is resized - HEAD's size, the GRID (a new cell gets the height of
 the old cell nearest to it) - and loaded again (not undone). Growing gives the map a ground image of
@@ -283,11 +290,57 @@ spam with 160 strokes, and 305 strokes with the history at its cap, saved, ran a
 rails and 288 objects (trains of both armies, factories, repair points, forts) were laid, saved,
 loaded, run and saved again at 60 fps (784 MB). With the large-address-aware flag set on a private
 copy of the exe the rounds that crash passed (6144 x 4608, and 8192 x 6144 with 2554 MB) and
-18432 x 18432 played - one pass each, not a test of the game. None of this is fixed yet (the picture
-written before the map and as a stream of tiles, the failure caught and said instead of thrown, a
-bound on the area in File > New and Map size, a crossing grid as big as the map); until it is, a map
-to paint is safe at the campaign's sizes, 3072 x 2304 at most, and a map's track should stay within
-7500 px.
+18432 x 18432 played - one pass each, not a test of the game.
+
+Save no longer loses the painted ground, and the editor bounds the area of the maps it
+makes (`editor.cpp` `save_map`, `editor_newmap.cpp`, `editor_ground.cpp`; "Saving" in `editor.md`).
+The picture is written a 256 x 256 tile at a time straight into the file (`write_ground_vid`: byte for
+byte the file the old writer built whole) and read the same way (`read_ground`: the chunks' headers
+walked as `read_res` walks them, each texture read when a tile shows it), so Save, Run the
+level, File > Map size and File > New need about 1 MB besides the picture instead of 22 - 30 bytes
+a pixel, and the first ground stroke no longer reads the file whole on top of its own copies
+(`ground_prepare` reserves the stroke's copies there, so a stroke never asks for a whole picture
+again; `ground_reset` gives the memory back - `clear()` kept it for the next map; a stroke's step
+of the history is allocated to its size, so `trim_history`'s count is what it holds; Run the level
+moves the picture's original into its keep instead of copying it and frees the rest before the run
+loads). The map and its picture are written as a pair (temporary files put in place together), out
+of memory is caught - a box at Save and Run the level, a status line at the ground tools, File > Map
+size's error box - and the editor stays open with the edits. Measured on the same machine and
+build as above: the 6144 x 4608 round (ground strokes, track, a factory, Save as,
+Load, Save as, Run the level and back) that crashed at Save (`EXCEPTION!`, 1262 MB) passes and peaks
+at 708 MB (the test build with the bound lifted); the 4096 x 4096 meadow with 161 ground strokes,
+track, buildings and trains (the stress pass above, three strokes a view) peaked at 1304 MB private
+and 1705 MB virtual with the unchanged build, which survived it this time, and at 742 / 1132 MB now.
+On File > New's own largest, 4096 x 3072, the same 161-stroke stress peaked
+at 1116 / 1480 MB with the unchanged build and at 663 / 1030 MB now. Out of memory forced at every
+guarded place (a test build's `LOCOFIX_FAIL`) the editor stayed open, said so, left the old pair on disk
+and no temporary file, and the next attempt worked. A save that fails for another reason (a file in use
+or read-only) is said in a box too.
+
+**The save test build.** Compiled with the define `LOCOFIX_SAVE_TEST=1` (MSVC reads extra options from
+the `CL` environment variable, e.g. `CL=-DLOCOFIX_SAVE_TEST=1` and `build_locofix.build(out_dir=...)`;
+`build.py` and `release.py` never set it) LocoFix keeps the old whole-file reader and writer
+(`read_ground_whole`, `ground_vid_whole`) and logs `editor: THE SAVE TEST BUILD` at the start. It
+reads `LOCOFIX_VID_COMPARE=1` (every image written is built the old way too and compared byte for
+byte, every picture read is read the old way too - `vid check:` lines), `LOCOFIX_FAIL=<place>[:<n>],...`
+(the n-th pass of a place fails as an allocation does: prepare, read, stroke, save, write, map, commit -
+the map's rename after the picture's -, keep, resize, new) and `LOCOFIX_NO_BOUND=1` (the area bound
+lifted), and `c40090` reads and writes every `maps\*\*.vid` both ways. Checked with it: painted rounds
+(ground height, paint, water) at 1024 x 768, 2048 x 1536, 3072 x 2304 and 4096 x 3072, File > New's
+meadow and empty map, Map size grown and cropped, the 20 campaign grounds and images that v0.2.9 itself
+painted and resized - every picture read the same both ways, every image written byte for byte
+the old one, and every image of the editor's layout (File > New's, a painted one, v0.2.9's own) written
+again from its picture is its file, byte for byte (the campaign's grounds have the authors' layout).
+
+The bound (`map_area_band`, `LARGE_W` / `LIMIT_W` in `editor_newmap.cpp`): File > New and a growing
+File > Map size make at most **4096 x 3072 as a whole** (12.6 million pixels; a side stays 512 - 4096
+in steps of 256), and the dialogs' note line says so; a loaded map whose picture is over it (made
+elsewhere, or a 4096 x 4096 meadow of v0.2.9) gets `MsgMapTooBig` when it is loaded and its ground
+tools refuse (`MsgGroundTooBig`, before the picture is read), while objects, track, Save and Run the
+level work, and File > Map size crops it; a picture over 3072 x 2304 gets `MsgMapLarge`. The bands
+are counted on the picture's size (its HEAD), not the map's: a map made bigger than its picture by
+`map_tool.py` (the template's 1024 x 768 ground in the middle of black) paints like a small one. A
+map's track should still stay within 7500 px (the crossing grid).
 
 **The map's frame.** The camera of a held level goes 300 px past the map, where nothing is drawn;
 the outside gets a dim 32 px grid and the map's edge a frame, so an empty map stands out - the track

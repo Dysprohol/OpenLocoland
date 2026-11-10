@@ -96,6 +96,7 @@ void edit_end_strokes(const char* why);   // editor_edit.cpp: a stroke of the br
 void edit_message_saved(const std::string& map);
 void panel_saved(const std::string& file);   // editor_panel.cpp: the SAVED notice
 void edit_message_line(const std::string& text);
+void edit_message_size(const char* key, const char* english, int w, int h);
 void install_editor_edit();
 void edit_level_held();
 void edit_touch();
@@ -1054,6 +1055,19 @@ bool resize_current(HWND window, int w, int h) {
         patch::log("editor: map size: %s is not resized", map.c_str());
         return false;
     }
+    int ow = 0, oh = 0;
+    edit_map_size(ow, oh);
+    if (!map_size_allowed(w, h, ow, oh)) {   // the dialog asks the same; the test step Z does not
+        int lw, lh;
+        map_area_limit(lw, lh);
+        const bool english = ui_english(true);
+        const std::string error = ui_printf(ui_format("SizeError", "a map is 512 to 4096 px wide and high, in steps of 256, and no bigger "
+                                                                   "than %d x %d as a whole"),
+                                            lw, lh);
+        ui_english(english);
+        patch::log("editor: map size: %d x %d refused - %s", w, h, error.c_str());
+        return false;
+    }
     const int outside = edit_outside(w, h, false);
     if (!g_test) {
         DialogScope scope;
@@ -1625,6 +1639,18 @@ void editor_level_loaded(void* w) {
             edit_message_line(ui_printf(ui_format("MsgNoGround", "the ground image %s is missing - the ground is black; put the file back "
                                                                  "before saving"),
                                         lost.c_str()));
+        } else if (!g_run_back) {
+            // a big picture, once when it is loaded (not on the way back from Run the level): over the
+            // bound the ground tools stay off (editor_edit.cpp ground_paintable)
+            int pw = 0, ph = 0;
+            if (ground_image_size(map_ground_image(game_path(map)), pw, ph)) {
+                const int band = map_area_band(pw, ph);
+                if (band == 2)
+                    edit_message_size("MsgMapTooBig", "this map is too big to paint (%d x %d px): the ground tools are off, track and objects work",
+                                      pw, ph);
+                else if (band == 1)
+                    edit_message_size("MsgMapLarge", "a big map (%d x %d px): when painting the ground, save often", pw, ph);
+            }
         }
         // the old folder of a map renamed or deleted (Rename or delete): its files are not in use now
         if (!g_remove_after_load.empty() && lower_path(folder_of(game_path(map))) != lower_path("maps\\" + g_remove_after_load)) {

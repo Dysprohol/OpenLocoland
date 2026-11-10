@@ -257,8 +257,11 @@ ground or size, Menu button → **NEW MAP**:
 - **Ground** - *an empty map* of one texture (grass, sand, snow, rock ... - flat and bare, to paint
   on), *a meadow*, or the terrain of one of the campaign's maps.
 - **Size** - for an empty map or a meadow: from 512 to 4096 px each way in steps of 256 (`-` and
-  `+`), or a preset: 1024 x 768 (small, like mission 1), 2048 x 1536 (most missions), 3072 x 2304
-  (big). Take 2048 x 1536 for a start.
+  `+`), and at most 4096 x 3072 as a whole (a wider map must be lower: the editor keeps the ground's
+  picture in memory, and the game has 2 GB), or a preset: 1024 x 768 (small, like mission 1),
+  2048 x 1536 (most missions), 3072 x 2304 (big). The line under the presets says when a map is big
+  (over 3072 x 2304 as a whole: save often while painting it) or too big. Take 2048 x 1536 for a
+  start.
 
 OK - the editor opens the new map. It already has a mission script and texts made from the
 template; you will fill them in at step 10. (**MAP SIZE** in the menu changes the size later: a

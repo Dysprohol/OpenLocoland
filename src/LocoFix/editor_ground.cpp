@@ -80,6 +80,10 @@ std::vector<uint8_t> g_textures_of, g_stroke_textures;   // the texture painted 
 bool g_stroke = false;
 bool g_prepare_failed = false;   // the last ground_prepare ran out of memory
 bool g_stroke_lost = false;      // the last ground_stroke_end had no memory for its patch
+// ground_too_big's answer for the level's map (read once)
+std::string g_size_map;
+bool g_size_over = false;
+int g_size_w = 0, g_size_h = 0;
 int g_x0 = 0, g_y0 = 0, g_x1 = -1, g_y1 = -1;
 // the rectangle changed since the last frame, to be written into the textures (ground_flush)
 int g_pending_x0 = 0, g_pending_y0 = 0, g_pending_x1 = -1, g_pending_y1 = -1;
@@ -519,6 +523,17 @@ bool ground_prepare(const std::string& map, float x, float y, void* vid, std::st
 bool ground_ready() { return g_ready; }
 bool ground_prepare_failed() { return g_prepare_failed; }
 
+bool ground_too_big(const std::string& map, int& w, int& h) {
+    if (map != g_size_map) {
+        g_size_map = map;
+        g_size_w = g_size_h = 0;
+        g_size_over = ground_image_size(map_ground_image(map), g_size_w, g_size_h) && map_area_band(g_size_w, g_size_h) == 2;
+    }
+    w = g_size_w;
+    h = g_size_h;
+    return g_size_over;
+}
+
 void ground_flush() {
     if (g_pending_x1 < g_pending_x0) return;
     const int x0 = g_pending_x0, y0 = g_pending_y0, x1 = g_pending_x1, y1 = g_pending_y1;
@@ -545,6 +560,7 @@ void ground_reset() {
     release(g_textures_of);
     release(g_stroke_textures);
     g_prepare_failed = false;
+    g_size_map.clear();
 }
 
 void ground_keep() {

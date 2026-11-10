@@ -256,9 +256,11 @@ rozmiaru: przycisk menu → **NOWA MAPA**:
   plików Windows.
 - **Teren** - *pusta mapa* z jednej tekstury (trawa, piasek, śnieg, skała ... - płaska i goła, do
   malowania), *łąka* albo teren jednej z map kampanii.
-- **Rozmiar** - dla pustej mapy albo łąki: od 512 do 4096 px w każdą stronę co 256 (`-` i `+`) albo
-  gotowy: 1024 x 768 (mała, jak misja 1), 2048 x 1536 (większość misji), 3072 x 2304 (duża). Na
-  początek weź 2048 x 1536.
+- **Rozmiar** - dla pustej mapy albo łąki: od 512 do 4096 px w każdą stronę co 256 (`-` i `+`), a w
+  całości najwyżej 4096 x 3072 (szersza mapa musi być niższa: edytor trzyma obraz terenu w pamięci,
+  a gra ma 2 GB), albo gotowy: 1024 x 768 (mała, jak misja 1), 2048 x 1536 (większość misji),
+  3072 x 2304 (duża). Linijka pod gotowymi rozmiarami mówi, kiedy mapa jest duża (w całości ponad
+  3072 x 2304: malując ją, zapisuj często) albo za duża. Na początek weź 2048 x 1536.
 
 OK - edytor otwiera nową mapę. Ma już skrypt misji i teksty zrobione z szablonu; uzupełnisz je w
 kroku 10. (**ROZMIAR MAPY** w menu zmienia rozmiar później: mniejsza mapa traci teren i obiekty za
