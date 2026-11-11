@@ -10685,12 +10685,24 @@ void draw_mine_labels() {
         const float sx = at<float>(o, O_X) - cam_x, sy = at<float>(o, O_Y) - at<float>(o, O_Z) - cam_y;
         // hidden from the player: drawn where the engine would (draw_vid takes the map's y and lifts it by z
         // itself - given sy, which is lifted already, the flag stood its height above the mine)
-        if (at<uint32_t>(o, O_FLAGS) & 0x8000) draw_vid(vid_of(o), 0, sx, at<float>(o, O_Y) - cam_y, at<float>(o, O_Z));
+        // drawn after the bar and the rows now (in their lock), so what of it falls on them is left out - the
+        // bar covered it when the labels came before it
+        auto covered = [](float x, float y) { return on_bar(x, y) || on_options(x, y); };
+        if ((at<uint32_t>(o, O_FLAGS) & 0x8000) && !covered(sx, sy) && !covered(sx, sy - 12) && !covered(sx, sy + 12))
+            draw_vid(vid_of(o), 0, sx, at<float>(o, O_Y) - cam_y, at<float>(o, O_Z));
         const bool marker = nvid_of(o) == VID_MINE_MARKER;
         const int army = marker ? 1 : army_of(o);
         const std::string label = ui_printf(marker ? ui_format("MapMineMarker", "MINE 1 IN 3: %s") : ui_format("MapMine", "MINE: %s"),
                                             ui_text(ARMY_CHOICE_KEYS[army], ARMY_CHOICES[army]));
-        draw_text(FONT_TIPS, sx + 15, sy - 6, label.c_str(), false, 3);
+        uint8_t* font = vid_by_number(FONT_TIPS);
+        const float cw = font ? at<float>(font, V_SIZE_X) : 6, ch = font ? at<float>(font, V_SIZE_Y) : 12;
+        const float lx = sx + 15, ty = sy - 6;
+        for (size_t c = 0; c < label.size(); ++c) {   // character by character: those on the bar or the rows stay out
+            const float l = lx + cw * c;
+            if (covered(l, ty) || covered(l + cw, ty) || covered(l, ty + ch) || covered(l + cw, ty + ch)) continue;
+            const char one[2] = {label[c], 0};
+            draw_text(FONT_TIPS, l, ty, one, false, 3);
+        }
     }
     g_mine_labels.clear();
 }

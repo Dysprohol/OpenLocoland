@@ -207,6 +207,9 @@ their rows): the Menu 2.1-2.4 ms, Help 2.1-2.3 ms, the same picture. The Factory
 lock of their own right before the status lines took theirs), the bar 2.3, the status lines 1.9. The mines'
 labels and hidden pictures are now drawn in the status lines' lock (`draw_mine_labels`; their squares stay
 where they were), so they come over what is drawn between - the push lines' arrows, the tool, the bar -,
-which only matters for a mine under the bar: Select 59-60 fps with 3-3.7 ms to spare, Track 59-60, the Menu
+which only matters for a mine under the bar - there the label's characters and a hidden mine's picture that
+fall on the bar or the rows are left out (`draw_mine_labels`, the review of 2026-11-11: they came out over the
+strip; checked with a mine on POLIGON's track under the strip, its label over the strip before, covered
+now): Select 59-60 fps with 3-3.7 ms to spare, Track 59-60, the Menu
 open 57.5-60. Not measured in full screen (the automatic tests do not switch the mode); the bar's own lock is
 needed for its plates, which are software pictures.
