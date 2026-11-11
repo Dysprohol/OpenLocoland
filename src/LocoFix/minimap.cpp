@@ -24,12 +24,12 @@
 // 7 x 5 px (times the size below) around the view's middle and inside the rectangle; the dots
 // kept inside the rectangle too.
 //
-// The size: the original was made for 1024x768, where the frame is a tenth of the screen's
-// height. On a higher screen (the game's screen - a small map's logical one, screen_scaling.cpp,
-// is stretched as a whole and its minimap with it) the minimap grows by whole steps: the step
-// closest to the original's share of the screen - 1 up to 1151 px of height, 2 up to 1919, 3
-// from 1920 - and never so wide that it would reach the bar's controls (the slots end 740 px
-// into the 1024 px base). The registry value MinimapSize (DWORD 1-3) chooses a step by hand.
+// The size is the player's choice: the launcher's Minimap row (options.cpp) keeps it in the
+// registry value MinimapSize (DWORD 2 or 3; absent or 1 = the original size, the default). A size
+// is used only where it fits the game's screen - never so wide that the frame would reach the bar's
+// controls (the slots end 740 px into the centred 1024 px base) - else the biggest that fits: a
+// small map's logical screen (screen_scaling.cpp, mission 1: 1024x768, stretched as a whole) takes
+// twice at most. The launcher offers only the sizes that fit the chosen resolution.
 // The bigger frames are VIDs 950 and 951 (game/objects.override): the frame's picture enlarged
 // two and three times pixel by pixel (patch_data.make_minimap_frames), the size of the menu
 // item's box with it. Player_ShowStateBar takes the frame's VID from World.vids[464], so while
@@ -61,7 +61,6 @@ constexpr int MAX_SIZE = 3;
 constexpr int OPENING_LEFT = 8, OPENING_TOP = 9, OPENING_LESS_W = 14, OPENING_LESS_H = 13;
 constexpr int FRAME_W = 104;
 constexpr int BAR_WIDTH = 1024, BAR_CONTROLS_END = 740;   // the slots end there in the base
-constexpr int ORIGINAL_HEIGHT = 768;
 constexpr float HIGHLIGHT_MIN_W = 7, HIGHLIGHT_MIN_H = 5;
 constexpr int BAR_MINIMAP = 73;            // the frame's place in PlayerBase.bar
 constexpr int WORLD_BOUNDS_BOTTOM = 0x40;  // World: the camera's limits (left, right, top, bottom from +0x34)
@@ -81,7 +80,7 @@ uint8_t*& vid_slot(int nvid) { return reinterpret_cast<uint8_t**>(world() + 0x29
 int vid_count() { return at<int>(world(), 0x290); }
 
 int g_size = 1;   // the step of the minimap the frame in use was made for
-int g_fixed = 0;  // MinimapSize from the registry, 0 = by the screen
+int g_chosen = 1;  // the player's choice (MinimapSize), 1 = the original size
 
 int read_fixed_size() {
     HKEY key;
@@ -89,14 +88,17 @@ int read_fixed_size() {
     DWORD value = 0, size = sizeof value, type = 0;
     const LONG r = RegQueryValueExA(key, "MinimapSize", nullptr, &type, reinterpret_cast<BYTE*>(&value), &size);
     RegCloseKey(key);
-    return r == ERROR_SUCCESS && type == REG_DWORD && value >= 1 && value <= MAX_SIZE ? static_cast<int>(value) : 0;
+    return r == ERROR_SUCCESS && type == REG_DWORD && value >= 1 && value <= MAX_SIZE ? static_cast<int>(value) : 1;
 }
 
-int size_for(int screen_w, int screen_h) {
-    int size = g_fixed ? g_fixed : (screen_h + ORIGINAL_HEIGHT / 2) / ORIGINAL_HEIGHT;
-    if (size > MAX_SIZE) size = MAX_SIZE;
-    // the frame stays right of the bar's controls (the bar's base is centred)
-    while (size > 1 && screen_w - size * FRAME_W < (screen_w - BAR_WIDTH) / 2 + BAR_CONTROLS_END) --size;
+// The frame stays right of the bar's controls (the bar's base is centred).
+bool fits(int size, int screen_w) {
+    return size <= 1 || screen_w - size * FRAME_W >= (screen_w - BAR_WIDTH) / 2 + BAR_CONTROLS_END;
+}
+
+int size_for(int screen_w) {
+    int size = g_chosen > MAX_SIZE ? MAX_SIZE : g_chosen;
+    while (size > 1 && !fits(size, screen_w)) --size;
     return size < 1 ? 1 : size;
 }
 
@@ -241,7 +243,7 @@ bool g_installed = false;
 void* minimap_frame_for_screen() {
     if (!g_installed || !world() || !graphics()) return nullptr;
     const float* screen = reinterpret_cast<float*>(graphics() + 0x20c);   // width, height
-    const int k = size_for(static_cast<int>(screen[0]), static_cast<int>(screen[1]));
+    const int k = size_for(static_cast<int>(screen[0]));
     if (k < 2) return nullptr;
     const int nvid = VID_MINIMAP_BIG[k - 2];
     if (nvid >= vid_count() || !vid_slot(nvid) || !vid_slot(VID_MINIMAP)) {
@@ -260,6 +262,13 @@ void* minimap_frame_for_screen() {
                static_cast<int>(screen[1]));
     return original;
 }
+
+// options.cpp: the launcher's choice (1 = the original size) and whether a size fits a screen width.
+void minimap_set_size(int size) {
+    g_chosen = size >= 1 && size <= MAX_SIZE ? size : 1;
+    patch::log("minimap: size %d chosen in the launcher", g_chosen);
+}
+bool minimap_size_fits(int size, int screen_w) { return fits(size, screen_w); }
 
 void minimap_frame_back(void* original) {
     if (original) vid_slot(VID_MINIMAP) = static_cast<uint8_t*>(original);
@@ -287,7 +296,7 @@ void minimap_bounds(void* player) {
 }
 
 void install_minimap() {
-    g_fixed = read_fixed_size();
+    g_chosen = read_fixed_size();
     // mov eax,[ecx] / push esi / mov esi,[esp+8]
     const uint8_t place_start[] = {0x8B, 0x01, 0x56, 0x8B, 0x74, 0x24, 0x08};
     // fld [esp+4] / fmul [ecx+0xc]
@@ -315,5 +324,5 @@ void install_minimap() {
                     reinterpret_cast<void*>(&menu_nvid_under_cursor), "MenuNVidUnderCursor");
     patch::write_call(DRAW_BRIGHTEN, nullptr, 0, reinterpret_cast<void*>(&brighten_call), 5);
     g_installed = true;
-    if (g_fixed) patch::log("minimap: size %d (MinimapSize)", g_fixed);
+    if (g_chosen > 1) patch::log("minimap: size %d chosen (MinimapSize)", g_chosen);
 }

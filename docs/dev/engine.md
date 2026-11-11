@@ -554,9 +554,10 @@ map point (the mouse's map position is taken from the rectangle), and the cursor
 minimap's. The frame's opening is columns 8-97 and rows 9-73 of the picture; the engine's
 rectangle starts at row 10 (one too low) and the view's highlight follows the camera 48 px past the
 map's bottom (`boundsBottom` = map height + 50 - 2, so the map's last rows can come up over the
-bar) - fixed in LocoFix. LocoFix also makes the minimap bigger on a high screen: at 1152 px of the
-game's screen height and more twice the size, from 1920 px three times (the step closest to the
-original's tenth of the height, never so wide that it reaches the bar's slots), as VIDs 950 and 951
+bar) - fixed in LocoFix. LocoFix also lets the player make the minimap twice or three times as big
+(the launcher's Minimap row, `options.cpp`, registry `MinimapSize` 2 or 3; absent = the original
+size; a size is used only where it keeps the frame clear of the bar's slots, else the biggest that
+does), as VIDs 950 and 951
 - the frame enlarged pixel by pixel (`patch_data.make_minimap_frames`), the menu box with it - put
 into `World.vids[464]` while `Player_ShowStateBar` builds the bar, so the engine places it by its
 own size; `MenuNVidUnderCursor` answers 464 for them, and the points, dots and the smallest
@@ -564,8 +565,9 @@ highlight (7 x 5 px) grow by the same step. The frame stands above the bar in th
 corner - the original one hides the map's last 30 rows there, the bigger ones would hide 208 x 108 or
 312 x 186 px for good - so with a bigger frame the camera may go below the map as far as the frame is
 high (`boundsBottom` = map height + the frame's height, set after every `Player_ShowStateBar`); there
-the engine draws the map's ground colour (lava, water) or black. The registry value `MinimapSize`
-(DWORD 1-3) chooses the step by hand. The held editor shows no minimap: it releases the state bar
+the engine draws what it draws outside a map: the edge of the map's ground (flat lava on mission
+13, water on mission 8) or black (mission 17); at the original size the bounds are the engine's
+own. The held editor shows no minimap: it releases the state bar
 (`Player_ReleaseLevel`) and draws its own bar; Run the level has the game's.
 
 **Panels** (`Player.panel`, `Player_SetPanel`): 0 the unit bar, 1 the cars of the flagman train, 2 the

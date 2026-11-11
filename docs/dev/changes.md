@@ -481,17 +481,17 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
   42. the minimap (`minimap.cpp`, `BUGS.md` F26, "The minimap"): its rectangle fitted to the frame's
       opening (a row higher - a click lands one row of the minimap higher than in the original) and
       the view's highlight kept on the map - the engine's ran up to three rows onto the frame at the
-      bottom - and at least 7 x 5 px, so it can be found on a huge map; the dots stay inside. On a
-      high screen the minimap grows by whole steps, the one closest to the original's tenth of the
-      screen's height: twice the size from 1152 px of height (2560x1440: 208 x 156), three times
-      from 1920 px, never so wide that it reaches the bar's slots; the frames are VIDs 950 and 951
+      bottom - and at least 7 x 5 px, so it can be found on a huge map; the dots stay inside. The
+      minimap's size can be chosen in the launcher (the Minimap row, `options.cpp`): the normal size
+      (the default), twice (208 x 156) or three times as big, only the sizes that keep it clear of
+      the bar's slots at the chosen resolution; the frames are VIDs 950 and 951
       (`vid\464x2.vid`, `vid\464x3.vid`, the frame enlarged pixel by pixel by `build.py`; an edition
       whose frame it cannot enlarge gets the frame copied as it is, which LocoFix keeps at its size), the dots
       grow with them, and clicks, the right-click orders, the cursor and the mouse tip treat them
       as the minimap; with a bigger frame the camera may go below the map as far as the frame is
       high, so its corner hides no more of the map than the original's. A small map's logical
-      screen (mission 1) keeps the original size and is
-      stretched as before. The registry value `MinimapSize` (DWORD 1-3) chooses a step by hand,
+      screen (mission 1: 1024 px wide) takes twice at most and is stretched as before. The choice is
+      the registry value `MinimapSize` (DWORD 2 or 3; absent = the normal size, so Setup writes nothing),
   43. the version in the main menu (`menu_version.cpp`): "OpenLocoland v0.2.x" (`LOCOFIX_VERSION`,
       "OpenLocoland dev" for a build of `build.py`) in the menu's own font (VID 2,
       `fonts\font8x13.bmp`) at half its brightness, in the bottom right corner of the window - in
