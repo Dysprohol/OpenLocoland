@@ -20,6 +20,7 @@
 
 void* minimap_frame_for_screen();          // minimap.cpp: the minimap's frame for the screen's size
 void minimap_frame_back(void* original);
+void minimap_bounds(void* player);         // the camera may go below the map by a bigger frame's height
 
 namespace {
 
@@ -104,6 +105,7 @@ void __fastcall show(void* player, void* edx) {
     void* minimap = created ? minimap_frame_for_screen() : nullptr;
     g_show(player, edx);
     minimap_frame_back(minimap);
+    minimap_bounds(player);
     uint8_t* side = vid_by_number(SIDE_VID);
     if (!side) return;   // objects.res without VID 938
     if (created && at<int>(player, 0x18) > 0) add_sides(player, side);

@@ -487,7 +487,9 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       from 1920 px, never so wide that it reaches the bar's slots; the frames are VIDs 950 and 951
       (`vid\464x2.vid`, `vid\464x3.vid`, the frame enlarged pixel by pixel by `build.py`), the dots
       grow with them, and clicks, the right-click orders, the cursor and the mouse tip treat them
-      as the minimap. A small map's logical screen (mission 1) keeps the original size and is
+      as the minimap; with a bigger frame the camera may go below the map as far as the frame is
+      high, so its corner hides no more of the map than the original's. A small map's logical
+      screen (mission 1) keeps the original size and is
       stretched as before. The registry value `MinimapSize` (DWORD 1-3) chooses a step by hand,
   43. the version in the main menu (`menu_version.cpp`): "OpenLocoland v0.2.x" (`LOCOFIX_VERSION`,
       "OpenLocoland dev" for a build of `build.py`) in the menu's own font (VID 2,

@@ -560,8 +560,12 @@ original's tenth of the height, never so wide that it reaches the bar's slots), 
 - the frame enlarged pixel by pixel (`patch_data.make_minimap_frames`), the menu box with it - put
 into `World.vids[464]` while `Player_ShowStateBar` builds the bar, so the engine places it by its
 own size; `MenuNVidUnderCursor` answers 464 for them, and the points, dots and the smallest
-highlight (7 x 5 px) grow by the same step. The registry value `MinimapSize` (DWORD 1-3) chooses
-the step by hand. The held editor shows no minimap: it releases the state bar
+highlight (7 x 5 px) grow by the same step. The frame stands above the bar in the map's bottom right
+corner - the original one hides the map's last 30 rows there, the bigger ones would hide 208 x 108 or
+312 x 186 px for good - so with a bigger frame the camera may go below the map as far as the frame is
+high (`boundsBottom` = map height + the frame's height, set after every `Player_ShowStateBar`); there
+the engine draws the map's ground colour (lava, water) or black. The registry value `MinimapSize`
+(DWORD 1-3) chooses the step by hand. The held editor shows no minimap: it releases the state bar
 (`Player_ReleaseLevel`) and draws its own bar; Run the level has the game's.
 
 **Panels** (`Player.panel`, `Player_SetPanel`): 0 the unit bar, 1 the cars of the flagman train, 2 the

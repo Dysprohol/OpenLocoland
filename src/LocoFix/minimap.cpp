@@ -63,6 +63,8 @@ constexpr int FRAME_W = 104;
 constexpr int BAR_WIDTH = 1024, BAR_CONTROLS_END = 740;   // the slots end there in the base
 constexpr int ORIGINAL_HEIGHT = 768;
 constexpr float HIGHLIGHT_MIN_W = 7, HIGHLIGHT_MIN_H = 5;
+constexpr int BAR_MINIMAP = 73;            // the frame's place in PlayerBase.bar
+constexpr int WORLD_BOUNDS_BOTTOM = 0x40;  // World: the camera's limits (left, right, top, bottom from +0x34)
 
 struct Minimap {   // re/types.txt
     uint32_t flags;
@@ -255,6 +257,27 @@ void* minimap_frame_for_screen() {
 
 void minimap_frame_back(void* original) {
     if (original) vid_slot(VID_MINIMAP) = static_cast<uint8_t*>(original);
+}
+
+// status_bar.cpp, after every Player_ShowStateBar: the camera's room below the map for a bigger
+// frame. The engine lets the camera go past the map's bottom by the bar's height less 2
+// (boundsBottom = map height + 48), so the bar hides none of the map; the frame stands above the
+// bar in the corner - the original's 104 x 78 one hides the map's last 30 rows there, a part the
+// original never shows. A bigger frame would hide 208 x 108 px (twice) or 312 x 186 px (three
+// times) of the map's bottom right corner for good: units, trains and buildings there could not be
+// seen or clicked. So with a bigger frame the camera goes down as far as the frame is high, the
+// map's bottom edge up to the frame's top, and nothing the original shows is hidden. Below the map
+// the engine draws black (Graphics_DrawScene clears the view where it leaves the map).
+void minimap_bounds(void* player) {
+    if (!g_installed || !world()) return;
+    const int count = at<int>(player, 0x18);   // PlayerBase.bar
+    if (count <= BAR_MINIMAP) return;
+    uint8_t* frame = at<uint8_t**>(player, 0x20)[BAR_MINIMAP];
+    if (!frame || size_of_frame(frame) < 2) return;
+    const float height = static_cast<float>(at<short>(at<uint8_t*>(frame, 0x1c), 0x2a8));
+    float& bottom = at<float>(world(), WORLD_BOUNDS_BOTTOM);
+    const float wanted = at<float>(world(), 0x2c) + height;
+    if (bottom < wanted) bottom = wanted;
 }
 
 void install_minimap() {
