@@ -11950,10 +11950,13 @@ void edit_restore_selection() {
         if (best) select(best);
     }
     g_remembered.clear();
-    // the tool as it was (edit_reset put Select back for the load): a tool, not a panel's entry
+    // the tool as it was (edit_reset put Select back for the load): a tool, not a panel's entry, chosen as a
+    // click chooses it - its setup with it (the Place and Decals tools drop the selection found above) -, the
+    // palette's two entries without opening the palette (what they place is kept)
     if (g_remembered_entry > 0 && g_remembered_entry < ENTRY_COUNT && ENTRIES[g_remembered_entry].icon >= 0 &&
         ENTRIES[g_remembered_entry].tool != Tool::Arrivals && ENTRIES[g_remembered_entry].tool != Tool::Settings) {
-        g_entry = g_remembered_entry;
+        if (is_palette(ENTRIES[g_remembered_entry])) take_palette_entry(ENTRIES[g_remembered_entry].nvid == VEHICLES_NVID ? 1 : 0);
+        else choose_entry(g_remembered_entry);
         patch::log("edit: tool: %s (as before the run)", ENTRIES[g_entry].label);
     }
     g_remembered_entry = -1;
