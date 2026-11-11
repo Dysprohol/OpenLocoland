@@ -2755,7 +2755,11 @@ void continue_drag(POINT p) {
             }
             continue;
         }
-        reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, x, y, ground_z(vid_of(o), x, y) + g_drag.lift[i]);
+        // a gun in its host's socket or a piece of a whole rides on the host (issue #14: on a slope the ground
+        // under a mining plant's gun is not the plant's, and the gun stood above or inside its tower)
+        const bool rider = i > 0 && (is_gun(nvid_of(o)) || is_piece(nvid_of(o)));
+        const float z = rider ? at<float>(g_drag.objects[0], O_Z) + (s.z - g_drag.before[0].z) : ground_z(vid_of(o), x, y) + g_drag.lift[i];
+        reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, x, y, z);
     }
 }
 
@@ -4792,13 +4796,31 @@ void end_height_stroke() {
     }
     std::vector<uint8_t*> moved;
     std::vector<State> moved_before;
+    // The objects stand on the new ground, but a gun in its host's socket and a piece of a whole go by
+    // their host - up or down as far as it went, or not at all when the host stayed (issue #14: the
+    // ground raised under a mining plant's gun lifted the gun alone, a gap above its tower)
+    std::set<uint8_t*> riders;
+    for (uint8_t* o : g_stroke.objects)
+        if (is_gun(nvid_of(o)) || is_piece(nvid_of(o)))
+            if (host_of(o)) riders.insert(o);
     for (size_t i = 0; i < g_stroke.objects.size(); ++i) {
         uint8_t* o = g_stroke.objects[i];
+        if (riders.count(o)) continue;
+        const std::vector<uint8_t*> group = group_of(o);   // found before the host moves (pieces by their height)
         const float z = ground_z(vid_of(o), at<float>(o, O_X), at<float>(o, O_Y)) + g_stroke.lift[i];
-        if (std::fabs(z - at<float>(o, O_Z)) < 0.5f) continue;
+        const float dz = z - at<float>(o, O_Z);
+        if (std::fabs(dz) < 0.5f) continue;
         reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, at<float>(o, O_X), at<float>(o, O_Y), z);
         moved.push_back(o);
         moved_before.push_back(g_stroke.object_before[i]);
+        for (size_t k = 1; k < group.size(); ++k) {
+            uint8_t* r = group[k];
+            if (is_car(o) || std::find(moved.begin(), moved.end(), r) != moved.end()) continue;
+            const auto at_i = std::find(g_stroke.objects.begin(), g_stroke.objects.end(), r);
+            moved_before.push_back(at_i != g_stroke.objects.end() ? g_stroke.object_before[at_i - g_stroke.objects.begin()] : state_of(r));
+            reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(r, nullptr, at<float>(r, O_X), at<float>(r, O_Y), at<float>(r, O_Z) + dz);
+            moved.push_back(r);
+        }
     }
     commit({"OpHeight", "ground height"}, moved, moved_before);
     g_undo.back().grid = changes;

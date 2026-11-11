@@ -106,7 +106,14 @@ and the tester's "how do I change an object's height" had no answer either. Now:
   tool; for the track and buildings only when the picture is the map's own (an empty map, a meadow, a
   grown map, a painted one, or one the tool already redrew): a campaign terrain's `lNN.vid` is left
   as it came until the tool is used there, and then the map gets `<name>.vid` when saved, as a painted
-  one does (`ground_save_image`: never over `lNN.vid`). The Water tool keeps its own way (it lowers the
+  one does (`ground_save_image`: never over `lNN.vid`). The objects under a stroke stand on the new ground with their height
+  above it kept - but a gun in its host's socket and a piece of a whole go by their host (`end_height_stroke`;
+  issue #14, "a gap in the Mining plant's tower"): before, each took the ground under its own point, so on a
+  slope, or a stroke under the gun's spot alone, the mining plant's gun (46 px from its middle) rose 8 px over
+  its tower or sank into it; the same in a drag across a slope (`continue_drag`), where the gun now keeps its
+  height over the plant. Reproduced on a new map: a mining plant placed with Shift, a raise under its gun's
+  spot - the gun at z 172 over the plant's 70 + 94, a gap in the picture; now 164, and a raise under the plant's
+  middle takes both (78 and 172), a drag onto the hill too (87 and 181), undone and redone. The Water tool keeps its own way (it lowers the
   picture's heights where it paints, MAP_RULES.md 2). Chosen over an overlay alone because it shows
   in the game too: the hill is in the saved picture, the objects stand on what is seen, the depth hides
   what is behind it; the cost is a picture of the map's own (a few MB) once the ground is shaped.
