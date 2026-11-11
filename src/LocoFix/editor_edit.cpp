@@ -1694,6 +1694,10 @@ bool liftable(uint8_t* o);   // the height of an object, below
 float lift_of(uint8_t* o);
 
 bool is_marker(uint8_t* o);   // the context panel, below
+// The pirates' small engine (VID 5 in army 3) is the authors' reinforcement point: ReinforcementInit
+// takes it away when the map starts (BUGS.md F12). Said when it is placed or given that army, not only
+// when it is selected (issue #13: it vanished in a quick test with no word why).
+#define PIRATE_ENGINE_NOTE "the pirates' Engine (VID 5) is taken away when the map starts - it marks where the reinforcements arrive; in another army it stays"
 
 void select(uint8_t* o) {
     g_selection = o ? group_of(o) : std::vector<uint8_t*>();
@@ -2340,6 +2344,7 @@ void place_car(POINT mouse) {
     else
         MESSAGE("MsgCarPlaced", "placed VID %d at %.0f,%.0f direction %d army %d - a train of %u", nvid, at<float>(o, O_X),
                 at<float>(o, O_Y), at<int>(o, O_DIRECTION), army_of(o), static_cast<unsigned>(length));
+    if (is_marker(o)) MESSAGE("MsgPirateEngine", PIRATE_ENGINE_NOTE);
 }
 
 // U: the coupling in front of the car comes apart - the car and the cars behind it become a train of
@@ -3098,6 +3103,7 @@ void set_army(int army) {
     }
     commit({"OpArmy", "army"}, g_selection, before);
     MESSAGE("MsgArmy", "VID %d: army %d (%s)", nvid_of(host), army, army_name(army));
+    if (is_marker(host)) MESSAGE("MsgPirateEngine", PIRATE_ENGINE_NOTE);
 }
 
 void next_army() {
@@ -10640,6 +10646,8 @@ void draw_overlay() {
                     g_place_status = ui_printf(ui_format("StatusCarCouples", "%s: coupled to the train of VID %d"), place_label(),
                                                nvid_of(p.couple_to));
                 }
+                if (place_nvid() == VID_LOCOMOTIVE && (p.couple_to ? army_of(p.couple_to) : place_army()) == 3)
+                    g_place_status = ui_text("MsgPirateEngine", PIRATE_ENGINE_NOTE);
             } else {
                 g_place_status = std::string(place_label()) + ": " + p.why.get();
             }

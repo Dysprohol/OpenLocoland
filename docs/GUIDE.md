@@ -521,7 +521,9 @@ that runs arrivals (older maps: CONVERT in the Arrivals panel).
   track), `R` turns the train round, `E` turns one car round in its place (a locomotive backwards in the
   middle, a gun car at the end), a drag lays the train on the track under the cursor - when it does not
   fit there (a dead end too short, another train) it stays and the status line says why. A train needs a
-  **locomotive** to move.
+  **locomotive** to move. The pirates' small **Engine** (VID 5) is the game's mark for where reinforcements
+  arrive: the game takes it away when the map starts, and the status line says so when you place it or
+  give it the pirates' army - in another army it stays.
 
   ![The Vehicles row above the bar](img/vehicles-strip-en.jpg)
 

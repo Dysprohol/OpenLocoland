@@ -98,8 +98,9 @@ Script engine functions (DEVELOPERS.md "Script machine"):
   map.
 - `ReinforcementInit()` takes the first plain engine (VID 5) of army 3 as the place where
   reinforcements arrive and removes it (F12) - on any map, so a pirate VID 5 placed in the editor
-  is gone when the map starts (GitHub issue #13); LocoFix's editor names it as that marker when it
-  is selected.
+  is gone when the map starts (GitHub issue #13); LocoFix's editor says so when it is placed or
+  given army 3 (the preview's status line and the message, `MsgPirateEngine`) and names it as that
+  marker when it is selected. The engine's rule stays: missions and old maps use the marker.
 
 Engine:
 
