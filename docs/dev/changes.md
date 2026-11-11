@@ -158,6 +158,8 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
      for shadows x +-512, y +-512), so at 1920x1080 shadows ended 512 pixels left and right
      of the centre, and on screens wider than 2048 or taller than 1024 pixels whole objects
      were missing at the edges; the box now grows with the screen (the same up to 1024x768),
+     and the shadows get the objects' margin at the sides (`BUGS.md` F28): a shadow no longer
+     vanishes when the middle of its object passes the left edge of the screen (GitHub issue #13),
   10. camera panning with the middle mouse button (`mouse_pan.cpp`): hold it and drag the
      map, next to the arrows and the screen edge (the engine declares `SCROLL_WITH_MOUSE`
      but never implemented it). `World_UpdateScroll` puts the camera at the start

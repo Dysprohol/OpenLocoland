@@ -13,9 +13,17 @@
 //
 // We replace both tests with one that takes the halves from the current screen size:
 // max(original half, screen half + margin), where the margin is what the original box
-// left at 1024x768 (horizontally 512 for objects and 0 for shadows, vertically 128).
-// Up to 1024x768 nothing changes. Drawing more is safe - the drawing code clips to the
-// view itself; the box only saves time.
+// left at 1024x768 (horizontally 512 for objects, vertically 128). Drawing more is safe -
+// the drawing code clips to the view itself; the box only saves time.
+//
+// The shadows' box left nothing at the sides (BUGS.md F28): at 1024x768 it was the screen's
+// width, so the shadow of an object whose middle had gone past the left edge vanished while
+// half of the object and the shadow beside it were still on the screen - a shadow falls to the
+// right of its object (SpriteVid_DrawShadow: each point x + 0.35 of its height, y - 0.7 of it),
+// and the shadow drawing's own clip keeps an object up to 200 px plus its picture's width left
+// of the view. On a bigger screen the same at both edges of the screen-sized box. The shadows
+// now get the objects' margin at the sides too, so a shadow goes with its object; up to
+// 1024x768 only that changes.
 #include "patch.h"
 #include "profile.h"
 
@@ -36,7 +44,7 @@ struct Box {
     bool truncate_y_z_apart;       // the shadow pass truncates y and z separately, World_DrawLayer y - z
 };
 constexpr Box OBJECTS = {1024, 512, 512, 128, false};
-constexpr Box SHADOWS = {512, 512, 0, 128, true};
+constexpr Box SHADOWS = {512, 512, 512, 128, true};
 
 int max_int(int a, int b) { return a > b ? a : b; }
 
