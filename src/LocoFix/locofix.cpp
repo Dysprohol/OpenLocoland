@@ -15,6 +15,7 @@ void install_editor_text();
 void install_window();
 void install_test_mode();
 void install_resolutions();
+void install_mode_list();
 void install_camera();
 void install_view_culling();
 void install_profile();
@@ -132,6 +133,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         install_editor_text();   // after install_language: its lookups go to the chosen pack
         install_window();
         install_resolutions();
+        install_mode_list();
         install_camera();
         install_view_culling();
         install_profile();

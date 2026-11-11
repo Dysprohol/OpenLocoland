@@ -520,6 +520,11 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       on a view higher than 768 px a drop made again starts at the top only with the chance
       (768 / height)², else anywhere in the view - the rain reaches the bottom of a big screen (it
       stopped at about 790 px, GitHub issue #13),
+  45. 16 display modes at most (`mode_list.cpp`, `BUGS.md` F29): `Graphics_FilterDisplayMode` wrote
+      every matching mode into a device's lists of 16 without a check, so a 17th overwrote the first
+      mode's height and format (the start window's first line read "640 x 2560 x 0bpp" on a 2560 x
+      1440 screen) and more would reach the device's flags; a mode that finds the list full is left
+      out and named in LocoFix.log, and `resolutions.cpp` offers 16 at most,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
