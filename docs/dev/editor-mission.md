@@ -619,7 +619,7 @@ its order's number: `PlanAdopt` takes the train `OrdersFind` found as the entry'
 is built again with the same cars and order - the enemy's through the AI's queue as any enemy entry, the
 others' car by car in the factory of its army nearest to the train at the save (`rebuild_factory`), driving
 to where the lost one stood when it patrolled. Read back, such an entry gives its order its REBUILT value
-(`read_orders`) and is left out of the factory's plan. The player's factory and trains are the player's:
+(`read_orders`) and is left out of the factory's plan. The train built again gets the IT FIRES of the one it replaces (since v0.2.12, GitHub issue #13): `PlanAdopt` keeps whether a car of the map's train fires on its own (`plan_fires`, behave bit 1, `PlanFires`), and `PlanMade` sets or clears the bit on every car of the new one (`PlanFire`) - a factory gives its army's usual one, so a pirate train set to ONLY WHEN TOLD came back firing on its own. Checked on a POLIGON copy (a pirate train 10,20 with its gun ONLY WHEN TOLD, REBUILT ONCE 5 s, the pirates' factory; its locomotive destroyed at 15 s): the old runner's new gun had behave 1, the new runner's 0. The player's factory and trains are the player's:
 none of it is offered for army 0. A pirate train needed a locomotive 10: a VID 5 of army 3 is the authors'
 reinforcement marker, which `ReinforcementInit` takes away at the start (seen: `ORDER 1 ... train 0`) - since
 v0.2.12 only on a map with reinforcement waves (`PLAYER_REINFORCEMENT` > 0; `game/maps/script/reinforcement.lgc.patch`

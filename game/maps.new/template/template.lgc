@@ -150,6 +150,7 @@ int plan_base[]={0};
 int plan_unit[]={0};
 int plan_loco[]={0};
 int plan_lost[]={0};
+int plan_fires[]={0};
 int price_vid[]={0};
 int price_of[]={0};
 // </editor>
@@ -497,6 +498,28 @@ PlanLoco(int u)
   }
   return u;
 }
+// PlanFires(u): 2 when a car of train u fires on its own (behave bit 1: its panel's IT FIRES), else 1;
+// PlanFire(u,f): the cars of a train of the map built again get the bit of the one they replace
+// (plan_fires of the entry, 0 while it is not known) - a factory gives its army's usual one.
+PlanFires(int u)
+{
+  int c;
+  for( c=Action(u,ACT_FIRST_ENGINE); c; c=Action(c,ACT_NEXT_ENGINE) )
+    if( Action(c,ACT_GET_BEHAVE)&1 )
+      return 2;
+  return 1;
+}
+PlanFire(int u,int f)
+{
+  int c;
+  for( c=Action(u,ACT_FIRST_ENGINE); c; c=Action(c,ACT_NEXT_ENGINE) )
+  {
+    if( f==2 )
+      Action(c,ACT_SET_BEHAVE,Action(c,ACT_GET_BEHAVE)|1);
+    else
+      Action(c,ACT_SET_BEHAVE,Action(c,ACT_GET_BEHAVE)&(~1));
+  }
+}
 // PlanReorder(i,u): a train of the map built again (plan_order) gets its order again from the order's
 // runner, wherever it is; the enemy's train of an order that is not the AI's leaves the AI.
 PlanReorder(int i,int u)
@@ -520,6 +543,8 @@ PlanReorder(int i,int u)
 }
 PlanMade(int i,int u,int t)
 {
+  if( u && plan_fires[i] )
+    PlanFire(u,plan_fires[i]);
   if( u && plan_order[i] )
     PlanReorder(i,u);
   if( !plan_renew[i] )
@@ -561,8 +586,9 @@ PlanAdopt(int i,int t)
   {
     plan_loco[i]=PlanLoco(order_unit[o]);
     plan_lost[i]=-1;
+    plan_fires[i]=PlanFires(order_unit[o]);
   }
-  Log("ARRIVAL F"+itoa(i+1)+" the map's train of order "+itoa(o+1)+" is wave 1, watched: "+itoa(plan_loco[i]!=0));
+  Log("ARRIVAL F"+itoa(i+1)+" the map's train of order "+itoa(o+1)+" is wave 1, watched: "+itoa(plan_loco[i]!=0)+", fires on its own: "+itoa(plan_fires[i]==2));
   return 0;
 }
 PlanTaken(int t)

@@ -842,6 +842,28 @@ const char* const ARRIVALS_RUNNER[] = {
     "  }",
     "  return u;",
     "}",
+    "// PlanFires(u): 2 when a car of train u fires on its own (behave bit 1: its panel's IT FIRES), else 1;",
+    "// PlanFire(u,f): the cars of a train of the map built again get the bit of the one they replace",
+    "// (plan_fires of the entry, 0 while it is not known) - a factory gives its army's usual one.",
+    "PlanFires(int u)",
+    "{",
+    "  int c;",
+    "  for( c=Action(u,ACT_FIRST_ENGINE); c; c=Action(c,ACT_NEXT_ENGINE) )",
+    "    if( Action(c,ACT_GET_BEHAVE)&1 )",
+    "      return 2;",
+    "  return 1;",
+    "}",
+    "PlanFire(int u,int f)",
+    "{",
+    "  int c;",
+    "  for( c=Action(u,ACT_FIRST_ENGINE); c; c=Action(c,ACT_NEXT_ENGINE) )",
+    "  {",
+    "    if( f==2 )",
+    "      Action(c,ACT_SET_BEHAVE,Action(c,ACT_GET_BEHAVE)|1);",
+    "    else",
+    "      Action(c,ACT_SET_BEHAVE,Action(c,ACT_GET_BEHAVE)&(~1));",
+    "  }",
+    "}",
     "// PlanReorder(i,u): a train of the map built again (plan_order) gets its order again from the order's",
     "// runner, wherever it is; the enemy's train of an order that is not the AI's leaves the AI.",
     "PlanReorder(int i,int u)",
@@ -865,6 +887,8 @@ const char* const ARRIVALS_RUNNER[] = {
     "}",
     "PlanMade(int i,int u,int t)",
     "{",
+    "  if( u && plan_fires[i] )",
+    "    PlanFire(u,plan_fires[i]);",
     "  if( u && plan_order[i] )",
     "    PlanReorder(i,u);",
     "  if( !plan_renew[i] )",
@@ -906,8 +930,9 @@ const char* const ARRIVALS_RUNNER[] = {
     "  {",
     "    plan_loco[i]=PlanLoco(order_unit[o]);",
     "    plan_lost[i]=-1;",
+    "    plan_fires[i]=PlanFires(order_unit[o]);",
     "  }",
-    "  Log(\"ARRIVAL F\"+itoa(i+1)+\" the map's train of order \"+itoa(o+1)+\" is wave 1, watched: \"+itoa(plan_loco[i]!=0));",
+    "  Log(\"ARRIVAL F\"+itoa(i+1)+\" the map's train of order \"+itoa(o+1)+\" is wave 1, watched: \"+itoa(plan_loco[i]!=0)+\", fires on its own: \"+itoa(plan_fires[i]==2));",
     "  return 0;",
     "}",
     "PlanTaken(int t)",
@@ -2907,7 +2932,7 @@ std::vector<std::string> settings_block(const Mission& m, const ArrivalsState& a
         plan("plan_to2_x", [&](size_t i) { return std::to_string(built(i) && q[i].task == TASK_PATROL ? q[i].tx2 : 0); });
         plan("plan_to2_y", [&](size_t i) { return std::to_string(built(i) && q[i].task == TASK_PATROL ? q[i].ty2 : 0); });
         for (const char* name : {"plan_state", "plan_done", "plan_last", "plan_since", "plan_slot", "plan_fifo", "plan_next", "plan_base",
-                                 "plan_unit", "plan_loco", "plan_lost"})
+                                 "plan_unit", "plan_loco", "plan_lost", "plan_fires"})
             plan(name, zero);
         price_vids.push_back("0");
         prices.push_back("0");
