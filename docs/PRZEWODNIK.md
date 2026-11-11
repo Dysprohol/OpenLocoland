@@ -550,7 +550,8 @@ panelu Przyjazdy nie wybierzesz **PRZESTAW NA PRZYJAZDY**):
   zaczynają walki.
 - **CEL: WSKAZ...** i kliknięcie jednostki albo budynku innej armii (fortyfikacja: jedno z jej dział) -
   pociąg atakuje go po starcie poziomu zamiast innego rozkazu; pociąg wroga przechodzi potem do swojego
-  AI, pozostałe stają. **START: OD RAZU** albo **PO n S** wstrzymuje rozkaz do tego czasu.
+  AI, pozostałe stają. **START: OD RAZU** albo **PO n S** wstrzymuje rozkaz do tego czasu; `-` `+` zmieniają go o 10 s,
+  z `Shift` o 1 s (tak samo wszystkie czasy panelu Przyjazdy i planu fabryki).
 - **ODBUDOWA: NIE / RAZ / 3 RAZY / ZAWSZE** i **ODBUDOWA ZA** (sekundy po stracie), dla pociągu wroga,
   neutralnych albo piratów z rozkazem: gdy jego lokomotywa zostanie zniszczona albo przejęta, AI wroga
   (w pierwszej wolnej fabryce) albo najbliższa fabryka jego armii buduje ten sam pociąg i daje mu ten

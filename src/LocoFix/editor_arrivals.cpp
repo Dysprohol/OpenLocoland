@@ -36,6 +36,7 @@
 
 // editor_edit.cpp
 void edit_draw_picture(int nvid, int frame, float x, float y, int step);
+int edit_time_step();   // - + of a time: 10 s, with Shift 1 s
 void edit_commit_arrivals(const UiText& what, const ArrivalsState& before);
 void edit_convert_arrivals();
 bool edit_reinforcement_marker(int& x, int& y, int& z);
@@ -94,8 +95,8 @@ struct RowTip {
 const RowTip ROW_TIPS[] = {
     {"ArrWho", "TipArrWho", "Who: whose train arrives - ours, the enemy's, the neutrals' or the pirates'"},
     {"ArrEntryLabel", "TipArrEntry", "Entry: the rail point the train is made on - past the edge of the map, where a line that pushes brings it in"},
-    {"ArrWhen", "TipArrWhen", "When: the first wave - at the start, after a time, when the player has no train or pays"},
-    {"ArrRepeat", "TipArrRepeat", "Repeat: how many waves come and how long after the one before"},
+    {"ArrWhen", "TipArrWhen", "When: the first wave - at the start, after a time, when the player has no train or pays (- +: 10 s, with Shift 1 s)"},
+    {"ArrRepeat", "TipArrRepeat", "Repeat: how many waves come and how long after the one before (- +: 10 s, with Shift 1 s)"},
     {"ArrThen", "TipArrThen", "Then: what the train does once it is made (the enemy's: its AI's task)"},
     {"ArrPoint", "TipArrPoint", "Point: the rail point of its task - PICK, then a click on the track"},
     {"ArrPoints", "TipArrPoints", "Points: the two ends of its patrol - PICK, then two clicks on the track"},
@@ -470,7 +471,7 @@ float draw_when(const Arrival& a, float y) {
         number(x, y, seconds(a.first), [](int by) {
             change({"OpArrivalWhen", "arrival time"}, [by](Arrival& r) {
                 set_when(r, When::After);
-                r.first = (std::max)(10, r.first + by * 10);
+                r.first = (std::max)(10, r.first + by * edit_time_step());
             });
         });
     y += ROW;
@@ -493,7 +494,7 @@ float draw_when(const Arrival& a, float y) {
     if (w != When::AtStart && w != When::After) {
         x = put(vx, y, ui_text("ArrNotBefore", "NOT BEFORE"));
         number(x, y, seconds(a.first), [](int by) {
-            change({"OpArrivalWhen", "arrival time"}, [by](Arrival& r) { r.first = (std::max)(0, r.first + by * 10); });
+            change({"OpArrivalWhen", "arrival time"}, [by](Arrival& r) { r.first = (std::max)(0, r.first + by * edit_time_step()); });
         });
         y += ROW;
     }
@@ -529,7 +530,7 @@ float draw_repeat(const Arrival& a, float y) {
     if (a.times != 1) {
         x = put(g_px + LEFT + LABEL, y, ui_text("ArrEveryWord", "EVERY"));
         number(x, y, seconds(a.every), [](int by) {
-            change({"OpArrivalTime", "arrival time"}, [by](Arrival& r) { r.every = (std::max)(10, r.every + by * 10); });
+            change({"OpArrivalTime", "arrival time"}, [by](Arrival& r) { r.every = (std::max)(10, r.every + by * edit_time_step()); });
         });
         y += ROW;
     }

@@ -99,6 +99,7 @@ const char* arrivals_tip(POINT mouse);   // editor_arrivals.cpp: the row under t
 const char* factory_tip(POINT mouse);    // editor_factory.cpp
 bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse);
 bool panel_open();
+int edit_time_step();   // the panels' - + of a time: 10 s, Shift 1 s (below)
 void panel_reset();
 void panel_open_arrivals();         // editor_panel.cpp: the Arrivals panel (editor_arrivals.cpp)
 void arrivals_reset();
@@ -9824,13 +9825,14 @@ void target_rows(uint8_t* o, std::vector<ContextRow>& rows) {
     static std::string wait_text;
     const int w = order.wait;
     wait_text = ui_printf(ui_format("CtxStartAfter", "AFTER %d S"), w ? w : 10);
+    // - + by 10 s, with Shift by 1 s (issue #13: to the second, so trains with orders can be kept apart)
     rows.push_back({{"CtxStart", "STARTS:"},
                     {{{"CtxStartNow", "AT ONCE"}, w == 0, [set_wait] { set_wait(0); }},
-                     {{nullptr, "-"}, false, [set_wait, w] { set_wait(w > 10 ? w - 10 : 0); }},
+                     {{nullptr, "-"}, false, [set_wait, w] { set_wait(w > edit_time_step() ? w - edit_time_step() : 0); }},
                      {{nullptr, wait_text.c_str()}, w > 0, [set_wait, w] { set_wait(w ? w : 10); }},
-                     {{nullptr, "+"}, false, [set_wait, w] { set_wait(w + 10); }}},
-                    {"TipStart", "Starts: the order begins at once or so many seconds after the level starts (steps of 10 s); until then the "
-                                 "train stands"}});
+                     {{nullptr, "+"}, false, [set_wait, w] { set_wait(w + edit_time_step()); }}},
+                    {"TipStart", "Starts: the order begins at once or so many seconds after the level starts (- +: 10 s, with Shift 1 s); "
+                                 "until then the train stands"}});
 }
 
 // A train of the enemy, the neutrals or the pirates with an order, in a map that runs arrivals: REBUILT
@@ -9868,10 +9870,10 @@ void rebuild_row(uint8_t* o, std::vector<ContextRow>& rows) {
         static std::string wait_text;
         wait_text = ui_printf(ui_format("CtxRebuildWait", "%d S AFTER THE LOSS"), w);
         rows.push_back({{"CtxRebuildAfter", "REBUILT IN:"},
-                        {{{nullptr, "-"}, false, [set, r, w] { set(r, w - 10); }},
+                        {{{nullptr, "-"}, false, [set, r, w] { set(r, w - edit_time_step()); }},
                          {{nullptr, wait_text.c_str()}, true, [] {}},
-                         {{nullptr, "+"}, false, [set, r, w] { set(r, w + 10); }}},
-                        {"TipRebuildWait", "Rebuilt in: how long after the loss the factory starts the new train (steps of 10 s)"}});
+                         {{nullptr, "+"}, false, [set, r, w] { set(r, w + edit_time_step()); }}},
+                        {"TipRebuildWait", "Rebuilt in: how long after the loss the factory starts the new train (- +: 10 s, with Shift 1 s)"}});
     }
 }
 
@@ -10898,6 +10900,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
     // painted after it with no button held until the next click
     if (panel_open() && stroke_under_way()) end_strokes("a panel opened");
     if (m == WM_LBUTTONDOWN && music_click(logical(l))) return true;   // the music player, also over an open panel
+    if ((m == WM_KEYDOWN || m == WM_KEYUP) && w == VK_SHIFT) g_shift = m == WM_KEYDOWN;   // also while a panel takes the keys (Shift+- +)
     if (panel_message(window, m, w, g_mouse)) {   // the Help and Menu buttons, an open panel
         if (panel_open() && stroke_under_way()) end_strokes("a panel opened");
         return true;
@@ -11967,6 +11970,8 @@ void edit_commit_mission(const ArrivalsState& arrivals_before, const FactoryStat
 }
 
 int edit_object_army(void* o) { return army_of(static_cast<uint8_t*>(o)); }
+// The step of a time's - and + in the panels: 10 s, with Shift held 1 s (issue #13).
+int edit_time_step() { return shift_down() ? 1 : 10; }
 bool edit_object_gone(void* o) { return !o || removed(static_cast<uint8_t*>(o)); }
 void edit_object_place(void* o, int& x, int& y) {
     x = static_cast<int>(std::lround(at<float>(o, O_X)));

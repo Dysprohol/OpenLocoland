@@ -339,7 +339,9 @@ unit or building of another army, a fort's or a mining plant's first gun for the
 points) - which replaces its other order (`TASK_TARGET`, `order_task` -4, the object found at the start by
 its VID `order_tvid` and place, 30 px): `OrderTry` gives ACT_ATTACK and `OrderTarget` watches it (state
 3) until the object is gone, then the enemy's train goes to its AI to attack (`ATA_FIGHT`), the others'
-stays; and STARTS: AT ONCE / AFTER n S (`order_wait`, steps of 10 s) for any order: the train stands until
+stays; and STARTS: AT ONCE / AFTER n S (`order_wait`; - + by 10 s, with Shift by 1 s - issue #13: to the second, so that
+trains with orders can be kept apart; the runner counts whole seconds once a second, `t` of `OrdersTact`, so a
+second is exact - checked on a POLIGON copy: the order set to 13 s began "at 13 s") for any order: the train stands until
 then. A train with a target is not rebuilt (the AI's queue has no such task). Checked in play on a POLIGON
 copy: a neutral train 5,20 stood until 20 s, drove to the enemy fort and destroyed the gun it was told to
 (hp 40, 30, 15, 5, gone at 55 s, `ORDER n target gone`), then stood; the enemy's patrolling train told to
@@ -462,7 +464,9 @@ rail point nearest to the cursor, shown in cyan; "line ok" when a push_flag 1 li
 the script runs from it); WHEN - one choice of AT THE START, AFTER n s, WHEN THE PLAYER HAS NO TRAIN,
 WHEN THE PLAYER PAYS n (the first time, or the condition `IF_NO_TRAIN` / `IF_MONEY` "only then" with
 the first time as NOT BEFORE); an older map's other condition is shown as it is; REPEAT - ONCE, n TIMES,
-WITHOUT END, EVERY m s (steps of 10 s); THEN and the POINT(S) (PICK; a patrol's two ends one after
+WITHOUT END, EVERY m s (- + by 10 s, with Shift by 1 s, as every time of the panels: AFTER, NOT BEFORE, a
+factory plan's AT and EVERY, REBUILT IN - `edit_time_step`; Shift reaches the editor's key state also while a
+panel takes the keys); THEN and the POINT(S) (PICK; a patrol's two ends one after
 the other); MESSAGE (ours and the enemy's) on the title's line at its right. The strip above the title names a real problem with the button that
 mends it: no entry (PICK THE ENTRY), no track at it, no entry line - the line and its lights are one
 thing (the posts own a line that ends at them, `edit_post_line` of the signals' side): with a pair of

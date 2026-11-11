@@ -552,7 +552,8 @@ only, until **CONVERT TO ARRIVALS** in the Arrivals panel):
   means by the map's rules: the neutrals start no fight.
 - **TARGET: PICK...** and a click on a unit or building of another army (a fort: one of its guns) -
   the train attacks it when the level starts, in place of its other order; the enemy's train then goes
-  to its AI, the others' stay. **STARTS: AT ONCE** or **AFTER n S** holds the order until then.
+  to its AI, the others' stay. **STARTS: AT ONCE** or **AFTER n S** holds the order until then; `-` `+` change it by 10 s, with
+  `Shift` by 1 s (so do all the times of the Arrivals panel and a factory's plan).
 - **REBUILT: NO / ONCE / 3 TIMES / ALWAYS** and **REBUILT IN** (seconds after the loss), for an enemy,
   neutral or pirate train with an order: when its locomotive is destroyed or taken, the enemy's AI (in
   its first free factory) or the nearest factory of its army builds the same train again and gives it

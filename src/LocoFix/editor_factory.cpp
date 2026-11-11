@@ -38,6 +38,7 @@
 
 // editor_edit.cpp
 void edit_draw_picture(int nvid, int frame, float x, float y, int step);
+int edit_time_step();   // - + of a time: 10 s, with Shift 1 s
 void edit_fill(float l, float t, float r, float b, uint32_t argb);
 int edit_object_army(void* o);
 bool edit_object_gone(void* o);
@@ -100,8 +101,8 @@ struct RowTip {
 const RowTip ROW_TIPS[] = {
     {"ArrWho", "TipArrWho", "Who: whose train arrives - ours, the enemy's, the neutrals' or the pirates'"},
     {"ArrEntryLabel", "TipArrEntry", "Entry: the rail point the train is made on - past the edge of the map, where a line that pushes brings it in"},
-    {"ArrWhen", "TipArrWhen", "When: the first wave - at the start, after a time, when the player has no train or pays"},
-    {"ArrRepeat", "TipArrRepeat", "Repeat: how many waves come and how long after the one before"},
+    {"ArrWhen", "TipArrWhen", "When: the first wave - at the start, after a time, when the player has no train or pays (- +: 10 s, with Shift 1 s)"},
+    {"ArrRepeat", "TipArrRepeat", "Repeat: how many waves come and how long after the one before (- +: 10 s, with Shift 1 s)"},
     {"ArrThen", "TipArrThen", "Then: what the train does once it is made (the enemy's: its AI's task)"},
     {"ArrPoint", "TipArrPoint", "Point: the rail point of its task - PICK, then a click on the track"},
     {"ArrPoints", "TipArrPoints", "Points: the two ends of its patrol - PICK, then two clicks on the track"},
@@ -558,7 +559,7 @@ float draw_when(const FactoryTrain& t, float y) {
         };
     };
     auto time = [](int by) {
-        change({"OpPlanWhen", "factory plan time"}, [by](FactoryTrain& r) { r.time = (std::max)(0, r.time + by * 10); });
+        change({"OpPlanWhen", "factory plan time"}, [by](FactoryTrain& r) { r.time = (std::max)(0, r.time + by * edit_time_step()); });
     };
     float x = label(y, "ArrWhen", "WHEN:");
     x = put(x, y, ui_text("PlanWhenAt", "AT"), t.when == WHEN_AT, pick(WHEN_AT));
@@ -622,7 +623,7 @@ float draw_repeat(const FactoryTrain& t, float y) {
     if (t.times != 1) {
         x = put(g_px + LEFT + LABEL, y, ui_text("ArrEveryWord", "EVERY"));
         x = number(x, y, seconds(t.every), [](int by) {
-            change({"OpPlanRepeat", "factory plan repeat"}, [by](FactoryTrain& r) { r.every = (std::max)(10, r.every + by * 10); });
+            change({"OpPlanRepeat", "factory plan repeat"}, [by](FactoryTrain& r) { r.every = (std::max)(10, r.every + by * edit_time_step()); });
         });
         put(x, y, fit(ui_text("PlanEveryNote", "AFTER THE LAST"), x));
         y += ROW;
