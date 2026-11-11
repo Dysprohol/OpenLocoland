@@ -248,6 +248,12 @@ void* minimap_frame_for_screen() {
         patch::log("minimap: no VID %d for size %d - the original frame", nvid, k);
         return nullptr;
     }
+    // build.py copies the original frame there when it cannot enlarge an edition's picture
+    const short w = at<short>(vid_slot(nvid), 0x2a6), h = at<short>(vid_slot(nvid), 0x2a8);
+    if (w != k * at<short>(vid_slot(VID_MINIMAP), 0x2a6) || h != k * at<short>(vid_slot(VID_MINIMAP), 0x2a8)) {
+        patch::log("minimap: VID %d is %dx%d, not %d times the frame - the original size", nvid, w, h, k);
+        return nullptr;
+    }
     uint8_t* original = vid_slot(VID_MINIMAP);
     vid_slot(VID_MINIMAP) = vid_slot(nvid);
     patch::log("minimap: size %d (VID %d) for a %dx%d screen", k, nvid, static_cast<int>(screen[0]),

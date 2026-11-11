@@ -239,7 +239,13 @@ MINIMAP_FRAME = (104, 78)
 
 def make_minimap_frames(frame_vid, *outputs):
     """Writes `outputs` (vid\\464x2.vid, vid\\464x3.vid): the frame of `frame_vid` enlarged 2, 3...
-    times. Returns False (and writes nothing) when the frame is not the 104 x 78 one."""
+    times. objects.res always gets VIDs 950 and 951 (game/objects.override), so every output is
+    written whenever `frame_vid` is there: a frame this cannot enlarge (another size or layout, a
+    raw or shadowed frame, any error of unpacking or packing) is copied as it is - LocoFix uses a
+    bigger VID only when its picture really is 2 or 3 times the original's, else the original size.
+    Returns "enlarged", "copied", or False when `frame_vid` is missing (nothing written)."""
+    import csv
+    import glob
     import json
     import shutil
     import tempfile
@@ -250,25 +256,41 @@ def make_minimap_frames(frame_vid, *outputs):
         return False
     work = tempfile.mkdtemp(prefix="minimap_")
     try:
-        frame = os.path.join(work, "frame")
-        map_tool.unpack(frame_vid, frame)
-        meta = json.load(open(os.path.join(frame, "vid.json"), encoding="utf-8"))
-        if meta.get("kind") != "sprite" or (meta["width"], meta["height"], meta["frameCount"]) != (*MINIMAP_FRAME, 1):
-            return False
-        src = Image.open(os.path.join(frame, "frames.png")).convert("RGBA")
-        frames_tsv = open(os.path.join(frame, "frames.tsv"), encoding="utf-8").read()
-        for k, output in enumerate(outputs, 2):
-            big = os.path.join(work, "x%d" % k)
-            os.makedirs(big)
-            w, h = MINIMAP_FRAME[0] * k, MINIMAP_FRAME[1] * k
-            src.resize((w, h), Image.NEAREST).save(os.path.join(big, "frames.png"))
-            with open(os.path.join(big, "frames.tsv"), "w", encoding="utf-8", newline="\n") as f:
-                f.write(frames_tsv)
-            m = dict(meta, width=w, height=h, sheet={"columns": 1, "cellWidth": w, "cellHeight": h})
-            with open(os.path.join(big, "vid.json"), "w", encoding="utf-8") as f:
-                json.dump(m, f, indent=2)
-            map_tool.pack(big, output)
-        return True
+        try:
+            frame = os.path.join(work, "frame")
+            map_tool.unpack(frame_vid, frame)
+            meta = json.load(open(os.path.join(frame, "vid.json"), encoding="utf-8"))
+            with open(os.path.join(frame, "frames.tsv"), encoding="utf-8") as f:
+                rows = list(csv.DictReader(f, delimiter="\t"))
+            if (meta.get("kind") != "sprite" or (meta["width"], meta["height"], meta["frameCount"]) != (*MINIMAP_FRAME, 1)
+                    or any((r.get("raw") or "").strip() or (r.get("shadow") or "").strip() for r in rows)):
+                raise ValueError("not the frame this enlarges")
+            made = []
+            for k, output in enumerate(outputs, 2):
+                big = os.path.join(work, "x%d" % k)
+                shutil.copytree(frame, big)
+                w, h = MINIMAP_FRAME[0] * k, MINIMAP_FRAME[1] * k
+                # every picture of the frame (frames.png; depth.png with imageFlags 4; a palette image
+                # stays indexed) pixel by pixel
+                for png in glob.glob(os.path.join(big, "*.png")):
+                    image = Image.open(png)
+                    image.load()
+                    image.resize((image.width * k, image.height * k), Image.NEAREST).save(png)
+                m = dict(meta, width=w, height=h, sheet={"columns": 1, "cellWidth": w, "cellHeight": h})
+                with open(os.path.join(big, "vid.json"), "w", encoding="utf-8") as f:
+                    json.dump(m, f, indent=2)
+                temp = output + ".part"
+                map_tool.pack(big, temp)
+                made.append((temp, output))
+            for temp, output in made:
+                os.replace(temp, output)
+            return "enlarged"
+        except Exception:   # never stop the build: the original frame, which LocoFix leaves at its size
+            for output in outputs:
+                if os.path.exists(output + ".part"):
+                    os.remove(output + ".part")
+                shutil.copyfile(frame_vid, output)
+            return "copied"
     finally:
         shutil.rmtree(work, ignore_errors=True)
 

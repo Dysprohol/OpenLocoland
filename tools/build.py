@@ -828,10 +828,12 @@ def build(steam, target, locofix=None, captured=None, progress=None, version=Non
     if not generate(copied, lambda path: patch_data.make_status_bar_sides(os.path.join(a.steam, "vid", "450sbar.vid"),
                                                                           path), os.path.join(vid, "450side.vid")):
         print("vid\\450sbar.vid: unknown layout, no side tiles for the state bar")
-    if not generate(copied, lambda x2, x3: patch_data.make_minimap_frames(os.path.join(a.steam, "vid", "464map.vid"),
-                                                                           x2, x3),
-                    os.path.join(vid, "464x2.vid"), os.path.join(vid, "464x3.vid")):
-        print("vid\\464map.vid: unknown layout, the minimap keeps its size on high screens")
+    frames = generate(copied, lambda x2, x3: patch_data.make_minimap_frames(os.path.join(a.steam, "vid", "464map.vid"),
+                                                                             x2, x3),
+                      os.path.join(vid, "464x2.vid"), os.path.join(vid, "464x3.vid"))
+    if frames != "enlarged":   # copied: VIDs 950/951 have the original frame, which LocoFix keeps at its size
+        print("vid\\464map.vid: " + ("unknown layout, copied as it is" if frames else "missing") +
+              " - the minimap keeps its size on high screens")
     if not generate(copied, lambda path: patch_data.make_editor_icons(os.path.join(a.steam, "vid"), path),
                     os.path.join(vid, "939edit.vid")):
         print("vid: unknown images, no icons for the editor bar")
