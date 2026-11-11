@@ -521,6 +521,32 @@ the bar slot (a train car uses `Unit.slotNumber`, below 1 the last frame = no nu
 the minimap (`Minimap_Draw`; a click on it moves the camera) and prints money (object 77) and the
 game speed (76).
 
+**The minimap** (`src/LocoFix/minimap.cpp`, `BUGS.md` F26) is object 73 of the bar: VID 464
+(`vid\464map.vid`, a 104 x 78 brass frame with a dark green inside; its menu box, `sizeX`/`sizeY`,
+100 x 74), placed by `Player_ShowStateBar` in the bottom right corner of the view by the picture's
+size (`viewRight - width / 2`, `viewBottom - height / 2`). There is no picture of the map: every
+frame `Player_UpdateStateBar` takes the rectangle inside the frame (`Minimap_PlaceOver`) and
+`Minimap_Draw` writes into the locked back buffer every rail point as one pixel (`Minimap_PutPoint`,
+grey), in editor mode the terrain objects too, the units as 2 x 2 dots (`Minimap_PutDot`) and the
+buildings and factories as 4 x 4 (`Minimap_PutBigDot`), each scaled by `mapWidth` / `mapHeight`
+into the rectangle, and brightens the view (`Graphics_BrightenRect`, a Direct3D quad that
+multiplies the screen by 1.8: the rails in it turn white). The menu item under the cursor being VID
+464 (`MenuNVidUnderCursor`) makes a left click move the camera there (`Minimap_Click`,
+`SetPosition` mode 2; holding the button and dragging does not scroll, in the original either), a right click an order to that
+map point (the mouse's map position is taken from the rectangle), and the cursor and mouse tip the
+minimap's. The frame's opening is columns 8-97 and rows 9-73 of the picture; the engine's
+rectangle starts at row 10 (one too low) and the view's highlight follows the camera 48 px past the
+map's bottom (`boundsBottom` = map height + 50 - 2, so the map's last rows can come up over the
+bar) - fixed in LocoFix. LocoFix also makes the minimap bigger on a high screen: at 1152 px of the
+game's screen height and more twice the size, from 1920 px three times (the step closest to the
+original's tenth of the height, never so wide that it reaches the bar's slots), as VIDs 950 and 951
+- the frame enlarged pixel by pixel (`patch_data.make_minimap_frames`), the menu box with it - put
+into `World.vids[464]` while `Player_ShowStateBar` builds the bar, so the engine places it by its
+own size; `MenuNVidUnderCursor` answers 464 for them, and the points, dots and the smallest
+highlight (7 x 5 px) grow by the same step. The registry value `MinimapSize` (DWORD 1-3) chooses
+the step by hand. The held editor shows no minimap: it releases the state bar
+(`Player_ReleaseLevel`) and draws its own bar; Run the level has the game's.
+
 **Panels** (`Player.panel`, `Player_SetPanel`): 0 the unit bar, 1 the cars of the flagman train, 2 the
 build list of the flagman factory, 5 the queue of that factory, 6 hidden. The ten bar slots
 (`Player.barUnits`) are filled by `Player_SetBarSlot` - `Shift`+1..9 puts the flagman there (a train

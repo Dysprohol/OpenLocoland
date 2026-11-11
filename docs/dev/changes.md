@@ -478,6 +478,17 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       deleting the region - freed it a second time and the game crashed a little later (the editor:
       FOG: MIST, FOG: NONE or an undo, FOG: MIST); the pointer is cleared after the original ran with
       no fog to make,
+  42. the minimap (`minimap.cpp`, `BUGS.md` F26, "The minimap"): its rectangle fitted to the frame's
+      opening (a row higher - a click lands one row of the minimap higher than in the original) and
+      the view's highlight kept on the map - the engine's ran up to three rows onto the frame at the
+      bottom - and at least 7 x 5 px, so it can be found on a huge map; the dots stay inside. On a
+      high screen the minimap grows by whole steps, the one closest to the original's tenth of the
+      screen's height: twice the size from 1152 px of height (2560x1440: 208 x 156), three times
+      from 1920 px, never so wide that it reaches the bar's slots; the frames are VIDs 950 and 951
+      (`vid\464x2.vid`, `vid\464x3.vid`, the frame enlarged pixel by pixel by `build.py`), the dots
+      grow with them, and clicks, the right-click orders, the cursor and the mouse tip treat them
+      as the minimap. A small map's logical screen (mission 1) keeps the original size and is
+      stretched as before. The registry value `MinimapSize` (DWORD 1-3) chooses a step by hand,
   43. the version in the main menu (`menu_version.cpp`): "OpenLocoland v0.2.x" (`LOCOFIX_VERSION`,
       "OpenLocoland dev" for a build of `build.py`) in the menu's own font (VID 2,
       `fonts\font8x13.bmp`) at half its brightness, in the bottom right corner of the window - in

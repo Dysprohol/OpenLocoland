@@ -106,6 +106,10 @@ Misje grają się tak jak zawsze. Co się zmieniło:
 
 - **Pasek stanu na całą szerokość.** Na szerokim ekranie pasek na dole biegnie od krawędzi do
   krawędzi zamiast kończyć się na środku.
+- **Większa minimapa na dużym ekranie.** Na ekranie o wysokości od 1152 pikseli minimapa w prawym
+  dolnym rogu jest dwa razy większa (od 1920 pikseli trzy razy), a kliknięcie w nią dalej przenosi
+  tam, gdzie się kliknęło. Jasna ramka, która pokazuje, na co patrzysz, nie wychodzi poza minimapę
+  i nawet na ogromnej mapie nie robi się tak mała, że nie da się jej znaleźć.
 - **Drugi rząd w panelu fabryki.** Fabryka może budować do 14 rodzajów wagonów (klawisze F1 - F12,
   `[` i `]`), ale jej panel pokazywał dziesięć. Jedenasty i dalsze są teraz w drugim rzędzie nad
   pierwszym i można je klikać.

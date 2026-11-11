@@ -105,6 +105,10 @@ The missions play as they always did. What changed:
 
 - **The state bar across the whole screen.** On a wide screen the bar at the bottom runs from edge
   to edge instead of stopping in the middle.
+- **A bigger minimap on a big screen.** On a screen 1152 pixels high or more the minimap in the
+  bottom right corner is twice as big (three times from 1920 pixels), and a click on it still takes
+  you to the place you clicked. The bright frame that shows what you are looking at stays inside the
+  minimap and never gets too small to find, even on a huge map.
 - **A second row in the factory panel.** A factory can build up to 14 kinds of cars (keys F1 - F12,
   `[` and `]`), but its panel showed ten. The 11th and further now show in a second row above the
   first, and a click on them works.

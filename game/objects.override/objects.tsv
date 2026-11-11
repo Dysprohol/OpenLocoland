@@ -30,3 +30,8 @@ nvid	name	spriteType	spriteClass	flags	moveMask	sizeX	sizeY	sizeZ	maxHp	speed	sp
 # nothing: vid\481logo.vid, a sprite with only the logo's pixels drawn, made by build.py from
 # tools/icon/openlocoland_logo.png (patch_data.make_logo_board)
 481																			vid\481logo.vid
+# VID 950 and 951: the minimap's frame (VID 464) enlarged two and three times for high screens (LocoFix
+# minimap.cpp), its menu box with it - vid\464x2.vid and vid\464x3.vid, made by build.py from vid\464map.vid
+# (patch_data.make_minimap_frames)
+950	Statebar level map x2	0x400	FRAME	0x2800	0xf	200	148	0	0	0	0	999999	999999	2500	1	1	1	1	vid\464x2.vid
+951	Statebar level map x3	0x400	FRAME	0x2800	0xf	300	222	0	0	0	0	999999	999999	2500	1	1	1	1	vid\464x3.vid

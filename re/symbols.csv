@@ -167,7 +167,7 @@
 0x415e40;f;Graphics_DrawPrimitive;IDirect3DDevice7::DrawPrimitive(type, fvf, vertices, count) - the vertex size argument is not passed on; logs "DrawPrimitive in DrawPrimitive".
 0x419720;f;Graphics_LockDepthBuffer;Locks the software depth buffer (+0xbf8) with a DDSURFACEDESC2 when depthBits (+0x218) is not set: depthBits = lpSurface and depthPitch (+0x21c) = lPitch / 2 (pixels per row of the 16-bit buffer). A failed lock is logged as a "GRAPH" error and leaves depthBits = 0, so the next call tries again.
 # --- renderer: drawing helpers (screen coordinates)
-0x405cd0;f;Graphics_PutPoint;Writes a 2x2 pixel point of a colour into the locked back buffer (16- or 32-bit) when (x, y) is inside the view. Used by Graphics_DrawLine.
+0x405cd0;f;Graphics_PutPoint;Writes one pixel of a colour into the locked back buffer (16- or 32-bit) when (x, y) is inside the view. Used by Graphics_DrawLine and Minimap_PutPoint.
 0x405e70;f;Graphics_PutPoint2x2;Writes a 2x2 pixel point of a colour into the locked back buffer (16- or 32-bit) when (x, y) is inside the view (one pixel less at the right and bottom edge); the minimap dots (Minimap_PutDot) and the object debug drawing use it.
 0x4060e0;f;Graphics_LogError;Log_Error with the "GRAPH" module name (stdcall: code, text, value).
 0x411a00;f;Graphics_DrawVid;Draws frame `frame` of a VID at screen (x, y, z) through a temporary GameObject (camera added); layers 2-4 lock the back and depth buffers (software sprites), others unlock them; layers below 6 opaque with z writes, others alpha-blended with z test. "ncadr in DrawVid". Used for health/ammo bars and unit-bar numbers (Unit_Draw) and the loading frame.
@@ -1215,7 +1215,7 @@
 0x5d1624;d;g_searchDistance;Route search: length of the current route in pixels.
 0x5d1628;d;g_floodDepth;RailDot_Flood: depth of the current point.
 # --- minimap (Player interface)
-0x405500;f;Minimap_PlaceOver;Minimap method (frame object): the rectangle inside the frame's image (8, 10 px in, 14, 13 px smaller); clears the background flag.
+0x405500;f;Minimap_PlaceOver;Minimap method (frame object): the rectangle inside the frame's image (8, 10 px in, 14, 13 px smaller - a row below the picture's opening, which starts at row 9: BUGS.md F26); clears the background flag. LocoFix minimap.cpp replaces it.
 0x4055a0;f;Minimap_PutPoint;Minimap method (map x, y, colour): one pixel at the scaled position when it is inside the rectangle (Graphics_PutPoint).
 0x405630;f;Minimap_PutDot;Minimap method (map x, y, colour): a 2x2 point (0x405e70) at the scaled position.
 0x4056c0;f;Minimap_PutBigDot;Minimap method (map x, y, colour): four 2x2 points (4x4) at the scaled position - buildings and depots.

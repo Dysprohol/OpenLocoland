@@ -47,8 +47,9 @@ Order:
   5. LocoFix.dll - the C++ fixes from src/LocoFix (compiled when the sources changed, or the
      prebuilt one of --locofix),
   6. objects.res with the sound fix, vid\110.vid with the fort cannon frames and
-     vid\450side.vid, the side tiles of the state bar, and vid\939edit.vid, the icons of the
-     editor bar (patch_data.py),
+     vid\450side.vid, the side tiles of the state bar, vid\464x2.vid and vid\464x3.vid, the
+     minimap's frame for high screens, and vid\939edit.vid, the icons of the editor bar
+     (patch_data.py),
   7. Locoland.exe = Steam.exe after the patches from patch_exe.py (LocoFix loading, launcher).
 Then objects.res gets the values changed in game/objects.override/ (TSV tables, see
 res_tool.py), the maps with a folder in game/maps.override/ get their changed objects
@@ -827,6 +828,10 @@ def build(steam, target, locofix=None, captured=None, progress=None, version=Non
     if not generate(copied, lambda path: patch_data.make_status_bar_sides(os.path.join(a.steam, "vid", "450sbar.vid"),
                                                                           path), os.path.join(vid, "450side.vid")):
         print("vid\\450sbar.vid: unknown layout, no side tiles for the state bar")
+    if not generate(copied, lambda x2, x3: patch_data.make_minimap_frames(os.path.join(a.steam, "vid", "464map.vid"),
+                                                                           x2, x3),
+                    os.path.join(vid, "464x2.vid"), os.path.join(vid, "464x3.vid")):
+        print("vid\\464map.vid: unknown layout, the minimap keeps its size on high screens")
     if not generate(copied, lambda path: patch_data.make_editor_icons(os.path.join(a.steam, "vid"), path),
                     os.path.join(vid, "939edit.vid")):
         print("vid: unknown images, no icons for the editor bar")

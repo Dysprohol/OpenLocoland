@@ -231,6 +231,48 @@ def make_status_bar_sides(bar_vid, output):
         shutil.rmtree(work, ignore_errors=True)
 
 
+# The minimap's frame on a high screen (LocoFix minimap.cpp): vid\464map.vid, the 104 x 78 brass
+# frame, enlarged two and three times pixel by pixel - as the game itself stretches a small map's
+# picture (nearest pixel) - for VIDs 950 and 951 (game/objects.override).
+MINIMAP_FRAME = (104, 78)
+
+
+def make_minimap_frames(frame_vid, *outputs):
+    """Writes `outputs` (vid\\464x2.vid, vid\\464x3.vid): the frame of `frame_vid` enlarged 2, 3...
+    times. Returns False (and writes nothing) when the frame is not the 104 x 78 one."""
+    import json
+    import shutil
+    import tempfile
+    from PIL import Image
+    import map_tool
+
+    if not os.path.isfile(frame_vid):
+        return False
+    work = tempfile.mkdtemp(prefix="minimap_")
+    try:
+        frame = os.path.join(work, "frame")
+        map_tool.unpack(frame_vid, frame)
+        meta = json.load(open(os.path.join(frame, "vid.json"), encoding="utf-8"))
+        if meta.get("kind") != "sprite" or (meta["width"], meta["height"], meta["frameCount"]) != (*MINIMAP_FRAME, 1):
+            return False
+        src = Image.open(os.path.join(frame, "frames.png")).convert("RGBA")
+        frames_tsv = open(os.path.join(frame, "frames.tsv"), encoding="utf-8").read()
+        for k, output in enumerate(outputs, 2):
+            big = os.path.join(work, "x%d" % k)
+            os.makedirs(big)
+            w, h = MINIMAP_FRAME[0] * k, MINIMAP_FRAME[1] * k
+            src.resize((w, h), Image.NEAREST).save(os.path.join(big, "frames.png"))
+            with open(os.path.join(big, "frames.tsv"), "w", encoding="utf-8", newline="\n") as f:
+                f.write(frames_tsv)
+            m = dict(meta, width=w, height=h, sheet={"columns": 1, "cellWidth": w, "cellHeight": h})
+            with open(os.path.join(big, "vid.json"), "w", encoding="utf-8") as f:
+                json.dump(m, f, indent=2)
+            map_tool.pack(big, output)
+        return True
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
 # The editor's icons (vid\939edit.vid, VID 939): the tools of LocoFix's editor bar that the
 # state bar's atlas (vid\455icon.vid) has no icon for, made from the game's own sprites in
 # the atlas' style - a 40 x 40 cell with the gold frame and the dark striped ground of the
