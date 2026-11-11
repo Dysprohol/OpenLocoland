@@ -8658,6 +8658,8 @@ const char* hint_of(Tool t) {
     }
 }
 
+bool context_rect(Box& b);   // the object's panel where it stands, below
+
 void draw_hint() {
     const DWORD now = GetTickCount();
     if (g_mouse.x != g_hint_mouse.x || g_mouse.y != g_hint_mouse.y) {   // it moved: gone, the rest starts anew
@@ -8682,13 +8684,28 @@ void draw_hint() {
                            : hint_of(entry_under >= 0 ? ENTRIES[entry_under].tool : tool());
     uint8_t* font = vid_by_number(FONT_TIPS);
     if (!text || !*text || !font) return;
+    // An object's panel is drawn by Direct3D, which comes out over the software text of a hint drawn
+    // after it (issue #9: the panel opened beside the object hid the hint of the cursor on the object).
+    // On the panel the map's hint has nothing to say (its rows have their tips in the status line); off
+    // it the hint goes to a side of the cursor where the panel is not.
+    Box panel{};
+    const bool has_panel = context_rect(panel);
+    if (has_panel && panel.contains(mx, my)) return;
     const std::string shown = std::string(" ") + text + " ";
     const float cw = at<float>(font, V_SIZE_X), w = cw * shown.size();
     const Box v = view();
-    float x = mx + 14, y = my + 22;   // below right of the arrow, as the game's tips
-    if (x + w > v.r - 2) x = (std::max)(v.l + 2, v.r - 2 - w);
-    if (y + LINE_HEIGHT > v.b - 2 || entry_under >= 0 || (button && my > v.b - 80)) y = my - 22 - LINE_HEIGHT;   // above the bar
-    if (y + LINE_HEIGHT > rows_top() - 2) y = rows_top() - 2 - LINE_HEIGHT;   // and above the rows standing on it
+    auto place = [&](bool left, bool above, float& x, float& y) {
+        x = left ? mx - 14 - w : mx + 14;
+        y = above ? my - 22 - LINE_HEIGHT : my + 22;   // below right of the arrow, as the game's tips
+        if (x + w > v.r - 2) x = (std::max)(v.l + 2, v.r - 2 - w);
+        if (x < v.l + 2) x = v.l + 2;
+        if (y + LINE_HEIGHT > v.b - 2 || entry_under >= 0 || (button && my > v.b - 80)) y = my - 22 - LINE_HEIGHT;   // above the bar
+        if (y + LINE_HEIGHT > rows_top() - 2) y = rows_top() - 2 - LINE_HEIGHT;   // and above the rows standing on it
+        return !has_panel || x + w < panel.l || x > panel.r || y + LINE_HEIGHT < panel.t || y > panel.b;
+    };
+    float x = 0, y = 0;
+    if (!place(false, false, x, y) && !place(true, false, x, y) && !place(false, true, x, y) && !place(true, true, x, y))
+        return;   // no side of the cursor is free of the panel
     draw_text(FONT_TIPS, x, y, shown.c_str());
 }
 
@@ -8758,6 +8775,7 @@ struct OptionHit {
     float l, t, r, b;
     std::function<void()> act;
     int object = 0;   // the object of a strip's icon
+    int rail = 0;     // or a kind of rail of the Track tool's row
 };
 std::vector<OptionHit> g_option_hits;    // the buttons where the last frame drew them
 std::vector<Box> g_option_rows;          // the rows' boxes
@@ -9277,7 +9295,7 @@ void draw_options() {
                 if (pass == 2) draw_text(i.lit || hover ? CONTEXT_FONT_LIT : CONTEXT_FONT_VID, x + (i.button ? 0 : 0), cy - ch / 2, text, false, OPTION_STEP);
                 if (pass == 1 && i.lit) fill(graphics(), nullptr, x, cy + ch / 2 + 1, x + iw - 8, cy + ch / 2 + 3, 0xe0f0e080);
             }
-            if (pass == 2 && i.button) g_option_hits.push_back({x - 2, cy - SLOT / 2, x + iw, cy + SLOT / 2, i.act, i.object});
+            if (pass == 2 && i.button) g_option_hits.push_back({x - 2, cy - SLOT / 2, x + iw, cy + SLOT / 2, i.act, i.object, i.rail});
         });
     }
 }
@@ -9292,15 +9310,26 @@ int strip_under_mouse() {
 // The name of the strip's object under the mouse, in the mouse tips' font right above its icon (the
 // status line at the top is far from the row in a wide window), shown at once - not after a rest, as
 // the cursor hints are, and whether they are on or not: it is the icon's label.
+// The Track tool's kinds of rail are pictures too (issue #9: they had no tip, the beds beside them had).
+const char* rail_kind_tip(int nvid) {
+    switch (nvid) {
+    case 610: return ui_text("TipRailPlain", "plain rails, on the ground");
+    case 600: return ui_text("TipRailSwamp", "swamp rails, on an embankment over the swamp");
+    case 611: return ui_text("TipRailDestroyed", "destroyed rails: trains go slowly there until the repair car mends them");
+    case 601: return ui_text("TipRailSwampDestroyed", "destroyed swamp rails: trains go slowly there until the repair car mends them");
+    default: return nullptr;
+    }
+}
+
 void draw_row_tip() {
     if (panel_open()) return;
     for (const OptionHit& h : g_option_hits) {
-        if (h.object <= 0 || g_mouse.x < h.l || g_mouse.x >= h.r || g_mouse.y < h.t || g_mouse.y >= h.b) continue;
-        const char* name = object_name(h.object);
+        if ((h.object <= 0 && h.rail <= 0) || g_mouse.x < h.l || g_mouse.x >= h.r || g_mouse.y < h.t || g_mouse.y >= h.b) continue;
+        const char* name = h.rail > 0 ? rail_kind_tip(h.rail) : object_name(h.object);
         uint8_t* font = vid_by_number(FONT_TIPS);
         if (!name || !*name || !font) return;
         // a bed is the swap of the track's bed, not a decal to drop: the tip says what its brush does
-        const int bed = bed_kind_of(h.object);
+        const int bed = h.rail > 0 ? -1 : bed_kind_of(h.object);
         const std::string shown = std::string(" ") +
                                   (bed >= 0 ? ui_printf(ui_format("TipBedBrush", "gravel bed: %s - click / drag on the track"), bed_kind_label(bed))
                                             : std::string(name)) + " ";
@@ -10283,6 +10312,20 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
 
 // Where the panel goes: beside the object and what goes with it (a fort's guns stay in sight), inside
 // the view.
+void context_box(uint8_t* o, int rows, float& x, float& y);
+std::vector<ContextRow> open_rows();   // below
+
+// The object's (or push line's) panel on the screen, false when none is open.
+bool context_rect(Box& b) {
+    if (g_context && removed(g_context)) return false;
+    if (!g_context && (g_context_line < 0 || g_context_line >= static_cast<int>(mission_push_lines().size()))) return false;
+    float x, y;
+    const size_t n = open_rows().size();
+    context_box(g_context, static_cast<int>(n), x, y);
+    b = {x, y, x + CONTEXT_WIDTH, y + (n + 1) * CONTEXT_ROW};
+    return true;
+}
+
 void context_box(uint8_t* o, int rows, float& x, float& y) {
     uint8_t* w = world();
     const Box v = view();

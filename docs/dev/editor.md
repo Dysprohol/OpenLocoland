@@ -256,7 +256,16 @@ Mission settings (panels, not tools), had none - the tester's "two icons at the 
 tools have theirs too since then: the music player's name, |<, || / > and >|
 (`HintMusicName`, `...Previous`, `...Stop` / `...Play`, `...Next`) and the bar's Help and Menu buttons
 (`HintHelpButton`, `HintMenuButton`; `panel_on_help` / `panel_on_menu`). The rows' buttons are their own
-words and the strip's icons have their name above them at once (`draw_row_tip`), so they have none.
+words and the strip's icons have their name above them at once (`draw_row_tip`), so they have none; the
+Track tool's four kinds of rail, pictures as the beds beside them, had no such tip (issue #9) - now
+`TipRailPlain`, `TipRailSwamp`, `TipRailDestroyed`, `TipRailSwampDestroyed` say what each is. An object's
+panel (the right button) is drawn by Direct3D, which comes out over the software text of a hint drawn
+after it, so the hint of the cursor resting on the object beside the panel was hidden under the panel
+(issue #9, the tester's picture): the hint now takes the first side of the cursor the panel does not
+cover - below right as before, below left, above right, above left (`context_rect`) - and none while the
+cursor is on the panel, whose rows have their tips in the status line. Checked in Polish at 1024 x 768
+(a flower's panel: the hint left of the cursor; on the panel none; the four rail tips and a bed's) and
+1920 x 1080 (the panel left of the object near the view's right edge, the hint right of it).
 Checked in Polish: each of the four parts of the player, the two buttons, Train arrivals and Mission
 settings, the hint after a rest (the strip's empty slot, no button, has none). The Menu panel's line in the strip above its title, HINTS UNDER THE
 CURSOR: ON / OFF (`PanelHintsOn` / `Off`, its tip `TipHints`), turns them off and on; `EditorHints`
