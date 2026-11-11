@@ -54,6 +54,11 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
 - Mission 11 (`maps\l11\l11.map`): a rail at 745,2075 laid as a ramp the wrong way up
   is laid flat (`game/maps.override/l11/objects.tsv`, `BUGS.md` F21), so the line at x 745
   goes on south there instead of ending; trains no longer go round through the fort gate.
+- A fort or a mine taken back from the pirates or the neutral army changes hands whole:
+  `game/maps/script/export.lgc.patch` corrects the script library's `GETSPRITE_ARMY` (the mask of
+  army 2 and 3 named the wrong armies, `BUGS.md` F29, GitHub issue #10), so the capture handler
+  hands the dead gun sockets over with the building and the guns rebuilt there are the new owner's,
+  not the pirates'.
 - The strategic map of the menu has a second page with the custom maps (every map folder of
   `maps\`, POLIGON first: "Map files") and the map editor entry (`game/maps/menu.lgc.patch`; "The custom
   maps page" above).

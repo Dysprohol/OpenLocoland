@@ -1,0 +1,5 @@
+--- maps/script/export.lgc
++++ maps/script/export.lgc
+@@ -390,1 +390,1 @@
+-GETSPRITE_ARMY(int army) { return GETSPRITE_ARMY0*(army+1); }
++GETSPRITE_ARMY(int army) { return GETSPRITE_ARMY0<<army; }

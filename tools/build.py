@@ -134,6 +134,7 @@ ORIGINAL_SHA256 = {
     os.path.join("maps", "script", "basefunctions.lgc"): "a0ee8eb3865434c423a71b0df701ab8ec142ff0515cdafe05415f243dbd41397",
     os.path.join("maps", "script", "constants.lgc"): "4313d929e4ea9c082c246cc9dc0e5b75eb687deb8f9c4df9cad6913d27a3d72c",
     os.path.join("maps", "script", "debug_functions.lgc"): "c425230d5851b7c776cfaa2e025e8f498d20c88f1dea1b49daa9b0b2725f8c0f",
+    os.path.join("maps", "script", "export.lgc"): "1ff2bf46926dec161a461cf83d54cf293062fe03f9749300f66f1eca7414a6be",
     os.path.join("maps", "script", "initdefault.lgc"): "779bde2e9aa2606818647da9a1de590ad14b8d10a4b35afaaa49871779fb0f04",
     os.path.join("maps", "script", "menuend.lgc"): "618e3a9df1e68af3a18b985e9c3bfa7601904de80be73cdd5dafb2925910d367",
     os.path.join("maps", "script", "menutact.lgc"): "ca2479c2ab512fe112ea937c9c9225d4649f3c80e3550ce3a7768c05ff366bda",
