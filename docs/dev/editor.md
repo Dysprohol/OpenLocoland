@@ -221,7 +221,10 @@ checked by the stream's state - its playing slot, the name - for 30 s after a wo
 and after Play the map's way back, where the editor's new game has no music at all) and loads the saved map again, held: the
 state of the run does not stay, the editor's bar comes back as before (the state bar's icons, VID
 455, and the editor's, 939, get the menu gammas the editor gives them again), the view and
-the chosen object (found again by VID and place) and the tool as they were, and the undo history: before
+the chosen object (found again by VID and place) and the tool as they were (the tool since 2026-11-11:
+`edit_reset` put Select back for the load and nothing chose the tool again - the to-do list's "after QUICK
+TEST the tool returns to Select"; a panel's entry, Train arrivals or Mission settings, is not a tool to go
+back to), and the undo history: before
 the run the editor keeps it with every object of the level in the world's order and the rail points
 its cars stand on (their places and their links' other points); after the load held again
 (`edit_restore_history`) the new objects are matched by that order, VID and place (the save keeps the

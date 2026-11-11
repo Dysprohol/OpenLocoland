@@ -158,7 +158,10 @@ Track, an object's panel, an enemy factory's panel, the Arrivals panel, and the 
 settings, New map and Map size (opened from the Menu panel, closed with Cancel; the editor draws again
 after each). While a dialog was open the game's window went to the taskbar and came back when it closed - gone since
 v0.2.10, where full screen is a screen-size window (`FullscreenAttributes = fake` in `game/dgVoodoo.conf`,
-"Graphics and dgVoodoo"). Not clean but not broken: an object's panel on a rail is titled "(VID 610)" without a name; the
+"Graphics and dgVoodoo"). Not clean but not broken: an object's panel on a rail was titled "(VID 610)" without a name (since
+2026-11-11 the Track row's word and the rail's kind, "SZYNA: ZWYKLE (VID 610)"; the New map dialog the to-do
+list had without Cancel has had one since 2026-10-22 - its id 2 found and clicked in the game, the dialog
+closed with no map made); the
 palette's list of categories starts right under its title and ends close to the bottom strip; the
 grid's points of the placing helps are faint on bright ground. 2560 x 1440 is not checked.
 

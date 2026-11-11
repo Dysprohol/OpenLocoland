@@ -10543,6 +10543,8 @@ void draw_context() {
     if (g_context) {
         const int nvid = nvid_of(g_context);
         const char* name = ui_unit_name(nvid) ? ui_unit_name(nvid) : object_name(nvid);
+        std::string rail;   // a rail has no name of its own: the Track row's word and its kind
+        if (!name && class_of(g_context) == B_RAIL) name = (rail = std::string(ui_text("OptRailKind", "RAIL:")) + " " + rail_kind_name(nvid)).c_str();
         std::snprintf(title, sizeof title, "%s (VID %d)", name ? name : "", nvid);
     } else {
         std::snprintf(title, sizeof title, "%s", ui_text("CtxLineTitle", "PUSH LINE"));
@@ -10949,7 +10951,9 @@ void draw_overlay() {
                       rail_kind_name(RAIL_KINDS[g_rail_kind]), track_level(),
                       g_ramp > 0 ? ui_text("WordClimbs", "climbs") : g_ramp < 0 ? ui_text("WordDescends", "descends")
                                                                      : ui_text("WordFlat", "flat"),
-                      swamp_rail(RAIL_KINDS[g_rail_kind]) ? "602" : g_bed ? std::to_string(g_bed).c_str() : ui_text("WordNone", "none"));
+                      swamp_rail(RAIL_KINDS[g_rail_kind]) ? ui_text("WordEmbankment", "the embankment")
+                      : g_bed && bed_kind_of(g_bed) >= 0 ? bed_kind_name(bed_kind_of(g_bed))
+                      : g_bed ? std::to_string(g_bed).c_str() : ui_text("WordNone", "none"));
         const std::string ground = std::string(bed) + ui_printf(ui_format("StatusRaiseGround", ", the ground under rising rails (G): %s"), raise_name());
         status_line(v.l, v.t + 2 * LINE_HEIGHT, ground.c_str());
     }
@@ -11688,8 +11692,10 @@ void edit_before_save() {
 // editor.cpp's Run the level: the chosen object, found again by its VID and place once the level is
 // loaded again (held); the tool stays as it is.
 std::vector<std::pair<int, std::pair<float, float>>> g_remembered;
+int g_remembered_entry = -1;   // the bar's entry (the tool) before the run
 void edit_remember_selection() {
     g_remembered.clear();
+    g_remembered_entry = g_entry;
     if (!g_selection.empty())
         g_remembered.push_back({nvid_of(g_selection.front()), {at<float>(g_selection.front(), O_X), at<float>(g_selection.front(), O_Y)}});
 }
@@ -11925,6 +11931,13 @@ void edit_restore_selection() {
         if (best) select(best);
     }
     g_remembered.clear();
+    // the tool as it was (edit_reset put Select back for the load): a tool, not a panel's entry
+    if (g_remembered_entry > 0 && g_remembered_entry < ENTRY_COUNT && ENTRIES[g_remembered_entry].icon >= 0 &&
+        ENTRIES[g_remembered_entry].tool != Tool::Arrivals && ENTRIES[g_remembered_entry].tool != Tool::Settings) {
+        g_entry = g_remembered_entry;
+        patch::log("edit: tool: %s (as before the run)", ENTRIES[g_entry].label);
+    }
+    g_remembered_entry = -1;
 }
 
 // editor_mission.cpp: a message of the status line (a save that could not write everything).
