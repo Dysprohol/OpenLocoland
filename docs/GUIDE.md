@@ -416,7 +416,8 @@ no lights at the entry (**PUT LIGHTS**: a pair of posts the first place inside t
 which pushes the train in - the entry's line and its lights are one thing, as in the missions) or lights
 on the way in without a line to them (**LINE TO THE LIGHTS**), no locomotive in the train, no point. A
 wave waits while a train stands at its entry. The arrow at the bottom left, Esc or the right button go
-back to the list; a click on an entry or a point on the map opens its arrival. Every change is undone
+back to the list; a click on an entry or a point on the map opens its arrival, and an entry dragged with the
+Select tool moves along the track - every arrival from it comes from where it is let go. Every change is undone
 with Ctrl+Z. Maps made with an older version keep their reinforcement and the enemy's start trains of
 their script (shown as marks on the track; a click on one opens this panel) until **CONVERT TO
 ARRIVALS** in the panel: the start trains then stand on the map as trains with their orders (patrol or

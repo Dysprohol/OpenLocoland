@@ -414,7 +414,8 @@ Pasek nad tytułem podaje prawdziwy problem z przyciskiem, który go naprawia - 
 WJAZD**), brak świateł na wjeździe (**POSTAW SWIATLA**: para semaforów w pierwszym miejscu w mapie i ich
 linia, która wpycha pociąg - linia wjazdu i jej światła to jedno, jak w misjach) albo światła na drodze
 bez linii do nich (**LINIA DO SWIATEL**), brak lokomotywy w składzie, brak punktu. Fala czeka, gdy na wjeździe stoi pociąg. Strzałka na dole po lewej, Esc albo prawy przycisk
-wracają do listy; kliknięcie wjazdu albo punktu na mapie otwiera jego przyjazd. Każdą zmianę cofa
+wracają do listy; kliknięcie wjazdu albo punktu na mapie otwiera jego przyjazd, a wjazd przeciągnięty narzędziem
+Zaznacz przesuwa się po torze - każdy przyjazd z niego przybywa z miejsca, gdzie go puścisz. Każdą zmianę cofa
 Ctrl+Z. Mapy ze starszej wersji zachowują swoje posiłki i pociągi startowe wroga ze skryptu (widać je
 jako znaczniki na torze; kliknięcie znacznika otwiera ten panel), dopóki w panelu nie wybierzesz
 **PRZESTAW NA PRZYJAZDY**: pociągi startowe stają wtedy na mapie jako zwykłe pociągi z rozkazami

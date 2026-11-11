@@ -7560,13 +7560,28 @@ void end_sweep() {
 // over it, and the first one's changes stayed on the map without a step of the history.
 int g_held_button = 0;
 
-bool stroke_under_way() { return g_stroke.active || g_gstroke.active || g_drag.active || g_sweep.active || g_region_drag; }
+// Dragging an entry's mark (the Select tool; GitHub issue #9): the button pressed on an entry's square
+// or its "ENTRY n" begins it (start_entry_drag), the mark follows the rail point under the cursor, and
+// let go there every arrival from that entry comes from it (finish_entry_drag: one step of the history,
+// as the panel's ENTRY pick); let go where it began - a click - it chooses the arrival as before.
+struct EntryDrag {
+    bool active = false, moved = false;
+    int x = 0, y = 0;   // the entry as it was
+    int arrival = -1;   // the arrival a click chooses
+    POINT from{};       // where the button went down (the view's point)
+};
+EntryDrag g_entry_drag;
+void finish_entry_drag();   // below, by the arrivals' marks
+
+bool stroke_under_way() {
+    return g_stroke.active || g_gstroke.active || g_drag.active || g_sweep.active || g_region_drag || g_entry_drag.active;
+}
 
 const char* stroke_kind() {
     return g_stroke.active && tool() == Tool::Height ? "ground height" : g_stroke.active && tool() == Tool::Place ? "scatter"
          : g_stroke.active ? "decals"
          : g_gstroke.active ? (g_gstroke.water ? "water" : g_gstroke.gravel ? "gravel bed" : "paint")
-         : g_drag.active ? "drag" : g_sweep.active ? "delete sweep" : "region";
+         : g_drag.active ? "drag" : g_sweep.active ? "delete sweep" : g_entry_drag.active ? "entry drag" : "region";
 }
 
 // The cursor is over the game's view (always in test mode, whose mouse is the messages' own).
@@ -7603,6 +7618,7 @@ void end_strokes(const char* why) {
         mouse_on_map(sx, sy);
         finish_region(sx, sy);
     }
+    finish_entry_drag();
     if (!g_test && GetCapture()) ReleaseCapture();
     // let go outside the window: the brush's outline does not stay where the cursor left it
     if (g_view_window && !cursor_in_window(g_view_window)) g_mouse = {-1, -1};
@@ -9697,13 +9713,18 @@ void draw_arrivals() {
         }
     }
     if (!s.on) return;
+    POINT dragged{g_entry_drag.x, g_entry_drag.y};   // an entry being dragged: drawn on the rail point under the cursor
+    if (g_entry_drag.active && g_entry_drag.moved)
+        if (uint8_t* d = cursor_dot()) dragged = dot_screen(d);
     std::vector<POINT> entries;
     for (const Arrival& a : s.list)
         if (a.entry && std::none_of(entries.begin(), entries.end(), [&](const POINT& e) { return e.x == a.x && e.y == a.y; })) {
             entries.push_back({a.x, a.y});
-            square(a.x, a.y, 7, 0xe0ff9020);
-            square(a.x, a.y, 3, 0xe0000000);
-            draw_text(FONT_TIPS, a.x - cx + 10, a.y - cy - 7,
+            const bool moving = g_entry_drag.active && a.x == g_entry_drag.x && a.y == g_entry_drag.y;
+            const int x = moving ? dragged.x : a.x, y = moving ? dragged.y : a.y;
+            square(x, y, 7, moving && g_entry_drag.moved ? 0xe000ffff : 0xe0ff9020);
+            square(x, y, 3, 0xe0000000);
+            draw_text(FONT_TIPS, x - cx + 10, y - cy - 7,
                       ui_printf(ui_format("MapEntry", "ENTRY %d"), static_cast<int>(entries.size())).c_str(), false, 3);
         }
     if (i >= 0 && i < static_cast<int>(s.list.size())) {
@@ -9774,6 +9795,58 @@ bool arrival_marker_click(POINT m) {
     panel_open_arrivals();
     patch::log("edit: arrival %d chosen on the map", i + 1);
     return true;
+}
+
+// The button down on an arrival's marker (the Select tool): on an entry's mark the drag begins
+// (g_entry_drag, above), on the chosen arrival's point it is chosen as before.
+bool start_entry_drag(POINT m) {
+    const int i = arrival_marker_at(m);
+    if (i < 0) return false;
+    const Arrival& a = mission_arrivals().list[i];
+    uint8_t* w = world();
+    const float dx = at<float>(w, W_CAMERA_X) + m.x - a.x, dy = at<float>(w, W_CAMERA_Y) + m.y - a.y;
+    const bool on_entry = a.entry && ((std::fabs(dx) <= 9 && std::fabs(dy) <= 9) || (dx > 8 && dx < 78 && dy > -9 && dy < 9));
+    if (!on_entry) return arrival_marker_click(m);
+    g_entry_drag = EntryDrag();
+    g_entry_drag.active = true;
+    g_entry_drag.x = a.x;
+    g_entry_drag.y = a.y;
+    g_entry_drag.arrival = i;
+    g_entry_drag.from = m;
+    return true;
+}
+
+void continue_entry_drag(POINT m) {
+    if (g_entry_drag.active && !g_entry_drag.moved && (std::abs(m.x - g_entry_drag.from.x) > 3 || std::abs(m.y - g_entry_drag.from.y) > 3))
+        g_entry_drag.moved = true;
+}
+
+void finish_entry_drag() {
+    if (!g_entry_drag.active) return;
+    const EntryDrag d = g_entry_drag;
+    g_entry_drag = EntryDrag();
+    if (!d.moved) {   // a click: the arrival in its panel, as before
+        arrivals_select(d.arrival);
+        panel_open_arrivals();
+        patch::log("edit: arrival %d chosen on the map", d.arrival + 1);
+        return;
+    }
+    uint8_t* dot = view().contains(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)) ? cursor_dot() : nullptr;
+    const POINT p = dot ? dot_screen(dot) : POINT{d.x, d.y};
+    if (!dot || (p.x == d.x && p.y == d.y)) {
+        MESSAGE("MsgEntryStays", "the entry stays at %d,%d", d.x, d.y);
+        return;
+    }
+    ArrivalsState& s = mission_arrivals();
+    const ArrivalsState before = s;
+    int n = 0;
+    for (Arrival& a : s.list)
+        if (a.entry && a.x == d.x && a.y == d.y) {
+            a.x = p.x, a.y = p.y, a.z = at<int>(dot, DOT_Z);
+            ++n;
+        }
+    edit_commit_arrivals({"OpArrivalEntry", "arrival entry"}, before);
+    MESSAGE("MsgEntryMoved", "the entry moved from %d,%d to %d,%d - %d arrivals come from there", d.x, d.y, p.x, p.y, n);
 }
 
 // ---- the context panel ----
@@ -11152,6 +11225,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             g_tracking_leave = TrackMouseEvent(&t) != FALSE;
         }
         if (g_drag.active) continue_drag(g_mouse);
+        continue_entry_drag(g_mouse);
         if (panel_open() || on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)) ||
             on_options(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)) ||
             !view().contains(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
@@ -11182,7 +11256,13 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             pick_arrival_at(cursor_dot());
             return true;
         }
-        if (tool() == Tool::Select && arrival_marker_click(g_mouse)) return true;
+        if (tool() == Tool::Select && start_entry_drag(g_mouse)) {
+            if (g_entry_drag.active) {
+                g_held_button = VK_LBUTTON;
+                if (!g_test) SetCapture(window);
+            }
+            return true;
+        }
         if (tool() == Tool::Select && start_mark_click()) return true;
         uint8_t* w0 = world();
         const float x = at<float>(w0, W_CAMERA_X) + g_mouse.x, y = at<float>(w0, W_CAMERA_Y) + g_mouse.y;
@@ -11604,6 +11684,7 @@ void edit_reset() {
     g_grid_original.clear();
     g_gstroke = GroundStroke();
     g_region_drag = false;
+    g_entry_drag = EntryDrag();
     g_post_owner.clear();
     g_mine_labels.clear();
 }

@@ -481,7 +481,12 @@ where the next ones come (DRIVE ON). The list's last rows: a limit of the game's
 authors' reinforcement to convert. The arrow at the bottom left, Esc and the right button go a screen
 back, from the list they close the panel. Each change is one step of the history
 (`edit_commit_arrivals`; Ctrl+Z / Ctrl+Y reach it while the panel is open). The entries are drawn on
-the map ("ENTRY n"), the chosen arrival's points too, joined to its entry; a deletion of rails that
+the map ("ENTRY n"), the chosen arrival's points too, joined to its entry. An entry's mark is dragged with the
+Select tool (since v0.2.12, GitHub issue #9; `start_entry_drag`, `finish_entry_drag`): pressed on its square or
+its "ENTRY n" the mark follows the rail point under the cursor (`cursor_dot`, drawn cyan), and let go there
+every arrival of that entry gets the rail point - one step of the history, `OpArrivalEntry` as the panel's
+ENTRY pick; let go within 3 px of where it began it is the click it was (the arrival in its panel), off the
+view or on its own rail point the entry stays (`MsgEntryStays`). A deletion of rails that
 takes an entry's or a point's rail point unsets it in the same step of the history
 (`edit_arrivals_track_gone`), so no marker stays in the grass and Ctrl+Z brings it back. Test mode: `arrival:` lines
 of the `M<file>` settings (`arrival_of_line`: `army=`, `cars=`, `at=x,y,z`, `first=`, `every=`,
