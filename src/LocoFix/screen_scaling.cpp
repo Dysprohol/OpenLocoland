@@ -30,6 +30,8 @@
 
 // frame_limit.cpp: the FPS counter, drawn on the final picture
 void draw_fps_counter(IDirectDrawSurface7* back_buffer, const RECT& picture, double scale);
+// menu_version.cpp: the version in the main menu, on the final picture
+void draw_menu_version(IDirectDrawSurface7* target, const RECT& window, const RECT& picture);
 
 namespace {
 
@@ -351,6 +353,7 @@ int __cdecl scale_frame(uint8_t* g, int present) {
                    g_window_h ? g_window_h : static_cast<int>(screen_size(g)[1])};
     Scaling s;
     if (!compute(g, s)) {
+        draw_menu_version(back_buffer, window, window);
         draw_fps_counter(back_buffer, window, 1.0);
         return 0;
     }
@@ -368,6 +371,7 @@ int __cdecl scale_frame(uint8_t* g, int present) {
     }
     clear_bars(picture, window, s.target);
     picture->Blt(&s.target, g_copy, nullptr, DDBLT_WAIT, nullptr);
+    draw_menu_version(picture, window, s.target);
     g_last_frame_scaled = true;
     g_last = s;
     if (picture == back_buffer)

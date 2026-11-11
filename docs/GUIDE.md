@@ -50,7 +50,8 @@ Windows user's registry, as the original kept it.
 
 **Updating.** Run a newer `Setup.exe` and press **Update**: it finds the installed game and copies only what changed. Your own maps (in `maps\` of the game folder) and your profile are kept.
 
-To find out whether there is a newer version, press **Check for updates** in the launcher (see
+The version you have is written small in the bottom right corner of the main menu (and in the
+title of the launcher and of the game's window). To find out whether there is a newer version, press **Check for updates** in the launcher (see
 [the first start](#2-the-first-start)). It asks the project's page on GitHub and says "You have the
 latest version" or "New version ... is available"; then **Download** saves the new `Setup.exe` in
 your Downloads folder, and **Run Setup** starts it (after a question) and closes the game, so Setup

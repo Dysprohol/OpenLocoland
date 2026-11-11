@@ -476,6 +476,16 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       deleting the region - freed it a second time and the game crashed a little later (the editor:
       FOG: MIST, FOG: NONE or an undo, FOG: MIST); the pointer is cleared after the original ran with
       no fog to make,
+  43. the version in the main menu (`menu_version.cpp`): "OpenLocoland v0.2.x" (`LOCOFIX_VERSION`,
+      "OpenLocoland dev" for a build of `build.py`) in the menu's own font (VID 2,
+      `fonts\font8x13.bmp`) at half its brightness, in the bottom right corner of the window - in
+      the black bar beside the menu's picture on a wide screen (under it on a 5:4 one), on a 4:3
+      screen in the picture's own bottom right corner, where the menu's wall has only its dark rim
+      in every language - so the version can be seen in full screen too. It is drawn on the final
+      picture before it is presented (`screen_scaling.cpp`, as the FPS counter), whole steps of the
+      menu's stretch big (at 2160 px of height twice), only while the main menu's buttons (VID 467)
+      are there and no briefing (VID 501): not in a mission or its Esc menu, not on the end screen,
+      not in the editor; nothing reacts to the mouse there,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that

@@ -50,7 +50,8 @@ tak jak w oryginale.
 
 **Aktualizacja.** Uruchom nowszy `Setup.exe` i wciśnij **Aktualizuj**: znajdzie zainstalowaną grę i skopiuje tylko to, co się zmieniło. Twoje mapy (w `maps\` folderu gry) i twój profil zostają.
 
-Czy jest nowsza wersja, sprawdzisz przyciskiem **Sprawdź aktualizacje** w okienku startowym (zob.
+Twoja wersja jest napisana drobnym drukiem w prawym dolnym rogu menu głównego (i w tytule okienka
+startowego oraz okna gry). Czy jest nowsza wersja, sprawdzisz przyciskiem **Sprawdź aktualizacje** w okienku startowym (zob.
 [pierwsze uruchomienie](#2-pierwsze-uruchomienie)). Okienko pyta stronę projektu na GitHubie i
 odpowiada „Masz aktualną wersję” albo „Jest nowa wersja ...”; wtedy **Pobierz** zapisuje nowy
 `Setup.exe` w folderze Pobrane, a **Uruchom Setup** uruchamia go (po pytaniu) i zamyka grę, żeby
