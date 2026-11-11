@@ -53,6 +53,8 @@ void restart_wait();
 void install_options();
 void install_restart();
 void install_update_check();
+void install_dpi_awareness();
+void install_dpi_launcher();
 
 namespace {
 
@@ -129,6 +131,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
                        static_cast<unsigned long>(nt->OptionalHeader.SizeOfImage));
             return TRUE;
         }
+        install_dpi_awareness();   // first: everything after it reads the screen in real pixels (dpi_aware.cpp)
         install_language();
         install_editor_text();   // after install_language: its lookups go to the chosen pack
         install_window();
@@ -172,6 +175,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         install_options();   // after language and frame_limit: takes their CreateFileA and DialogBoxParamA
         install_restart();   // after options: takes its DialogBoxParamA entry
         install_update_check();   // after restart: takes its DialogBoxParamA entry
+        install_dpi_launcher();   // after update_check: the start window opens unaware (dpi_aware.cpp)
     } else if (reason == DLL_PROCESS_DETACH) {
         frame_limit_exit();
     }

@@ -525,6 +525,11 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       mode's height and format (the start window's first line read "640 x 2560 x 0bpp" on a 2560 x
       1440 screen) and more would reach the device's flags; a mode that finds the list full is left
       out and named in LocoFix.log, and `resolutions.cpp` offers 16 at most,
+  46. real pixels at any display scale (`dpi_aware.cpp`, "Graphics and dgVoodoo"): the game declares
+      itself per-monitor DPI-aware when LocoFix loads, before any window; at 125 % or 150 % Windows no
+      longer shrinks the screen the game measures (a 1920x1080 screen was 1536x864 / 1280x720 to it)
+      nor enlarges the game's window as a picture. The start window opens unaware and looks as
+      before (its picture has fixed pixels); its test of the screen size gets the real pixels,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that

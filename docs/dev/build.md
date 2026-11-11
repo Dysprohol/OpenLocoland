@@ -23,6 +23,14 @@ Mission settings, New map, Map size, Load - took the activation and the game wen
 until the dialog closed; with the screen-size window the game stays behind the dialog. Checked by the
 maintainer in full screen on his machine, 2026-11-10; not checked by a script - a full-screen test
 started from a script draws nothing).
+The game is DPI-aware (LocoFix `dpi_aware.cpp`, per monitor, set when LocoFix loads, before WinMain
+and before DirectDraw starts): the exe has no manifest and dgVoodoo does not declare the process
+aware either (a running game reported "unaware", 2026-11-11), so before that Windows' display scale
+shrank the screen the game measured - at 150 % a 1920x1080 screen was 1280x720 to the engine and to
+the start window's test of the mode, while dgVoodoo listed and set the real 1920x1080 modes. The
+start window itself opens unaware and is scaled by Windows as before (its picture has fixed
+pixels); everything after it - the game's window, dgVoodoo's full-screen window, the cursor, the
+editor's dialogs (dialog units, scaled by Windows) and file dialogs - works in real pixels.
 
 **Configuration.** The game reads `<exe name>.cfg`, i.e. `Locoland.cfg`. Graphics settings
 (ScreenX, ScreenY, BPP, Device, FullScreen, SoundHighQuality, WindowPositionX/Y) are kept in
