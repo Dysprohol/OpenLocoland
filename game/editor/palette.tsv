@@ -303,6 +303,8 @@ GroupUnits	250	2
 GroupUnits	418	2	Obj418	Fish shoal
 GroupUnits	263	1		
 GroupUnits	416	2	Obj416	Bird
+GroupUnits	268	2		
+GroupUnits	422	2		
 GroupEffects	504	0	Obj504	Water circles
 GroupEffects	510	0	Obj510	Water noise
 GroupEffects	206	0	Obj206	Bubbles

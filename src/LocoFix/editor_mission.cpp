@@ -56,6 +56,7 @@ std::vector<UnitUnlock> edit_place_unlocks(std::vector<UnitUnlock>& unlocks);   
 std::string language_file(const std::string& path);   // language.cpp: the pack's copy of a file
 std::vector<int> edit_place_plans(std::vector<FactoryTrain>& plans);   // editor_edit.cpp: the plans' factories now, their armies
 int unit_price(int nvid);   // depot_rows.cpp: a unit's price in a factory
+const char* object_name(int nvid);   // editor_panel.cpp: the palette's (the game's) name of an object
 
 namespace {
 
@@ -2976,8 +2977,14 @@ bool parse_patrol(const std::string& raw, TrainPatrol& out) {
 enum : int {
     IDC_TITLE = 100, IDC_HEADER, IDC_MONEY, IDC_TIME, IDC_RAIN, IDC_NUKE, IDC_LIMIT, IDC_WAVES, IDC_TRAIN, IDC_START,
     IDC_QUEUE, IDC_OBJECTIVES, IDC_WIN, IDC_LOSE, IDC_BRIEF, IDC_ARRIVALS, IDC_WEATHER, IDC_PLAN, IDC_MUSIC,
-    IDC_MUSIC_FILE, IDC_MUSIC_ADD, IDC_MUSIC_REMOVE, IDC_MUSIC_UP, IDC_MUSIC_DOWN
+    IDC_MUSIC_FILE, IDC_MUSIC_ADD, IDC_MUSIC_REMOVE, IDC_MUSIC_UP, IDC_MUSIC_DOWN, IDC_FLIES, IDC_FLY_COUNT
 };
+// The authors' fliers over the map (environmenttact.lgc calls Muxi(MUXI_NVID, MUXI) of civil.lgc: while
+// fewer than MUXI of the kind are there, one more comes in from beyond a map edge, army 2): none, the
+// dragon-fly of missions 2, 3, 4, 8 and 9, the bird of 12, 13, 14 and 20, the winter hornet of 16-19.
+// The field IDC_FLIES holds the VID (0 none), IDC_FLY_COUNT their number; written as MUXI and MUXI_NVID.
+const int FLY_KINDS[] = {0, 268, 416, 422};
+constexpr int FLY_MAX = 50;   // the missions have 2-20
 bool g_open_arrivals = false;   // the dialog ended with its Arrivals... button
 bool g_open_plan = false;       // ... or its Plan... button (the enemy factory's panel)
 
@@ -3165,6 +3172,16 @@ std::wstring item_text(HWND dialog, int id) {
     return text;
 }
 
+// The fliers as the script has them: the kind's VID (0 none: MUXI 0) and their number.
+int mission_fly_count(const Mission& m) {
+    auto it = m.settings.find("MUXI");
+    return it == m.settings.end() ? 0 : (std::max)(0, to_int(it->second, 0));
+}
+int mission_fly_kind(const Mission& m) {
+    auto it = m.settings.find("MUXI_NVID");
+    return mission_fly_count(m) > 0 && it != m.settings.end() ? to_int(it->second, 0) : 0;
+}
+
 // What the dialog's boxes hold (by their ids), and the mission they make; an error message when
 // a box cannot be read.
 using Fields = std::map<int, std::wstring>;
@@ -3189,6 +3206,14 @@ std::string apply_fields(const Fields& f, Mission& n) {
     if (number(IDC_RAIN, rain)) n.rain = (std::max)(0, (std::min)(2, rain));
     if (f.count(IDC_WEATHER) && number(IDC_WEATHER, weather)) n.weather = (std::max)(0, (std::min)(4, weather));
     n.nuke = get(IDC_NUKE) == L"1";
+    if (f.count(IDC_FLIES)) {   // none (MUXI 0, the kind as it was), or a kind and how many
+        int kind = 0, count = 0;
+        number(IDC_FLIES, kind);
+        if (kind > 0 && (!number(IDC_FLY_COUNT, count) || count < 0 || count > FLY_MAX) && error.empty())
+            error = ui_printf(ui_format("ErrFlies", "Fliers: a number from 0 to %d"), FLY_MAX);
+        n.settings["MUXI"] = std::to_string(kind > 0 ? (std::max)(0, (std::min)(FLY_MAX, count)) : 0);
+        if (kind > 0) n.settings["MUXI_NVID"] = std::to_string(kind);
+    }
     if (f.count(IDC_MUSIC)) {   // the files, separated by commas; empty: no music
         std::vector<std::string> music;
         const std::string list = to_pack(get(IDC_MUSIC));
@@ -3327,6 +3352,21 @@ INT_PTR CALLBACK mission_proc(HWND dialog, UINT m, WPARAM w, LPARAM) {
             SendDlgItemMessageW(dialog, IDC_RAIN, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(t.c_str()));
         SendDlgItemMessageW(dialog, IDC_RAIN, CB_SETCURSEL, s.rain, 0);
         CheckDlgButton(dialog, IDC_NUKE, s.nuke ? BST_CHECKED : BST_UNCHECKED);
+        {   // the fliers: none, the three kinds by the game's names (and a kind of its own a script may have)
+            const int kind = mission_fly_kind(s);
+            std::vector<int> kinds(std::begin(FLY_KINDS), std::end(FLY_KINDS));
+            if (std::find(kinds.begin(), kinds.end(), kind) == kinds.end()) kinds.push_back(kind);
+            for (int v : kinds) {
+                const char* name = v ? object_name(v) : nullptr;
+                const std::wstring t = !v ? ui_wtext("FliesNone", "none")
+                                     : name ? ui_wide(name)
+                                            : ui_wide(ui_printf("VID %d", v));
+                const LRESULT i = SendDlgItemMessageW(dialog, IDC_FLIES, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(t.c_str()));
+                SendDlgItemMessageW(dialog, IDC_FLIES, CB_SETITEMDATA, i, v);
+                if (v == kind) SendDlgItemMessageW(dialog, IDC_FLIES, CB_SETCURSEL, i, 0);
+            }
+            SetDlgItemInt(dialog, IDC_FLY_COUNT, kind ? mission_fly_count(s) : 5, FALSE);
+        }
         // the level's list as it plays, and the files of music\ (the menu's left out) to add from
         for (const std::string& name : s.music)
             SendDlgItemMessageW(dialog, IDC_MUSIC, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(widen(name).c_str()));
@@ -3359,6 +3399,11 @@ INT_PTR CALLBACK mission_proc(HWND dialog, UINT m, WPARAM w, LPARAM) {
     fields[IDC_RAIN] = std::to_wstring(SendDlgItemMessageW(dialog, IDC_RAIN, CB_GETCURSEL, 0, 0));
     fields[IDC_WEATHER] = std::to_wstring(SendDlgItemMessageW(dialog, IDC_WEATHER, CB_GETCURSEL, 0, 0));
     fields[IDC_NUKE] = IsDlgButtonChecked(dialog, IDC_NUKE) == BST_CHECKED ? L"1" : L"0";
+    {
+        const LRESULT k = SendDlgItemMessageW(dialog, IDC_FLIES, CB_GETCURSEL, 0, 0);
+        fields[IDC_FLIES] = std::to_wstring(k >= 0 ? static_cast<int>(SendDlgItemMessageW(dialog, IDC_FLIES, CB_GETITEMDATA, k, 0)) : 0);
+        fields[IDC_FLY_COUNT] = item_text(dialog, IDC_FLY_COUNT);
+    }
     fields[IDC_MUSIC] = music_list_text(dialog);
     Mission n = s;
     const std::string error = apply_fields(fields, n);
@@ -3382,6 +3427,8 @@ Fields current_fields() {
             {IDC_RAIN, std::to_wstring(s.rain)},
             {IDC_WEATHER, std::to_wstring(s.weather)},
             {IDC_NUKE, s.nuke ? L"1" : L"0"},
+            {IDC_FLIES, std::to_wstring(mission_fly_kind(s))},
+            {IDC_FLY_COUNT, std::to_wstring(mission_fly_count(s))},
             {IDC_MUSIC, widen(music_list(s.music))},
             {IDC_LIMIT, std::to_wstring(s.factories.ai.limit)},
             {IDC_WAVES, std::to_wstring(s.reinforcements)},
@@ -3672,6 +3719,9 @@ bool mission_dialog(HWND owner, bool* open_arrivals, bool* open_plan) {
     t.item(STATIC, ui_wtext("MissionMusicNote", "From the first, again and again; one file plays on, an empty list "
                                                 "means no music. mus00 is the victory's.").c_str(),
            -1, label, cx, 260, cw, 24);
+    t.item(STATIC, ui_wtext("MissionFlies", "Fliers over the map:").c_str(), -1, label, cx, 290, 76, 8);
+    t.item(COMBOBOX, L"", IDC_FLIES, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, cx + 78, 288, 76, 70);
+    t.item(EDIT, L"", IDC_FLY_COUNT, LINE | ES_NUMBER, cx + 158, 288, cw - 158, 12);
     if (g_arrivals.on) {   // the trains that arrive: the Arrivals panel
         t.item(STATIC,
                ui_wide(ui_printf(ui_format("MissionArrivals", "Train arrivals: %u - set in the Arrivals panel (the row above the bar)"),
@@ -3988,7 +4038,8 @@ bool mission_settings_from_file(const std::string& path) {
         {"title", IDC_TITLE}, {"header", IDC_HEADER}, {"money", IDC_MONEY}, {"time", IDC_TIME},
         {"rain", IDC_RAIN}, {"weather", IDC_WEATHER}, {"nuke", IDC_NUKE}, {"limit", IDC_LIMIT}, {"waves", IDC_WAVES},
         {"train", IDC_TRAIN}, {"start", IDC_START}, {"queue", IDC_QUEUE}, {"objectives", IDC_OBJECTIVES},
-        {"win", IDC_WIN}, {"lose", IDC_LOSE}, {"brief", IDC_BRIEF}, {"music", IDC_MUSIC}};
+        {"win", IDC_WIN}, {"lose", IDC_LOSE}, {"brief", IDC_BRIEF}, {"music", IDC_MUSIC},
+        {"flies", IDC_FLIES}, {"flies_count", IDC_FLY_COUNT}};
     Fields fields = current_fields();
     std::map<int, bool> cleared;
     ArrivalsState arrivals = g_arrivals;

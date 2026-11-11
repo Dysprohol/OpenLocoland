@@ -671,6 +671,9 @@ Menu → **MISSION SETTINGS** (or the gear in the strip):
   then (it comes and goes, about half a minute each) or all the time;
 - **Lightning** - flashes in a clear sky; with rain only while it rains, none with snow, clouds or
   meteorites;
+- **Fliers over the map** - none, or the missions' dragon-flies, birds or winter hornets and how many:
+  while fewer are there, one more flies in from beyond an edge of the map, as in the missions; a click
+  that squashes one gives the player 1 money. They can also be placed by hand (the palette's units);
 - **Music, played in turn** - a list of files of the game's `music` folder: choose a file in the
   drop-down and **Add** it (after the one chosen in the list, or at the end), **Remove**, **Up** and
   **Down** change the list; the level plays them from the first, again and again, one file plays on, and

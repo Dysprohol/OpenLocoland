@@ -668,6 +668,9 @@ Menu → **USTAWIENIA MISJI** (albo zębatka na listwie):
   do czasu (przychodzi i odchodzi, mniej więcej co pół minuty) albo cały czas;
 - **błyskawice** - błyska przy czystym niebie; z deszczem tylko, gdy pada; przy śniegu, chmurach i
   meteorytach nie ma ich;
+- **latające nad mapą** - brak albo muchosmoki, ptaki lub zimowe szerszenie z misji i ile ich: gdy jest
+  ich mniej, następny przylatuje zza krawędzi mapy, jak w misjach; kliknięcie, które go rozgniata, daje
+  graczowi 1 pieniądz. Można je też postawić ręcznie (jednostki w palecie);
 - **muzyka, grana po kolei** - lista plików z folderu `music` gry: wybierz plik z listy rozwijanej i
   **dodaj** go (za plikiem wybranym na liście albo na końcu), **usuń**, **w górę** i **w dół** zmieniają
   listę; poziom gra je od pierwszego, w kółko, jeden plik gra bez końca, a pusta lista to brak muzyki

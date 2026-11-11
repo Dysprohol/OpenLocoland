@@ -26,7 +26,13 @@ storm clouds, meteorites - `environmenttact.lgc` makes the last three) and how o
 never, 1 now and then - it comes and goes, about half a minute each -, 2 all the time;
 `daynight.lgc`'s own comment has 1 and 2 the other way round, its code does this), lightning
 (`NUKE`: a flash and its sound at random in a clear sky, with rain only while it rains, never with
-the other weathers), the level's music - none, one file or a list of
+the other weathers), the fliers over the map (since v0.2.12, FLIERS OVER THE MAP: none or the kind - 268
+the dragon-fly of missions 2, 3, 4, 8, 9, 416 the bird of 12-14 and 20, 422 the winter hornet of 16-19, by
+the game's names - and how many, 0-50: `MUXI` and `MUXI_NVID` as the missions have them; `environmenttact.lgc`
+calls `Muxi()` of `civil.lgc`, which brings one more in from beyond a random map edge in army 2 while fewer
+are there; none writes `MUXI 0` and keeps the kind; test file keys `flies:` (the VID, 0 none) and
+`flies_count:`; 268 and 422 are in the palette's units beside 416 now; checked on a POLIGON copy: 422 x 7
+written, 5 hornets at 5 s, 7 from 10 s on), the level's music - none, one file or a list of
 up to 30 played in turn (MUSIC, PLAYED IN TURN: the list, a drop-down of the files of the game's
 `music\` folder but the menu's `musicmenu.ogg` - `mission_music_files` -, Add (after the file chosen in
 the list, or at its end), Remove, Up, Down; `mus00` is the victory's, `menuend.lgc`). The standard scripts
