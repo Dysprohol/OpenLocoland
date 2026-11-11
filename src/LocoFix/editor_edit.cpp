@@ -1334,6 +1334,7 @@ struct Box {
 // Where an object is drawn, roughly: its footprint around (x, y - z) and its height above.
 bool is_region(uint8_t* o);
 constexpr float REGION_BORDER = 8;   // a region is picked at its frame, not inside
+constexpr float REGION_HANDLE = 5;   // half the side of the handle in a region's middle (draw_regions)
 
 Box box_of(uint8_t* o) {
     uint8_t* v = vid_of(o);
@@ -1367,11 +1368,15 @@ bool on_region_frame(uint8_t* o, float x, float y) {
 
 uint8_t* host_of(uint8_t* gun);
 
-// The class of what a click takes first (pick): 0 the train cars and the units - every Unit class,
+// The class of what a click takes first (pick): -1 a region's handle in its middle, 0 the train cars and the units - every Unit class,
 // the guns of the sockets and their hosts (a fort is a static object, its guns are the units) -, 1
 // every other object (a decoration, a decal, a region's frame), 2 the rails, 3 a region's inside.
 int pick_class(uint8_t* o, float x, float y) {
-    if (is_region(o) && !on_region_frame(o, x, y)) return 3;
+    if (is_region(o)) {   // its handle in the middle before everything (-1), its inside last
+        const Box b = box_of(o);
+        if (std::fabs(x - (b.l + b.r) / 2) <= REGION_HANDLE + 2 && std::fabs(y - (b.t + b.b) / 2) <= REGION_HANDLE + 2) return -1;
+        if (!on_region_frame(o, x, y)) return 3;
+    }
     const int c = class_of(o), nvid = nvid_of(o);
     if (is_car(o) || is_unit_class(c) || is_gun(nvid) || !sockets_of(nvid, 0).empty() || !pieces_of_kind(nvid, 0).empty())
         return 0;
@@ -5954,42 +5959,7 @@ void draw_vid(uint8_t* v, int frame, float x, float y, float z);   // below
 
 void draw_vid(uint8_t* v, int frame, float x, float y, float z);   // below
 
-// The rectangles of the regions, dashed, the selected one brighter: blue a splash region over water,
-// orange over lava, grey a fog, white a marker.
-void draw_regions() {
-    uint8_t* w = world();
-    const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
-    const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
-    for_each_object([&](uint8_t* o) {
-        if (removed(o) || !is_region(o)) return;
-        const float x = at<float>(o, O_X) - cam_x, y = at<float>(o, O_Y) - at<float>(o, O_Z) - cam_y;
-        const float hw = at<float>(o, RG_WIDTH) / 2, hh = at<float>(o, RG_HEIGHT) / 2;
-        const bool selected = !g_selection.empty() && g_selection[0] == o;
-        const int splash = region_splash(o);
-        uint32_t c = splash == 1 ? 0x4080c0 : splash == 2 ? 0xf08020 : at<int>(o, RG_HIGH) > at<int>(o, RG_LOW) ? 0xa0a0a0 : 0xffffff;
-        c |= selected ? 0xf0000000 : 0x90000000;
-        for (float u = -hw; u < hw; u += 8) {
-            fill(graphics(), nullptr, x + u, y - hh, x + (std::min)(u + 4, hw), y - hh + 1, c);
-            fill(graphics(), nullptr, x + u, y + hh - 1, x + (std::min)(u + 4, hw), y + hh, c);
-        }
-        for (float v = -hh; v < hh; v += 8) {
-            fill(graphics(), nullptr, x - hw, y + v, x - hw + 1, y + (std::min)(v + 4, hh), c);
-            fill(graphics(), nullptr, x + hw - 1, y + v, x + hw, y + (std::min)(v + 4, hh), c);
-        }
-    });
-    if (g_region_drag) {   // the rectangle being drawn
-        float sx, sy;
-        mouse_on_map(sx, sy);
-        const float l = (std::min)(sx, static_cast<float>(g_region_start.x)) - cam_x, r = (std::max)(sx, static_cast<float>(g_region_start.x)) - cam_x;
-        const float t = (std::min)(sy, static_cast<float>(g_region_start.y)) - cam_y, b = (std::max)(sy, static_cast<float>(g_region_start.y)) - cam_y;
-        const WaterKind* k = sheet_kind();
-        const uint32_t c = !k ? 0xf0ffffff : shift_down() ? 0xf0ff4040 : k->splash == 2 ? 0xf0f08020 : 0xf04080c0;
-        fill(graphics(), nullptr, l, t, r, t + 1, c);
-        fill(graphics(), nullptr, l, b - 1, r, b, c);
-        fill(graphics(), nullptr, l, t, l + 1, b, c);
-        fill(graphics(), nullptr, r - 1, t, r, b, c);
-    }
-}
+void draw_regions();   // the regions' frames and handles, the effects' marks: below, with the batched rectangles
 
 // ---- push lines ----
 //
@@ -7683,6 +7653,79 @@ void fill_rect(float l, float t, float r, float b, uint32_t argb) {
         lb{l, b, Z, 1, argb, 0xffffffff};
     for (const FillVertex& x : {lt, rt, rb, lt, rb, lb}) g_fill_batch->v.push_back(x);   // FillRect's fan as two triangles
     if ((argb & 0xff000000) != 0xff000000) g_fill_batch->opaque = false;
+}
+
+// The effects that draw nothing on a held level: the generators (their picture is vid\generator.vid,
+// empty), which make their bubbles, circles, smoke, sparks, fire, bears only while the level runs - the
+// palette's Effects but the lights, and the Water tool's circles. In the editor (never in play) each has a
+// mark where it stands, so it is seen, picked and deleted (issue #13: "no confirmation that the object has
+// been placed or where").
+constexpr int NO_PICTURE[] = {206, 291, 305, 337, 392, 401, 402, 414, 441, 446, 504, 505, 506, 510, 520, 522};
+bool no_picture(int nvid) { return std::find(std::begin(NO_PICTURE), std::end(NO_PICTURE), nvid) != std::end(NO_PICTURE); }
+
+// The rectangles of the regions, dashed, the selected one brighter: blue a splash region over water,
+// orange over lava, grey a fog, white a marker. In the tools that take a region (Select, Delete, Region)
+// every frame has a dark edge under its dashes, so it shows on light ground too (a white frame on l01's
+// paving was not seen), and a handle in its middle: a click there takes the region before anything
+// under it (`pick_class`), so it is selected, dragged and given its panel (the right button) in Select
+// too, also where objects fill it (a lake's generators). Elsewhere the frames stay faint, as before.
+void draw_regions() {
+    uint8_t* w = world();
+    const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
+    const bool taken = tool() == Tool::Select || tool() == Tool::Delete || tool() == Tool::Region;
+    const Box v = view();
+    FillBatch batch;   // a mission's regions are thousands of dashes: one list of triangles
+    for_each_object([&](uint8_t* o) {
+        if (removed(o)) return;
+        if (!is_region(o)) {
+            if (!no_picture(nvid_of(o)) || !pickable(o)) return;
+            const float x = at<float>(o, O_X) - cam_x, y = at<float>(o, O_Y) - at<float>(o, O_Z) - cam_y;
+            if (x < v.l - 8 || x > v.r + 8 || y < v.t - 8 || y > v.b + 8) return;
+            const bool selected = !g_selection.empty() && g_selection[0] == o;
+            fill_rect(x - 4, y - 4, x + 4, y + 4, 0xc0000000);   // a small diamond-ish dot: dark rim, cyan, a dark middle
+            fill_rect(x - 3, y - 3, x + 3, y + 3, selected ? 0xffffffff : 0xf040d8ff);
+            fill_rect(x - 1, y - 1, x + 1, y + 1, 0xff002030);
+            return;
+        }
+        const float x = at<float>(o, O_X) - cam_x, y = at<float>(o, O_Y) - at<float>(o, O_Z) - cam_y;
+        const float hw = at<float>(o, RG_WIDTH) / 2, hh = at<float>(o, RG_HEIGHT) / 2;
+        if (x + hw < v.l - 8 || x - hw > v.r + 8 || y + hh < v.t - 8 || y - hh > v.b + 8) return;
+        const bool selected = !g_selection.empty() && g_selection[0] == o;
+        const int splash = region_splash(o);
+        uint32_t c = splash == 1 ? 0x4080c0 : splash == 2 ? 0xf08020 : at<int>(o, RG_HIGH) > at<int>(o, RG_LOW) ? 0xa0a0a0 : 0xffffff;
+        c |= selected ? 0xf0000000 : taken ? 0xd0000000 : 0x90000000;
+        const uint32_t edge = 0xa0000000;
+        auto dash = [&](float l, float t, float r, float b) {
+            if (taken) fill_rect(l + 1, t + 1, r + 1, b + 1, edge);
+            fill_rect(l, t, r, b, c);
+        };
+        for (float u = -hw; u < hw; u += 8) {
+            dash(x + u, y - hh, x + (std::min)(u + 4, hw), y - hh + 1);
+            dash(x + u, y + hh - 1, x + (std::min)(u + 4, hw), y + hh);
+        }
+        for (float d = -hh; d < hh; d += 8) {
+            dash(x - hw, y + d, x - hw + 1, y + (std::min)(d + 4, hh));
+            dash(x + hw - 1, y + d, x + hw, y + (std::min)(d + 4, hh));
+        }
+        if (taken) {   // the handle
+            const float r = REGION_HANDLE;
+            fill_rect(x - r - 1, y - r - 1, x + r + 1, y + r + 1, 0xd0000000);
+            fill_rect(x - r, y - r, x + r, y + r, c | 0xff000000);
+            fill_rect(x - r + 2, y - r + 2, x + r - 2, y + r - 2, selected ? 0xffffffff : 0xff303030);
+        }
+    });
+    if (g_region_drag) {   // the rectangle being drawn
+        float sx, sy;
+        mouse_on_map(sx, sy);
+        const float l = (std::min)(sx, static_cast<float>(g_region_start.x)) - cam_x, r = (std::max)(sx, static_cast<float>(g_region_start.x)) - cam_x;
+        const float t = (std::min)(sy, static_cast<float>(g_region_start.y)) - cam_y, b = (std::max)(sy, static_cast<float>(g_region_start.y)) - cam_y;
+        const WaterKind* k = sheet_kind();
+        const uint32_t c = !k ? 0xf0ffffff : shift_down() ? 0xf0ff4040 : k->splash == 2 ? 0xf0f08020 : 0xf04080c0;
+        fill_rect(l, t, r, t + 1, c);
+        fill_rect(l, b - 1, r, b, c);
+        fill_rect(l, t, l + 1, b, c);
+        fill_rect(r - 1, t, r, b, c);
+    }
 }
 
 // An arrowhead with its tip at (x, y) pointing the way (ux, uy) (a unit vector), on a dark outline.

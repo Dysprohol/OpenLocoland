@@ -620,7 +620,7 @@ a flagpole or a station with its flag, chimneys with their smoke or glow, an oil
 says when it stops - when its army's towers fall, or never. **Scylla** (swamp) bites everyone on a
 diagonal track every 15 seconds. When the pirates' towers fall, the corkscrews break.
 A **Region** (strip): drag its rectangle; its panel sets fog (mist, dust, haze, glow) and splashes, over
-it or the whole map (**OVER**, a row of its own); a creature placed inside keeps to it. A click inside a region where nothing else stands selects it (the Delete tool and `Del` delete it, the right button opens its panel). A fog is
+it or the whole map (**OVER**, a row of its own); a creature placed inside keeps to it. In Select, Delete and Region every region's dashed frame shows, with a small **handle** in its middle: a click on the handle selects the region even when other objects stand in it, a drag there moves it, the right button opens its panel (in Select too); a click inside where nothing else stands selects it as well (the Delete tool and `Del` delete it). Effects that have no picture while you edit - bubbles, water circles, smoke, sparks, fire - have a small cyan mark where they stand (only in the editor, not in the game), so you can see, select and delete them. A fog is
 thickest low down, objects rise out of it: over the region it takes the shape of a hollow (a lake bed),
 on flat ground it is a tinted rectangle; **OVER: THE WHOLE MAP** makes it a haze over the whole view, as
 in missions 7, 13 and 18 (it also turns a region's explosions into splashes everywhere). **FOG LOOK** chooses how

@@ -947,6 +947,25 @@ of a run (golems do not walk by themselves - l13's stand at its script's places)
 rests on the engine's code and the missions' dragons, not on a run; the pairs on the code path only
 (an explosion inside a splash region was not provoked).
 
+**Regions' handles, effects' marks** (`draw_regions`, `pick_class` of `editor_edit.cpp`; issue #13 and the
+maintainer's request of 2026-11-10). A region's frame was a dashed line at 0x90 alpha, white for a marker
+region: on l01's light paving its 751s and its big 750 lake region were not seen at all until one was
+selected, and its inside is picked only where nothing else stands, so a lake's region full of generators was
+reached only by its frame. In Select, Delete and Region the dashes now have a dark edge (one pixel off) and
+every region a handle in its middle (an 11 px square in the frame's colour, white when selected); a point
+within 7 px of the middle is `pick_class` -1, before the cars and units, so a click there selects it, a drag
+moves it (Select: the region's own move, its fog following), the right button opens its panel without the
+Region tool, and Delete takes it. Other tools keep the faint frames. The effects that draw nothing on a held
+level - the generators, whose picture is `vid\generator.vid` (VIDs 206, 291, 305, 337, 392, 401, 402, 414,
+441, 446, 504, 505, 506, 510, 520, 522: bubbles, circles, smoke, rockfalls, fumes, lava eruptions, fire, the
+polar bears, fireflies, the water's noise, sparks; the lights 311 and 555 have pictures) - get a cyan mark
+of 7 px where they stand (white when selected), in the same pass and in the editor's overlay only, so never
+in play; their box (`box_of`, at least 20 x 12) holds the mark, so it is clicked and deleted there. All of
+it is one `FillBatch`. Checked in Polish on l01 at 1024 x 768 (every frame, handle and the ring's circles
+seen; the right button on the 750's handle in Select opened its panel; the 751 dragged by its handle 80 px,
+undone and redone) and 1920 x 1080 (the same seen), and on a new map (fire 446 and chimney smoke 291
+placed: two marks; in Run the level the fire and smoke and no marks; held again: the marks).
+
 **A fog that rises or pulses** (2026-11-10; `Region_Draw` 0x435770, `src/LocoFix/region_pulse.cpp`,
 `BUGS.md` Quirks). `Region_Draw` keeps the fog's top at +0x70, in eighths of a GRID level, and gives it
 to `Graphics_DrawFog`: full fog below top + (low - high) * 8, fading out up to the top. Without flag 1

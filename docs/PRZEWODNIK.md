@@ -618,7 +618,7 @@ szczytem, maszt albo dworzec z flagą, kominy z dymem albo poświatą, szyb naft
 (piraci) stoi w poprzek toru i co 25 sekund gryzie wszystko poza swoją armią; jego panel mówi, kiedy
 staje - gdy padną wieże jego armii, albo nigdy. **Scylla** (bagno) na ukośnym torze gryzie każdego co
 15 sekund. Gdy padną wieże piratów, świdry się łamią. **Region** (listwa): przeciągnij jego prostokąt; jego panel ustawia mgłę (mgła, pył,
-opar, poświata) i rozpryski, nad nim albo nad całą mapą; stworzenie postawione w środku trzyma się go. Klik w środku regionu, gdzie nic innego nie stoi, zaznacza go (narzędzie Usun i `Del` go usuwają, prawy przycisk otwiera jego panel).
+opar, poświata) i rozpryski, nad nim albo nad całą mapą; stworzenie postawione w środku trzyma się go. W narzędziach Zaznacz, Usuń i Region widać przerywaną ramkę każdego regionu z małym **uchwytem** pośrodku: klik w uchwyt zaznacza region, nawet gdy stoją w nim inne obiekty, przeciągnięcie za niego go przesuwa, prawy przycisk otwiera jego panel (także w Zaznacz); klik w środku, gdzie nic innego nie stoi, też go zaznacza (narzędzie Usuń i `Del` go usuwają). Efekty, które podczas edycji nie mają obrazka - bąbelki, kręgi na wodzie, dym, iskry, ogień - mają w miejscu, gdzie stoją, mały błękitny znacznik (tylko w edytorze, nie w grze), więc widać je, da się je zaznaczyć i usunąć.
 Mgła (wiersz **NAD** osobno) jest najgęstsza nisko, obiekty z niej wystają: nad regionem przybiera
 kształt zagłębienia (dna jeziora), na płaskim terenie to zabarwiony prostokąt; **NAD: CALA MAPA** robi z
 niej mgiełkę nad całym widokiem, jak w misjach 7, 13 i 18 (zamienia też wybuchy regionu w pluski na całej
