@@ -2764,6 +2764,25 @@ void continue_drag(POINT p) {
 }
 
 void end_drag() {
+    if (g_drag.active && g_drag.moved) {
+        // a drag whose objects all end where they began - back to the start, or less than half a cell of
+        // the grid from a grid point (continue_drag snaps them) - is a click: no step of the history and
+        // nothing "not saved" (before, OpMove was committed with no change and the redo cleared)
+        bool same = true;
+        for (size_t i = 0; i < g_drag.objects.size() && same; ++i) {
+            const State& s = g_drag.before[i];
+            uint8_t* o = g_drag.objects[i];
+            same = std::fabs(at<float>(o, O_X) - s.x) < 0.5f && std::fabs(at<float>(o, O_Y) - s.y) < 0.5f &&
+                   std::fabs(at<float>(o, O_Z) - s.z) < 0.5f && at<int>(o, O_DIRECTION) == s.direction;
+        }
+        if (same) {
+            for (size_t i = 0; i < g_drag.objects.size(); ++i) apply(g_drag.objects[i], g_drag.before[i]);   // exactly as it was
+            patch::log("edit: drag ended where it began - nothing moved");
+            g_drag = Drag();
+            if (!g_test && GetCapture()) ReleaseCapture();
+            return;
+        }
+    }
     if (g_drag.active && g_drag.moved && is_car(g_drag.objects[0])) {   // a train, along the track
         uint8_t* c = g_drag.objects[0];
         float sx, sy;   // where it was dropped: the track under the cursor
