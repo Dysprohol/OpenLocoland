@@ -538,7 +538,8 @@ const char* const ARRIVALS_RUNNER[] = {
     "}",
     "// MissionIf(c,n): the condition c (the editor's list: 1 the player has no train, 2 fewer than n,",
     "// 3 fewer units than n, 4 no factory, 5 a neutral factory stands, 6 the enemy has fewer trains than",
-    "// n, 7 fewer of the AI's trains attack than n, 8 the player has n money, 9 1 and 5), 0 always.",
+    "// n, 7 fewer of the AI's trains attack than n, 8 the player has n money, 9 1 and 5, 10 no locomotive",
+    "// and a factory of the player's, 11 more trains than n), 0 always.",
     "MissionIf(int c,int n)",
     "{",
     "  int k,m;",
@@ -568,6 +569,8 @@ const char* const ARRIVALS_RUNNER[] = {
     "    return ArrivalTrains(0)==0 && GetVid(102,VID_COUNT2)>0;",
     "  if( c==10 )",
     "    return GetVid(5,VID_COUNT0)+GetVid(10,VID_COUNT0)==0 && GetVid(102,VID_COUNT0)>0;",
+    "  if( c==11 )",
+    "    return ArrivalTrains(0)>n;",
     "  return 1;",
     "}",
     "ArrivalIf(int i)",
@@ -3599,6 +3602,7 @@ const std::vector<Condition>& mission_conditions() {
         {IF_NONE, "ArrIfNone", "ALWAYS", false, 0, 0, true},
         {IF_NO_TRAIN, "ArrIfNoTrain", "THE PLAYER HAS NO TRAIN", false, 0, 0, true},
         {IF_FEW_TRAINS, "ArrIfFewTrains", "THE PLAYER HAS FEWER TRAINS THAN", true, 2, 1, true},
+        {IF_MANY_TRAINS, "ArrIfManyTrains", "THE PLAYER HAS MORE TRAINS THAN", true, 3, 1, true},
         {IF_FEW_UNITS, "ArrIfFewUnits", "THE PLAYER HAS FEWER UNITS THAN", true, 10, 1, true},
         {IF_NO_FACTORY, "ArrIfNoFactory", "THE PLAYER HAS NO FACTORY", false, 0, 0, true},
         {IF_NEUTRAL_FACTORY, "ArrIfNeutralFactory", "A NEUTRAL FACTORY STANDS", false, 0, 0, true},
@@ -3611,9 +3615,13 @@ const std::vector<Condition>& mission_conditions() {
     return list;
 }
 
+// By its code (the list is in the panels' order: a later code may stand beside its kin); an unknown
+// code is ALWAYS.
 const Condition& mission_condition(int code) {
     const std::vector<Condition>& list = mission_conditions();
-    return list[(std::max)(0, (std::min)(static_cast<int>(list.size()) - 1, code))];
+    for (const Condition& c : list)
+        if (c.code == code) return c;
+    return list.front();
 }
 
 bool Arrival::operator==(const Arrival& o) const {

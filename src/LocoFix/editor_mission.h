@@ -114,6 +114,7 @@ enum ArrivalIf : int {
     IF_MONEY,            // the player has n money - and pays it
     IF_CAMPAIGN,         // no train and a neutral factory stands (the campaign's reinforcements)
     IF_OWN_FACTORY,      // no locomotive and a factory of the player's (the old template's, POLIGON's second wave)
+    IF_MANY_TRAINS,      // the player has more than n locomotives and branders (11: added after the others, the maps keep their codes)
     IF_COUNT
 };
 // The conditions as one list - the WHEN of an arrival and of a factory's plan entry (later of the

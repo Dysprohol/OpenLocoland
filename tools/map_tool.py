@@ -632,7 +632,8 @@ ArrivalTrains(int army)
 }
 // MissionIf(c,n): the condition c (the editor's list: 1 the player has no train, 2 fewer than n,
 // 3 fewer units than n, 4 no factory, 5 a neutral factory stands, 6 the enemy has fewer trains than
-// n, 7 fewer of the AI's trains attack than n, 8 the player has n money, 9 1 and 5), 0 always.
+// n, 7 fewer of the AI's trains attack than n, 8 the player has n money, 9 1 and 5, 10 no locomotive
+// and a factory of the player's, 11 more trains than n), 0 always.
 MissionIf(int c,int n)
 {
   int k,m;
@@ -662,6 +663,8 @@ MissionIf(int c,int n)
     return ArrivalTrains(0)==0 && GetVid(102,VID_COUNT2)>0;
   if( c==10 )
     return GetVid(5,VID_COUNT0)+GetVid(10,VID_COUNT0)==0 && GetVid(102,VID_COUNT0)>0;
+  if( c==11 )
+    return ArrivalTrains(0)>n;
   return 1;
 }
 ArrivalIf(int i)
