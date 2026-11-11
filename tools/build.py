@@ -831,6 +831,10 @@ def build(steam, target, locofix=None, captured=None, progress=None, version=Non
     frames = generate(copied, lambda x2, x3: patch_data.make_minimap_frames(os.path.join(a.steam, "vid", "464map.vid"),
                                                                              x2, x3),
                       os.path.join(vid, "464x2.vid"), os.path.join(vid, "464x3.vid"))
+    if not generate(copied, lambda p1, p2, p3: patch_data.make_minimap_previews(
+            os.path.join(a.steam, "vid", "464map.vid"), p1, p2, p3),
+            *(os.path.join(vid, "464preview%d.bmp" % k) for k in (1, 2, 3))):
+        print("vid\\464map.vid: unknown layout, no minimap preview on the settings page")
     if frames != "enlarged":   # copied: VIDs 950/951 have the original frame, which LocoFix keeps at its size
         print("vid\\464map.vid: " + ("unknown layout, copied as it is" if frames else "missing") +
               " - the minimap keeps its size on high screens")

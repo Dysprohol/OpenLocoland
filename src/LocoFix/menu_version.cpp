@@ -1,39 +1,61 @@
-// "OpenLocoland v0.2.x" in the main menu, so the version can be seen in full screen too (the
-// launcher's caption and the window's title bar have it, options.cpp and screen_scaling.cpp).
+// Pictures of ours in the bottom right corner of the window, drawn on the final picture just before
+// it is presented (screen_scaling.cpp, where the FPS counter is drawn too): the menus are a 1024x768
+// picture stretched over a bigger window keeping its proportions, so the window's corner - the black
+// bar beside the picture on a wide screen - exists only in the final picture, out of reach of the
+// menus' own sprites. Each picture is made once into a surface of its own and put on with a Blt keyed
+// on its transparent colour: a GetDC or a lock of the window-sized picture every frame makes dgVoodoo
+// copy it to memory and back (the main menu fell from 438 to 200 fps at 1920x1080 and from 432 to
+// 138 at 2560x1440 with the version drawn that way).
 //
-// The text is drawn in the menu's own font - VID 2, fonts\font8x13.bmp, the green 8 x 13 letters
-// of the menu's lists - at half its brightness, on the final picture just before it is presented
-// (screen_scaling.cpp, where the FPS counter is drawn too): the menu is a 1024x768 picture,
-// stretched over a bigger window keeping its proportions, and the black bars beside it exist only
-// in the final picture. The text goes into the bottom right corner of the window when a bar there
-// has room for it (beside the picture on a wide screen, under it on a 5:4 one), else into the
-// picture's own bottom right corner: the menu's background (VID 465, a metal wall) fills the whole
-// picture, and that corner has only the wall's dark lower rim - the panel of the pages, the
-// buttons and every text of the menu stay far from it in all six languages (looked at at
-// 1024x768; the "Help" button is in the top left corner, a pipe in the bottom left one). The text
-// is put on with its black as the colour key, so the wall shows through between the letters.
-// It is not a menu item - nothing reacts to the mouse there.
+// On the main menu: "OpenLocoland v0.2.x" (LOCOFIX_VERSION, "OpenLocoland dev" for a build of
+// build.py) in the menu's own font - VID 2, fonts\font8x13.bmp, the green 8 x 13 letters of the
+// menu's lists - at half its brightness, so the version can be seen in full screen too (the
+// launcher's caption and the window's title bar have it, options.cpp and screen_scaling.cpp). It goes
+// into the window's corner when a bar there has room for it (beside the picture on a wide screen,
+// under it on a 5:4 one), else into the picture's own corner: the menu's background (VID 465, a metal
+// wall) fills the whole picture, and that corner has only the wall's dark lower rim - the panel of the
+// pages, the buttons and every text of the menu stay far from it in all six languages (looked at at
+// 1024x768; the "Help" button is in the top left corner, a pipe in the bottom left one). Only on the
+// main menu: the map whose script (menu.lgc) makes the seven buttons of VID 467 down its left side,
+// and not while a briefing is open there (its picture is VID 501). A mission, its Esc menu (buttons
+// VID 471, menutact.lgc), the end-of-mission screen and the editor have no 467.
 //
-// Only on the main menu: the map whose script (menu.lgc) makes the seven buttons of VID 467 down
-// its left side, and not while a briefing is open there (its picture is VID 501). A mission, its
-// Esc menu (buttons VID 471, menutact.lgc), the end-of-mission screen and the editor have no 467.
+// While the settings page is open - the main menu's or the Esc menu's, while the arrows of its
+// minimap row (VID 952, game/maps/script/optfields.lgc) exist - the corner shows the minimap's frame
+// instead, as the state bar will put it there: the size the game would use on this window
+// (minimap.cpp: the player's choice as far as it fits), in the bottom right corner, in real pixels,
+// from vid\464preview1-3.bmp (patch_data.make_minimap_previews, the same frame as VIDs 464/950/951);
+// for a bigger one a line above it says that a strip shows under the map (the pack's strings.ini
+// [strings] MenuOptionsMinimapStrip, in the pack's own font). It follows a click on the row at once
+// and goes with the page. The version gives way meanwhile: the corner is the preview's. (A mission on a
+// small map - mission 1, whose logical screen is stretched - has its minimap in the stretched
+// picture's corner; the preview shows the big maps' place.) In the Esc menu the engine has the bar
+// hidden and given up while the menu is open, so the real bar cannot show the change behind it; it
+// is built with the new size when the menu closes.
+//
+// A later field (the interface's scale) can show its picture the same way: a Picture loaded from a
+// BMP made by build.py, an Overlay for it, and a line in draw_menu_version.
 #include "patch.h"
 #include <ddraw.h>
 #include <vector>
 
 #pragma comment(lib, "gdi32.lib")
 
+std::string language_code();                  // language.cpp
+int minimap_size_for_screen(int screen_w);    // minimap.cpp
+
 namespace {
 
 constexpr uintptr_t G_WORLD = 0x4a9d38;
 constexpr int VID_MENU_BUTTONS = 467;
 constexpr int VID_BRIEFING = 501;
+constexpr int VID_MINIMAP_ROW = 952;   // the settings page's minimap row (its left arrow)
 constexpr int MENU_HEIGHT = 768;
 // fonts\font8x13.bmp: 16 x 16 cells of 9 x 14 px (a grey line right and below each), the letter
-// in the top left 8 x 13 of its cell by its code
+// in the top left 8 x 13 of its cell by its code (the pack's code page)
 constexpr int CELL_W = 9, CELL_H = 14, GLYPH_W = 8, GLYPH_H = 13;
-constexpr int MARGIN = 8;        // px from the window's (or the picture's) edges, times the size
-constexpr int DIM_PERCENT = 50;  // of the font's own colour
+constexpr int MARGIN = 8;              // px from the window's (or the picture's) edges, times the size
+constexpr uint32_t KEY_BLACK = 0, KEY_MAGENTA = 0xff00ff;   // patch_data.PREVIEW_KEY
 
 int vid_count(int nvid) {
     auto* world = *reinterpret_cast<uint8_t**>(G_WORLD);
@@ -45,32 +67,34 @@ int vid_count(int nvid) {
 }
 
 bool main_menu_on_screen() { return vid_count(VID_MENU_BUTTONS) > 0 && vid_count(VID_BRIEFING) == 0; }
+bool settings_page_open() { return vid_count(VID_MINIMAP_ROW) > 0; }
 
-// The text as a 32-bit picture, black where nothing is written; made once.
-struct Text {
+bool exists(const std::string& path) {
+    const DWORD a = GetFileAttributesA(path.c_str());
+    return a != INVALID_FILE_ATTRIBUTES && !(a & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+// The chosen pack's copy of a game file (lang\<code>\...), else the game folder's.
+std::string pack_file(const char* rel) {
+    const std::string pack = patch::game_folder() + "lang\\" + language_code() + "\\" + rel;
+    return exists(pack) ? pack : patch::game_folder() + rel;
+}
+
+// A picture as 0x00RRGGBB, `key` where it is transparent.
+struct Picture {
     int w = 0, h = 0;
     std::vector<uint32_t> pixels;
-    bool tried = false;
+    uint32_t key = KEY_BLACK;
 };
-Text g_text;
 
-void make_text() {
-    g_text.tried = true;
-    const std::string text = std::string("OpenLocoland ") + LOCOFIX_VERSION;
-    const std::string font_file = patch::game_folder() + "fonts\\font8x13.bmp";
+// A BMP file's pixels, top row first; empty when it cannot be read.
+std::vector<uint32_t> load_bmp(const std::string& path, int& w, int& h) {
+    std::vector<uint32_t> out;
     HBITMAP bitmap = static_cast<HBITMAP>(
-        LoadImageA(nullptr, font_file.c_str(), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION));
-    if (!bitmap) {
-        patch::log("menu version: no %s", font_file.c_str());
-        return;
-    }
+        LoadImageA(nullptr, path.c_str(), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION));
+    if (!bitmap) return out;
     BITMAP info = {};
     GetObject(bitmap, sizeof info, &info);
-    if (info.bmWidth < 16 * CELL_W || info.bmHeight < 8 * CELL_H) {
-        DeleteObject(bitmap);
-        patch::log("menu version: unexpected font picture %dx%d", info.bmWidth, info.bmHeight);
-        return;
-    }
     BITMAPINFO bi = {};
     bi.bmiHeader.biSize = sizeof bi.bmiHeader;
     bi.bmiHeader.biWidth = info.bmWidth;
@@ -78,43 +102,53 @@ void make_text() {
     bi.bmiHeader.biPlanes = 1;
     bi.bmiHeader.biBitCount = 32;
     bi.bmiHeader.biCompression = BI_RGB;
-    std::vector<uint32_t> font(static_cast<size_t>(info.bmWidth) * info.bmHeight);
+    out.resize(static_cast<size_t>(info.bmWidth) * info.bmHeight);
     HDC dc = GetDC(nullptr);
-    const int rows = GetDIBits(dc, bitmap, 0, info.bmHeight, font.data(), &bi, DIB_RGB_COLORS);
+    const int rows = GetDIBits(dc, bitmap, 0, info.bmHeight, out.data(), &bi, DIB_RGB_COLORS);
     ReleaseDC(nullptr, dc);
     DeleteObject(bitmap);
-    if (rows != info.bmHeight) return;
+    if (rows != info.bmHeight) return {};
+    for (uint32_t& p : out) p &= 0xffffff;
+    w = info.bmWidth;
+    h = info.bmHeight;
+    return out;
+}
 
-    g_text.w = GLYPH_W * static_cast<int>(text.size());
-    g_text.h = GLYPH_H;
-    g_text.pixels.assign(static_cast<size_t>(g_text.w) * g_text.h, 0);
+// `text` (bytes of the font's code page) in font8x13 at `percent` of its colour, black around it.
+Picture text_picture(const std::string& text, const std::string& font_file, int percent) {
+    Picture p;
+    int fw = 0, fh = 0;
+    const std::vector<uint32_t> font = load_bmp(font_file, fw, fh);
+    if (font.empty() || fw < 16 * CELL_W || fh < 16 * CELL_H) {
+        patch::log("menu corner: no usable font %s", font_file.c_str());
+        return p;
+    }
+    p.w = GLYPH_W * static_cast<int>(text.size());
+    p.h = GLYPH_H;
+    p.pixels.assign(static_cast<size_t>(p.w) * p.h, 0);
     for (size_t i = 0; i < text.size(); ++i) {
         const auto c = static_cast<unsigned char>(text[i]);
         const int cx = (c % 16) * CELL_W, cy = (c / 16) * CELL_H;
         for (int y = 0; y < GLYPH_H; ++y)
             for (int x = 0; x < GLYPH_W; ++x) {
-                const uint32_t p = font[static_cast<size_t>(cy + y) * info.bmWidth + cx + x] & 0xffffff;
-                const uint32_t r = (p >> 16 & 0xff) * DIM_PERCENT / 100, g = (p >> 8 & 0xff) * DIM_PERCENT / 100,
-                               b = (p & 0xff) * DIM_PERCENT / 100;
-                g_text.pixels[static_cast<size_t>(y) * g_text.w + i * GLYPH_W + x] = r << 16 | g << 8 | b;
+                const uint32_t v = font[static_cast<size_t>(cy + y) * fw + cx + x];
+                const uint32_t r = (v >> 16 & 0xff) * percent / 100, g = (v >> 8 & 0xff) * percent / 100,
+                               b = (v & 0xff) * percent / 100;
+                p.pixels[static_cast<size_t>(y) * p.w + i * GLYPH_W + x] = r << 16 | g << 8 | b;
             }
     }
+    return p;
 }
 
-// The text drawn into a surface of its own once, put on the picture with a Blt keyed on black:
-// a GetDC or a lock of the window-sized picture every frame makes dgVoodoo copy it to memory and
-// back (the main menu fell from 438 to 200 fps at 1920x1080 and from 432 to 138 at 2560x1440).
+Picture bmp_picture(const std::string& path) {
+    Picture p;
+    p.pixels = load_bmp(path, p.w, p.h);
+    p.key = KEY_MAGENTA;
+    if (p.pixels.empty()) patch::log("menu corner: no %s", path.c_str());
+    return p;
+}
+
 const GUID IID_DirectDraw7_ = {0x15e65ec0, 0x3b9c, 0x11d2, {0xb9, 0x2f, 0x00, 0x60, 0x97, 0x97, 0xea, 0x5b}};
-IDirectDrawSurface7* g_surface = nullptr;
-int g_surface_size = 0;
-DDPIXELFORMAT g_surface_format = {};
-int g_failures = 0;
-
-void release_text() {
-    if (g_surface) g_surface->Release();
-    g_surface = nullptr;
-    g_surface_size = 0;
-}
 
 // One channel of 0xRRGGBB (shift 16, 8, 0) into the bits of `mask`.
 uint32_t channel(uint32_t rgb, int shift, uint32_t mask) {
@@ -126,62 +160,119 @@ uint32_t channel(uint32_t rgb, int shift, uint32_t mask) {
     return v << low & mask;
 }
 
-// The text, `size` times, into the surface (black, the colour key, where nothing is written).
-bool fill(IDirectDrawSurface7* s, int size) {
-    DDSURFACEDESC2 desc = {};
-    desc.dwSize = sizeof desc;
-    if (FAILED(s->Lock(nullptr, &desc, DDLOCK_WAIT | DDLOCK_WRITEONLY, nullptr))) return false;
-    const DDPIXELFORMAT& f = desc.ddpfPixelFormat;
-    const int bytes = static_cast<int>(f.dwRGBBitCount) / 8;
-    for (int y = 0; y < g_text.h * size; ++y) {
-        auto* row = static_cast<uint8_t*>(desc.lpSurface) + static_cast<size_t>(y) * desc.lPitch;
-        for (int x = 0; x < g_text.w * size; ++x) {
-            const uint32_t rgb = g_text.pixels[static_cast<size_t>(y / size) * g_text.w + x / size];
-            const uint32_t v = channel(rgb, 16, f.dwRBitMask) | channel(rgb, 8, f.dwGBitMask) | channel(rgb, 0, f.dwBBitMask);
-            if (bytes == 2) reinterpret_cast<uint16_t*>(row)[x] = static_cast<uint16_t>(v);
-            else if (bytes == 4) reinterpret_cast<uint32_t*>(row)[x] = v;
-        }
-    }
-    s->Unlock(nullptr);
-    return bytes == 2 || bytes == 4;
+uint32_t convert(uint32_t rgb, const DDPIXELFORMAT& f) {
+    return channel(rgb, 16, f.dwRBitMask) | channel(rgb, 8, f.dwGBitMask) | channel(rgb, 0, f.dwBBitMask);
 }
 
-IDirectDrawSurface7* text_surface(IDirectDrawSurface7* target, int size) {
-    if (g_failures >= 3) return nullptr;
+// A Picture made into a surface once (`size` times, pixel by pixel) and put on with one keyed Blt.
+struct Overlay {
+    Picture picture;
+    bool loaded = false;
+    IDirectDrawSurface7* surface = nullptr;
+    int size = 0;
     DDPIXELFORMAT format = {};
-    format.dwSize = sizeof format;
-    if (FAILED(target->GetPixelFormat(&format))) return nullptr;
-    if (g_surface && g_surface_size == size && std::memcmp(&format, &g_surface_format, sizeof format) == 0) return g_surface;
-    release_text();
-    IUnknown* unknown = nullptr;
-    if (FAILED(target->GetDDInterface(reinterpret_cast<void**>(&unknown))) || !unknown) return nullptr;
-    IDirectDraw7* dd = nullptr;
-    unknown->QueryInterface(IID_DirectDraw7_, reinterpret_cast<void**>(&dd));
-    unknown->Release();
-    if (!dd) return nullptr;
-    DDSURFACEDESC2 desc = {};
-    desc.dwSize = sizeof desc;
-    desc.dwFlags = DDSD_CAPS | DDSD_WIDTH | DDSD_HEIGHT | DDSD_PIXELFORMAT | DDSD_CKSRCBLT;
-    desc.dwWidth = g_text.w * size;
-    desc.dwHeight = g_text.h * size;
-    desc.ddpfPixelFormat = format;
-    desc.ddckCKSrcBlt.dwColorSpaceLowValue = desc.ddckCKSrcBlt.dwColorSpaceHighValue = 0;   // black
-    desc.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN | DDSCAPS_VIDEOMEMORY;
-    HRESULT hr = dd->CreateSurface(&desc, &g_surface, nullptr);
-    if (FAILED(hr)) {
-        desc.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN;
-        hr = dd->CreateSurface(&desc, &g_surface, nullptr);
+    int failures = 0;
+
+    void release() {
+        if (surface) surface->Release();
+        surface = nullptr;
+        size = 0;
     }
-    dd->Release();
-    if (FAILED(hr) || !fill(g_surface, size)) {
-        if (FAILED(hr)) g_surface = nullptr;
-        release_text();
-        if (++g_failures == 3) patch::log("menu version: cannot make the text's surface (%08X)", static_cast<unsigned>(hr));
-        return nullptr;
+
+    bool fill() {
+        DDSURFACEDESC2 desc = {};
+        desc.dwSize = sizeof desc;
+        if (FAILED(surface->Lock(nullptr, &desc, DDLOCK_WAIT | DDLOCK_WRITEONLY, nullptr))) return false;
+        const DDPIXELFORMAT& f = desc.ddpfPixelFormat;
+        const int bytes = static_cast<int>(f.dwRGBBitCount) / 8;
+        for (int y = 0; y < picture.h * size; ++y) {
+            auto* row = static_cast<uint8_t*>(desc.lpSurface) + static_cast<size_t>(y) * desc.lPitch;
+            for (int x = 0; x < picture.w * size; ++x) {
+                const uint32_t v = convert(picture.pixels[static_cast<size_t>(y / size) * picture.w + x / size], f);
+                if (bytes == 2) reinterpret_cast<uint16_t*>(row)[x] = static_cast<uint16_t>(v);
+                else if (bytes == 4) reinterpret_cast<uint32_t*>(row)[x] = v;
+            }
+        }
+        surface->Unlock(nullptr);
+        return bytes == 2 || bytes == 4;
     }
-    g_surface_size = size;
-    g_surface_format = format;
-    return g_surface;
+
+    IDirectDrawSurface7* ready(IDirectDrawSurface7* target, int wanted) {
+        if (failures >= 3 || picture.pixels.empty()) return nullptr;
+        DDPIXELFORMAT f = {};
+        f.dwSize = sizeof f;
+        if (FAILED(target->GetPixelFormat(&f))) return nullptr;
+        if (surface && size == wanted && std::memcmp(&f, &format, sizeof f) == 0) return surface;
+        release();
+        IUnknown* unknown = nullptr;
+        if (FAILED(target->GetDDInterface(reinterpret_cast<void**>(&unknown))) || !unknown) return nullptr;
+        IDirectDraw7* dd = nullptr;
+        unknown->QueryInterface(IID_DirectDraw7_, reinterpret_cast<void**>(&dd));
+        unknown->Release();
+        if (!dd) return nullptr;
+        DDSURFACEDESC2 desc = {};
+        desc.dwSize = sizeof desc;
+        desc.dwFlags = DDSD_CAPS | DDSD_WIDTH | DDSD_HEIGHT | DDSD_PIXELFORMAT | DDSD_CKSRCBLT;
+        desc.dwWidth = picture.w * wanted;
+        desc.dwHeight = picture.h * wanted;
+        desc.ddpfPixelFormat = f;
+        desc.ddckCKSrcBlt.dwColorSpaceLowValue = desc.ddckCKSrcBlt.dwColorSpaceHighValue = convert(picture.key, f);
+        desc.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN | DDSCAPS_VIDEOMEMORY;
+        HRESULT hr = dd->CreateSurface(&desc, &surface, nullptr);
+        if (FAILED(hr)) {
+            desc.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN;
+            hr = dd->CreateSurface(&desc, &surface, nullptr);
+        }
+        dd->Release();
+        size = wanted;
+        if (FAILED(hr) || !fill()) {
+            if (FAILED(hr)) surface = nullptr;
+            release();
+            if (++failures == 3) patch::log("menu corner: cannot make a surface (%08X)", static_cast<unsigned>(hr));
+            return nullptr;
+        }
+        format = f;
+        return surface;
+    }
+
+    // Puts the picture with its top left at (x, y).
+    void draw(IDirectDrawSurface7* target, int x, int y, int wanted) {
+        IDirectDrawSurface7* s = ready(target, wanted);
+        if (!s) return;
+        RECT to = {x, y, x + picture.w * wanted, y + picture.h * wanted};
+        const HRESULT hr = s->IsLost() == DDERR_SURFACELOST
+                               ? DDERR_SURFACELOST
+                               : target->Blt(&to, s, nullptr, DDBLT_WAIT | DDBLT_KEYSRC, nullptr);
+        if (SUCCEEDED(hr)) {
+            failures = 0;
+        } else if (hr == DDERR_SURFACELOST) {   // a lost surface (Alt+Tab in full screen): filled again
+            if (FAILED(s->Restore()) || !fill()) release();
+        } else {
+            release();
+            if (++failures == 3) patch::log("menu corner: cannot draw (%08X)", static_cast<unsigned>(hr));
+        }
+    }
+};
+
+Overlay g_version;
+Overlay g_preview[3];   // the minimap's frame at sizes 1-3
+Overlay g_strip;        // "a strip shows under the map"
+
+void load_once() {
+    static bool done = false;
+    if (done) return;
+    done = true;
+    g_version.picture = text_picture(std::string("OpenLocoland ") + LOCOFIX_VERSION,
+                                     patch::game_folder() + "fonts\\font8x13.bmp", 50);
+    for (int k = 0; k < 3; ++k) {
+        char name[64];
+        wsprintfA(name, "vid\\464preview%d.bmp", k + 1);
+        g_preview[k].picture = bmp_picture(patch::game_folder() + name);
+    }
+    char text[256] = {};
+    GetPrivateProfileStringA("strings", "MenuOptionsMinimapStrip", "", text, sizeof text,
+                             pack_file("strings.ini").c_str());
+    g_strip.picture = text_picture(*text ? text : "A STRIP SHOWS UNDER THE MAP", pack_file("fonts\\font8x13.bmp"), 100);
 }
 
 }  // namespace
@@ -189,34 +280,30 @@ IDirectDrawSurface7* text_surface(IDirectDrawSurface7* target, int size) {
 // screen_scaling.cpp, before the frame is presented: `target` holds the final picture of the
 // window `window`, the menu's 1024x768 picture (stretched or not) at `picture`.
 void draw_menu_version(IDirectDrawSurface7* target, const RECT& window, const RECT& picture) {
-    if (!target || !main_menu_on_screen()) return;
-    if (!g_text.tried) make_text();
-    if (g_text.pixels.empty()) return;
+    if (!target) return;
+    const bool page = settings_page_open();
+    if (!page && !main_menu_on_screen()) return;
+    load_once();
     // whole steps of the menu's stretch, so the letters stay sharp
     int size = (picture.bottom - picture.top) / MENU_HEIGHT;
     if (size < 1) size = 1;
-    const int w = g_text.w * size, h = g_text.h * size, margin = MARGIN * size;
+    const int margin = MARGIN * size;
+    if (page) {
+        const int k = minimap_size_for_screen(window.right - window.left);
+        Overlay& frame = g_preview[(k >= 1 && k <= 3 ? k : 1) - 1];
+        if (frame.picture.pixels.empty()) return;
+        const int top = window.bottom - frame.picture.h;
+        frame.draw(target, window.right - frame.picture.w, top, 1);
+        if (k >= 2 && !g_strip.picture.pixels.empty())
+            g_strip.draw(target, window.right - margin - g_strip.picture.w * size,
+                         top - margin / 2 - g_strip.picture.h * size, size);
+        return;
+    }
+    const int w = g_version.picture.w * size, h = g_version.picture.h * size;
     const bool right_bar = window.right - picture.right >= w + 2 * margin;
     const bool bottom_bar = window.bottom - picture.bottom >= h + 2 * margin;
-    int x, y;
-    if (right_bar || bottom_bar) {
-        x = window.right - margin - w;
-        y = window.bottom - margin - h;
-    } else {
-        x = picture.right - margin - w;
-        y = picture.bottom - margin - h;
-    }
-    IDirectDrawSurface7* text = text_surface(target, size);
-    if (!text) return;
-    RECT to = {x, y, x + w, y + h};
-    HRESULT hr = text->IsLost() == DDERR_SURFACELOST ? DDERR_SURFACELOST
-                                                    : target->Blt(&to, text, nullptr, DDBLT_WAIT | DDBLT_KEYSRC, nullptr);
-    if (SUCCEEDED(hr)) {
-        g_failures = 0;
-    } else if (hr == DDERR_SURFACELOST) {   // a lost surface (Alt+Tab in full screen): filled again next frame
-        if (FAILED(text->Restore()) || !fill(text, size)) release_text();
-    } else if (FAILED(hr)) {
-        release_text();
-        if (++g_failures == 3) patch::log("menu version: cannot draw the text (%08X)", static_cast<unsigned>(hr));
-    }
+    if (right_bar || bottom_bar)
+        g_version.draw(target, window.right - margin - w, window.bottom - margin - h, size);
+    else
+        g_version.draw(target, picture.right - margin - w, picture.bottom - margin - h, size);
 }

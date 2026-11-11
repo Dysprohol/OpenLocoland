@@ -503,7 +503,12 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       picture before it is presented (`screen_scaling.cpp`, as the FPS counter), whole steps of the
       menu's stretch big (at 2160 px of height twice), only while the main menu's buttons (VID 467)
       are there and no briefing (VID 501): not in a mission or its Esc menu, not on the end screen,
-      not in the editor; nothing reacts to the mouse there,
+      not in the editor; nothing reacts to the mouse there. While the settings page is open (its
+      minimap row's arrows, VID 952, exist - in the main menu or the Esc menu) the corner shows the
+      minimap's frame instead, in real pixels and where the bar will put it, at the size the game
+      would use on this window (`vid\464preview1-3.bmp`, made by `build.py` from the same frame), and
+      for a bigger one the line "A STRIP SHOWS UNDER THE MAP" above it (the pack's text and font);
+      the version gives way meanwhile, and both follow a click and go with the page,
   44. the rain over the whole view (`rain.cpp`, `BUGS.md` F27, "The rain"): `Graphics_DrawRain` in C++,
       the same up to 1024x768; on a bigger view as many drops as the original has per 1024 x 768 px, and
       on a view higher than 768 px a drop made again starts at the top only with the chance

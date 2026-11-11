@@ -295,6 +295,53 @@ def make_minimap_frames(frame_vid, *outputs):
         shutil.rmtree(work, ignore_errors=True)
 
 
+# The settings page's preview of the minimap (LocoFix menu_version.cpp): the frame at the sizes 1, 2
+# and 3 as plain pictures, drawn on the final picture in the window's corner while the page is open
+# (the menu's own sprites live in its 1024x768 picture, which is stretched and cannot reach that
+# corner). 24-bit BMP, magenta where the frame is transparent (the colour key).
+PREVIEW_KEY = (255, 0, 255)
+
+
+def make_minimap_previews(frame_vid, *outputs):
+    """Writes `outputs` (vid\\464preview1.bmp ...): the frame of `frame_vid` 1, 2, 3 ... times, pixel
+    by pixel. Returns False (and writes nothing) when the frame is missing or not the 104 x 78 one -
+    then the page shows no preview."""
+    import json
+    import shutil
+    import tempfile
+    from PIL import Image
+    import map_tool
+
+    if not os.path.isfile(frame_vid):
+        return False
+    work = tempfile.mkdtemp(prefix="minimap_preview_")
+    try:
+        try:
+            frame = os.path.join(work, "frame")
+            map_tool.unpack(frame_vid, frame)
+            meta = json.load(open(os.path.join(frame, "vid.json"), encoding="utf-8"))
+            if meta.get("kind") != "sprite" or (meta["width"], meta["height"]) != MINIMAP_FRAME:
+                return False
+            src = Image.open(os.path.join(frame, "frames.png")).convert("RGBA")
+        except Exception:
+            return False
+        flat = Image.new("RGB", src.size, PREVIEW_KEY)
+        opaque = src.split()[3].point(lambda a: 255 if a >= 128 else 0)
+        # no picture pixel may be the key colour
+        body = src.convert("RGB")
+        pixels = body.load()
+        for y in range(body.height):
+            for x in range(body.width):
+                if pixels[x, y] == PREVIEW_KEY:
+                    pixels[x, y] = (247, 0, 247)
+        flat.paste(body, (0, 0), opaque)
+        for k, output in enumerate(outputs, 1):
+            flat.resize((flat.width * k, flat.height * k), Image.NEAREST).save(output, "BMP")
+        return True
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
 # The editor's icons (vid\939edit.vid, VID 939): the tools of LocoFix's editor bar that the
 # state bar's atlas (vid\455icon.vid) has no icon for, made from the game's own sprites in
 # the atlas' style - a 40 x 40 cell with the gold frame and the dark striped ground of the

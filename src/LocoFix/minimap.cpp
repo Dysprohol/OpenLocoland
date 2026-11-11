@@ -271,6 +271,9 @@ void* minimap_frame_for_screen() {
     return original;
 }
 
+// menu_version.cpp: the size the bar would get on a screen this wide (the settings page's preview).
+int minimap_size_for_screen(int screen_w) { return size_for(screen_w); }
+
 void minimap_frame_back(void* original) {
     if (original) vid_slot(VID_MINIMAP) = static_cast<uint8_t*>(original);
 }

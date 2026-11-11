@@ -107,8 +107,10 @@ The missions play as they always did. What changed:
   to edge instead of stopping in the middle.
 - **The minimap's size.** In the game's settings (Options in the main menu, and in a mission's Esc
   menu), **MINIMAP SIZE** makes the minimap in the bottom right corner twice or three times as big;
-  normal is the default. It changes when you go back to the game or start a mission, and on a screen
-  too narrow for the size you chose the minimap is as big as fits. A bigger minimap lets the view go
+  normal is the default. While the page is open, the bottom right corner of the screen shows the
+  minimap's frame as big and where it will stand in a mission. It changes when you go back to the
+  game or start a mission, and on a screen too narrow for the size you chose the minimap is as big as
+  fits (the corner shows that size). A bigger minimap lets the view go
   a little further down, past the map's bottom edge, so a strip shows there and the minimap covers
   nothing of the map. A click on the minimap
   still takes you to the place you clicked, and the bright frame that shows what you are looking at
