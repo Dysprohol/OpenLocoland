@@ -105,10 +105,12 @@ The missions play as they always did. What changed:
 
 - **The state bar across the whole screen.** On a wide screen the bar at the bottom runs from edge
   to edge instead of stopping in the middle.
-- **The minimap's size.** In the launcher, **Minimap** makes the minimap in the bottom right corner
-  twice or three times as big (the sizes that fit the chosen resolution are offered; the normal size
-  is the default). A bigger minimap lets the view go a little further down, past the map's bottom
-  edge, so a strip shows there and the minimap covers nothing of the map. A click on the minimap
+- **The minimap's size.** In the game's settings (Options in the main menu, and in a mission's Esc
+  menu), **MINIMAP SIZE** makes the minimap in the bottom right corner twice or three times as big;
+  normal is the default. It changes when you go back to the game or start a mission, and on a screen
+  too narrow for the size you chose the minimap is as big as fits. A bigger minimap lets the view go
+  a little further down, past the map's bottom edge, so a strip shows there and the minimap covers
+  nothing of the map. A click on the minimap
   still takes you to the place you clicked, and the bright frame that shows what you are looking at
   stays inside it and never gets too small to find, even on a huge map.
 - **A second row in the factory panel.** A factory can build up to 14 kinds of cars (keys F1 - F12,

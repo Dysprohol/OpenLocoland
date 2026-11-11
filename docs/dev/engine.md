@@ -555,9 +555,11 @@ minimap's. The frame's opening is columns 8-97 and rows 9-73 of the picture; the
 rectangle starts at row 10 (one too low) and the view's highlight follows the camera 48 px past the
 map's bottom (`boundsBottom` = map height + 50 - 2, so the map's last rows can come up over the
 bar) - fixed in LocoFix. LocoFix also lets the player make the minimap twice or three times as big
-(the launcher's Minimap row, `options.cpp`, registry `MinimapSize` 2 or 3; absent = the original
-size; a size is used only where it keeps the frame clear of the bar's slots, else the biggest that
-does), as VIDs 950 and 951
+(a row of ours on the game's settings page, `game/maps/script/optfields.lgc`, which keeps
+`MinimapSize` "1"-"3" in the Players key like the sound settings; absent = the original size; read
+each time the bar is built, so it applies from the next mission or when the Esc menu closes; a size
+is used only where it keeps the frame clear of the bar's slots, else the biggest that does), as VIDs
+950 and 951
 - the frame enlarged pixel by pixel (`patch_data.make_minimap_frames`), the menu box with it - put
 into `World.vids[464]` while `Player_ShowStateBar` builds the bar, so the engine places it by its
 own size; `MenuNVidUnderCursor` answers 464 for them, and the points, dots and the smallest

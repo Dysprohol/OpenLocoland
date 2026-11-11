@@ -35,3 +35,8 @@ nvid	name	spriteType	spriteClass	flags	moveMask	sizeX	sizeY	sizeZ	maxHp	speed	sp
 # (patch_data.make_minimap_frames)
 950	Statebar level map x2	0x400	FRAME	0x2800	0xf	200	148	0	0	0	0	999999	999999	2500	1	1	1	1	vid\464x2.vid
 951	Statebar level map x3	0x400	FRAME	0x2800	0xf	300	222	0	0	0	0	999999	999999	2500	1	1	1	1	vid\464x3.vid
+# VID 952 and 953: the arrows of LocoFix's minimap row on the settings page (game/maps/script/optfields.lgc) - the
+# page's own arrows (VID 495/496, their images) as types of their own, so a click on them is told from the sound and
+# music rows' and their mouse tips ([MouseTips] MenuVid952AllDir/953) say what they do
+952	Settings left	0x400	FRAME	0x2800	0xf	17	17	0	0	0	0	999999	999999	2500	1	1	1	1	vid\495menu.vid
+953	Settings right	0x400	FRAME	0x2800	0xf	17	17	0	0	0	0	999999	999999	2500	1	1	1	1	vid\496menu.vid

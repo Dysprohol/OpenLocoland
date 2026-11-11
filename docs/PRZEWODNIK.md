@@ -106,10 +106,12 @@ Misje grają się tak jak zawsze. Co się zmieniło:
 
 - **Pasek stanu na całą szerokość.** Na szerokim ekranie pasek na dole biegnie od krawędzi do
   krawędzi zamiast kończyć się na środku.
-- **Wielkość minimapy.** W okienku startowym **Minimapa** powiększa minimapę w prawym dolnym rogu
-  dwa albo trzy razy (do wyboru są tylko wielkości, które mieszczą się przy wybranej rozdzielczości;
-  domyślnie jest normalna). Przy większej widok da się przesunąć trochę dalej w dół, za dolną krawędź
-  mapy - widać tam wtedy pas, a minimapa niczego z mapy nie zasłania. Kliknięcie w minimapę dalej
+- **Wielkość minimapy.** W ustawieniach gry (Ustawienia w menu głównym i w menu pod Esc w misji)
+  **WIELKOSC MINIMAPY** powiększa minimapę w prawym dolnym rogu dwa albo trzy razy; domyślnie jest
+  normalna. Zmienia się, gdy wracasz do gry albo zaczynasz misję, a na ekranie za wąskim na wybraną
+  wielkość minimapa jest tak duża, jak się zmieści. Przy większej widok da się przesunąć trochę dalej
+  w dół, za dolną krawędź mapy - widać tam wtedy pas, a minimapa niczego z mapy nie zasłania.
+  Kliknięcie w minimapę dalej
   przenosi tam, gdzie się kliknęło, a jasna ramka, która pokazuje, na co patrzysz, nie wychodzi poza
   nią i nawet na ogromnej mapie nie robi się tak mała, że nie da się jej znaleźć.
 - **Drugi rząd w panelu fabryki.** Fabryka może budować do 14 rodzajów wagonów (klawisze F1 - F12,

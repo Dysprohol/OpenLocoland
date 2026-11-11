@@ -24,12 +24,15 @@
 // 7 x 5 px (times the size below) around the view's middle and inside the rectangle; the dots
 // kept inside the rectangle too.
 //
-// The size is the player's choice: the launcher's Minimap row (options.cpp) keeps it in the
-// registry value MinimapSize (DWORD 2 or 3; absent or 1 = the original size, the default). A size
-// is used only where it fits the game's screen - never so wide that the frame would reach the bar's
-// controls (the slots end 740 px into the centred 1024 px base) - else the biggest that fits: a
-// small map's logical screen (screen_scaling.cpp, mission 1: 1024x768, stretched as a whole) takes
-// twice at most. The launcher offers only the sizes that fit the chosen resolution.
+// The size is the player's choice on the game's settings page (the main menu's and the Esc
+// menu's; game/maps/script/optfields.lgc): the script keeps it with SetReg next to the sound and
+// music settings, the value MinimapSize ("1", "2" or "3") of the Players key (player_registry.cpp:
+// HKCU\SOFTWARE\Gromada\Locoland\Players); absent = the original size, the default. It is read
+// each time the bar is built - at a mission's start and when the Esc menu closes (the bar is given
+// up while it is hidden, so it is built again) - and used only where it fits the game's screen:
+// never so wide that the frame would reach the bar's controls (the slots end 740 px into the
+// centred 1024 px base), else the biggest that fits (a small map's logical screen,
+// screen_scaling.cpp - mission 1: 1024x768, stretched as a whole - takes twice at most).
 // The bigger frames are VIDs 950 and 951 (game/objects.override): the frame's picture enlarged
 // two and three times pixel by pixel (patch_data.make_minimap_frames), the size of the menu
 // item's box with it. Player_ShowStateBar takes the frame's VID from World.vids[464], so while
@@ -38,6 +41,7 @@
 // cursor and the mouse tip treat them as the minimap. The dots are drawn as blocks of the
 // step's size at their own scaled place.
 #include "patch.h"
+#include <cstdlib>
 
 namespace {
 
@@ -52,7 +56,7 @@ constexpr uintptr_t BRIGHTEN_RECT = 0x412ba0;   // Graphics_BrightenRect
 constexpr uintptr_t GRAPHICS_PUT_POINT = 0x405cd0;
 constexpr uintptr_t GRAPHICS_PUT_POINT_2X2 = 0x405e70;
 constexpr uintptr_t MENU_NVID_UNDER_CURSOR = 0x4247f0;
-constexpr char REG_KEY[] = "SOFTWARE\\Gromada\\Locoland";
+constexpr char REG_KEY[] = "SOFTWARE\\Gromada\\Locoland\\Players";   // the scripts' settings (player_registry.cpp)
 
 constexpr int VID_MINIMAP = 464;
 constexpr int VID_MINIMAP_BIG[] = {950, 951};   // two and three times
@@ -80,15 +84,19 @@ uint8_t*& vid_slot(int nvid) { return reinterpret_cast<uint8_t**>(world() + 0x29
 int vid_count() { return at<int>(world(), 0x290); }
 
 int g_size = 1;   // the step of the minimap the frame in use was made for
-int g_chosen = 1;  // the player's choice (MinimapSize), 1 = the original size
-
-int read_fixed_size() {
+// The player's choice: MinimapSize of the Players key, the text the script's SetReg writes (a
+// DWORD is taken too); 1 when it is absent or not 1-3.
+int chosen_size() {
     HKEY key;
-    if (RegOpenKeyExA(HKEY_CURRENT_USER, REG_KEY, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) return 0;
-    DWORD value = 0, size = sizeof value, type = 0;
-    const LONG r = RegQueryValueExA(key, "MinimapSize", nullptr, &type, reinterpret_cast<BYTE*>(&value), &size);
+    if (RegOpenKeyExA(HKEY_CURRENT_USER, REG_KEY, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) return 1;
+    char text[16] = {};
+    DWORD size = sizeof text - 1, type = 0;
+    const LONG r = RegQueryValueExA(key, "MinimapSize", nullptr, &type, reinterpret_cast<BYTE*>(text), &size);
     RegCloseKey(key);
-    return r == ERROR_SUCCESS && type == REG_DWORD && value >= 1 && value <= MAX_SIZE ? static_cast<int>(value) : 1;
+    int value = 0;
+    if (r == ERROR_SUCCESS && type == REG_SZ) value = std::atoi(text);
+    if (r == ERROR_SUCCESS && type == REG_DWORD && size == 4) std::memcpy(&value, text, 4);
+    return value >= 1 && value <= MAX_SIZE ? value : 1;
 }
 
 // The frame stays right of the bar's controls (the bar's base is centred).
@@ -97,7 +105,7 @@ bool fits(int size, int screen_w) {
 }
 
 int size_for(int screen_w) {
-    int size = g_chosen > MAX_SIZE ? MAX_SIZE : g_chosen;
+    int size = chosen_size();
     while (size > 1 && !fits(size, screen_w)) --size;
     return size < 1 ? 1 : size;
 }
@@ -263,13 +271,6 @@ void* minimap_frame_for_screen() {
     return original;
 }
 
-// options.cpp: the launcher's choice (1 = the original size) and whether a size fits a screen width.
-void minimap_set_size(int size) {
-    g_chosen = size >= 1 && size <= MAX_SIZE ? size : 1;
-    patch::log("minimap: size %d chosen in the launcher", g_chosen);
-}
-bool minimap_size_fits(int size, int screen_w) { return fits(size, screen_w); }
-
 void minimap_frame_back(void* original) {
     if (original) vid_slot(VID_MINIMAP) = static_cast<uint8_t*>(original);
 }
@@ -296,7 +297,6 @@ void minimap_bounds(void* player) {
 }
 
 void install_minimap() {
-    g_chosen = read_fixed_size();
     // mov eax,[ecx] / push esi / mov esi,[esp+8]
     const uint8_t place_start[] = {0x8B, 0x01, 0x56, 0x8B, 0x74, 0x24, 0x08};
     // fld [esp+4] / fmul [ecx+0xc]
@@ -324,5 +324,5 @@ void install_minimap() {
                     reinterpret_cast<void*>(&menu_nvid_under_cursor), "MenuNVidUnderCursor");
     patch::write_call(DRAW_BRIGHTEN, nullptr, 0, reinterpret_cast<void*>(&brighten_call), 5);
     g_installed = true;
-    if (g_chosen > 1) patch::log("minimap: size %d chosen (MinimapSize)", g_chosen);
+    if (chosen_size() > 1) patch::log("minimap: size %d chosen on the settings page", chosen_size());
 }

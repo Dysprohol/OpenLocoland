@@ -1,0 +1,94 @@
+// LocoFix's own fields on the game's settings page - the main menu's (maps\menu.lgc) and the Esc
+// menu's in a mission (maps\script\menutact.lgc), both included from there. Each field is a row
+// like the sound row: its name on the left in the page's font and, where the sound row has its bar,
+// the value between a left and a right arrow - arrows of their own (VIDs 952 and 953, the page's
+// arrows 495/496 as types of their own, game/objects.override), so a click on them is not taken
+// for the sound or the music. The value is kept with SetReg next to the sound and music settings.
+//
+// Row 0 is under the mouse buttons' row, OPT_DY below it as the page's own rows are apart; it is the
+// last one that fits above the panel's bottom strip. The page's own rows stay where they are: the
+// panel's picture has dark slots behind the sound and music bars at their rows, and with the rows
+// moved those slots showed empty. Room for one more row of ours: the free band between the page's
+// title and the sound row, row -4 (OptRowY(-4), 40 px above the sound row). A second field there:
+// a pair of arrows of its own (954/955), its texts MenuOptions<Name> and MenuOptions<Name>1... in
+// each pack's strings.override.ini, and a line in each of the three functions below.
+#define OPT_ROW_Y   89    // row 0, from the Y of CreateOptionsMenu: the mouse buttons' row + 40
+#define OPT_DY      40    // between the rows, as the page's own
+#define OPT_LEFT_X  (-73+99)   // the arrows and the value, from the X of CreateOptionsMenu (the sound row's)
+#define OPT_RIGHT_X (72+99)
+#define OPT_VALUE_X 99
+#define OPT_MINIMAP_LEFT  952
+#define OPT_MINIMAP_RIGHT 953
+#define OPT_MINIMAP_SIZES 3   // the original size, twice, three times (LocoFix minimap.cpp: MinimapSize)
+
+int opt_minimap=1, opt_minimap_name=0, opt_minimap_value=0;
+int opt_x, opt_y, opt_z, opt_text_z;   // where CreateOptionsMenu put the page, and its depths
+string opt_text;
+
+// A text of the pack's strings.ini, or `english` when it has none: the game's own strings.ini (an
+// edition's language without a pack of ours, Portuguese) lacks our keys - as menu.lgc's custom maps
+// header falls back to CUSTOM MAPS.
+OptString(string key,string english)
+{
+  opt_text=GetString("strings",key);
+  if(opt_text=="") opt_text=english;
+  return opt_text;
+}
+
+OptRowY(int n)
+{
+  return opt_y+OPT_ROW_Y+n*OPT_DY+MENU_OPTIONS_SHIFT_Y;
+}
+
+OptMinimapSizeText()
+{
+  if(opt_minimap==2) return OptString("MenuOptionsMinimap2","TWICE AS BIG");
+  if(opt_minimap==3) return OptString("MenuOptionsMinimap3","3 TIMES AS BIG");
+  return OptString("MenuOptionsMinimap1","NORMAL");
+}
+
+OptMinimapValue()
+{
+  if(opt_minimap_value) Destroy(opt_minimap_value);
+  opt_minimap_value=PrintTextAtCenter(opt_x+OPT_VALUE_X+MENU_OPTIONS_SHIFT_X,OptRowY(0)+opt_text_z,opt_text_z,
+                                      OptMinimapSizeText(),2);
+}
+
+// After the page's own rows: X, Y as CreateOptionsMenu has them (GetRCX/GetRCY), the depth of its
+// arrows and of its texts (the main menu: 20 and 300, the Esc menu: 2220 and 2300). The names of
+// the parameters and globals here are used by no other script: a script that includes this file
+// does not compile when one of them is a global there (mvid of menutact.lgc did that).
+OptFieldsCreate(int at_x,int at_y,int depth,int text_depth)
+{
+  opt_x=at_x; opt_y=at_y; opt_z=depth; opt_text_z=text_depth;
+  opt_minimap=GetReg("SOFTWARE\\Gromada\\steam\\Players","MinimapSize","1");
+  if(opt_minimap<1 || opt_minimap>OPT_MINIMAP_SIZES) opt_minimap=1;
+  opt_minimap_name=PrintText(opt_x-144+MENU_OPTIONS_SHIFT_X,OptRowY(0)-8+opt_text_z,opt_text_z,
+                             OptString("MenuOptionsMinimap","MINIMAP SIZE"),2);
+  MenuCreate(OPT_MINIMAP_LEFT,0,opt_x+OPT_LEFT_X+MENU_OPTIONS_SHIFT_X,OptRowY(0),opt_z);
+  MenuCreate(OPT_MINIMAP_RIGHT,0,opt_x+OPT_RIGHT_X+MENU_OPTIONS_SHIFT_X,OptRowY(0),opt_z);
+  opt_minimap_value=0;
+  OptMinimapValue();
+}
+
+OptFieldsKill()
+{
+  if(opt_minimap_name) Destroy(opt_minimap_name);
+  if(opt_minimap_value) Destroy(opt_minimap_value);
+  opt_minimap_name=0; opt_minimap_value=0;
+  Genocide(OPT_MINIMAP_LEFT);
+  Genocide(OPT_MINIMAP_RIGHT);
+}
+
+// The menu item clicked (MenuVid()) while the page is open.
+OptFieldsClick(int clicked)
+{
+  if(clicked==OPT_MINIMAP_LEFT || clicked==OPT_MINIMAP_RIGHT)
+  {
+    if(clicked==OPT_MINIMAP_LEFT && opt_minimap>1) opt_minimap=opt_minimap-1;
+    if(clicked==OPT_MINIMAP_RIGHT && opt_minimap<OPT_MINIMAP_SIZES) opt_minimap=opt_minimap+1;
+    PlaySFX(24);
+    SetReg("SOFTWARE\\Gromada\\steam\\Players","MinimapSize",itoa(opt_minimap));
+    OptMinimapValue();
+  }
+}

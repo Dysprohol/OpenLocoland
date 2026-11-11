@@ -1,10 +1,11 @@
 --- maps/menu.lgc
 +++ maps/menu.lgc
-@@ -2,2 +2,3 @@
+@@ -2,2 +2,4 @@
  #include "maps\Script\menus.lgc"
 +#include "maps\script\unlock.lgc"   // option_unlock_all: the launcher's All missions option (LocoFix)
++#include "maps\script\optfields.lgc"   // LocoFix's own fields on the settings page (the minimap's size)
  #define R_GAMMA 0
-@@ -50,2 +51,24 @@
+@@ -50,2 +52,24 @@
  #define MENU_EXIT     6
 +#define MENU_CUSTOM   7     // custom maps: the second page of the strategic map
 +
@@ -29,7 +30,7 @@
 +#define CUSTOM_EDIT_X 140   // its place, from the centre of the picture
 +#define CUSTOM_MSG_Y  106   // the line under the list: why a map could not be opened
  
-@@ -88,2 +111,10 @@
+@@ -88,2 +112,10 @@
  string load_list;
 +int custommenu_created=0,custom_count=0,custom_top=0,custom_shown=0;
 +string custom_folder[6];   // the maps shown: custom_top ... custom_top+custom_shown-1 of the list
@@ -40,14 +41,14 @@
 +int custom_text[]={0,0,0,0,0,0,0};   // their texts and the editor's
 +string brief_list,brief_title;   // the briefing SetMenuBriefState shows
  #include "maps\script\maps_create.lgc"
-@@ -154,2 +185,6 @@
+@@ -154,2 +186,6 @@
      }
 +    if(num==MENU_LEVELS)
 +      menu_next=MenuCreate(476,0,X+152,Y+131,30);
 +    if(num==MENU_CUSTOM)
 +      menu_prev=MenuCreate(475,0,X-151,Y+131,30);
      if(num==MENU_USER ) menu_brief_text=PrintFile(X-175,Y-70+100,100,GetFileFromList("maps\\menu"+itoa(num)+".lst"),2);
-@@ -191,4 +226,14 @@
+@@ -191,4 +227,14 @@
      }
 -    menu_pict=MenuCreate(482+num,0,X,Y,10);
 -    menu_brief_head=PrintText(X+BREIF_HEAD_X,Y+BREIF_HEAD_Y,BREIF_HEAD_Z,GetString("strings","MenuHeader"+itoa(num)),3);
@@ -64,14 +65,14 @@
 +    }
 +    menu_brief_head=PrintText(X+BREIF_HEAD_X,Y+BREIF_HEAD_Y,BREIF_HEAD_Z,s,3);
    }
-@@ -198,2 +243,6 @@
+@@ -198,2 +244,6 @@
  SetMenuBriefState(int num){
 +  if(num>0){
 +    brief_list="maps\\l"+sprintf("%02i",num)+"\\brief.lst";
 +    brief_title=GetString("strings","MapHeader"+itoa(num));
 +  }
    if (menu_pict!=-1) Destroy(menu_pict);
-@@ -208,5 +257,5 @@
+@@ -208,5 +258,5 @@
    menu_start_text=PrintTextAtCenter(X,Y+131+100,100,GetString("strings","MenuBriefGo"),2);
 -  if(curr_page>0) 
 +  if(curr_page>0 || num<0)   // a custom map goes back to the list from its first page
@@ -79,19 +80,19 @@
 -  if(GetCountFromList("maps\\l"+sprintf("%02i",num)+"\\brief.lst")-1>curr_page)
 +  if(GetCountFromList(brief_list)-1>curr_page)
      menu_next=MenuCreate(476,0,X+152,Y+131,30);
-@@ -214,4 +263,4 @@
+@@ -214,4 +264,4 @@
      menu_pict=MenuCreate(501,0,X,Y,10);
 -    menu_brief_text=PrintFile(X-175,Y-70+100,100,GetFileFromList("maps\\l"+sprintf("%02i",num)+"\\brief.lst"),2);
 -    menu_brief_head=PrintText(X+BREIF_HEAD_X,Y+BREIF_HEAD_Y,BREIF_HEAD_Z,GetString("strings","MapHeader"+itoa(num)),3);
 +    menu_brief_text=PrintFile(X-175,Y-70+100,100,GetFileFromList(brief_list),2);
 +    menu_brief_head=PrintText(X+BREIF_HEAD_X,Y+BREIF_HEAD_Y,BREIF_HEAD_Z,brief_title,3);
    }
-@@ -277,3 +326,3 @@
+@@ -277,3 +327,3 @@
      {
 -      if (k<j) Action(MenuCreate(468,j,X+xmaps[j],Y+ymaps[j],20),act_menudisable,0,0);
 +      if (k<j && !option_unlock_all) Action(MenuCreate(468,j,X+xmaps[j],Y+ymaps[j],20),act_menudisable,0,0);
        else 
-@@ -285,2 +334,188 @@
+@@ -285,2 +335,188 @@
    levelmenu_created=1;
 +}
 +KillCustomMenu()
@@ -280,7 +281,15 @@
 +  SetMenuBriefState(-1);
 +  return 0;
  }
-@@ -604,2 +839,8 @@
+@@ -414,2 +650,3 @@
+     Genocide(508);
++    OptFieldsKill();
+ 
+@@ -440,2 +677,3 @@
+   MenuCreate(496,1,X+MENU_OPTIONS_SHIFT_X+72+99,Y+MENU_OPTIONS_SHIFT_Y+9,20);
++  OptFieldsCreate(X,Y,20,300);
+   optionsmenu_created=1;
+@@ -604,2 +842,8 @@
          }
 +        else if(GetReg("SOFTWARE\\Gromada\\steam\\Players","return","0")=="2")
 +        {
@@ -289,7 +298,7 @@
 +           CreateCustomMenu();
 +        }
          else
-@@ -668,5 +909,22 @@
+@@ -668,5 +912,22 @@
          {
 -            if(curr_page){ curr_page--;PlaySFX(24);}
 -            if(brief_exists) SetMenuBriefState(brief_state);
@@ -315,7 +324,7 @@
 +               else SetMenuState(menu_state);
 +            }
          }
-@@ -674,5 +932,16 @@
+@@ -674,5 +935,16 @@
          {
 -            if(GetCountFromList(load_list)-1>curr_page){ curr_page++;PlaySFX(24);}
 -            if(brief_exists) SetMenuBriefState(brief_state);
@@ -335,7 +344,7 @@
 +               else SetMenuState(menu_state);
 +            }
          }
-@@ -687,2 +956,10 @@
+@@ -687,2 +959,10 @@
              }
 +           else if(brief_exists && brief_state<0 && CustomMapProblem(custom_selected)!="")
 +           {
@@ -346,11 +355,11 @@
 +              CreateCustomMenu();
 +           }
             else
-@@ -715,2 +992,3 @@
+@@ -715,2 +995,3 @@
            KillLevelMenu();
 +          KillCustomMenu();
            KillOptionsMenu();
-@@ -738,2 +1016,24 @@
+@@ -738,2 +1019,24 @@
            }
 +        }
 +        else if (menu_state==MENU_CUSTOM && !brief_exists){
@@ -375,3 +384,7 @@
 +          if(k>-1)
 +            if(CustomMenuSelect(k,0)) return;
          }
+@@ -950,2 +1253,3 @@
+          mvid=MenuVid(); i=MenuDir();
++         OptFieldsClick(mvid);
+          if(mvid==495)
