@@ -909,7 +909,10 @@ it), FOG LOOK (LIGHTENS / DARKENS - flag 2, `Graphics_DrawFog`'s source blend ZE
 and l07's fogs have: the fog takes its colour away from the picture instead of adding it; added light shows
 nothing on bright ground - a MIST over snow, on a player's winter map, was there and pulsing and could not be
 seen -, a darkening fog nothing on dark ground, and the tint seen is the colour's opposite: HAZE's pink leaves
-green, DUST's orange blue; the presets set no flag, the row does) and FOG MOTION (STEADY, RISES AT THE START - flag 1, which the row called PULSING -, PULSES with its
+green, DUST's orange blue; a preset sets the look its mission has - DUST, l01's, and HAZE, l07's, DARKENS (their
+flags 2 and 10), MIST, l05's, and GLOW, l13's, LIGHTENS (0 and 8) - since 2026-11-11, before the presets set
+no flag and DUST and HAZE came out a pale wash; one step of the history with the fog, and the row changes it
+afterwards - checked in Polish: DUST, then LIGHTENS by hand, GLOW, HAZE, each row as said, and an undo) and FOG MOTION (STEADY, RISES AT THE START - flag 1, which the row called PULSING -, PULSES with its
 row PULSE: SLOW, NORMAL, FAST: "A fog that rises or pulses"); the palette's Effects group places 750, 751 and 752 as rectangles sized in the
 panel; the image VID is the region's own and not set anywhere. FOG and OVER are rows of their own: a
 fog chosen stays over the region until OVER: THE WHOLE MAP is set (which says so when the region has

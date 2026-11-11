@@ -626,7 +626,8 @@ on flat ground it is a tinted rectangle; **OVER: THE WHOLE MAP** makes it a haze
 in missions 7, 13 and 18 (it also turns a region's explosions into splashes everywhere). **FOG LOOK** chooses how
 the fog shows: **LIGHTENS** adds its colour (for dark ground - on snow or sand it cannot be seen) or **DARKENS**
 takes light away, as the fogs of missions 1 and 7 do (for bright ground; the tint you see is then the opposite
-of the fog's colour: the pink haze turns the snow green). **FOG MOTION** says what
+of the fog's colour: the pink haze turns the snow green). Choosing **DUST** or **HAZE** sets DARKENS, as
+missions 1 and 7 have them, **MIST** or **GLOW** LIGHTENS; you can change it after. **FOG MOTION** says what
 the fog does: **STEADY**, **RISES AT THE START** (it comes up once from the bottom after the map is loaded -
 about half a second for each level of height - and stays; the editor shows the rise when you choose it) or
 **PULSES** (it swells and sinks for as long as the map runs: **PULSE: SLOW, NORMAL, FAST** - once in 12, 6 or

@@ -5939,19 +5939,23 @@ template <typename F> void region_change(uint8_t* o, F f) {
 // A fog covers the ground of the region whose level is below low fully and fades out up to
 // high (Graphics_DrawFog compares the depth buffer - 1024, 8 a level, with them), so the missions'
 // values are levels of their maps' ground. The presets keep the missions' colours and depths and are
-// set around the region's own level: from elow under it to bove over it.
+// set around the region's own level: from `below` under it to `above` over it, with the look (FOG LOOK,
+// flag 2) the mission has: l01's dust and l07's haze darken (flags 2 and 10), l05's mist and l13's glow
+// lighten (0 and 8) - the dust and the haze chosen with the lightening look were a pale wash that hardly
+// showed (the to-do list of 2026-11-10); the row can change it afterwards.
 struct FogPreset {
     UiText name;
     int below, above;
     uint32_t colour;
+    bool darkens;
 };
 // the missions' fogs: l05's blue mist (5-35), l01's dust (20-60), l07's red haze (30-45), l13's
 // lava glow (7-20)
-const FogPreset FOGS[] = {{{"CtxFogNone", "NONE"}, 0, 0, 0xff000000},
-                          {{"CtxFogMist", "MIST"}, 20, 10, 0xff006478},
-                          {{"CtxFogDust", "DUST"}, 25, 15, 0xff966400},
-                          {{"CtxFogHaze", "HAZE"}, 5, 10, 0xffff3296},
-                          {{"CtxFogGlow", "GLOW"}, 5, 8, 0xffff6400}};
+const FogPreset FOGS[] = {{{"CtxFogNone", "NONE"}, 0, 0, 0xff000000, false},
+                          {{"CtxFogMist", "MIST"}, 20, 10, 0xff006478, false},
+                          {{"CtxFogDust", "DUST"}, 25, 15, 0xff966400, true},
+                          {{"CtxFogHaze", "HAZE"}, 5, 10, 0xffff3296, true},
+                          {{"CtxFogGlow", "GLOW"}, 5, 8, 0xffff6400, false}};
 
 void draw_vid(uint8_t* v, int frame, float x, float y, float z);   // below
 
@@ -10133,8 +10137,12 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
             const bool current = !f.above ? at<int>(o, RG_HIGH) <= at<int>(o, RG_LOW)
                                           : at<int>(o, RG_HIGH) == high && at<int>(o, RG_LOW) == low && at<uint32_t>(o, RG_COLOUR) == f.colour;
             const uint32_t colour = f.colour;
-            fog.choices.push_back({f.name, current, [o, low, high, colour] {
-                                       region_change(o, [o, low, high, colour] { set_region_fog(o, low, high, colour); });
+            const bool preset = f.above != 0, darkens = f.darkens;
+            fog.choices.push_back({f.name, current, [o, low, high, colour, preset, darkens] {
+                                       region_change(o, [o, low, high, colour, preset, darkens] {
+                                           set_region_fog(o, low, high, colour);
+                                           if (preset) at<uint32_t>(o, RG_FLAGS) = darkens ? at<uint32_t>(o, RG_FLAGS) | 2u : at<uint32_t>(o, RG_FLAGS) & ~2u;
+                                       });
                                    }});
         }
         rows.push_back(fog);

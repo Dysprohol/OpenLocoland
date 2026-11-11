@@ -625,6 +625,8 @@ niej mgiełkę nad całym widokiem, jak w misjach 7, 13 i 18 (zamienia też wybu
 mapie). **WYGLAD MGLY** wybiera, jak mgłę widać: **ROZJASNIA** dodaje swój kolor (na ciemny grunt - na
 śniegu i piasku jest niewidoczna) albo **PRZYCIEMNIA** zabiera światło, jak mgły misji 1 i 7 (na jasny
 grunt; widoczny odcień jest wtedy odwrotnością koloru mgły: różowy opar barwi śnieg na zielono).
+Wybór **PYL** albo **OPAR** ustawia PRZYCIEMNIA, jak w misjach 1 i 7, **MGIELKA** albo **LUNA** -
+ROZJASNIA; potem możesz to zmienić.
 **RUCH MGLY** mówi, co mgła robi: **STOI**, **NARASTA NA STARCIE** (podnosi się raz od dołu po
 wczytaniu mapy - około pół sekundy na każdy poziom wysokości - i zostaje; edytor pokazuje narastanie, gdy
 to wybierzesz) albo **PULSUJE** (wzbiera i opada, dopóki mapa działa: **PULS: WOLNY, ZWYKLY, SZYBKI** - raz
