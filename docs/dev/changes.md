@@ -130,7 +130,11 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
      (6 GetWindowRect calls),
   4. more resolutions in the launcher: the built-in list (640x480, 800x600, 1024x768, in
      the settings struct `0x47b1f0`) gets 1280x720 ... 3840x2160 and the desktop
-     resolution; the game shows those the card supports,
+     resolution - only the modes no wider and no taller than the screen in real pixels (fix 46),
+     16 at most (fix 45); the game shows those the card supports. A saved mode bigger than the
+     screen (another monitor, another display scale) becomes the screen's own size (after
+     `Graphics_Construct`, before the start window), so full screen is never bigger than the
+     screen,
   5. a map smaller than the screen sits in the middle instead of at the right and bottom
      edge (`SetPosition` hooked - while the camera is clamped, the map bounds are widened
      to the view size; for a level held in editor mode by 300 px more on every side),

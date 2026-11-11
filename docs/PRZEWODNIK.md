@@ -74,8 +74,9 @@ Gra startuje okienkiem startowym (z obrazkiem Locolandu):
 
 ![Okienko startowe](img/launcher-update-pl.jpg)
 
-- **Rozdzielczość** - oprócz 640 x 480 ... 1024 x 768 lista ma tryby panoramiczne twojego monitora
-  (od 1280 x 720 do 3840 x 2160) i rozdzielczość pulpitu.
+- **Rozdzielczość** - oprócz 640 x 480 ... 1024 x 768 lista ma tryby panoramiczne, które mieszczą się
+  na twoim ekranie (od 1280 x 720 do rozdzielczości twojego ekranu). Większych trybów nie ma: na pełnym
+  ekranie część obrazu byłaby poza zasięgiem myszy.
 - **Pełny ekran** - pole pod obrazkiem. Gdy nie jest zaznaczone, gra działa w **oknie** (okno
   pamięta swoje miejsce).
 - **Język** - lista obok: języki, które masz (polski, angielski, ...; fanowskie tłumaczenie jest

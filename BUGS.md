@@ -303,6 +303,20 @@ Harmless log errors:
 - The system DirectDraw does not set the 16-bit mode and corrupts the picture - dgVoodoo2 is
   part of the game.
 - The launcher forces full screen with dgVoodoo (test at 0x40d95e skipped).
+- Full screen with part of the picture out of the cursor's reach (reported on v0.2.11: the cursor
+  could not go into the bottom part of the screen; a window worked). The exe is not DPI-aware and
+  dgVoodoo does not make it so, so at a Windows display scale of 125 % or 150 % the engine measured
+  a smaller screen (a 1920x1080 screen is 1536x864 / 1280x720 to it), while dgVoodoo listed and set
+  the real modes. The start window (`Launcher_FillOrRead` 0x40d660) ticks and greys the full screen
+  box for a mode bigger than the measured screen - at 150 % already for the default 1024x768. In full
+  screen dgVoodoo confines the cursor to the game's mode from the screen's corner (`ClipCursor`
+  (0,0)-(1600,1200) for 1600x1200, seen on a 2560x1440 screen), in the process's scaled units, which
+  Windows cuts at the scaled screen's edge: the lower part (and a strip at the right) of the game
+  could not be reached. LocoFix makes the game per-monitor DPI-aware (`dpi_aware.cpp`; the start
+  window stays scaled by Windows as before) and offers only modes that fit the screen, a saved mode
+  that no longer fits becoming the screen's own size (`resolutions.cpp`). The mechanism is the
+  code's and the confinement was seen at 100 %; not seen on a scaled screen (this machine is at
+  100 %). LocoFix's longer mode list also overflowed the engine's 16 places (F29).
 - In a window the game area was smaller than the chosen resolution and the picture and mouse
   were computed from the whole window (AdjustWindowRectEx, 6 GetWindowRect calls).
 - Only 640x480-1024x768 in the launcher; maps smaller than the screen sat at the right and

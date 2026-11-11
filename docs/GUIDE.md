@@ -73,8 +73,9 @@ The game starts with its launcher (the window with the Locoland picture):
 
 ![The launcher](img/launcher-update-en.jpg)
 
-- **Resolution** - besides 640 x 480 ... 1024 x 768 the list has the widescreen modes of your
-  monitor (1280 x 720 up to 3840 x 2160) and your desktop's own resolution.
+- **Resolution** - besides 640 x 480 ... 1024 x 768 the list has the widescreen modes that fit your
+  screen (from 1280 x 720 up to your screen's own resolution). A bigger mode is not offered: in full
+  screen part of the picture would be out of the mouse's reach.
 - **Full screen** - the box under the picture. Unticked, the game runs in a **window** (the window
   remembers its place).
 - **Language** - the list next to it: the languages you have (Polish, English, ...; a fan

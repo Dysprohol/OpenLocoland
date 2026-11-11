@@ -318,6 +318,20 @@ other missions use the whole 1920x1080 with the interface at the window edges (t
 fills it). In full screen dgVoodoo scales the chosen mode to the monitor
 (`ScalingMode = stretched_ar`).
 
+The launcher offers only modes that fit the screen (`resolutions.cpp`): no wider and no taller than
+the primary monitor in real pixels (the game is DPI-aware, `dpi_aware.cpp`), with the screen's own
+size, 16 at most (a device's list has room for 16, `BUGS.md` F29). dgVoodoo lists only modes up to
+the desktop's size and refuses a bigger one in full screen ("Couldn't set the display mode", seen
+with 2560x1600 on a 2560x1440 screen), so a mode the list offers is one dgVoodoo can set. A saved
+mode bigger than the screen becomes the screen's own size right after `Graphics_Construct` (the
+call at 0x41a518), before the start window selects it and also when the start window is turned
+off. Before, the start window measured the mode against the screen as Windows reported it to an
+unaware process - at 125 % or 150 % smaller than the real one - and ticked and greyed the full
+screen box for every mode bigger than that; the full screen then was dgVoodoo's window of the
+scaled screen while the game's picture had the real mode's size, and the cursor could not reach
+the lower part of it (reported on v0.2.11; the mechanism is the code's, not seen on a scaled
+screen - `BUGS.md` "Running on current Windows").
+
 **Frame rate at high resolutions.** The game draws on one thread, and the cost of a frame grows
 with the screen: the engine draws the ground with Direct3D, then locks the back buffer and the
 depth buffer whole for the software sprites (dgVoodoo waits for the GPU and copies both to the
