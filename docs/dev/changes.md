@@ -499,6 +499,11 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       menu's stretch big (at 2160 px of height twice), only while the main menu's buttons (VID 467)
       are there and no briefing (VID 501): not in a mission or its Esc menu, not on the end screen,
       not in the editor; nothing reacts to the mouse there,
+  44. the rain over the whole view (`rain.cpp`, `BUGS.md` F27, "The rain"): `Graphics_DrawRain` in C++,
+      the same up to 1024x768; on a bigger view as many drops as the original has per 1024 x 768 px, and
+      on a view higher than 768 px a drop made again starts at the top only with the chance
+      (768 / height)², else anywhere in the view - the rain reaches the bottom of a big screen (it
+      stopped at about 790 px, GitHub issue #13),
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that

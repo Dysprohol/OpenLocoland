@@ -85,6 +85,23 @@ are left out on a screen the grey texture does not cover (logged once) instead o
 `LocoFix.log` says "fog buffer: 512x512 (P8) for the 1920x1080 screen". No shipped mission turns
 ground snow on (no map's `GRPH` has 0x40 and no script sets it).
 
+**The rain** (`src/LocoFix/rain.cpp`, `BUGS.md` F27). `Graphics_DrawRain` draws `ENV_RAIN` (the
+missions' `StartRain` of `daynight.lgc`: missions 3 and 6 now and then, 15 by its script) as drops
+of two vertices each (a line list, source-alpha blended, z-tested against the ground): a drop of
+length 15-65 starts at a depth that it loses as it falls, so it lives for 250-750 px of fall, slanted
+by the wind (`g_sinTable[windDirection] * wind`). The engine keeps 250, and a drop made again
+starts in the top 40 px - only the 50th and later of one frame anywhere down the view, which steady
+rain (about 7 a frame) never reaches. So the rain was made for 768 px: there it thins toward the
+bottom (by rows of 64 px from about 0.57 drops near the top to 0.02 at the bottom, simulated), on a
+higher view the rest stays dry. LocoFix has the function in C++ with the same steps and the same
+calls of `rand()`, and from a view bigger than 1024x768 on gives it as many drops as the original
+has per 1024 x 768 px (and the "50" with them), and on a view higher than 768 px a drop made again
+starts in the top band only with the chance (768 / height)², else anywhere in the view - so the rain
+reaches the bottom (simulated at 1080 px: from 0.49 at the top to 0.17 at the bottom, at 1440 px
+from 0.42 to 0.26). Up to 1024x768 it is the original. Falling snow (`Graphics_DrawSnow`, 1000
+flakes) wraps round the view and covers it whole; its flakes are not more on a bigger view, so the
+snow is thinner there (4.7 times at 2560x1440).
+
 Worth knowing when changing it: `Graphics_Init` always clears the flags 0x10 (Windows
 cursor drawn with GDI), 0x20 (software device) and 0x40 (triple buffering), so those paths
 are dead code. Effects 4 (`OPEN_WINDOW`) and 8 (`SCALE_WINDOW`) have no drawing code;

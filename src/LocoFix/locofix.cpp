@@ -31,6 +31,7 @@ void install_mouse_coords();
 void install_depot_rows();
 void install_status_bar();
 void install_minimap();
+void install_rain();
 void install_mouse_pan();
 void install_screen_scaling();
 void install_lost_surfaces();
@@ -147,6 +148,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         install_depot_rows();
         install_status_bar();
         install_minimap();
+        install_rain();
         install_script_random();
         install_script_log();
         install_script_value();
