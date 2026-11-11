@@ -597,8 +597,8 @@ też są we Wszystkich obiektach, a gdy jeden z nich ma być postawiony, rząd n
 jego temat.
 
 **Pomoce przy stawianiu** (rząd nad paskiem, gdy coś stawiasz; na początku wszystkie wyłączone; strona
-pomocy 30): **SIATKA** (`Ctrl+G`) stawia na punktach siatki o wybranym rozmiarze - części mostów, latarnie
-i płoty w rzędzie; **NA TOR** (`N`) kładzie obiekt, który znajdzie się blisko szyny, na jej linii, most
+pomocy 30): **SIATKA** (`Ctrl+G`) stawia na punktach siatki o wybranym rozmiarze to, co stawiasz, i to, co
+przeciągasz w Zaznacz - części mostów, latarnie i płoty w rzędzie; **NA TOR** (`N`) kładzie obiekt, który znajdzie się blisko szyny, na jej linii, most
 łukowy na jego wysokości pod szynami jak w misjach (obracasz go `R` `E`); **WYSOKOSC** (`PgUp` / `PgDn`,
 `Home`) ustawia wysokość przed postawieniem, podgląd ją pokazuje; **OBROT: LOSOWY** (`Q`) obraca każdy
 obiekt inaczej, podgląd pokazuje następny obrót (`R` `E` losują inny); **STAWIAJ: POJEDYNCZO / ROZRZUC**

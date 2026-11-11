@@ -598,8 +598,8 @@ theme of **All objects** is placed the same way. Trees, houses and the rest are 
 while one of them is to be placed the row above the bar shows its theme the same way.
 
 **Placing helps** (a row above the strip while something is to be placed, all off at first; help page
-30): **GRID** (`Ctrl+G`) puts what you place on the points of a grid of the size you choose - bridge
-parts, lamps and fences in a row; **ONTO TRACK** (`N`) puts an object that comes near a rail onto its
+30): **GRID** (`Ctrl+G`) puts what you place, and what you drag in Select, on the points of a grid of
+the size you choose - bridge parts, lamps and fences in a row; **ONTO TRACK** (`N`) puts an object that comes near a rail onto its
 line, an arched bridge at its height under the rails as in the missions (turn it with `R` `E`);
 **HEIGHT** (`PgUp` / `PgDn`, `Home`) sets the height before you place, the preview shows it; **TURN:
 RANDOM** (`Q`) turns each object differently, the preview showing the next turn (`R` `E` draw another);

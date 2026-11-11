@@ -2713,10 +2713,19 @@ void start_drag(POINT p) {
         g_drag.lift.push_back(at<float>(o, O_Z) - ground_z(vid_of(o), at<float>(o, O_X), at<float>(o, O_Y)));
 }
 
+void grid_snap(float& x, float& y);   // placing helps, below
+
 void continue_drag(POINT p) {
-    const float dx = static_cast<float>(p.x - g_drag.start.x), dy = static_cast<float>(p.y - g_drag.start.y);
+    float dx = static_cast<float>(p.x - g_drag.start.x), dy = static_cast<float>(p.y - g_drag.start.y);
     if (!g_drag.moved && std::fabs(dx) + std::fabs(dy) < 3) return;   // a click, not a drag
     g_drag.moved = true;
+    {   // the grid (Ctrl+G) as for placing: the first object to its nearest point, the others (its guns, pieces) with it
+        const State& s = g_drag.before[0];
+        float gx = s.x + dx, gy = s.y + dy;
+        grid_snap(gx, gy);
+        dx = gx - s.x;
+        dy = gy - s.y;
+    }
     for (size_t i = 0; i < g_drag.objects.size(); ++i) {
         uint8_t* o = g_drag.objects[i];
         const State& s = g_drag.before[i];
@@ -10618,6 +10627,7 @@ void draw_overlay() {
             g_frame_times.tool += ground_clock() - began;
         } else if (g_drag.active && g_drag.moved) {
             cursor = CURSOR_MOVE;
+            if (!g_drag.objects.empty()) draw_grid_near(at<float>(g_drag.objects[0], O_X), at<float>(g_drag.objects[0], O_Y));
         } else if (pick(mx, my)) {
             cursor = CURSOR_SELECT;
         }

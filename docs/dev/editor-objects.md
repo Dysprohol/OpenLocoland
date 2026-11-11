@@ -104,7 +104,9 @@ third line names them; each is a key as well, and all start off (as before):
 - **GRID** (Ctrl+G; the row's GRID: OFF / ON, - n + px, 4-256, 32 at first): the object goes to the
   grid's nearest point of the map (x, y), the preview with it and the grid's points around the cursor
   dotted, the one it takes lit; the track's objects snap from there as before. A decal placed one at a
-  time and a paste go to the grid too.
+  time and a paste go to the grid too, and so does an object dragged in the Select tool (issue #6;
+  `continue_drag`: the first object of the selection to the grid's nearest point, its guns and pieces by the
+  same step, the points dotted around it; before, a drag ignored the grid).
 - **ONTO TRACK** (N; Place tool): an object that is not one of the track's own (those snap anyway, "On
   the track") within 30 px of a rail link on the screen (`track_spot`, as the wrecks) goes onto the
   link's line at the rails' level; the arched bridge 776 at its height under them as the missions have it
