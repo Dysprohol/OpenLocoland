@@ -11,7 +11,7 @@
 // picture, and that corner has only the wall's dark lower rim - the panel of the pages, the
 // buttons and every text of the menu stay far from it in all six languages (looked at at
 // 1024x768; the "Help" button is in the top left corner, a pipe in the bottom left one). The text
-// is added to the picture (its black adds nothing), so the wall shows through between the letters.
+// is put on with its black as the colour key, so the wall shows through between the letters.
 // It is not a menu item - nothing reacts to the mouse there.
 //
 // Only on the main menu: the map whose script (menu.lgc) makes the seven buttons of VID 467 down
@@ -101,6 +101,89 @@ void make_text() {
     }
 }
 
+// The text drawn into a surface of its own once, put on the picture with a Blt keyed on black:
+// a GetDC or a lock of the window-sized picture every frame makes dgVoodoo copy it to memory and
+// back (the main menu fell from 438 to 200 fps at 1920x1080 and from 432 to 138 at 2560x1440).
+const GUID IID_DirectDraw7_ = {0x15e65ec0, 0x3b9c, 0x11d2, {0xb9, 0x2f, 0x00, 0x60, 0x97, 0x97, 0xea, 0x5b}};
+IDirectDrawSurface7* g_surface = nullptr;
+int g_surface_size = 0;
+DDPIXELFORMAT g_surface_format = {};
+int g_failures = 0;
+
+void release_text() {
+    if (g_surface) g_surface->Release();
+    g_surface = nullptr;
+    g_surface_size = 0;
+}
+
+// One channel of 0xRRGGBB (shift 16, 8, 0) into the bits of `mask`.
+uint32_t channel(uint32_t rgb, int shift, uint32_t mask) {
+    if (!mask) return 0;
+    int low = 0, bits = 0;
+    while (!(mask >> low & 1)) ++low;
+    while (low + bits < 32 && (mask >> (low + bits) & 1)) ++bits;
+    const uint32_t v = (rgb >> shift & 0xff) * ((1u << bits) - 1) / 255;
+    return v << low & mask;
+}
+
+// The text, `size` times, into the surface (black, the colour key, where nothing is written).
+bool fill(IDirectDrawSurface7* s, int size) {
+    DDSURFACEDESC2 desc = {};
+    desc.dwSize = sizeof desc;
+    if (FAILED(s->Lock(nullptr, &desc, DDLOCK_WAIT | DDLOCK_WRITEONLY, nullptr))) return false;
+    const DDPIXELFORMAT& f = desc.ddpfPixelFormat;
+    const int bytes = static_cast<int>(f.dwRGBBitCount) / 8;
+    for (int y = 0; y < g_text.h * size; ++y) {
+        auto* row = static_cast<uint8_t*>(desc.lpSurface) + static_cast<size_t>(y) * desc.lPitch;
+        for (int x = 0; x < g_text.w * size; ++x) {
+            const uint32_t rgb = g_text.pixels[static_cast<size_t>(y / size) * g_text.w + x / size];
+            const uint32_t v = channel(rgb, 16, f.dwRBitMask) | channel(rgb, 8, f.dwGBitMask) | channel(rgb, 0, f.dwBBitMask);
+            if (bytes == 2) reinterpret_cast<uint16_t*>(row)[x] = static_cast<uint16_t>(v);
+            else if (bytes == 4) reinterpret_cast<uint32_t*>(row)[x] = v;
+        }
+    }
+    s->Unlock(nullptr);
+    return bytes == 2 || bytes == 4;
+}
+
+IDirectDrawSurface7* text_surface(IDirectDrawSurface7* target, int size) {
+    if (g_failures >= 3) return nullptr;
+    DDPIXELFORMAT format = {};
+    format.dwSize = sizeof format;
+    if (FAILED(target->GetPixelFormat(&format))) return nullptr;
+    if (g_surface && g_surface_size == size && std::memcmp(&format, &g_surface_format, sizeof format) == 0) return g_surface;
+    release_text();
+    IUnknown* unknown = nullptr;
+    if (FAILED(target->GetDDInterface(reinterpret_cast<void**>(&unknown))) || !unknown) return nullptr;
+    IDirectDraw7* dd = nullptr;
+    unknown->QueryInterface(IID_DirectDraw7_, reinterpret_cast<void**>(&dd));
+    unknown->Release();
+    if (!dd) return nullptr;
+    DDSURFACEDESC2 desc = {};
+    desc.dwSize = sizeof desc;
+    desc.dwFlags = DDSD_CAPS | DDSD_WIDTH | DDSD_HEIGHT | DDSD_PIXELFORMAT | DDSD_CKSRCBLT;
+    desc.dwWidth = g_text.w * size;
+    desc.dwHeight = g_text.h * size;
+    desc.ddpfPixelFormat = format;
+    desc.ddckCKSrcBlt.dwColorSpaceLowValue = desc.ddckCKSrcBlt.dwColorSpaceHighValue = 0;   // black
+    desc.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN | DDSCAPS_VIDEOMEMORY;
+    HRESULT hr = dd->CreateSurface(&desc, &g_surface, nullptr);
+    if (FAILED(hr)) {
+        desc.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN;
+        hr = dd->CreateSurface(&desc, &g_surface, nullptr);
+    }
+    dd->Release();
+    if (FAILED(hr) || !fill(g_surface, size)) {
+        if (FAILED(hr)) g_surface = nullptr;
+        release_text();
+        if (++g_failures == 3) patch::log("menu version: cannot make the text's surface (%08X)", static_cast<unsigned>(hr));
+        return nullptr;
+    }
+    g_surface_size = size;
+    g_surface_format = format;
+    return g_surface;
+}
+
 }  // namespace
 
 // screen_scaling.cpp, before the frame is presented: `target` holds the final picture of the
@@ -123,16 +206,17 @@ void draw_menu_version(IDirectDrawSurface7* target, const RECT& window, const RE
         x = picture.right - margin - w;
         y = picture.bottom - margin - h;
     }
-    HDC dc;
-    if (FAILED(target->GetDC(&dc))) return;
-    BITMAPINFO bi = {};
-    bi.bmiHeader.biSize = sizeof bi.bmiHeader;
-    bi.bmiHeader.biWidth = g_text.w;
-    bi.bmiHeader.biHeight = -g_text.h;
-    bi.bmiHeader.biPlanes = 1;
-    bi.bmiHeader.biBitCount = 32;
-    bi.bmiHeader.biCompression = BI_RGB;
-    // OR onto the picture: black adds nothing, so only the letters show
-    StretchDIBits(dc, x, y, w, h, 0, 0, g_text.w, g_text.h, g_text.pixels.data(), &bi, DIB_RGB_COLORS, SRCPAINT);
-    target->ReleaseDC(dc);
+    IDirectDrawSurface7* text = text_surface(target, size);
+    if (!text) return;
+    RECT to = {x, y, x + w, y + h};
+    HRESULT hr = text->IsLost() == DDERR_SURFACELOST ? DDERR_SURFACELOST
+                                                    : target->Blt(&to, text, nullptr, DDBLT_WAIT | DDBLT_KEYSRC, nullptr);
+    if (SUCCEEDED(hr)) {
+        g_failures = 0;
+    } else if (hr == DDERR_SURFACELOST) {   // a lost surface (Alt+Tab in full screen): filled again next frame
+        if (FAILED(text->Restore()) || !fill(text, size)) release_text();
+    } else if (FAILED(hr)) {
+        release_text();
+        if (++g_failures == 3) patch::log("menu version: cannot draw the text (%08X)", static_cast<unsigned>(hr));
+    }
 }
