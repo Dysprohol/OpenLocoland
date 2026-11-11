@@ -485,7 +485,8 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       high screen the minimap grows by whole steps, the one closest to the original's tenth of the
       screen's height: twice the size from 1152 px of height (2560x1440: 208 x 156), three times
       from 1920 px, never so wide that it reaches the bar's slots; the frames are VIDs 950 and 951
-      (`vid\464x2.vid`, `vid\464x3.vid`, the frame enlarged pixel by pixel by `build.py`), the dots
+      (`vid\464x2.vid`, `vid\464x3.vid`, the frame enlarged pixel by pixel by `build.py`; an edition
+      whose frame it cannot enlarge gets the frame copied as it is, which LocoFix keeps at its size), the dots
       grow with them, and clicks, the right-click orders, the cursor and the mouse tip treat them
       as the minimap; with a bigger frame the camera may go below the map as far as the frame is
       high, so its corner hides no more of the map than the original's. A small map's logical
