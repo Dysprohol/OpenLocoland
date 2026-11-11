@@ -602,7 +602,7 @@ przeciągasz w Zaznacz - części mostów, latarnie i płoty w rzędzie; **NA TO
 łukowy na jego wysokości pod szynami jak w misjach (obracasz go `R` `E`); **WYSOKOSC** (`PgUp` / `PgDn`,
 `Home`) ustawia wysokość przed postawieniem, podgląd ją pokazuje; **OBROT: LOSOWY** (`Q`) obraca każdy
 obiekt inaczej, podgląd pokazuje następny obrót (`R` `E` losują inny); **STAWIAJ: POJEDYNCZO / ROZRZUC**
-(`X`), osobno dla każdego obiektu: trawa, krzaki i podobne rozrzucają się przy przeciąganiu, reszta idzie
+(`X`), osobno dla każdego obiektu i zapamiętane na następny raz: trawa, krzaki i podobne rozrzucają się przy przeciąganiu, reszta idzie
 pojedynczo (dekoracja wraku już się nie rozrzuca), a drzewo albo kwiat też można rozrzucać.
 
 **Kopiuj i wstaw**: `Ctrl+C` kopiuje zaznaczony obiekt (fort z działami), `Ctrl+V` wstawia kopię pod

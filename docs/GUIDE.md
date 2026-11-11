@@ -603,7 +603,7 @@ the size you choose - bridge parts, lamps and fences in a row; **ONTO TRACK** (`
 line, an arched bridge at its height under the rails as in the missions (turn it with `R` `E`);
 **HEIGHT** (`PgUp` / `PgDn`, `Home`) sets the height before you place, the preview shows it; **TURN:
 RANDOM** (`Q`) turns each object differently, the preview showing the next turn (`R` `E` draw another);
-**PLACE: ONE / SCATTER** (`X`), chosen per object: grass, bushes and the like scatter on a drag, the rest
+**PLACE: ONE / SCATTER** (`X`), chosen per object and remembered for the next time: grass, bushes and the like scatter on a drag, the rest
 goes one at a time (a wreck decal no longer scatters), and a tree or a flower can be scattered too.
 
 **Copy and paste**: `Ctrl+C` copies the selected object (a fort with its guns), `Ctrl+V` puts a copy

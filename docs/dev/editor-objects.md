@@ -122,7 +122,9 @@ third line names them; each is a key as well, and all start off (as before):
 - **TURN: AS SHOWN / RANDOM** (Q): the next turn is drawn in advance (`roll_turn`), so the preview
   shows it, and drawn again after each placing; R / E draw another. For the objects whose turn is theirs
   (not the track's objects or a flag in the wind).
-- **PLACE: ONE / SCATTER** (X), per VID (`g_scatter`, for the session): the decals of the ground's cover
+- **PLACE: ONE / SCATTER** (X), per VID (`g_scatter`; kept between runs of the game since issue #6 - the
+  string `EditorScatter` next to `EditorHints` in the registry, `<vid>:<0|1>` pairs, only the choices that
+  are not the VID's default; before, the choice lasted until the game was closed): the decals of the ground's cover
   scatter by default (`ground_cover`: not the beds, wrecks, buildings, track and industry pieces of
   `NOT_COVER`) and everything else goes one at a time - before, every decal scattered on a drag, also a
   wreck or a paving stone. A decal one at a time: a click puts it as shown, a drag adds none (Shift+drag

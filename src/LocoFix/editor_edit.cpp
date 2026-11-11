@@ -3374,7 +3374,11 @@ constexpr float SNAP_REACH = 30;
 int g_place_lift = 0;
 bool g_random_turn = false;
 int g_random_direction = 0;      // the turn drawn for the next object
-std::map<int, bool> g_scatter;   // X: the choice made for a VID (else its class's default)
+constexpr char MUSIC_KEY[] = "SOFTWARE\\Gromada\\Locoland";   // LocoFix's settings (RegPath of Locoland.cfg)
+// X: the choice made for a VID where it is not its class's default - kept between runs of the game
+// (issue #6) as EditorScatter next to EditorHints: "<vid>:<0|1>" separated by spaces
+std::map<int, bool> g_scatter;
+bool g_scatter_loaded = false;
 struct OnLine {
     int nvid;
     float below_points;   // its z under the rail points (the missions')
@@ -3410,8 +3414,39 @@ bool scatter_able(int nvid) {
            !is_flag(nvid) && sockets_of(nvid, 0).empty() && pieces_of_kind(nvid, 0).empty();
 }
 
+void scatter_load() {
+    if (g_scatter_loaded) return;
+    g_scatter_loaded = true;
+    HKEY key;
+    if (RegOpenKeyExA(HKEY_CURRENT_USER, MUSIC_KEY, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) return;
+    char text[4096] = "";
+    DWORD size = sizeof text - 1, type = 0;
+    if (RegQueryValueExA(key, "EditorScatter", nullptr, &type, reinterpret_cast<BYTE*>(text), &size) == ERROR_SUCCESS && type == REG_SZ) {
+        text[(std::min)(size, static_cast<DWORD>(sizeof text - 1))] = 0;
+        for (const char* p = text; *p;) {
+            int nvid = 0, on = 0, used = 0;
+            if (std::sscanf(p, " %d:%d%n", &nvid, &on, &used) != 2) break;
+            if (nvid > 0) g_scatter[nvid] = on != 0;
+            p += used;
+        }
+        patch::log("edit: %u scatter choices of earlier runs (EditorScatter)", static_cast<unsigned>(g_scatter.size()));
+    }
+    RegCloseKey(key);
+}
+
+void scatter_save() {
+    std::string text;
+    for (const auto& [nvid, on] : g_scatter) text += (text.empty() ? "" : " ") + std::to_string(nvid) + (on ? ":1" : ":0");
+    HKEY key;
+    if (RegCreateKeyExA(HKEY_CURRENT_USER, MUSIC_KEY, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &key, nullptr) != ERROR_SUCCESS) return;
+    if (text.empty()) RegDeleteValueA(key, "EditorScatter");
+    else RegSetValueExA(key, "EditorScatter", 0, REG_SZ, reinterpret_cast<const BYTE*>(text.c_str()), static_cast<DWORD>(text.size() + 1));
+    RegCloseKey(key);
+}
+
 bool scatter_on(int nvid) {
     if (!scatter_able(nvid)) return false;
+    scatter_load();
     const auto it = g_scatter.find(nvid);
     return it != g_scatter.end() ? it->second : ground_cover(nvid);
 }
@@ -8394,7 +8429,6 @@ void draw_bar() {
 constexpr uintptr_t G_SOUND_OBJECT = 0x5d3a54, PLAY_MUSIC_FILE = 0x445090;
 constexpr size_t SOUND_MUSIC_NAME = 0x3d8;   // g_sound: the music file's name (a String)
 using PlayMusicFile_t = int(__fastcall*)(void* sound, void* edx, char** file, int loop);
-constexpr char MUSIC_KEY[] = "SOFTWARE\\Gromada\\Locoland";   // LocoFix's settings (RegPath of Locoland.cfg)
 
 struct MusicPlayer {
     bool loaded = false, on = false;
@@ -8673,7 +8707,10 @@ void toggle_scatter() {
         MESSAGE("MsgScatterNot", "VID %d is placed one by one (it is not scattered: a unit, building, the track's object, a whole ...)", nvid);
         return;
     }
-    g_scatter[nvid] = !scatter_on(nvid);
+    const bool on = !scatter_on(nvid);
+    if (on == ground_cover(nvid)) g_scatter.erase(nvid);   // back to its default: nothing to keep
+    else g_scatter[nvid] = on;
+    scatter_save();
     const char* name = object_name(nvid);
     MESSAGE("MsgScatter", "%s (VID %d): %s", name ? name : "?", nvid,
             scatter_on(nvid) ? ui_text("WordScatter", "a drag scatters it (radius: wheel, + -; spacing < >)") : ui_text("WordOneByOne", "placed one by one"));
