@@ -59,9 +59,21 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
   in a 16:9 window), so the points are scaled and moved the same way. The logs it watches
   (in `logs\` of the game folder) are the game's own and `LocoFix.log`, where test mode also lists every file the game
   opens. In test mode the game keeps running behind other windows (`test.cpp` does not
-  pass `WM_ACTIVATEAPP` FALSE to the game, which would pause it and ignore the mouse), so a test
-  never brings the window forward and the user keeps the focus; only the game's own start (the
-  launcher dialog) takes it once. Full screen is not part of the automatic tests - switching the mode
+  pass `WM_ACTIVATEAPP` FALSE to the game, which would pause it and ignore the mouse). A run is
+  quiet by default: the script starts itself again on a Win32 desktop of its own (`CreateDesktop`,
+  `STARTUPINFO.lpDesktop`, closed after the run), so neither the start window nor the game's window
+  appears on the user's screen, takes the focus or gets a taskbar button (the start window is a
+  dialog that activates itself - only another desktop keeps that off the user's), and
+  `LOCOFIX_QUIET=1` makes LocoFix hold the sound and music volume at 0 for the run (`test.cpp`: the
+  engine's two volume setters and the values themselves, never the registry or the sound devices);
+  output and exit code come back to the caller as before. The game draws there as usual; its
+  screenshots come from `PrintWindow`, or, when that is black (nothing composes a desktop that is
+  not shown), from the game's own screenshot (menu command 40023, the back buffer - the logical
+  picture before the stretch). The frame rate there is lower than on the user's screen (13-18 % at
+  1920x1080 and 2560x1440), so frame-rate measurements run with `-Visible`, the old way on the
+  user's desktop; so do the `A` and `Q` steps (real keys, a file dialog), `-SetFull 1` and `-Screen`,
+  automatically.
+  Full screen is not part of the automatic tests - switching the mode
   breaks the redrawing of other windows; `-SetFull 1` runs a single test in it. `-Map maps\l01\l01.map` starts straight into that
   map (LocoFix `--test-map`: no intro, no menu) and `-LogWait` sets how long `-WaitFor` may
   take (60 s). `-Editor` starts the game in editor mode (`--editor`); there the steps

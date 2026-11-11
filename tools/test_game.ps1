@@ -56,10 +56,19 @@
 # -Map      load this map straight away instead of the intro and the menu (LocoFix
 #           --test-map, game paths such as "maps\l01\l01.map"); -Steps may be left out then
 # -LogWait  how long -WaitFor may take (default 60 s)
+# -Visible  run on the user's desktop as before. Without it a run is quiet: the script starts itself
+#           again on a Win32 desktop of its own (CreateDesktop), so neither the start window nor the
+#           game's window comes up, takes the focus or gets a taskbar button on the user's screen, and
+#           LOCOFIX_QUIET=1 makes LocoFix hold the game's sound and music at 0 (test.cpp); its output
+#           and exit code come back here. The steps that need the user's desktop - A (Alt+Tab with
+#           real keys), Q (typing into a file dialog) - full screen (-SetFull 1) and -Screen always
+#           run visible. Screenshots there come from PrintWindow, or, when that is black (nothing
+#           composes a desktop that is not shown), from the game's own screenshot (menu command
+#           40023: the back buffer - the logical picture before its stretch, see screen_scaling.cpp).
 # At the end it closes the game with WM_CLOSE, so error.log is complete.
 # If the full screen box is disabled and the test should run in a window, the game is
 # closed without clicking OK - so the display mode is not switched.
-param([string]$Exe = (Join-Path (Split-Path (Split-Path $PSScriptRoot)) "Locoland\Locoland.exe"), [int]$Wait = 10, [string]$Shot = "", [int]$ClickOk = 0, [switch]$Screen, [int]$SetFull = -1, [string]$Steps = "", [string]$WaitFor = "", [int]$LogWait = 60, [string]$Language = "", [string]$Map = "", [switch]$LastShotOnly, [switch]$Menu, [switch]$Editor)
+param([string]$Exe = (Join-Path (Split-Path (Split-Path $PSScriptRoot)) "Locoland\Locoland.exe"), [int]$Wait = 10, [string]$Shot = "", [int]$ClickOk = 0, [switch]$Screen, [int]$SetFull = -1, [string]$Steps = "", [string]$WaitFor = "", [int]$LogWait = 60, [string]$Language = "", [string]$Map = "", [switch]$LastShotOnly, [switch]$Menu, [switch]$Editor, [switch]$Visible)
 Add-Type @"
 using System; using System.Runtime.InteropServices; using System.Text;
 public class W {
@@ -108,6 +117,54 @@ public class W {
 }
 "@
 Add-Type -AssemblyName System.Drawing, System.Windows.Forms
+$quiet = -not $Visible -and -not $Screen -and $SetFull -ne 1 -and $Steps -notmatch '(^|,)\s*[AQ]'
+if ($quiet -and $env:LOCOFIX_QUIET_INNER -ne "1") {
+  # Start this script again on a desktop of its own with the same parameters, and pass its output on.
+  Add-Type @"
+using System; using System.Runtime.InteropServices;
+public class QuietDesk {
+  [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)] public struct STARTUPINFO {
+    public int cb; public string lpReserved; public string lpDesktop; public string lpTitle;
+    public int dwX, dwY, dwXSize, dwYSize, dwXCountChars, dwYCountChars, dwFillAttribute, dwFlags;
+    public short wShowWindow, cbReserved2; public IntPtr lpReserved2, hStdInput, hStdOutput, hStdError; }
+  [StructLayout(LayoutKind.Sequential)] public struct PROCESS_INFORMATION { public IntPtr hProcess, hThread; public int dwProcessId, dwThreadId; }
+  [DllImport("user32.dll", CharSet=CharSet.Unicode, SetLastError=true)] public static extern IntPtr CreateDesktopW(string name, IntPtr dev, IntPtr mode, int flags, uint access, IntPtr sa);
+  [DllImport("user32.dll")] public static extern bool CloseDesktop(IntPtr h);
+  [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] public static extern bool CreateProcessW(string app, string cmd, IntPtr pa, IntPtr ta, bool inherit, uint flags, IntPtr env, string dir, ref STARTUPINFO si, out PROCESS_INFORMATION pi);
+  [DllImport("kernel32.dll")] public static extern uint WaitForSingleObject(IntPtr h, uint ms);
+  [DllImport("kernel32.dll")] public static extern bool GetExitCodeProcess(IntPtr h, out uint code);
+  [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr h);
+}
+"@
+  $name = "OpenLocolandTest$PID"
+  $desk = [QuietDesk]::CreateDesktopW($name, [IntPtr]::Zero, [IntPtr]::Zero, 0, 0x10000000, [IntPtr]::Zero)   # GENERIC_ALL
+  if ($desk -eq [IntPtr]::Zero) { "Quiet run: no desktop of its own (error $([Runtime.InteropServices.Marshal]::GetLastWin32Error())) - running visible" }
+  else {
+    $out = Join-Path ([IO.Path]::GetTempPath()) "openlocoland_test_$PID.txt"
+    $args2 = foreach ($k in $PSBoundParameters.Keys) {
+      $v = $PSBoundParameters[$k]
+      if ($v -is [System.Management.Automation.SwitchParameter]) { if ($v) { "-$k" } } else { "-$k '" + ("$v" -replace "'", "''") + "'" }
+    }
+    $inner = "& '" + ($PSCommandPath -replace "'", "''") + "' " + ($args2 -join " ") + " *> '" + ($out -replace "'", "''") + "'; exit `$LASTEXITCODE"
+    $cmd = "`"$PSHOME\powershell.exe`" -NoProfile -ExecutionPolicy Bypass -Command `"$($inner -replace '"', '\"')`""
+    $si = New-Object QuietDesk+STARTUPINFO; $si.cb = [Runtime.InteropServices.Marshal]::SizeOf($si); $si.lpDesktop = "WinSta0\$name"
+    $pinfo = New-Object QuietDesk+PROCESS_INFORMATION
+    $env:LOCOFIX_QUIET_INNER = "1"
+    $started = [QuietDesk]::CreateProcessW([NullString]::Value, $cmd, [IntPtr]::Zero, [IntPtr]::Zero, $false, 0x08000000, [IntPtr]::Zero, [NullString]::Value, [ref]$si, [ref]$pinfo)
+    Remove-Item Env:LOCOFIX_QUIET_INNER
+    if (-not $started) { [void][QuietDesk]::CloseDesktop($desk); "Quiet run: could not start on its desktop (error $([Runtime.InteropServices.Marshal]::GetLastWin32Error())) - running visible" }
+    else {
+      [void][QuietDesk]::WaitForSingleObject($pinfo.hProcess, [uint32]::MaxValue)
+      $code = [uint32]0; [void][QuietDesk]::GetExitCodeProcess($pinfo.hProcess, [ref]$code)
+      [void][QuietDesk]::CloseHandle($pinfo.hProcess); [void][QuietDesk]::CloseHandle($pinfo.hThread)
+      [void][QuietDesk]::CloseDesktop($desk)
+      if (Test-Path $out) { Get-Content $out; Remove-Item $out -ErrorAction SilentlyContinue }
+      exit [int]$code
+    }
+  }
+  $quiet = $false
+}
+if ($quiet) { "Quiet run: on a desktop of its own, sound and music at 0" }
 $scr = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
 "Screen: $($scr.Width)x$($scr.Height)"
 $dir = Split-Path $Exe
@@ -115,6 +172,7 @@ $logs = Join-Path $dir "logs"   # the game's error logs and LocoFix.log (build.p
 # LOCOFIX_TEST=1: the game listens only to the mouse from the test (src/LocoFix/test.cpp),
 # so clicks land where they should and the user's mouse is neither moved nor taken into account.
 $env:LOCOFIX_TEST = "1"
+if ($quiet) { $env:LOCOFIX_QUIET = "1" } else { Remove-Item Env:LOCOFIX_QUIET -ErrorAction SilentlyContinue }
 if ($Language) {
   $key = "HKCU:\SOFTWARE\Gromada\Locoland"
   if (-not (Test-Path $key)) { New-Item $key | Out-Null }
@@ -192,6 +250,34 @@ if ($ClickOk -gt 0) {
   $p.Refresh(); "Process alive after OK: $(-not $p.HasExited)"
 }
 
+# The game's own screenshot (menu command 40023: Screens\<time>.tga, the back buffer) as a PNG; false
+# when none came within 5 s.
+function Game-Shot($h, $file) {
+  $screens = Join-Path $dir "Screens"
+  if (-not (Test-Path $screens)) { New-Item -ItemType Directory $screens | Out-Null }
+  $before = @(Get-ChildItem $screens -Filter *.tga -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName + $_.LastWriteTime.Ticks })
+  [void][W]::PostMessage($h, 0x0111, [IntPtr]40023, [IntPtr]::Zero)
+  $deadline = (Get-Date).AddSeconds(5); $tga = $null
+  do { Start-Sleep -Milliseconds 200
+    $tga = Get-ChildItem $screens -Filter *.tga -ErrorAction SilentlyContinue | Where-Object { $before -notcontains ($_.FullName + $_.LastWriteTime.Ticks) } | Select-Object -First 1
+  } while (-not $tga -and (Get-Date) -lt $deadline)
+  if (-not $tga) { return $false }
+  Start-Sleep -Milliseconds 300
+  $b = [IO.File]::ReadAllBytes($tga.FullName)
+  $w = [BitConverter]::ToUInt16($b, 12); $hh = [BitConverter]::ToUInt16($b, 14); $bpp = $b[16]; $top = ($b[17] -band 0x20) -ne 0
+  $bytes = $bpp / 8; $off = 18 + $b[0]
+  $fmt = if ($bytes -eq 4) { [Drawing.Imaging.PixelFormat]::Format32bppRgb } else { [Drawing.Imaging.PixelFormat]::Format24bppRgb }
+  $bmp = New-Object Drawing.Bitmap $w, $hh, $fmt
+  $data = $bmp.LockBits((New-Object Drawing.Rectangle 0, 0, $w, $hh), [Drawing.Imaging.ImageLockMode]::WriteOnly, $fmt)
+  for ($y = 0; $y -lt $hh; $y++) {
+    $src = $off + $(if ($top) { $y } else { $hh - 1 - $y }) * $w * $bytes
+    [Runtime.InteropServices.Marshal]::Copy($b, $src, [IntPtr]($data.Scan0.ToInt64() + $y * $data.Stride), $w * $bytes)
+  }
+  $bmp.UnlockBits($data); $bmp.Save($file); $bmp.Dispose()
+  Remove-Item $tga.FullName -ErrorAction SilentlyContinue
+  return $true
+}
+
 function Save-Shot($h, $file) {
   $r = New-Object W+RECT; [void][W]::GetWindowRect($h, [ref]$r)
   $bmp = New-Object Drawing.Bitmap ($r.R - $r.L), ($r.B - $r.T)
@@ -201,6 +287,11 @@ function Save-Shot($h, $file) {
   # forward for a moment and the screen copied instead.
   $hdc = $g.GetHdc(); [void][W]::PrintWindow($h, $hdc, 2); $g.ReleaseHdc($hdc)
   $mid = $bmp.GetPixel([int]($bmp.Width / 2), [int]($bmp.Height / 2))
+  if ($mid.R + $mid.G + $mid.B -eq 0 -and $quiet) {
+    $g.Dispose(); $bmp.Dispose()
+    if (Game-Shot $h $file) { "Screenshot: $file (the game's own)" } else { "Screenshot: none - PrintWindow black and no game screenshot" }
+    return
+  }
   if ($mid.R + $mid.G + $mid.B -eq 0) { [void][W]::SetForegroundWindow($h); Start-Sleep -Milliseconds 800; $g.CopyFromScreen($r.L, $r.T, 0, 0, $bmp.Size) }
   $bmp.Save($file); $g.Dispose(); $bmp.Dispose()
   "Screenshot: $file"
@@ -482,7 +573,8 @@ foreach ($h in $wins) {
   $caption = ($style -band 0x00C00000) -ne 0
   $menu = [W]::GetMenu($h) -ne [IntPtr]::Zero
   "Window '$t' class=$k rect=($($r.L),$($r.T))-($($r.R),$($r.B)) client=$($c.R)x$($c.B) style=0x{0:X8} frame/caption=$caption menu=$menu" -f $style
-  if ($Shot -and $c.R -gt 0) {
+  if ($Shot -and $c.R -gt 0 -and $quiet) { Save-Shot $h $Shot }
+  elseif ($Shot -and $c.R -gt 0) {
     [void][W]::SetForegroundWindow($h); Start-Sleep -Milliseconds 1500
     $bmp = New-Object Drawing.Bitmap ($r.R - $r.L), ($r.B - $r.T)
     $g = [Drawing.Graphics]::FromImage($bmp)

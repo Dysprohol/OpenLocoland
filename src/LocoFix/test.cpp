@@ -16,6 +16,14 @@
 //    ignores the mouse), and WM_ACTIVATEAPP TRUE is posted once when the window is shown, in
 //    case it came up behind another one - so a test runs with the game window behind the
 //    user's and never has to bring it forward (test_game.ps1 does not).
+// A quiet run (LOCOFIX_QUIET=1 next to LOCOFIX_TEST=1, test_game.ps1 without -Visible, which runs
+// the game on a Win32 desktop of its own) also has no sound: the sound object's effects and music
+// volumes (g_sound +0x3c4 / +0x3c8, 0-100) are held at 0 - SetSoundVolume and SetMusicVolume get 0
+// whatever the script asks, and both fields are set to 0 every frame for a run whose scripts never
+// set them. At 0 the engine plays no effect (it skips one under -3000 hundredths of a dB, and 0 is
+// (0 - 100) * 32 = -3200) and starts no music (PlayMusicFile makes no stream at volume 0), so the
+// sound code runs as ever, nothing is taken away, and nothing is written to the registry (the
+// scripts keep their volumes with SetReg only on the settings page).
 // Outside test mode nothing changes.
 #include "patch.h"
 
@@ -26,6 +34,22 @@ constexpr uintptr_t IAT_SetCursorPos = 0x47517c;
 constexpr uintptr_t IAT_PeekMessageA = 0x475198;
 constexpr uintptr_t IAT_RegisterClassA = 0x4751b8;
 constexpr UINT WM_TEST_MOUSE = WM_APP + 1;
+constexpr uintptr_t G_SOUND = 0x5d3a54;               // g_sound: the sound object
+constexpr uintptr_t SET_SOUND_VOLUME = 0x444f90, SET_MUSIC_VOLUME = 0x444fc0;
+constexpr int SOUND_VOLUME = 0x3c4, MUSIC_VOLUME = 0x3c8;
+bool g_quiet = false;
+
+using SetVolume_t = void(__fastcall*)(void* sound, void* edx, int volume);
+SetVolume_t g_set_sound = nullptr, g_set_music = nullptr;
+void __fastcall quiet_set_sound(void* sound, void* edx, int) { g_set_sound(sound, edx, 0); }
+void __fastcall quiet_set_music(void* sound, void* edx, int) { g_set_music(sound, edx, 0); }
+
+void hold_silence() {
+    auto* sound = *reinterpret_cast<uint8_t**>(G_SOUND);
+    if (!sound) return;
+    *reinterpret_cast<int*>(sound + SOUND_VOLUME) = 0;
+    *reinterpret_cast<int*>(sound + MUSIC_VOLUME) = 0;
+}
 
 POINT g_cursor = {0, 0};   // screen coordinates
 WNDPROC g_game_wndproc = nullptr;
@@ -64,6 +88,7 @@ bool is_mouse(UINT message) {
 }
 
 BOOL WINAPI PeekMessageA_test(MSG* m, HWND window, UINT first, UINT last, UINT remove) {
+    if (g_quiet) hold_silence();
     BOOL got = PeekMessageA(m, window, first, last, remove);
     if (!got) return got;
     if (m->message == WM_TEST_MOUSE && is_mouse(LOWORD(m->wParam))) {
@@ -111,4 +136,15 @@ void install_test_mode() {
     replace_iat(IAT_PeekMessageA, reinterpret_cast<void*>(&PeekMessageA_test));
     replace_iat(IAT_RegisterClassA, reinterpret_cast<void*>(&RegisterClassA_test));
     patch::log("test mode: mouse input from the test only, the game stays active behind other windows");
+
+    if (!GetEnvironmentVariableA("LOCOFIX_QUIET", value, sizeof value) || value[0] != '1') return;
+    // mov eax,[esp+4] / test eax,eax ; push esi / push edi / mov edi,[esp+0xc]
+    const uint8_t sound_start[] = {0x8B, 0x44, 0x24, 0x04, 0x85, 0xC0};
+    const uint8_t music_start[] = {0x56, 0x57, 0x8B, 0x7C, 0x24, 0x0C};
+    g_set_sound = reinterpret_cast<SetVolume_t>(patch::hook(SET_SOUND_VOLUME, sound_start, sizeof sound_start,
+                                                            reinterpret_cast<void*>(&quiet_set_sound), "SetSoundVolume"));
+    g_set_music = reinterpret_cast<SetVolume_t>(patch::hook(SET_MUSIC_VOLUME, music_start, sizeof music_start,
+                                                            reinterpret_cast<void*>(&quiet_set_music), "SetMusicVolume"));
+    g_quiet = g_set_sound && g_set_music;
+    patch::log(g_quiet ? "test mode: quiet - sound and music at 0" : "test mode: quiet, but the sound could not be held at 0");
 }

@@ -219,7 +219,8 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       caller (`World_PopVid`) it did not overwrite (`BUGS.md` F9).
       `tools\test_script_value.py` checks the C++ against the original emulated in Unicorn
       on 2000 random cases plus edge cases,
-  19. test mode (only with `LOCOFIX_TEST=1`) - described below in "Working with the code",
+  19. test mode (only with `LOCOFIX_TEST=1`; with `LOCOFIX_QUIET=1` as well the sound and music
+      stay at 0) - described below in "Working with the code",
   20. test map (`test_map.cpp`, only with `--test-map <map>` or `-map <map>` on the command
       line): the game loads that map in place of the first level, so the intro and the menu
       are skipped and a test starts a mission the way the menu's "Uruchom grę" does with a
