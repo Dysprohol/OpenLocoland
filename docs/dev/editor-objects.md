@@ -106,7 +106,10 @@ third line names them; each is a key as well, and all start off (as before):
   dotted, the one it takes lit; the track's objects snap from there as before. A decal placed one at a
   time and a paste go to the grid too, and so does an object dragged in the Select tool (issue #6;
   `continue_drag`: the first object of the selection to the grid's nearest point, its guns and pieces by the
-  same step, the points dotted around it; before, a drag ignored the grid).
+  same step, the points dotted around it; before, a drag ignored the grid). A drag that leaves every object
+  where it began - dragged back, or less than half a cell from the grid point it stands on - is a click: no
+  step of the history, the redo kept, nothing "not saved" (`end_drag`; the review of 2026-11-11 found an
+  empty OpMove step there; checked: undo stayed at 2 over two such drags, with the grid and without).
 - **ONTO TRACK** (N; Place tool): an object that is not one of the track's own (those snap anyway, "On
   the track") within 30 px of a rail link on the screen (`track_spot`, as the wrecks) goes onto the
   link's line at the rails' level; the arched bridge 776 at its height under them as the missions have it

@@ -875,6 +875,7 @@ bool on_its_point(int nvid) { return nvid == VID_MINE || nvid == VID_MINE_MARKER
 void give_building_line(uint8_t* o);
 bool take_building_lines(uint8_t* o, std::vector<uint8_t*>& posts);
 void note_building_post(uint8_t* post);   // a building's post about to be moved away from its place (below)
+void claim_building_post(uint8_t* post);   // ... and at its new place (below)
 void resnap_on_track(uint8_t* o, float x, float y, int direction, const UiText& what, bool free = false);
 uint8_t* factory_door(uint8_t* v, float x, float y, uint8_t* self);   // placing, below
 bool rail_line_spot(float x, float y, float reach, bool diagonal, float& sx, float& sy, int& along);
@@ -2915,6 +2916,7 @@ void resnap_on_track(uint8_t* o, float x, float y, int direction, const UiText& 
     reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, x, y, z);
     set_direction(o, direction);
     remake_own_line(o, own);
+    claim_building_post(o);   // standing now at a building's post place: that building's
     commit(what, objects, before);
     if (lines_changed) {
         Operation& op = g_undo.back();
@@ -6990,6 +6992,27 @@ std::vector<uint8_t*> posts_of_others(uint8_t* o) {
     return out;
 }
 
+// A post now standing within 30 px of a building's post place is that building's (the nearest one's) -
+// dragged or turned onto another building's place it serves that line now; elsewhere it keeps its building.
+void claim_building_post(uint8_t* post) {
+    if (!post || removed(post) || nvid_of(post) != VID_SEMAPHORE) return;
+    const std::vector<PushLine>& lines = mission_push_lines();
+    uint8_t* best = nullptr;
+    float best_d = 30;
+    for_each_object([&](uint8_t* b) {
+        if (removed(b) || (nvid_of(b) != VID_DEPOT && nvid_of(b) != VID_WORKSHOP)) return;
+        for (int i : lines_of(b))
+            for (const Post& p : line_posts(trace(lines[i]))) {
+                const float d = std::hypot(at<float>(post, O_X) - p.x, at<float>(post, O_Y) - p.y);
+                if (d < best_d) best_d = d, best = b;
+            }
+    });
+    if (!best || post_owner(post) == best) return;
+    g_post_owner[post] = best;
+    patch::log("edit: VID 152 at %.0f,%.0f now stands at a post place of VID %d at %.0f,%.0f - it is that one's", at<float>(post, O_X),
+               at<float>(post, O_Y), nvid_of(best), at<float>(best, O_X), at<float>(best, O_Y));
+}
+
 void note_building_post(uint8_t* post) {
     if (!post || removed(post) || nvid_of(post) != VID_SEMAPHORE || post_owner(post)) return;
     const std::vector<PushLine>& lines = mission_push_lines();
@@ -7387,6 +7410,7 @@ void turn_post(uint8_t* o) {
     reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, nx, ny, ground_z(vid_of(o), nx, ny) + lift);
     set_direction(o, (at<int>(o, O_DIRECTION) + 128) & 255);
     remake_own_line(o, own);
+    claim_building_post(o);   // standing now at a building's post place: that building's
     commit({"OpTurn", "turn"}, {o}, before);
     if (own >= 0) lines_into_step(lines_before);
     MESSAGE("MsgPostTurned", "semaphore turned round: now for the trains going %s, %s", way_name(at<int>(o, O_DIRECTION)),

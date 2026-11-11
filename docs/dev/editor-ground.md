@@ -405,7 +405,14 @@ stayed when the repair point was turned or the factory dragged along its spur, a
 ones - its lights twice (reproduced on POLIGON: the enemy repair point's lower post dragged 70 px down the
 track, the repair point turned - three posts at it in the saved map; now two, and undo brings the moved post
 back, a quick test round keeps the posts with it, the factory's moved post goes when it is dragged along
-its spur). A post given a line of its own (L) is no longer the building's. On a map loaded from disk a
+its spur). A post is ONE building's (the review of 2026-11-11: it was put on the list of every building with a
+post place within 30 px, and the building's step took it wherever it stood): as the missions' posts, it stands
+at the end of one line and faces that line's trains, so a post dragged or turned to within 30 px of a
+building's post place becomes that building's (`claim_building_post`, the nearest place's), moved elsewhere it
+keeps its building, and a building takes and reuses no post that is another's (`posts_of_others` in
+`take_building_lines` and `put_posts`) - checked: the repair point's lower post deleted, the factory's post
+dragged to its place, the factory dragged along its spur - before, the factory's step took the post and the
+repair point stood without its light; now the post stays, the repair point's. A post given a line of its own (L) is no longer the building's. On a map loaded from disk a
 building's posts are found by their places again until one is moved: a post moved away and saved is a post
 of its own after the load (the map keeps no mark of whose a post is). Checked in the game: a mission made on the template with the main line, a spur
 with a factory at its dead end (line and red post made), a repair point on the main line (line,
