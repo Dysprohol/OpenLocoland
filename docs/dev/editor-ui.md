@@ -211,5 +211,15 @@ which only matters for a mine under the bar - there the label's characters and a
 fall on the bar or the rows are left out (`draw_mine_labels`, the review of 2026-11-11: they came out over the
 strip; checked with a mine on POLIGON's track under the strip, its label over the strip before, covered
 now): Select 59-60 fps with 3-3.7 ms to spare, Track 59-60, the Menu
-open 57.5-60. Not measured in full screen (the automatic tests do not switch the mode); the bar's own lock is
+open 57.5-60 in that run - but the frame had no time to spare with it (wait 0-0.7 ms), and the control
+session's run of the same build with the game-picture commits measured 49-53 fps with the Menu (ed-panels
+4.26 ms, 16 locks), as did one of two runs of mine. The 16 locks: the music player's four texts (8, cheap - no
+Direct3D between them), the queued texts (2), and the device (466), the picture (484) and the start button
+(477), software sprites (layers 2-4) that locked for themselves after Direct3D drawing - a sync each. Those
+go into the same queue now, in call order (`edit_draw_picture`), with a flush after the panel's background
+(`draw_frame`, so the lamps and icons Direct3D draws come over it) and one at the end: 12 locks, 2 syncs.
+Measured back to back on The Factory, 1920 x 1080 in a window, 14 s Select then 14 s Menu, two pairs: before
+57.2-59.9 and 49.3-50.4 fps with the Menu (ed-panels 3.6-4.8 ms, max 5.2-7.1, wait 0), after 59.8-60.2 in both
+(3.6-3.7 ms, max 4.2-4.7, wait 0.1-0.7 ms); Select 60 in all; Help, the Arrivals panel and the palette drawn as
+before. Not measured in full screen (the automatic tests do not switch the mode); the bar's own lock is
 needed for its plates, which are software pictures.

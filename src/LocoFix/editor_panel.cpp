@@ -54,6 +54,7 @@
 // editor_edit.cpp: drawing in front of the scene, the view and the bar
 void edit_draw_picture(int nvid, int frame, float x, float y, int step);
 float edit_draw_text(int font, float x, float y, const char* text, int step);
+void edit_texts_flush();   // the queued pictures and texts of the panel under one lock
 bool edit_font_size(int font, float& w, float& h);
 void edit_view_box(float& l, float& t, float& r, float& b);
 void edit_bar_box(float& l, float& t, float& r, float& b);
@@ -507,6 +508,7 @@ void draw_frame(int picture_vid, const char* title) {
     edit_draw_picture(VID_DEVICE, 0, d.x, d.y, STEP);
     edit_draw_picture(picture_vid, 0, p.x, p.y, STEP + 1);
     edit_draw_text(FONT_TITLE, p.x + TITLE_X, p.y + TITLE_Y, title, STEP + 3);
+    edit_texts_flush();   // the background now: what Direct3D draws on it (lamps, icons) comes after it
 }
 
 void draw_close(POINT m) {

@@ -11693,7 +11693,7 @@ void edit_log_rail_points(float x, float y) {
 bool edit_dirty() { return g_dirty; }
 
 // editor_panel.cpp's drawing: pictures and texts in front of the scene as the bar's, the view and the bar.
-void edit_draw_picture(int nvid, int frame, float x, float y, int step) { draw_screen(nvid, frame, x, y, step); }
+void edit_draw_picture(int nvid, int frame, float x, float y, int step);   // below, with the panels' queue
 // editor_panel.cpp's Menu panel: the hints under the cursor on or off (kept in the registry).
 bool edit_hints_on() { return hints_on(); }
 void edit_set_hints(bool on) { set_hints(on); }
@@ -11704,11 +11704,18 @@ void edit_set_hints(bool on) { set_hints(on); }
 // written after its pictures under one lock (`edit_texts_begin` / `edit_texts_flush` / `edit_texts_end`).
 // The pictures are under the texts anyway; what must come over texts (the click-and-hold strip of
 // the Arrivals and factory panels) flushes the queue first.
+// The panels' software pictures go into the same queue, in the order they were called (a picture under
+// a text before it): the Menu panel at 1920 x 1080 still took 16 locks a frame - the device (466), the
+// picture (484) and the start button (477) are software sprites (layers 2-4), each locking for itself
+// after the lamps' and the panel's Direct3D drawing, a sync each. A panel flushes once its background
+// pictures are queued (draw_frame), so what Direct3D draws over them - the lamps, the icons - still comes
+// after them, and once at its end.
 struct QueuedText {
-    int font;
+    int font;   // or the picture's VID (frame >= 0)
     float x, y;
     std::string text;
     int step;
+    int frame = -1;
 };
 std::vector<QueuedText> g_text_queue;
 bool g_text_queued = false;
@@ -11717,18 +11724,33 @@ void edit_texts_begin() { g_text_queued = true; }
 void edit_texts_flush() {
     if (g_text_queue.empty()) return;
     SoftwareLock locked;   // one lock for all of them
-    for (const QueuedText& t : g_text_queue) draw_text(t.font, t.x, t.y, t.text.c_str(), false, t.step);
+    for (const QueuedText& t : g_text_queue)
+        if (t.frame >= 0) draw_screen(t.font, t.frame, t.x, t.y, t.step);
+        else draw_text(t.font, t.x, t.y, t.text.c_str(), false, t.step);
     g_text_queue.clear();
 }
 void edit_texts_end() {
     edit_texts_flush();
     g_text_queued = false;
 }
+void edit_draw_picture(int nvid, int frame, float x, float y, int step) {
+    if (g_text_queued && software_vid(nvid)) {
+        static bool told = false;
+        if (!told) {
+            told = true;
+            patch::log("panel: software pictures queued with the texts (466 %d, 484 %d, 486 %d, 477 %d, 472 %d, 475 %d)", software_vid(466),
+                       software_vid(484), software_vid(486), software_vid(477), software_vid(472), software_vid(475));
+        }
+        g_text_queue.push_back({nvid, x, y, std::string(), step, (std::max)(0, frame)});
+        return;
+    }
+    draw_screen(nvid, frame, x, y, step);
+}
 float edit_draw_text(int font, float x, float y, const char* text, int step) {
     if (!g_text_queued) return draw_text(font, x, y, text, false, step);
     uint8_t* v = vid_by_number(font);
     if (!v) return x;
-    g_text_queue.push_back({font, x, y, text, step});
+    g_text_queue.push_back({font, x, y, text, step, -1});
     return x + at<float>(v, V_SIZE_X) * static_cast<float>(std::strlen(text));   // where draw_text would end
 }
 bool edit_font_size(int font, float& w, float& h) {
