@@ -10,6 +10,10 @@ the engine is documented (names and struct types for the decompiled code) and it
 are rewritten in readable C++ that replaces the originals one at a time, so the game stays
 playable all the way. Not affiliated with the rights holders of Locoland.
 
+OpenLocoland is by Dysprohol and its contributors, under the GNU GPLv3 (`LICENSE`); that covers our own
+work in this repository - the game belongs to its rights holders, and dgVoodoo2 has its own terms
+(`external/dgVoodoo2/NOTICE.md`).
+
 The goals: run well on current Windows (window, any resolution, no external setup), fix the
 game's bugs, open it up for mods, new missions and translations.
 

@@ -159,7 +159,8 @@ If you find this project useful and would like to support the time I dedicate to
 
 ## License
 
-OpenLocoland is an open-source project licensed under the **GNU GPLv3 License**.
+OpenLocoland is an open-source project licensed under the **GNU GPLv3 License** (see [LICENSE](LICENSE)).
+Copyright © 2026 Dysprohol and OpenLocoland contributors.
 
 *Disclaimer: This is an independent, non-commercial fan project. It is strictly not affiliated with, endorsed by, or connected to Gromada or ESDigital Games. Locoland and all related assets are the property of their respective rights holders.*
 

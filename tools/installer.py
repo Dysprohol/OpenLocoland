@@ -135,6 +135,7 @@ def missing_own_files():
     return [f for f in [sys.executable] + listed + BUNDLE_FILES if not os.path.isfile(f)]
 REPO = build.REPO
 APP = "OpenLocoland"
+CREDIT = "by Dysprohol"   # after the name and version in the window's corner (the exe's copyright line: release.py)
 MANIFEST = "OpenLocoland.json"
 SETTINGS_KEY = r"SOFTWARE\Gromada\Locoland"   # RegPath of Locoland.cfg: LocoFix's settings too
 DEFAULT_TARGET = os.path.join(os.environ.get("USERPROFILE", os.path.expanduser("~")), "Games", APP)
@@ -1793,6 +1794,9 @@ class Installer:
         self.log.grid(row=7, column=0, columnspan=3, sticky="nsew")
         frame.rowconfigure(7, weight=1)
 
+        # the project's credit, the same words in every language (CREDIT: release.py's version resource too)
+        ttk.Label(frame, text=f"OpenLocoland {version()} {CREDIT}", foreground="#6a6a6a").grid(
+            row=8, column=0, columnspan=3, sticky="w", pady=(10, 0))
         buttons = ttk.Frame(frame)
         buttons.grid(row=8, column=0, columnspan=3, sticky="e", pady=(10, 0))
         for i, (key, command) in enumerate([("install", self.install), ("uninstall", self.uninstall),

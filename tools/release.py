@@ -135,7 +135,8 @@ def version_resource(ver, path):
                ("FileDescription", f"OpenLocoland {ver} Setup"),
                ("FileVersion", ver),
                ("InternalName", "Setup"),
-               ("LegalCopyright", "OpenLocoland project; Locoland is a trademark of its owners"),
+               ("LegalCopyright", "Copyright (C) 2026 Dysprohol and OpenLocoland contributors. "
+                                 "Locoland is a trademark of its owners."),   # installer.CREDIT in the window
                ("OriginalFilename", f"OpenLocoland-{ver}-Setup.exe"),
                ("ProductName", "OpenLocoland Setup"),
                ("ProductVersion", ver),

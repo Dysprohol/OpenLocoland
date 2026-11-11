@@ -1,6 +1,6 @@
 # Contributing to OpenLocoland
 
-OpenLocoland is a fan project developed by one maintainer on a set plan (see "Plans" in
+OpenLocoland is a fan project developed by one maintainer (Dysprohol) on a set plan (see "Plans" in
 [README.md](README.md)). Help is welcome; this page says in what form, so that nobody puts work into
 something that cannot be taken in.
 
@@ -35,3 +35,8 @@ Nothing of the game itself and nothing derived from it: no game files, no unpack
 decompiled code, no lists taken out of the game's scripts. The game's files come from the player's
 own copy when the game is put together (see "What must not be shared" in
 [docs/dev/release.md](docs/dev/release.md)).
+
+## Licence
+
+OpenLocoland is licensed under the GNU GPLv3 ([LICENSE](LICENSE)). What you contribute - a fix, a
+translation, a correction - is taken in under the same licence, and you stay its author.

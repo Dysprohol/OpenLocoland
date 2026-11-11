@@ -33,7 +33,9 @@ from their own Steam copy, as `build.py` does it for a developer.
    exe gets a Windows version resource (`release.version_resource`: the numbers of the tag -
    v0.2.11 is 0.2.11.0, three commits after it 0.2.11.3 -, FileDescription "OpenLocoland <version>
    Setup", ProductName "OpenLocoland Setup", CompanyName "OpenLocoland", OriginalFilename
-   `OpenLocoland-<version>-Setup.exe`: the project, never a person) and its own manifest
+   `OpenLocoland-<version>-Setup.exe`, LegalCopyright "Copyright (C) 2026 Dysprohol and OpenLocoland
+   contributors": the project and its maintainer's public name, never a personal name; the window shows
+   the same credit in its bottom left corner, "OpenLocoland <version> by Dysprohol", `installer.CREDIT`) and its own manifest
    (`release.MANIFEST`: PyInstaller's - asInvoker, the Windows versions, long paths, the common
    controls - and system DPI awareness, so on a scaled screen the window is drawn sharp instead
    of stretched; the window's few sizes in pixels follow the scale, `Installer.px`); no UPX.
