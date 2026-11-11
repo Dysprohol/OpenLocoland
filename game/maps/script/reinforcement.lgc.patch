@@ -1,0 +1,10 @@
+--- maps/script/reinforcement.lgc
++++ maps/script/reinforcement.lgc
+@@ -11,2 +11,7 @@
+   int i;
++#ifdef CUSTOM_MAP
++  // a custom map without the reinforcement keeps the pirates' engine as a train of theirs
++  if( PLAYER_REINFORCEMENT<1 )
++    return 0;
++#endif
+   for( i=FirstUnit(u_monster);i;i=NextUnit() )

@@ -1701,9 +1701,10 @@ bool liftable(uint8_t* o);   // the height of an object, below
 float lift_of(uint8_t* o);
 
 bool is_marker(uint8_t* o);   // the context panel, below
-// The pirates' small engine (VID 5 in army 3) is the authors' reinforcement point: ReinforcementInit
-// takes it away when the map starts (BUGS.md F12). Said when it is placed or given that army, not only
-// when it is selected (issue #13: it vanished in a quick test with no word why).
+// The pirates' small engine (VID 5 in army 3) is the authors' reinforcement point on a map with
+// reinforcement waves: ReinforcementInit takes it away when the map starts (BUGS.md F12). Said when the
+// one that goes (is_marker) is placed or given that army, not only when it is selected (issue #13: it
+// vanished in a quick test with no word why).
 #define PIRATE_ENGINE_NOTE "the pirates' Engine (VID 5) is taken away when the map starts - it marks where the reinforcements arrive; in another army it stays"
 
 void select(uint8_t* o) {
@@ -1711,9 +1712,7 @@ void select(uint8_t* o) {
     if (tool() != Tool::PushLine) g_push_selected = -1;   // a line selected in the Select tool
     if (o && is_marker(o)) {   // its parking army 3 is not what it is in play
         MESSAGE("MsgSelectedMarker", "selected the reinforcement's point locomotive at %.0f,%.0f - in play: %s", at<float>(o, O_X),
-                at<float>(o, O_Y),
-                mission_reinforcement_waves() > 0 ? ui_text("CtxArrivesOurs", "OURS ARRIVE HERE (THE AUTHORS' REINFORCEMENT)")
-                                                  : ui_text("CtxTakenAway", "TAKEN AWAY AT THE START (NO WAVES)"));
+                at<float>(o, O_Y), ui_text("CtxArrivesOurs", "OURS ARRIVE HERE (THE AUTHORS' REINFORCEMENT)"));
         return;
     }
     if (o)
@@ -9805,9 +9804,23 @@ struct ContextRow {
 uint8_t* g_context = nullptr;   // the object of the open panel
 int g_context_line = -1;        // or the push line (an index of the editor's lines)
 
-// The point locomotive of the authors' reinforcement (reinforcement.lgc): VID 5 in army 3, which
-// ReinforcementInit takes away at the start, keeping its place and its commands for the waves.
-bool is_marker(uint8_t* o) { return o && is_car(o) && nvid_of(o) == VID_LOCOMOTIVE && army_of(o) == 3; }
+// The point locomotive of the authors' reinforcement (reinforcement.lgc): the VID 5 in army 3 that
+// ReinforcementInit takes away at the start, keeping its place and its commands for the waves - only
+// on a map with waves (a custom map without them keeps every such engine as a pirate train:
+// game/maps/script/reinforcement.lgc.patch, BUGS.md F12), and only the first one FirstUnit finds.
+// That one walks the unit list of g_objectMap from its end, which a loaded level fills in the map
+// file's order; Level_Save writes each layer's list from its end (0x41e486) - so in a map as the editor
+// saves it the one taken is the first one met in its layer's list, the first for_each_object meets
+// (every VID 5 is on the same layer). Any other VID 5 in army 3 stays, on any map.
+uint8_t* reinforcement_marker() {
+    if (mission_waves_in_play() < 1) return nullptr;
+    uint8_t* found = nullptr;
+    for_each_object([&](uint8_t* o) {
+        if (!found && is_car(o) && nvid_of(o) == VID_LOCOMOTIVE && army_of(o) == 3) found = o;
+    });
+    return found;
+}
+bool is_marker(uint8_t* o) { return o && o == reinforcement_marker(); }
 struct Hit {
     float l, t, r, b;
     int row, choice;
@@ -10221,13 +10234,9 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
     std::vector<ContextRow> rows;
     const int nvid = nvid_of(o);
     if (is_marker(o)) {
-        // the authors' reinforcement point: the army it gets in play (never its parking army 3, which
-        // ReinforcementInit takes it away by), and the panel that makes such trains now
-        const bool arrives = mission_reinforcement_waves() > 0;
-        rows.push_back({{"CtxInPlay", "IN PLAY:"},
-                        {{arrives ? UiText{"CtxArrivesOurs", "OURS ARRIVE HERE (THE AUTHORS' REINFORCEMENT)"}
-                                  : UiText{"CtxTakenAway", "TAKEN AWAY AT THE START (NO WAVES)"},
-                          true, [] {}}}});
+        // the authors' reinforcement point (a map with waves): the army it gets in play (never its
+        // parking army 3, which ReinforcementInit takes it away by), and the panel that makes such trains now
+        rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{UiText{"CtxArrivesOurs", "OURS ARRIVE HERE (THE AUTHORS' REINFORCEMENT)"}, true, [] {}}}});
         rows.push_back({{"CtxArrivals", "ARRIVALS:"},
                         {{{"CtxOpenArrivals", "OPEN THE PANEL (0)"}, false, [] {
                               g_context = nullptr;
@@ -10850,7 +10859,8 @@ void draw_overlay() {
                     g_place_status = ui_printf(ui_format("StatusCarCouples", "%s: coupled to the train of VID %d"), place_label(),
                                                nvid_of(p.couple_to));
                 }
-                if (place_nvid() == VID_LOCOMOTIVE && (p.couple_to ? army_of(p.couple_to) : place_army()) == 3)
+                if (place_nvid() == VID_LOCOMOTIVE && (p.couple_to ? army_of(p.couple_to) : place_army()) == 3 &&
+                    mission_waves_in_play() > 0 && !reinforcement_marker())   // the only one: the one taken away (is_marker)
                     g_place_status = ui_text("MsgPirateEngine", PIRATE_ENGINE_NOTE);
             } else {
                 g_place_status = std::string(place_label()) + ": " + p.why.get();

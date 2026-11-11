@@ -620,8 +620,20 @@ is built again with the same cars and order - the enemy's through the AI's queue
 others' car by car in the factory of its army nearest to the train at the save (`rebuild_factory`), driving
 to where the lost one stood when it patrolled. Read back, such an entry gives its order its REBUILT value
 (`read_orders`) and is left out of the factory's plan. The player's factory and trains are the player's:
-none of it is offered for army 0. A pirate train needs a locomotive 10: a VID 5 of army 3 is the authors'
-reinforcement marker, which `ReinforcementInit` takes away at the start (seen: `ORDER 1 ... train 0`).
+none of it is offered for army 0. A pirate train needed a locomotive 10: a VID 5 of army 3 is the authors'
+reinforcement marker, which `ReinforcementInit` takes away at the start (seen: `ORDER 1 ... train 0`) - since
+v0.2.12 only on a map with reinforcement waves (`PLAYER_REINFORCEMENT` > 0; `game/maps/script/reinforcement.lgc.patch`
+keeps it on a custom map without them, `BUGS.md` F12), and only the first one `FirstUnit` finds. `FirstUnit` walks the
+unit list of `g_objectMap` from its end, which a loaded level fills in the map file's order, and `Level_Save`
+writes each layer's list from its end (0x41e486), so in a map the editor saved the one taken is the first
+one in its layer's list - the first the editor's `for_each_object` meets, which `is_marker` names alone (the
+status line's note when it is placed or given army 3, its panel, CONVERT's point). A map loaded and saved
+again has that order turned round: with two or more such engines another one may be the marker after the
+next load and save, and the editor names the one of the map as it stands. Checked on POLIGON copies with
+`PROBE` logs: without waves the engine stays (before the patch it was gone, its point kept); with one wave
+of a map made by `map_tool place` the last in the file went and the reinforcement arrived there; the same
+map loaded in the editor - the other engine named the marker, the first one a pirate train - and saved: in
+play that one went and the others stayed.
 Checked in play on a POLIGON copy (the player's factory switched to the pirates, a pirate train 10,20 with
 a drive and ALWAYS, 10 s; the enemy's patrolling train 20,5,20 with ONCE, 10 s; a test script destroying
 the locomotives of armies 1 and 3 at 25 s and 90 s): both adopted as wave 1 at 1 s, both lost at 25 s, the

@@ -530,8 +530,9 @@ pociągiem raz o czasie wymaga mapy z przyjazdami (starsze mapy: PRZESTAW w pane
   (lokomotywa tyłem w środku pociągu, działo na końcu), przeciąganie kładzie pociąg na torze pod
   kursorem - gdy się tam nie mieści (za krótki ślepy tor, inny pociąg), zostaje, a wiersz stanu mówi
   dlaczego. Pociąg bez **lokomotywy** nie pojedzie. Mała **Lokomotywa** piratów (VID 5) to znacznik gry,
-  gdzie przybywają posiłki: gra zabiera ją na starcie mapy, a wiersz stanu mówi to przy stawianiu jej albo
-  przy zmianie jej armii na piratów - w innej armii zostaje.
+  gdzie przybywają posiłki na mapie z falami posiłków: gra zabiera ją na starcie mapy (tylko jedną, jeśli jest
+  ich więcej - wiersz stanu mówi, którą, gdy ją zaznaczysz), a wiersz stanu mówi to przy stawianiu jej albo przy zmianie jej armii na piratów.
+  Na mapie bez fal i w innej armii zostaje jako pociąg.
 
   ![Rząd Pojazdów nad paskiem](img/vehicles-strip-pl.jpg)
 

@@ -3436,6 +3436,7 @@ void mission_load(const std::string& map) {
 ArrivalsState& mission_arrivals() { return g_arrivals; }
 FactoryState& mission_factories() { return g_mission.factories; }
 int mission_reinforcement_waves() { return g_mission.reinforcements; }
+int mission_waves_in_play() { return g_arrivals.on ? g_arrivals.waves : g_mission.reinforcements; }
 std::vector<int> mission_reinforcement_train() {
     std::vector<int> cars;
     for (size_t a = 0; a <= g_mission.train.size();) {
