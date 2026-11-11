@@ -38,6 +38,7 @@
 
 // editor_edit.cpp
 void edit_draw_picture(int nvid, int frame, float x, float y, int step);
+void edit_texts_flush();   // the queued texts of the panel, under one lock
 int edit_time_step();   // - + of a time: 10 s, with Shift 1 s
 void edit_fill(float l, float t, float r, float b, uint32_t argb);
 int edit_object_army(void* o);
@@ -806,6 +807,7 @@ void factory_draw(POINT m) {
     case Screen::Ai: draw_ai(); break;
     }
     // the click-and-hold strip of a car or + CAR held down: over everything of the panel
+    edit_texts_flush();   // the strip comes over the rows' texts (they are queued: editor_edit.cpp)
     const int under = g_rows.draw_hold(ICON, g_px + LEFT - 20, g_px + LEFT + WIDTH * g_cw + 20, [](int vid, float cx, float cy, bool lit) {
         const int frame = palette_icon(vid);
         if (frame >= 0) edit_draw_picture(VID_ICONS, frame, cx, cy, STEP - 1);

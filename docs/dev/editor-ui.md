@@ -190,3 +190,20 @@ in full screen 58-60 fps with Select, Paint and Ground height (0-1.5 ms to spare
 locks themselves, ~8 ms at 1920 x 1080: the engine's own three and the overlay's mines' labels, bar,
 status lines and rows, each a sync with the GPU of 1-2 ms there; fewer would need the overlay's
 software pictures drawn together, which changes what is drawn over what.
+
+Measured again on 2026-11-11 (issue #9: "FPS drops from 70 to 22 upon opening ESC menu"; the to-do's 56-58 fps
+on The Factory at 1920 x 1080). The Menu panel cost 11.5-12 ms a frame at 1024 x 768 on POLIGON (0.13 without
+it; still 60 fps there, with 0.5-1.6 ms to spare): timed inside `draw_menu`, the device's and the picture's
+pictures 1 ms, the lamps 1.4, its fifteen texts 10 ms - each text a lock of its own after Direct3D drawing, a
+sync each, more costly on a bigger screen. A panel's texts are now queued while it is drawn and written after
+its pictures under one lock (`edit_texts_begin` / `edit_texts_flush` / `edit_texts_end` of `editor_edit.cpp`,
+around `panel_draw`; the Arrivals and factory panels flush before their click-and-hold strip, which comes over
+their rows): the Menu 2.1-2.4 ms, Help 2.1-2.3 ms, the same picture. The Factory at 1920 x 1080 in a window
+(the profiler's lines): Select 53-55 fps, Track 45-53, the Menu open 52; of its ~18.5 ms the engine's parts
+(sprites 2.6, Direct3D 1.2, the rest of the scene 6 ms) and our software passes - the mines' labels 2.9 ms (a
+lock of their own right before the status lines took theirs), the bar 2.3, the status lines 1.9. The mines'
+labels and hidden pictures are now drawn in the status lines' lock (`draw_mine_labels`; their squares stay
+where they were), so they come over what is drawn between - the push lines' arrows, the tool, the bar -,
+which only matters for a mine under the bar: Select 59-60 fps with 3-3.7 ms to spare, Track 59-60, the Menu
+open 57.5-60. Not measured in full screen (the automatic tests do not switch the mode); the bar's own lock is
+needed for its plates, which are software pictures.

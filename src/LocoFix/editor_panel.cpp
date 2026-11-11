@@ -770,9 +770,19 @@ void run(HWND window, int i) {
 }  // namespace
 
 bool panel_open() { return g_panel != Panel::None; }
+void panel_draw_open(POINT m);   // below
 
 // editor_edit.cpp, after the bar: the two buttons and the open panel.
+void edit_texts_begin();   // editor_edit.cpp: the panel's texts under one lock, after its pictures
+void edit_texts_end();
+
 void panel_draw(POINT m) {
+    edit_texts_begin();
+    panel_draw_open(m);
+    edit_texts_end();
+}
+
+void panel_draw_open(POINT m) {
     const Place h = help_button(), n = menu_button();
     edit_draw_picture(VID_HELP_BUTTON, g_panel == Panel::Help || on_circle(m, h, HELP_R) ? 1 : 0, h.x, h.y, 3);
     edit_draw_picture(VID_MENU_BUTTON, g_panel == Panel::Menu || on_circle(m, n, MENU_R) ? 1 : 0, n.x, n.y, 3);

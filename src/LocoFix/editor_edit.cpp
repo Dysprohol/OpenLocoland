@@ -10578,6 +10578,8 @@ void draw_context() {
 // Every mine and mine marker with its army: a square in the army's colour (ours green, the enemy
 // red, the neutrals yellow, the pirates grey) and "MINE: ENEMY" / "MINE 1 IN 3: ENEMY" beside it -
 // drawn by the editor only. A mine the engine hides (another army than the player's) is drawn too.
+std::vector<uint8_t*> g_mine_labels;   // this frame's mines, for their labels (draw_mine_labels)
+
 void draw_mines() {
     uint8_t* w = world();
     const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
@@ -10587,9 +10589,12 @@ void draw_mines() {
     for_each_object([&](uint8_t* o) {
         if (!removed(o) && (nvid_of(o) == VID_MINE || nvid_of(o) == VID_MINE_MARKER)) mines.push_back(o);
     });
+    g_mine_labels = mines;
     if (mines.empty()) return;
-    // the squares first (Direct3D), then the pictures and the labels (software) under one lock -
-    // mine by mine each label had its own lock after a square (SoftwareLock)
+    // the squares now (Direct3D); the pictures and the labels (software) later, in the status lines'
+    // lock (draw_mine_labels): a lock of their own here, after Direct3D drawing, was a sync with the GPU
+    // of its own - 2.9 ms a frame on The Factory at 1920 x 1080 (issue #9's frame rate, 2026-11-11);
+    // before that, mine by mine each label had its own lock after a square
     for (uint8_t* o : mines) {
         const float sx = at<float>(o, O_X) - cam_x, sy = at<float>(o, O_Y) - at<float>(o, O_Z) - cam_y;
         const int army = nvid_of(o) == VID_MINE_MARKER ? 1 : army_of(o);   // a marker becomes an enemy mine or nothing
@@ -10598,8 +10603,14 @@ void draw_mines() {
         fill(graphics(), nullptr, sx - 12, sy - 12, sx - 10, sy + 12, COLOURS[army]);
         fill(graphics(), nullptr, sx + 10, sy - 12, sx + 12, sy + 12, COLOURS[army]);
     }
-    SoftwareLock locked;
-    for (uint8_t* o : mines) {
+}
+
+// The mines' hidden pictures and labels of draw_mines, in a lock taken already (the status lines').
+void draw_mine_labels() {
+    uint8_t* w = world();
+    const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
+    for (uint8_t* o : g_mine_labels) {
+        if (removed(o)) continue;
         const float sx = at<float>(o, O_X) - cam_x, sy = at<float>(o, O_Y) - at<float>(o, O_Z) - cam_y;
         // hidden from the player: drawn where the engine would (draw_vid takes the map's y and lifts it by z
         // itself - given sy, which is lifted already, the flag stood its height above the mine)
@@ -10610,6 +10621,7 @@ void draw_mines() {
                                             ui_text(ARMY_CHOICE_KEYS[army], ARMY_CHOICES[army]));
         draw_text(FONT_TIPS, sx + 15, sy - 6, label.c_str(), false, 3);
     }
+    g_mine_labels.clear();
 }
 
 // While a host's panel is open: each socket's number at its place on the wall (the panel's rows
@@ -10891,6 +10903,7 @@ void draw_overlay() {
                   g_dirty ? ui_text("StatusNotSaved", " - not saved") : "",
                   GetTickCount() - g_message_time < 6000 ? g_message.c_str() : "");
     SoftwareLock locked(vid_by_number(FONT_TIPS) != nullptr);   // the status lines are text only: one lock for all of them (above); not for the GDI text without the font
+    draw_mine_labels();   // the mines' labels in the same lock (draw_mines)
     status_line(v.l, v.t, status);
     if (tool() == Tool::Track) status_line(v.l, v.t + LINE_HEIGHT, g_track_status.c_str());
     if (tool() == Tool::PushLine) status_line(v.l, v.t + LINE_HEIGHT, g_push_status.c_str());
@@ -11497,6 +11510,7 @@ void edit_reset() {
     g_gstroke = GroundStroke();
     g_region_drag = false;
     g_building_posts.clear();
+    g_mine_labels.clear();
 }
 
 // editor_mission.cpp, writing main()'s block: every train's patrol with its first car as it stands.
@@ -11598,7 +11612,40 @@ void edit_draw_picture(int nvid, int frame, float x, float y, int step) { draw_s
 // editor_panel.cpp's Menu panel: the hints under the cursor on or off (kept in the registry).
 bool edit_hints_on() { return hints_on(); }
 void edit_set_hints(bool on) { set_hints(on); }
-float edit_draw_text(int font, float x, float y, const char* text, int step) { return draw_text(font, x, y, text, false, step); }
+// The panels' texts (editor_panel.cpp, the rows of editor_rows.cpp): written by the software, each locking
+// the back and the depth buffer - with dgVoodoo a lock after Direct3D drawing reads the picture back, a
+// sync with the GPU each time. The Menu panel's fifteen lines took 10 ms a frame at 1024 x 768 (issue #9:
+// "FPS drops from 70 to 22 upon opening ESC menu"); while a panel is drawn its texts are queued and
+// written after its pictures under one lock (`edit_texts_begin` / `edit_texts_flush` / `edit_texts_end`).
+// The pictures are under the texts anyway; what must come over texts (the click-and-hold strip of
+// the Arrivals and factory panels) flushes the queue first.
+struct QueuedText {
+    int font;
+    float x, y;
+    std::string text;
+    int step;
+};
+std::vector<QueuedText> g_text_queue;
+bool g_text_queued = false;
+
+void edit_texts_begin() { g_text_queued = true; }
+void edit_texts_flush() {
+    if (g_text_queue.empty()) return;
+    SoftwareLock locked;   // one lock for all of them
+    for (const QueuedText& t : g_text_queue) draw_text(t.font, t.x, t.y, t.text.c_str(), false, t.step);
+    g_text_queue.clear();
+}
+void edit_texts_end() {
+    edit_texts_flush();
+    g_text_queued = false;
+}
+float edit_draw_text(int font, float x, float y, const char* text, int step) {
+    if (!g_text_queued) return draw_text(font, x, y, text, false, step);
+    uint8_t* v = vid_by_number(font);
+    if (!v) return x;
+    g_text_queue.push_back({font, x, y, text, step});
+    return x + at<float>(v, V_SIZE_X) * static_cast<float>(std::strlen(text));   // where draw_text would end
+}
 bool edit_font_size(int font, float& w, float& h) {
     uint8_t* v = vid_by_number(font);
     w = v ? at<float>(v, V_SIZE_X) : 8;
