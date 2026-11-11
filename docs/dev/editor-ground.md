@@ -391,7 +391,16 @@ goes, it gets none) - before, it went back where it was; deleting a factory or a
 history. A factory is not turned by hand (its spur turns it); a repair
 point turns round on its leg - R / E, or TURN: ROUND in its panel, also while it is being placed -,
 and its line is made anew the other way with its posts (a green one at the new way in, a red one at
-the far end), one step of the history. Checked in the game: a mission made on the template with the main line, a spur
+the far end), one step of the history. A building's posts are those its line got and those standing within 30
+px of where its line's rule puts them when one is dragged or turned round (`note_building_post`,
+`g_building_posts`; issue #14): before, only the second kind was found, so a post the player had moved away
+stayed when the repair point was turned or the factory dragged along its spur, and the building got new
+ones - its lights twice (reproduced on POLIGON: the enemy repair point's lower post dragged 70 px down the
+track, the repair point turned - three posts at it in the saved map; now two, and undo brings the moved post
+back, a quick test round keeps the posts with it, the factory's moved post goes when it is dragged along
+its spur). A post given a line of its own (L) is no longer the building's. On a map loaded from disk a
+building's posts are found by their places again until one is moved: a post moved away and saved is a post
+of its own after the load (the map keeps no mark of whose a post is). Checked in the game: a mission made on the template with the main line, a spur
 with a factory at its dead end (line and red post made), a repair point on the main line (line,
 green and red posts), a crate on the line and the reinforcement point; played with a test script in
 the game folder's copy: the reinforcement, damaged to 60 hp, was pushed through the repair point and

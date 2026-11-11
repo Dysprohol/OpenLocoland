@@ -874,6 +874,7 @@ float crate_height(float x, float y, float ground);   // a money crate on a rail
 bool on_its_point(int nvid) { return nvid == VID_MINE || nvid == VID_MINE_MARKER; }
 void give_building_line(uint8_t* o);
 bool take_building_lines(uint8_t* o, std::vector<uint8_t*>& posts);
+void note_building_post(uint8_t* post);   // a building's post about to be moved away from its place (below)
 void resnap_on_track(uint8_t* o, float x, float y, int direction, const UiText& what, bool free = false);
 uint8_t* factory_door(uint8_t* v, float x, float y, uint8_t* self);   // placing, below
 bool rail_line_spot(float x, float y, float reach, bool diagonal, float& sx, float& sy, int& along);
@@ -2864,6 +2865,7 @@ void end_drag() {
 // it goes to (x, y) as it is, without a line of its own.
 void resnap_on_track(uint8_t* o, float x, float y, int direction, const UiText& what, bool free) {
     UiText why;
+    note_building_post(o);   // a factory's or repair point's post leaving the place its rule gives it
     if (on_its_point(nvid_of(o))) free = false;   // a mine: onto a rail point or not at all
     const bool shift = free && shift_down();
     const bool snapped = !shift && snap(nvid_of(o), x, y, direction, why);
@@ -6916,6 +6918,32 @@ std::vector<int> lines_of(uint8_t* o) {
     return out;
 }
 
+// The posts of a factory or repair point (issue #14): those its line got (give_building_line) and those
+// found at its line's places when they were dragged or turned away from them (note_building_post). A
+// building's posts were found only within 30 px of where its line's rule puts them, so one the player
+// had moved farther stayed when the building was turned or dragged along its track, and the building
+// got new ones: its lights twice. The set only grows - a post taken away by a step stays in it, so an
+// undo that brings it back finds it again -, it is forgotten with the level and carried over a run
+// (edit_keep_history); a loaded map's posts are found by their places, as before, until one is moved.
+std::map<uint8_t*, std::set<uint8_t*>> g_building_posts;
+std::map<uint8_t*, std::set<uint8_t*>> g_kept_building_posts;
+
+void note_building_post(uint8_t* post) {
+    if (!post || removed(post) || nvid_of(post) != VID_SEMAPHORE) return;
+    const std::vector<PushLine>& lines = mission_push_lines();
+    for_each_object([&](uint8_t* b) {
+        if (removed(b) || (nvid_of(b) != VID_DEPOT && nvid_of(b) != VID_WORKSHOP) || g_building_posts[b].count(post)) return;
+        for (int i : lines_of(b))
+            for (const Post& p : line_posts(trace(lines[i])))
+                if (std::hypot(at<float>(post, O_X) - p.x, at<float>(post, O_Y) - p.y) < 30) {
+                    g_building_posts[b].insert(post);
+                    patch::log("edit: VID 152 at %.0f,%.0f is a post of VID %d at %.0f,%.0f - it goes with it", at<float>(post, O_X),
+                               at<float>(post, O_Y), nvid_of(b), at<float>(b, O_X), at<float>(b, O_Y));
+                    return;
+                }
+    });
+}
+
 // Takes a building's lines away and their posts into `posts` (to delete); true when lines went.
 bool take_building_lines(uint8_t* o, std::vector<uint8_t*>& posts) {
     std::vector<int> own = lines_of(o);
@@ -6924,6 +6952,12 @@ bool take_building_lines(uint8_t* o, std::vector<uint8_t*>& posts) {
     for (int i : own)
         for (const Post& p : line_posts(trace(lines[i])))
             if (uint8_t* post = post_near(p.x, p.y, posts)) posts.push_back(post);
+    const auto known = g_building_posts.find(o);   // and those moved away from their places (not one given a line of its own)
+    if (known != g_building_posts.end())
+        for (uint8_t* post : known->second)
+            if (!removed(post) && nvid_of(post) == VID_SEMAPHORE && std::find(posts.begin(), posts.end(), post) == posts.end() &&
+                own_line(post) < 0)
+                posts.push_back(post);
     for (auto it = own.rbegin(); it != own.rend(); ++it) lines.erase(lines.begin() + *it);
     g_push_selected = -1;
     return true;
@@ -7280,6 +7314,7 @@ void turn_post(uint8_t* o) {
     const float nx = dot_wx(d) - ty * away, ny = dot_wy(d) + tx * away;
     const std::vector<State> before = states({o});
     const std::vector<PushLine> lines_before = mission_push_lines();
+    note_building_post(o);
     const int own = own_line(o);
     const float lift = at<float>(o, O_Z) - ground_z(vid_of(o), x, y);
     reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, nx, ny, ground_z(vid_of(o), nx, ny) + lift);
@@ -7309,6 +7344,7 @@ void give_building_line(uint8_t* o) {
     std::vector<State> before;
     put_posts(line_posts(t), objects, before);
     for (size_t i = 0; i < objects.size(); ++i) op.changes.push_back({objects[i], before[i], state_of(objects[i])});
+    for (uint8_t* post : objects) g_building_posts[o].insert(post);   // its own, wherever they are moved later
     MESSAGE("MsgBuildingLine", "%s at %.0f,%.0f direction %d with its push line %d,%d -> %d,%d and %u semaphores",
             nvid_of(o) == VID_DEPOT ? ui_text("WordFactory", "factory") : ui_text("WordRepairPoint", "repair point"),
             at<float>(o, O_X), at<float>(o, O_Y),
@@ -11438,6 +11474,7 @@ void edit_reset() {
     g_grid_original.clear();
     g_gstroke = GroundStroke();
     g_region_drag = false;
+    g_building_posts.clear();
 }
 
 // editor_mission.cpp, writing main()'s block: every train's patrol with its first car as it stands.
@@ -11670,6 +11707,7 @@ void edit_keep_history() {
     g_kept_undo = g_undo;
     g_kept_redo = g_redo;
     g_kept_grid_original = g_grid_original;
+    g_kept_building_posts = g_building_posts;
     ground_keep();   // the picture's original: the copy's picture is all the load reads again
     g_kept_valid = true;
     patch::log("edit: run - %u objects and %u steps of the history kept", static_cast<unsigned>(g_kept.size()),
@@ -11682,6 +11720,7 @@ void edit_drop_kept() {
     std::vector<Operation>().swap(g_kept_undo);
     std::vector<Operation>().swap(g_kept_redo);
     g_kept_grid_original.clear();
+    g_kept_building_posts.clear();
     g_kept_valid = false;
 }
 
@@ -11753,6 +11792,11 @@ void edit_restore_history() {
         pos[0] = static_cast<int>(reinterpret_cast<uintptr_t>(d->second.first));
         pos[3] = d->second.second;
     };
+    for (const auto& [b, posts] : g_kept_building_posts)   // the buildings' posts, on the objects of the load
+        if (uint8_t* nb = object(b))
+            for (uint8_t* post : posts)
+                if (uint8_t* np = object(post)) g_building_posts[nb].insert(np);
+    g_kept_building_posts.clear();
     auto factories = [&](FactoryState& f) {
         for (UnitUnlock& u : f.unlocks) u.factory = object(static_cast<uint8_t*>(u.factory));
     };
