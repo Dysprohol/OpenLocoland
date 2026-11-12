@@ -38,7 +38,8 @@ constexpr uintptr_t IAT_DialogBoxParamA = 0x4751ac;
 // DPI_AWARENESS_CONTEXT values (windef.h, Windows 10)
 const HANDLE CONTEXT_UNAWARE = reinterpret_cast<HANDLE>(-1);
 const HANDLE CONTEXT_SYSTEM_AWARE = reinterpret_cast<HANDLE>(-2);
-const HANDLE CONTEXT_PER_MONITOR_V2 = reinterpret_cast<HANDLE>(-4);
+const HANDLE CONTEXT_PER_MONITOR = reinterpret_cast<HANDLE>(-3);      // Windows 10 1607, as the per-thread switch
+const HANDLE CONTEXT_PER_MONITOR_V2 = reinterpret_cast<HANDLE>(-4);   // Windows 10 1703
 
 using SetProcessDpiAwarenessContext_t = BOOL(WINAPI*)(HANDLE);
 using SetThreadDpiAwarenessContext_t = HANDLE(WINAPI*)(HANDLE);
@@ -146,8 +147,12 @@ void install_dpi_awareness() {
     }
     g_awareness = real_awareness();
     g_aware = g_awareness != 0;
-    // measure in the process's own awareness, whatever the calling thread's (the start window's is unaware)
-    g_measure = g_awareness == 2 ? CONTEXT_PER_MONITOR_V2 : g_awareness == 1 ? CONTEXT_SYSTEM_AWARE : nullptr;
+    // measure in the process's own awareness, whatever the calling thread's (the start window's is unaware).
+    // Per monitor (-3), not v2 (-4): the screen's size is the same in both, and 1607, the first Windows with
+    // the per-thread switch, has no v2 - a refused switch leaves the thread as it is (screen_pixels).
+    // Windows 7 / 8.1 / 10 before 1607 have no per-thread switch: GetSystemMetrics in the process's
+    // awareness, which their start window shares (it opens aware there).
+    g_measure = g_awareness == 2 ? CONTEXT_PER_MONITOR : g_awareness == 1 ? CONTEXT_SYSTEM_AWARE : nullptr;
     static const char* const names[] = {"unaware", "system", "per monitor"};
     patch::log("DPI awareness: %s (asked: %s), screen %dx%d%s", names[g_awareness < 0 || g_awareness > 2 ? 0 : g_awareness],
                how ? how : "refused", GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN),
