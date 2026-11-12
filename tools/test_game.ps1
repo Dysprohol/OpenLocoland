@@ -53,7 +53,8 @@
 # -Language language pack code (pl, en...; default pl), the game's choice for the run
 # -Resolution the start window's mode (default 1024x768); -SetFull 1 also saves full screen
 # -Cheats, -UnlockMissions (0/1, default 0), -FrameLimit (default 60), -FpsCounter (0/1, default 0)
-# -Reg      more settings, "Name=1,Other=s:text" (a number is a DWORD, s: a text), e.g. "EditorHints=0"
+# -Reg      more settings, "Name=1,Other=s:text" (a number is a DWORD, s: a text), e.g. "EditorHints=0";
+#           Sub\Name for a subkey of the test key, e.g. "Players\MinimapSize=s:3"
 # -ResetTestKey  start from an empty test key (no Players, no window place, no editor settings)
 # -TestScreen <w>x<h>  the game takes the screen as that size (LOCOFIX_TEST_SCREEN, test mode only:
 #           LocoFix's mode list, the start window's test and the saved mode's check - not the engine's
@@ -114,6 +115,10 @@ public class W {
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindowEx(IntPtr p, IntPtr after, string cls, string title);
   [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "SendMessageW")] public static extern IntPtr SendText(IntPtr h, uint m, IntPtr w, string l);
   [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "SendMessageW")] static extern IntPtr SendBuffer(IntPtr h, uint m, IntPtr w, StringBuilder l);
+  [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr c);
+  // this script's window rectangles and screen captures in real pixels, also on a monitor at 125-200 %
+  // (the game is per-monitor DPI-aware); Windows 10 1607 and later, otherwise left as it is
+  public static void RealPixels() { try { SetThreadDpiAwarenessContext(new IntPtr(-4)); } catch (EntryPointNotFoundException) { } }
   // the lines of a combo box (the start window's resolution list)
   public static string ComboLines(IntPtr box) {
     int n = (int)SendMessage(box, 0x146, IntPtr.Zero, IntPtr.Zero); var all = new System.Collections.Generic.List<string>();
@@ -138,6 +143,7 @@ public class W {
 }
 "@
 Add-Type -AssemblyName System.Drawing, System.Windows.Forms
+[W]::RealPixels()
 $quiet = -not $Visible -and -not $Screen -and $SetFull -ne 1 -and $Steps -notmatch '(^|,)\s*[AQ]'
 if ($quiet -and $env:LOCOFIX_QUIET_INNER -ne "1") {
   # Start this script again on a desktop of its own with the same parameters, and pass its output on.
@@ -214,12 +220,15 @@ $dwords = [ordered]@{ ScreenX = [int]$rw; ScreenY = [int]$rh; BPP = 16; Device =
   Cheats = $Cheats; UnlockMissions = $UnlockMissions; FrameLimit = $FrameLimit; FpsCounter = $FpsCounter; UpdateCheckAtStart = 0 }
 foreach ($n in $dwords.Keys) { Set-ItemProperty $testKey -Name $n -Value $dwords[$n] -Type DWord }
 Set-ItemProperty $testKey -Name Language -Value $(if ($Language) { $Language } else { "pl" }) -Type String
-# -Reg "Name=1,Other=s:text": more values (a number is a DWORD, s: a text)
+# -Reg "Name=1,Other=s:text,Players\MinimapSize=s:3": more values (a number is a DWORD, s: a text; a name
+# with a backslash goes to that subkey of the test key)
 foreach ($pair in ($Reg -split ",")) {
   if (-not $pair) { continue }
   $n, $v = $pair.Split("=", 2)
-  if ($v.StartsWith("s:")) { Set-ItemProperty $testKey -Name $n -Value $v.Substring(2) -Type String }
-  else { Set-ItemProperty $testKey -Name $n -Value ([int]$v) -Type DWord }
+  $k = $testKey
+  if ($n.Contains("\")) { $i = $n.LastIndexOf("\"); $k = Join-Path $testKey $n.Substring(0, $i); $n = $n.Substring($i + 1); if (-not (Test-Path $k)) { New-Item $k -Force | Out-Null } }
+  if ($v.StartsWith("s:")) { Set-ItemProperty $k -Name $n -Value $v.Substring(2) -Type String }
+  else { Set-ItemProperty $k -Name $n -Value ([int]$v) -Type DWord }
 }
 "Test key: $Resolution, full screen $($dwords.FullScreen), language $(if ($Language) { $Language } else { 'pl' })$(if ($Reg) { ', ' + $Reg })"
 $start = @{ FilePath = $Exe; WorkingDirectory = $dir; PassThru = $true }
