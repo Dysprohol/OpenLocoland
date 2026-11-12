@@ -191,7 +191,7 @@ turn reverses them; the missions have each of these). The rules only choose whic
 one joining the line's last rail when there is one (`rail::plan` / `plan_track` with `lay`). The one
 rail not laid is one that would give a point a 7th link, which the engine cannot take ("Too many
 links"); the status line says only that ("this point already has 6 rails"), its ends red - the run
-stops before it. The preview draws the rails of the click always (the 6-link one too), wherever the
+stops before it. The preview's end shows whether the click joins the track (see "The track's joints"). The preview draws the rails of the click always (the 6-link one too), wherever the
 cursor is, also over the bar - before, a step that broke a rule was not drawn at all and the
 preview seemed to vanish with the cursor far off. The right button or Esc cancels a line started (a second one the
 tool). A click of the middle button (a drag of it pans the map, `mouse_pan.cpp`) deletes the rail under
@@ -278,6 +278,20 @@ wrong way, a rail twice): the log's count the same as `check-track`'s (37 ends o
 near, 14 two heights, 19 not joined, 4 V, 1 over 6 links; 1 laid twice), the marks on their joints, and `D`
 showing the plain and swamp rails linked at the same points' height, apart at the swamp rail's lower point,
 and the 8-rail point with 7 refs and 6 links (the engine dropped two).
+
+While a line is laid, the preview's end is the same question asked before the click (`run_end`: `end_state`
+of the run's last rail end among the rails there and the run's own): a **green** diamond where the rails of
+the click will join the track, an **orange** one where they end at a rail without joining it (a near
+miss, two heights, an angle, a V), a light one at a new end of track; the run's other points are small and
+light (before, every point was green), all red when the 6-link limit keeps the run out. The first status
+line says it in words instead of "ok" - "ok, the end joins the track there (green)", "ok, but the end stops
+5 px from a rail without joining it (orange)", "... meets a rail at another height - not joined", "...
+meets rails at an angle", "ok, but trains could only turn round at the end (a V, orange)". Laying is as
+before. Checked in the game on `tjtest`: a run of two straights onto the near-miss cluster's loose end
+(green), a curve ending 5 px from its vertical (orange, "5 px"), a curve onto a V's straight from the same
+side (V), a destroyed swamp line's rail onto the swamp rail at the plain rails' height (two heights), a
+diagonal onto the joint of the two-heights cluster (angle), and a line laid (two rails, one step of the
+history: the counts 37 -> 39 ends of track, Ctrl+Z 37, Ctrl+Y 39).
 
 **The ground under rising rails** (the Track tool's G, the row's GROUND UNDER RISING RAILS: AS IT IS /
 SOFT / HARD; `g_raise_ground` in `lay_step`; issue #5). AS IT IS, the default, is the rule above: a rail

@@ -355,7 +355,8 @@ track can look joined and not be. In the Track tool every end of track has a sma
 siding, a line beyond the edge - and a **red** one shows where the track looks joined but is not, or
 where trains can only turn round: an end a few px short of another rail, rails meeting at two heights or
 at an angle, a V (two rails from one point with nothing going on). The third status line counts them.
-Help page 33 sums it up.
+While you lay a line, the preview's end is **green** where the click joins the track and **orange** where it
+ends at a rail without joining it; the status line says why. Help page 33 sums it up.
 
 Lay the main line the way the missions do: from **past the west edge** (scroll out over the grid)
 along the map, so the trains come and go out of sight. Then a spur for the factory: a branch off

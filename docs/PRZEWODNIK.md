@@ -354,7 +354,9 @@ tej samej wysokości, więc tor może wyglądać na połączony, choć nie jest.
 toru ma mały **żółty** znak - bocznica, linia za krawędzią mapy - a **czerwony** pokazuje miejsce, gdzie
 tor wygląda na połączony, ale nie jest, albo gdzie pociągi mogą tylko zawrócić: koniec kilka pikseli od
 innej szyny, szyny stykające się na dwóch wysokościach albo pod kątem, V (dwie szyny z jednego punktu i
-nic dalej). Trzeci wiersz stanu je liczy. Strona 33 pomocy to podsumowuje.
+nic dalej). Trzeci wiersz stanu je liczy. Gdy kładziesz linię, koniec podglądu jest **zielony** tam, gdzie
+kliknięcie połączy się z torem, a **pomarańczowy** tam, gdzie skończy się przy szynie bez połączenia; wiersz
+stanu mówi dlaczego. Strona 33 pomocy to podsumowuje.
 
 Główną linię połóż tak, jak robią to misje: **zza zachodniej krawędzi** (przewiń nad siatkę) przez
 mapę, żeby pociągi przyjeżdżały i odjeżdżały poza widokiem. Potem bocznica na fabrykę: odgałęzienie
