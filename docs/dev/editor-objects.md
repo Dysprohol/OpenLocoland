@@ -317,7 +317,13 @@ each), a near miss 5 px from a vertical re-aimed onto the next loose end, a new 
 of a rail it meets moved onto it (laid at x 74 and 145 instead of 71 and 142, ending at 180.5,875), SNAP:
 OFF - the row's tip shown, still OFF after Select and back - laying the first case as clicked (two straights,
 not joined 19 -> 20) and previewing the second unsnapped; the map saved after two snapped runs has every
-rail and bed of the map before unchanged, 4 rails and 4 beds more, the GRID the same.
+rail and bed of the map before unchanged, 4 rails and 4 beds more, the GRID the same. (The angle case joined the
+diagonal of the mirrored cluster beside it, which rises the other way - an end can only be met pointing the opposite
+way.) On a ramp and with swamp rails (2026-11-12): a line of two climbing rails (PgUp) from ground 70 toward a
+diagonal two ramp steps up (points 98), and a new swamp line (V) toward a swamp diagonal (points 105), each arriving
+at an angle, were laid as two curves - climbing, z 66 and 77, and swamp rails at z 98 - that join it: the test
+command `D` shows the points 159,1512 and 195,1487 linked at 98, 443,1512 and 479,1487 at 105 (the first line 0.5 px
+off the diagonal's lattice, joined within the engine's 2 px).
 
 **A snap never doubles a rail** (the review of 2026-11-12, finding 2; `doubles_a_rail`). The search takes per step
 the rail the plan would take and checks only where the way ends, so it could reach a near rail end Q, go on along
