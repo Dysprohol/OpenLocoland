@@ -348,7 +348,11 @@ unaware process - at 125 % or 150 % smaller than the real one - and ticked and g
 screen box for every mode bigger than that; the full screen then was dgVoodoo's window of the
 scaled screen while the game's picture had the real mode's size, and the cursor could not reach
 the lower part of it (reported on v0.2.11; the mechanism is the code's, not seen on a scaled
-screen - `BUGS.md` "Running on current Windows").
+screen - `BUGS.md` "Running on current Windows"). In full screen dgVoodoo holds the real cursor to
+(0,0)-(the mode) and the engine reads its screen position as game pixels: seen with the real cursor
+at 1600x1200 on a 2560x1440 screen (2026-11-12), where the cursor stopped at 1599,1199 and every edge
+and the bar were reached; full screen opens on the primary monitor even when the window's saved
+place is on another one.
 
 **Frame rate at high resolutions.** The game draws on one thread, and the cost of a frame grows
 with the screen: the engine draws the ground with Direct3D, then locks the back buffer and the
