@@ -12,7 +12,7 @@ r"""Maps and images (.map, .vid) as editable files: unpack, pack back, apply ove
                            [--direction <n>] [--id <n>] [--z <n>] [--objects <objects.res>]
     python tools\map_tool.py copy <folder> <source.map> <nvid> [--objects <objects.res>]
     python tools\map_tool.py check <game folder>
-    python tools\map_tool.py check-track <file.map | folder> [--objects <objects.res>]
+    python tools\map_tool.py check-track <file.map | folder> [--objects <objects.res>] [--rail <vid>]
 
 A new map keeps the terrain of its template and nothing else: the ground object (VID
 1024) with its image, GRPH, HEAD and GRID stay, all other objects, the groups and the
