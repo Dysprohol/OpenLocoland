@@ -319,6 +319,18 @@ OFF - the row's tip shown, still OFF after Select and back - laying the first ca
 not joined 19 -> 20) and previewing the second unsnapped; the map saved after two snapped runs has every
 rail and bed of the map before unchanged, 4 rails and 4 beds more, the GRID the same.
 
+**The level a new line is laid at** (the review of 2026-11-12, finding 1; `plan_laid`, `new_line_level`). A line
+that goes on from a rail keeps that rail point's height; a new one is laid at the ground under its first rail's
+centre (as `map_tool.py track` does). The preview, the dot and the snap planned with the ground at the start point
+instead, and `lay_step` took the ground under the first rail only when it laid it - on uneven ground the dot said
+"joins it (green)" and the click laid the joint at two heights, or orange for a run that did join; the moved (off
+the lattice) snap was the most exposed. Now every plan of a click - the run, its 6-link shortening, each snap
+candidate - is made at the level its rails will be laid at, and `lay_step` takes that level from the step; the
+preview is drawn there and the status line names it. Checked on `tjtest` (a bump of ground 80 under the first rail
+of a new line from ground 70 to a rail at 70): before, green and laid at 80 (two heights 14 -> 16); now orange
+"meets a rail at another height", laid the same; a start on the bump whose first rail lies on flat ground: green,
+laid at 70 and joined (orange before); a new line on flat ground: green as before.
+
 **Check the track** (the Menu's CHECK THE TRACK, after REDO - the Menu has two columns of eight and seven
 now; `check_track_start`, `check_step`). What `check-track` lists - rails laid twice, points of more than 6
 links, joints at two heights, V's, rails meeting at an angle, near misses: `track_report` without the ends

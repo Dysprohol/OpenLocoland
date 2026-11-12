@@ -4144,7 +4144,34 @@ struct TrackStep {
     bool snapped = false;                 // SNAP: its end re-aimed to meet a rail end (snap_run)
     rail::Point unsnapped = {};           // where it would have ended
     bool shifted = false;                 // the snap moved a new line's start a few px (off the lattice)
+    int level = 0;                        // the ground level its rails are laid at (plan_laid)
 };
+
+// The level a new line's rails are laid at: the ground under its first rail's centre (map_tool.py track), a
+// swamp line SWAMP_LIFT above it - lay_step takes it from the step, so what the preview shows is laid.
+int new_line_level(const rail::Segment& first) {
+    return ground_cell((std::max)(0, (std::min)(grid_width() - 1, static_cast<int>(first.x) / 8)),
+                       (std::max)(0, (std::min)(grid_height() - 1, static_cast<int>(first.y) / 8))) +
+           (swamp_rail(RAIL_KINDS[g_rail_kind]) ? SWAMP_LIFT : 0);
+}
+
+// The plan of a run at the height its rails will be laid at (the review of 2026-11-12, finding 1): a line that
+// goes on from a rail keeps its level; a new one takes new_line_level of its first rail - before, the preview,
+// the dot and the snap planned with the ground at the start point and the rails were laid at the ground under
+// the first rail, so on uneven ground a green "joins" could be laid at two heights. A free start has no rail
+// ending there, so the second plan makes the same rails at the other height.
+rail::Plan plan_laid(const std::vector<rail::Rail>& there, const std::vector<rail::Point>& points, int& level) {
+    level = g_line_level;
+    rail::Plan p = rail::plan(there, points, {}, level - 4 + rail::ALTITUDE, true, true, g_ramp);
+    if (!g_line_level_known && p.error == rail::Error::None && !p.segments.empty()) {
+        const int l = new_line_level(p.segments[0]);
+        if (l != level) {
+            level = l;
+            p = rail::plan(there, points, {}, level - 4 + rail::ALTITUDE, true, true, g_ramp);
+        }
+    }
+    return p;
+}
 
 UiText reason_of(rail::Error e) {
     // the Track tool lays what is clicked: only the engine's limit of links keeps a rail out
@@ -4309,9 +4336,11 @@ TrackStep snap_run(const std::vector<rail::Rail>& there, const TrackStep& s, int
             const std::vector<rail::Point>& points = f.first;
             const size_t rails = (points.size() - 1) * 4 + back;   // the fewest rails, then the fewest laid again
             if (f.second > best_d + 0.01 || (f.second > best_d - 0.01 && rails >= best_rails)) continue;
-            const rail::Plan plan = rail::plan(there, points, {}, z, true, true, g_ramp);
+            int level = 0;
+            const rail::Plan plan = plan_laid(there, points, level);
             if (plan.error != rail::Error::None || state_of(plan.segments, points.back()) != rail::End::Linked) continue;
             best = s;
+            best.level = level;
             best.points = points;
             best.segments = plan.segments;
             best.to = points.back();
@@ -4337,9 +4366,11 @@ TrackStep snap_run(const std::vector<rail::Rail>& there, const TrackStep& s, int
             const double dx = target.at.x - e.x, dy = target.at.y - e.y;
             std::vector<rail::Point> points;
             for (const rail::Point& p : s.points) points.push_back({rail::round3(p.x + dx), rail::round3(p.y + dy)});
-            const rail::Plan plan = rail::plan(there, points, {}, z, true, true, g_ramp);
+            int level = 0;
+            const rail::Plan plan = plan_laid(there, points, level);
             if (plan.error != rail::Error::None || state_of(plan.segments, points.back()) != rail::End::Linked) continue;
             TrackStep moved = s;
+            moved.level = level;
             moved.points = points;
             moved.segments = plan.segments;
             moved.to = points.back();
@@ -4360,14 +4391,16 @@ TrackStep next_step(const std::vector<RailObject>& rails) {
     const std::vector<rail::Rail> there = rails_of(rails);
     s.points = run_to_cursor(there, g_line.back(), mouse_on_level(g_line_level), z);
     s.to = s.points.back();
-    rail::Plan plan = rail::plan(there, s.points, {}, z, true, true, g_ramp);
+    rail::Plan plan = plan_laid(there, s.points, s.level);
     if (plan.error == rail::Error::Links) {   // the rails up to the one that would give a point a 7th
         s.reason = reason_of(plan.error);
         for (size_t n = s.points.size() - 1; n > 1 && plan.error != rail::Error::None; --n) {
             const std::vector<rail::Point> shorter(s.points.begin(), s.points.begin() + static_cast<long>(n));
-            const rail::Plan p = rail::plan(there, shorter, {}, z, true, true, g_ramp);
+            int level = 0;
+            const rail::Plan p = plan_laid(there, shorter, level);
             if (p.error == rail::Error::None) {
                 s.points = shorter;
+                s.level = level;
                 plan = p;
             }
         }
@@ -4435,8 +4468,10 @@ void set_ramp(int ramp) {
 
 // The ground level the next rail stands at: the line's, or - before a click starts one - the level of
 // the rail end or the ground where it would start.
+int g_preview_level = 0;   // draw_track: the level the next rails are laid at (a new line's: plan_laid)
+
 int track_level() {
-    if (!g_line.empty()) return g_line_level;
+    if (!g_line.empty()) return g_line_level_known ? g_line_level : g_preview_level;
     const std::vector<RailObject> rails = map_rails();
     const rail::Point p = line_start(rails);
     int level = 0;
@@ -4481,9 +4516,7 @@ void lay_step() {
     g_line_nvid = RAIL_KINDS[g_rail_kind];
     const bool swamp = swamp_rail(g_line_nvid);
     if (!g_line_level_known && !s.segments.empty()) {   // the first rail of a new line: the ground under its centre
-        g_line_level = ground_cell((std::max)(0, (std::min)(grid_width() - 1, static_cast<int>(s.segments[0].x) / 8)),
-                                   (std::max)(0, (std::min)(grid_height() - 1, static_cast<int>(s.segments[0].y) / 8))) +
-                       (swamp ? SWAMP_LIFT : 0);
+        g_line_level = s.level;   // new_line_level, as next_step planned it (plan_laid)
         g_line_level_known = true;
     }
     std::vector<GridChange> changes;   // all the run's, one step of the history
@@ -8099,13 +8132,13 @@ RunEnd run_end(const std::vector<RailObject>& rails, const TrackStep& s) {
         RunEnd end;
     } memo;
     const uint64_t signature = track_joints().signature;
-    if (memo.valid && memo.rails == signature && memo.level == g_line_level && memo.ramp == g_ramp && memo.points.size() == s.points.size() &&
+    if (memo.valid && memo.rails == signature && memo.level == s.level && memo.ramp == g_ramp && memo.points.size() == s.points.size() &&
         std::equal(s.points.begin(), s.points.end(), memo.points.begin(),
                    [](const rail::Point& a, const rail::Point& b) { return rail::close(a.x, b.x) && rail::close(a.y, b.y); }))
         return memo.end;
     memo.valid = true;
     memo.rails = signature;
-    memo.level = g_line_level;
+    memo.level = s.level;
     memo.ramp = g_ramp;
     memo.points = s.points;
     memo.end = run_end_now(rails, s);
@@ -8166,9 +8199,11 @@ void draw_track() {
     // the rails the click lays, always drawn - wherever the cursor is, also over the bar - the end
     // its dot (run_end), all red only for a rail the engine's limit of links keeps out
     const TrackStep s = next_step(rails);
+    g_preview_level = s.level;   // the status line's level (track_level)
     const int nvid = RAIL_KINDS[g_rail_kind];
-    // every rail of the run a step higher or lower than the one before (the ramp mode), as lay_step lays them
-    const float z = line_rail_z(nvid);
+    // every rail of the run a step higher or lower than the one before (the ramp mode), as lay_step lays them,
+    // at the level they are laid at (plan_laid: a new line's, the ground under its first rail)
+    const float z = s.level + 6.0f - rail_altitude(nvid);
     const float step = static_cast<float>(g_ramp * rail::RAMP);
     if (uint8_t* v = vid_by_number(nvid))
         for (size_t k = 0; k < s.segments.size() && k + 1 < s.points.size(); ++k)
