@@ -103,6 +103,8 @@ New-Item -ItemType Directory -Force $home_ | Out-Null
 if (-not ("RigHost" -as [type])) { Add-Type -TypeDefinition (Get-Content (Join-Path $rigDir "RigHost.cs") -Raw) -ReferencedAssemblies System.Drawing }
 
 function Say($s) { "[rig $(Get-Date -Format 'HH:mm:ss')] $s" }
+# whatever stops this script says why and where, also when its output goes to a file
+trap { Say "rig.ps1 stopped: $($_.Exception.Message) $($_.InvocationInfo.PositionMessage -replace '\s+', ' ')"; break }
 function GuestPath([string]$p) {
   $full = [IO.Path]::GetFullPath($(if ([IO.Path]::IsPathRooted($p)) { $p } else { Join-Path (Get-Location) $p }))
   if ($full.StartsWith($hostRoot + "\", [StringComparison]::OrdinalIgnoreCase)) { return "C:\host\" + $full.Substring($hostRoot.Length + 1) }
@@ -279,16 +281,31 @@ function Set-BoxDisplay([string]$res, [int]$scale) {
   $b = Get-Content $boxFile -Raw | ConvertFrom-Json
   $b | Add-Member display ([pscustomobject]@{ res = "${w}x$h"; scale = $scale }) -Force
   ($b | ConvertTo-Json) | Set-Content $boxFile -Encoding utf8
-  if ($s.screen -eq $want) { return "guest display $w x $h at $($mon.Scale) % (as it was)" }
-  # The client area holds the guest's screen and the window's own title strip; the strip's height is
+  # A display counts only once the guest has kept it for 3 s: the client changes its own size a
+  # moment after a move between monitors of different scales, and a job must not start on a passing one.
+  function Held([string]$want) {
+    $until = (Get-Date).AddSeconds(3)
+    while ((Get-Date) -lt $until) { Start-Sleep -Milliseconds 500; if ((AgentState).screen -ne $want) { return $false } }
+    return $true
+  }
+  if ($s.screen -eq $want -and (Held $want)) { return "guest display $w x $h at $($mon.Scale) % (as it was)" }
+  # First onto the monitor: on one of another scale Windows resizes the window by the scales' ratio
+  # (WM_DPICHANGED) right after the move, so the size is set only once that is over.
+  $tl = [RigHost]::TopLeft($win)
+  if ($tl[0] -lt $mon.X -or $tl[0] -ge $mon.X + $mon.W -or $tl[1] -lt $mon.Y -or $tl[1] -ge $mon.Y + $mon.H) {
+    [RigHost]::Move($win, $mon.X, $mon.Y); Start-Sleep -Milliseconds 1500 }
+  # The client area holds the guest's screen and the window's own title strip; both sizes are
   # corrected from what the guest gets.
-  $strip = [int](33 * $mon.Dpi / 96); $placed = ""
-  for ($try = 1; $try -le 3; $try++) {
-    $placed = [RigHost]::Place($win, $mon.X, $mon.Y, $w, $h + $strip)
+  $cw = $w; $ch = $h + [int](33 * $mon.Dpi / 96); $placed = ""
+  for ($try = 1; $try -le 5; $try++) {
+    $placed = [RigHost]::Place($win, $mon.X, $mon.Y, $cw, $ch)
     $deadline = (Get-Date).AddSeconds(10)
     do { Start-Sleep -Milliseconds 500; $s = AgentState } while ($s.screen -ne $want -and (Get-Date) -lt $deadline)
-    if ($s.screen -eq $want) { return "guest display $w x $h at $($mon.Scale) % (window $placed on $($mon.Name))" }
-    if ($s.screen -match '^(\d+)x(\d+)@(\d+)$' -and [int]$Matches[1] -eq $w -and [int]$Matches[3] -eq $mon.Dpi) { $strip += $h - [int]$Matches[2] } else { break }
+    if ($s.screen -eq $want -and (Held $want)) { return "guest display $w x $h at $($mon.Scale) % (window $placed on $($mon.Name)$(if ($try -gt 1) { ", try $try" }))" }
+    $s = AgentState
+    if ($s.screen -match '^(\d+)x(\d+)@(\d+)$' -and [int]$Matches[3] -eq $mon.Dpi) { $cw += $w - [int]$Matches[1]; $ch += $h - [int]$Matches[2] }
+    elseif ($s.screen -notmatch '^(\d+)x(\d+)@(\d+)$') { break }
+    if ($cw -le 200 -or $ch -le 200 -or $cw -gt $mon.W * 2 -or $ch -gt $mon.H * 2) { break }
   }
   throw "display $w x $h at $($mon.Scale) % cannot be produced: the guest shows $($s.screen) (window $placed on $($mon.Name)); the window cannot be larger than the host's screens allow - host monitors: $list"
 }

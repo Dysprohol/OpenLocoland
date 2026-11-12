@@ -60,6 +60,7 @@ $boot = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
 $startScreen = ScreenKey
 $defRes = if ($config.DefaultResolution) { $config.DefaultResolution } else { $startScreen.Split("@")[0] }
 $defaultKey = "$defRes@100"
+$lastKey = ScreenKey; $keySince = (Get-Date).AddSeconds(-10)   # the display and since when the guest has had it
 # The slot users' game copies live under C:\work, which they may write to.
 New-Item -ItemType Directory -Force "C:\work\games" | Out-Null
 & icacls C:\work /grant "*S-1-5-32-545:(OI)(CI)M" /Q 2>&1 | Out-Null   # Users: modify
@@ -172,16 +173,18 @@ function Blocked($c) {
     if ($n -and $g + $cls.Games -gt $config.MaxGames) { return "$g of $($config.MaxGames) games running, it needs $($cls.Games)" }
   }
   $now = ScreenKey
+  $ans = $null; try { $ans = Get-Content (Join-Path $agentDir "display-done.json") -Raw -ErrorAction Stop | ConvertFrom-Json } catch { }
+  $answered = [bool]($want -and $ans -and [int]$ans.n -eq $want.n)
   if ($now -ne $cls.Display) {
     if ($n) { return "needs the display $($cls.Display) % (now $now %): waits for $n running job(s) to end" }
-    if (-not $want -or $want.Display -ne $cls.Display) {
+    if ($answered -and -not $ans.ok) { return "FAIL:the display $($cls.Display) % cannot be produced: $($ans.text)" }
+    # asked anew when nothing was asked for it yet, or the host said it was made and the guest drifted since
+    if (-not $want -or $want.Display -ne $cls.Display -or $answered) {
       $script:wantN++
       $script:want = @{ n = $wantN; res = $cls.Res; scale = $cls.Scale; Display = $cls.Display; for = $c.Id; time = (Get-Date).ToString("o"); Since = Get-Date }
       WriteJson (Join-Path $agentDir "display-want.json") ([ordered]@{ n = $want.n; res = $want.res; scale = $want.scale; for = $want.for; time = $want.time })
       Log "display $($cls.Display) % asked of the host for $($c.Id) (now $now %)"
     }
-    $ans = $null; try { $ans = Get-Content (Join-Path $agentDir "display-done.json") -Raw -ErrorAction Stop | ConvertFrom-Json } catch { }
-    if ($ans -and [int]$ans.n -eq $want.n -and -not $ans.ok) { return "FAIL:the display $($cls.Display) % cannot be produced: $($ans.text)" }
     $age = ((Get-Date) - $want.Since).TotalSeconds
     if ($cls.Legacy -and -not $cls.Named -and $age -gt 15) {
       $notes[$c.Id] = "display left at $now % (an older rig.ps1 queued it, named no display, and no host script set the default)"; return "" }
@@ -189,7 +192,26 @@ function Blocked($c) {
       return "FAIL:the display $($cls.Display) % was not made: an older rig.ps1 queued the job and no newer host script was waiting to set it - run it again" }
     return "waits for the host to set the display $($cls.Display) % (now $now %)"
   }
+  # The display is right. When the host was asked for it, its answer counts (it answers once the guest
+  # has kept the display for 3 s); otherwise the display must have stayed so for 2 s - a job never
+  # starts on a size the client passes through.
+  if (-not $n) {
+    if ($want -and $want.Display -eq $cls.Display) {
+      if (-not $answered) {
+        if (-not ($cls.Legacy -and ((Get-Date) - $want.Since).TotalSeconds -gt 15)) { return "waits for the host to finish setting the display $($cls.Display) %" } }
+      elseif (-not $ans.ok) { return "FAIL:the display $($cls.Display) % cannot be produced: $($ans.text)" }
+    }
+    if (((Get-Date) - $script:keySince).TotalSeconds -lt 2) { return "waits for the display $($cls.Display) % to stay put" }
+  }
   return ""
+}
+# A shared job that may start right now beside the running ones, with no display change and no
+# waiting for the box to empty (see the queue loop: jobs that start while an earlier turn waits).
+function Fits($o) {
+  if ($o.Cls.Excl -or $o.Cls.Fresh -or $o.Cls.Display -ne (ScreenKey)) { return $false }
+  if ($running.Values | Where-Object { $_.Excl }) { return $false }
+  if ($running.Count -ge $config.MaxJobs) { return $false }
+  return ((Games-Running) + $o.Cls.Games -le $config.MaxGames)
 }
 function Fail-Queued($c, [string]$why) {
   $dir = Join-Path $jobs $c.Id; New-Item -ItemType Directory -Force $dir | Out-Null
@@ -293,6 +315,7 @@ while ($true) {
   }
   # what the running jobs run under: the display (a peek window, or an older rig.ps1, can change it)
   $now = ScreenKey
+  if ($now -ne $script:lastKey) { $script:lastKey = $now; $script:keySince = Get-Date }
   foreach ($r in $running.Values) { if ($now -ne $r.Display -and -not $r.Changed) { $r.Changed = "$(Get-Date -Format 'HH:mm:ss') the guest became $now %"; Log "job $($r.Id): the display changed under it ($($r.Display) -> $now)" } }
   if ($running.Count -and (Get-Date) -ge $nextShot) {
     $nextShot = (Get-Date).AddSeconds([Math]::Max(1, $config.ScreenSeconds))
@@ -321,6 +344,15 @@ while ($true) {
       elseif (-not $why) { Start-Run $c }
       else {
         $waitWhy[$c.Id] = $why
+        # While the job whose turn it is waits for the box to empty (another display, to run alone, a
+        # fresh box), the jobs queued BEFORE it that fit the display and the room start meanwhile:
+        # jobs of one display go together, and the waiting job is held up by no job newer than itself.
+        if ($running.Count -and ($c.Cls.Excl -or $c.Cls.Fresh -or $now -ne $c.Cls.Display)) {
+          foreach ($o in @($waiting | Where-Object { $_.Id -ne $c.Id -and [string]::CompareOrdinal($_.Id, $c.Id) -lt 0 } | Sort-Object Id)) {
+            if (Fits $o) { $notes[$o.Id] = "started while $($c.Id) (its turn first) waited for the box to empty: queued before it, same display"; Start-Run $o
+                           $waiting = @($waiting | Where-Object { $_.Id -ne $o.Id }) }
+          }
+        }
         foreach ($w in $waiting) { if ($w.Id -ne $c.Id) { $waitWhy[$w.Id] = "waits its turn: $($c.Id) goes first" } }
         break
       }
@@ -329,7 +361,6 @@ while ($true) {
     }
     if (-not $waiting.Count) { $needFresh = $null }
   }
-  if ($want -and (ScreenKey) -eq $want.Display) { $want = $null; Remove-Item (Join-Path $agentDir "display-want.json") -ErrorAction SilentlyContinue }
   $script:waitingNow = $waiting
   if ($running.Count -or $waiting.Count) { $lastWork = Get-Date }
   if ($stop -and -not $running.Count) { Log "stop asked"; break }

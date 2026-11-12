@@ -20,22 +20,22 @@ function Launch([string]$name, [string]$argLine, [string]$script = $rig) {
   if (Test-Path $out) { Remove-Item $out -Recurse -Force }
   $log = Join-Path $b "rig\check-$name.txt"
   $cmd = "& '$script' $argLine -Out '$out' *> '$log'"
-  $p = Start-Process powershell -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $cmd) -WindowStyle Hidden -PassThru
+  $p = Start-Process powershell -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-EncodedCommand", [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cmd))) -WindowStyle Hidden -PassThru
   $null = $p.Handle
   return @{ Name = $name; P = $p; Out = $out; Log = $log }
 }
 function Wait-Report($runs) {
   foreach ($r in $runs) { $r.P.WaitForExit() }
   foreach ($r in $runs) {
-    $run = try { Get-Content (Join-Path $r.Out "run.json") -Raw | ConvertFrom-Json } catch { $null }
-    $done = try { Get-Content (Join-Path $r.Out "done.json") -Raw | ConvertFrom-Json } catch { $null }
+    $run = try { Get-Content (Join-Path $r.Out "run.json") -Raw -ErrorAction Stop | ConvertFrom-Json } catch { $null }
+    $done = try { Get-Content (Join-Path $r.Out "done.json") -Raw -ErrorAction Stop | ConvertFrom-Json } catch { $null }
     $st = if ($run) { ([datetime]$run.started).ToString("HH:mm:ss") } else { "-" }
     $en = if ($run -and $done) { ([datetime]$run.started).AddSeconds($done.seconds).ToString("HH:mm:ss") } else { "-" }
     $lang = (Get-Content (Join-Path $r.Out "game-logs\LocoFix.log") -ErrorAction SilentlyContinue | Select-String "language: \w+" | Select-Object -First 1).Line
     $scr = (Get-Content (Join-Path $r.Out "test_game.txt") -ErrorAction SilentlyContinue | Select-String "^Screen:").Line
     $closed = [bool](Get-Content (Join-Path $r.Out "test_game.txt") -ErrorAction SilentlyContinue | Select-String "Closed normally")
     Say "$($r.Name): exit $($r.P.ExitCode) | $st-$en | slot $($run.slot) | display $($run.display) (asked $($run.asked)) changed '$($done.displayChanged)' | beside $(@($done.alongside).Count) | waited $($run.waited) s | $scr | closed normally $closed | $lang"
-    Get-Content $r.Log | Where-Object { $_ -match "waiting|running|display for|fresh|restart|older|queued again|went away|THE DISPLAY|ran " } | Select-Object -First 12 | ForEach-Object { "      $_" }
+    Get-Content $r.Log -ErrorAction SilentlyContinue | Where-Object { $_ -match "waiting|running|display for|fresh|restart|older|queued again|went away|THE DISPLAY|ran " } | Select-Object -First 12 | ForEach-Object { "      $_" }
   }
 }
 $l01 = '@{ Map = "maps\l01\l01.map"; WaitFor = "test map: loaded"; ClickOk = 1; SetFull = 0; LastShotOnly = $true; Steps = "w@8"'

@@ -130,6 +130,19 @@ public static class RigHost {
     return string.Format("{0}: window at {1},{2}, client {3}x{4}", ok ? "placed" : "SetWindowPos failed", r.L, r.T, c.R, c.B);
   }
 
+  // Moves the window's top-left to x, y without changing its size (a window that lands on a monitor
+  // of another scale is then resized by Windows - WM_DPICHANGED - so the size is set after that).
+  public static void Move(IntPtr h, int x, int y) {
+    IntPtr old = SetThreadDpiAwarenessContext(new IntPtr(-4));
+    SetWindowPos(h, IntPtr.Zero, x, y, 0, 0, 0x0015 /*SWP_NOSIZE|SWP_NOZORDER|SWP_NOACTIVATE*/);
+    SetThreadDpiAwarenessContext(old);
+  }
+  // The window's top-left in real pixels.
+  public static int[] TopLeft(IntPtr h) {
+    IntPtr old = SetThreadDpiAwarenessContext(new IntPtr(-4)); RECT r; GetWindowRect(h, out r); SetThreadDpiAwarenessContext(old);
+    return new int[] { r.L, r.T };
+  }
+
   [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint f);
   // A picture of a window, also of one on a desktop that is not shown (PW_RENDERFULLCONTENT).
   public static string Capture(IntPtr h, string file) {
