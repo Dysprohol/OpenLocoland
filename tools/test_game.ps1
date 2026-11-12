@@ -58,6 +58,8 @@
 # -TestScreen <w>x<h>  the game takes the screen as that size (LOCOFIX_TEST_SCREEN, test mode only:
 #           LocoFix's mode list, the start window's test and the saved mode's check - not the engine's
 #           window limit or dgVoodoo), e.g. a smaller screen than this one
+# -TestDpi unaware|system  the process's DPI awareness fixed before LocoFix asks for its own
+#           (LOCOFIX_TEST_DPI, test mode only), as an exe compatibility setting would
 # -PickMode <text>  with -ClickOk, chooses that line of the start window's resolution list before OK
 #           ("1280 x 720"), as a player would
 #           All of these go to the test key HKCU\SOFTWARE\Gromada\Locoland-test, which LocoFix's test mode
@@ -81,7 +83,7 @@
 # If the full screen box is disabled and the test should run in a window, the game is
 # closed without clicking OK - so the display mode is not switched.
 param([string]$Exe = (Join-Path (Split-Path (Split-Path $PSScriptRoot)) "Locoland\Locoland.exe"), [int]$Wait = 10, [string]$Shot = "", [int]$ClickOk = 0, [switch]$Screen, [int]$SetFull = -1, [string]$Steps = "", [string]$WaitFor = "", [int]$LogWait = 60, [string]$Language = "", [string]$Map = "", [switch]$LastShotOnly, [switch]$Menu, [switch]$Editor, [switch]$Visible,
-      [string]$Resolution = "1024x768", [int]$Cheats = 0, [int]$UnlockMissions = 0, [int]$FrameLimit = 60, [int]$FpsCounter = 0, [string]$Reg = "", [switch]$ResetTestKey, [string]$TestScreen = "", [string]$PickMode = "")
+      [string]$Resolution = "1024x768", [int]$Cheats = 0, [int]$UnlockMissions = 0, [int]$FrameLimit = 60, [int]$FpsCounter = 0, [string]$Reg = "", [switch]$ResetTestKey, [string]$TestScreen = "", [string]$PickMode = "", [string]$TestDpi = "")
 Add-Type @"
 using System; using System.Runtime.InteropServices; using System.Text;
 public class W {
@@ -219,8 +221,9 @@ if ($Editor) { $arguments += "--editor" }
 if ($Map) { $arguments += @("--test-map", "`"$Map`"") }
 if ($arguments) { $start.ArgumentList = $arguments }
 if ($TestScreen) { $env:LOCOFIX_TEST_SCREEN = $TestScreen }
+if ($TestDpi) { $env:LOCOFIX_TEST_DPI = $TestDpi }
 $p = Start-Process @start
-Remove-Item Env:LOCOFIX_TEST_SCREEN -ErrorAction SilentlyContinue   # the game has its copy
+Remove-Item Env:LOCOFIX_TEST_SCREEN, Env:LOCOFIX_TEST_DPI -ErrorAction SilentlyContinue   # the game has its copy
 function Get-Wins { $script:wins = New-Object System.Collections.ArrayList
   $cb = [W+EnumProc]{ param($h, $x) $id = 0; [void][W]::GetWindowThreadProcessId($h, [ref]$id); if ($id -eq $p.Id -and [W]::IsWindowVisible($h)) { [void]$script:wins.Add($h) }; $true }
   [void][W]::EnumWindows($cb, [IntPtr]::Zero) }

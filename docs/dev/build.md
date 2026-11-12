@@ -31,6 +31,12 @@ the start window's test of the mode, while dgVoodoo listed and set the real 1920
 start window itself opens unaware and is scaled by Windows as before (its picture has fixed
 pixels); everything after it - the game's window, dgVoodoo's full-screen window, the cursor, the
 editor's dialogs (dialog units, scaled by Windows) and file dialogs - works in real pixels.
+LocoFix reads the awareness back after asking for it and logs it (`DPI awareness: per monitor (asked:
+per monitor v2)`): when it was fixed before LocoFix loads - the exe's compatibility setting "Override high DPI
+scaling", an overlay injected into the process - the calls are refused and `SetProcessDPIAware` may still
+report success (seen with `test_game.ps1 -TestDpi unaware`, which fixes it beforehand in test mode: "unaware
+(asked: system)"), and then the screen is measured the way the process sees it, scaled, so the mode list
+still fits the screen its windows get.
 
 **Configuration.** The game reads `<exe name>.cfg`, i.e. `Locoland.cfg`. Graphics settings
 (ScreenX, ScreenY, BPP, Device, FullScreen, SoundHighQuality, WindowPositionX/Y) are kept in
