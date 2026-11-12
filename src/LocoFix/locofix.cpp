@@ -54,6 +54,7 @@ void install_options();
 void install_restart();
 void install_update_check();
 void install_dpi_awareness();
+void install_test_registry();
 void install_dpi_launcher();
 
 namespace {
@@ -118,6 +119,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         clean_up_logs();
         patch::log("LocoFix %s", LOCOFIX_VERSION);
         install_crash_log();   // first: an exception anywhere after this is in LocoFix.log (crash_log.cpp)
+        install_test_registry();   // test mode: every setting read or written is the test key's, any exe (test_registry.cpp)
         // The patches fit one exe version only - we recognise it by the build date
         // in the PE header (2003-10-07, the Steam version; the same exe for all languages)
         // and its image size: the Italian CD's exe has the same date but is wrapped by a copy
@@ -131,7 +133,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
                        static_cast<unsigned long>(nt->OptionalHeader.SizeOfImage));
             return TRUE;
         }
-        install_dpi_awareness();   // first: everything after it reads the screen in real pixels (dpi_aware.cpp)
+        install_dpi_awareness();   // first fix: everything after it reads the screen in real pixels (dpi_aware.cpp)
         install_language();
         install_editor_text();   // after install_language: its lookups go to the chosen pack
         install_window();

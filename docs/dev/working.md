@@ -73,6 +73,24 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
   1920x1080 and 2560x1440), so frame-rate measurements run with `-Visible`, the old way on the
   user's desktop; so do the `A` and `Q` steps (real keys, a file dialog), `-SetFull 1` and `-Screen`,
   automatically.
+  A test run keeps its settings in a key of its own, `HKCU\SOFTWARE\Gromada\Locoland-test`: in test mode
+  LocoFix opens that key wherever the engine or LocoFix opens `HKCU\SOFTWARE\Gromada\Locoland` or a key
+  under it (`test_registry.cpp`: `RegOpenKeyExA`, `RegCreateKeyExA` and `RegGetValueA` replaced in the
+  exe's and LocoFix's import tables, before the exe is recognised, so another edition's exe too) - the
+  start window's settings, the window's place, the scripts' `Players`, LocoFix's options, the editor's
+  settings. A test never reads or writes the player's own key on the same computer, so nothing is
+  saved and put back around it. `test_game.ps1` writes the run's settings into the test key before
+  every start: `-Resolution` (1024x768), `-SetFull`, `-Language` (pl), `-Cheats`, `-UnlockMissions`
+  (0), `-FrameLimit` (60), `-FpsCounter` (0), the update check at start off, and `-Reg "Name=1,Other=s:text"`
+  for more; the rest of the test key (Players, the window's place, the editor's settings) stays from
+  run to run, `-ResetTestKey` starts from an empty one (its `Players` is not filled from old data, as
+  `player_registry.cpp` does for a player's first start). `LOCOFIX_TEST_KEY=1` gives the test key without
+  the rest of test mode, for a scripted check with the real mouse and focus (full screen). Checked 2026-11-12: two runs (a mission at
+  1280x720 in English, the editor at 1600x900 in German with `EditorHints` and `EditorScatter` set)
+  left `reg export` of the player's key and its `Players` byte for byte the same. What still uses the
+  player's key: Setup and the installed game (`tools\release.py`, `tools\installer.py`, the release
+  gate's install and start tests) and a build without LocoFix.dll (`build.py`'s as-is editions) - those
+  runs read and write the real key as a player's game does.
   Full screen is not part of the automatic tests - switching the mode
   breaks the redrawing of other windows; `-SetFull 1` runs a single test in it. `-Map maps\l01\l01.map` starts straight into that
   map (LocoFix `--test-map`: no intro, no menu) and `-LogWait` sets how long `-WaitFor` may

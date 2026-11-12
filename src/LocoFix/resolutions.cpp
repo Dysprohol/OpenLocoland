@@ -64,6 +64,8 @@ void* __fastcall construct_graphics(void* graphics, void* edx, void* settings) {
     auto* size = reinterpret_cast<float*>(static_cast<uint8_t*>(graphics) + 0x20c);   // width, height
     const Mode s = screen();
     const Mode saved = {static_cast<int>(size[0]), static_cast<int>(size[1])};
+    patch::log("saved mode %dx%d, %s", saved.width, saved.height,
+               *static_cast<uint32_t*>(graphics) & 0x80 ? "full screen" : "window");
     if (s.width > 0 && s.height > 0 && !fits(saved, s)) {
         patch::log("saved mode %dx%d is bigger than the screen (%dx%d) - the screen's size instead",
                    saved.width, saved.height, s.width, s.height);

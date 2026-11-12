@@ -50,7 +50,14 @@
 #           1024x768 screen and which the game scales to fit and centres in the game area
 #           (the 4:3 picture pillarboxed in a 16:9 window), so they are scaled and moved
 # -LastShotOnly  no screenshot after each step, only the final one
-# -Language language pack code (pl, en...) saved as the game's choice before the start
+# -Language language pack code (pl, en...; default pl), the game's choice for the run
+# -Resolution the start window's mode (default 1024x768); -SetFull 1 also saves full screen
+# -Cheats, -UnlockMissions (0/1, default 0), -FrameLimit (default 60), -FpsCounter (0/1, default 0)
+# -Reg      more settings, "Name=1,Other=s:text" (a number is a DWORD, s: a text), e.g. "EditorHints=0"
+# -ResetTestKey  start from an empty test key (no Players, no window place, no editor settings)
+#           All of these go to the test key HKCU\SOFTWARE\Gromada\Locoland-test, which LocoFix's test mode
+#           uses instead of the player's HKCU\SOFTWARE\Gromada\Locoland (src/LocoFix/test_registry.cpp):
+#           a test never reads or writes the player's own settings and puts nothing back.
 # -WaitFor  before the steps, wait (up to 60 s) until the running game's log contains this
 #           regex, e.g. "menu\.map" - the game loads at different speeds
 # -Map      load this map straight away instead of the intro and the menu (LocoFix
@@ -68,7 +75,8 @@
 # At the end it closes the game with WM_CLOSE, so error.log is complete.
 # If the full screen box is disabled and the test should run in a window, the game is
 # closed without clicking OK - so the display mode is not switched.
-param([string]$Exe = (Join-Path (Split-Path (Split-Path $PSScriptRoot)) "Locoland\Locoland.exe"), [int]$Wait = 10, [string]$Shot = "", [int]$ClickOk = 0, [switch]$Screen, [int]$SetFull = -1, [string]$Steps = "", [string]$WaitFor = "", [int]$LogWait = 60, [string]$Language = "", [string]$Map = "", [switch]$LastShotOnly, [switch]$Menu, [switch]$Editor, [switch]$Visible)
+param([string]$Exe = (Join-Path (Split-Path (Split-Path $PSScriptRoot)) "Locoland\Locoland.exe"), [int]$Wait = 10, [string]$Shot = "", [int]$ClickOk = 0, [switch]$Screen, [int]$SetFull = -1, [string]$Steps = "", [string]$WaitFor = "", [int]$LogWait = 60, [string]$Language = "", [string]$Map = "", [switch]$LastShotOnly, [switch]$Menu, [switch]$Editor, [switch]$Visible,
+      [string]$Resolution = "1024x768", [int]$Cheats = 0, [int]$UnlockMissions = 0, [int]$FrameLimit = 60, [int]$FpsCounter = 0, [string]$Reg = "", [switch]$ResetTestKey)
 Add-Type @"
 using System; using System.Runtime.InteropServices; using System.Text;
 public class W {
@@ -173,11 +181,27 @@ $logs = Join-Path $dir "logs"   # the game's error logs and LocoFix.log (build.p
 # so clicks land where they should and the user's mouse is neither moved nor taken into account.
 $env:LOCOFIX_TEST = "1"
 if ($quiet) { $env:LOCOFIX_QUIET = "1" } else { Remove-Item Env:LOCOFIX_QUIET -ErrorAction SilentlyContinue }
-if ($Language) {
-  $key = "HKCU:\SOFTWARE\Gromada\Locoland"
-  if (-not (Test-Path $key)) { New-Item $key | Out-Null }
-  Set-ItemProperty $key Language $Language
+# The game's settings for the run, in the test key: in test mode LocoFix opens
+# HKCU\SOFTWARE\Gromada\Locoland-test wherever the game or LocoFix opens HKCU\SOFTWARE\Gromada\Locoland
+# (test_registry.cpp), so the player's own key on this computer is never read or written by a test and
+# nothing has to be put back. Every run sets these; the rest of the test key (Players, the window's
+# place, the editor's settings) stays from run to run, -ResetTestKey starts it empty.
+$testKey = "HKCU:\SOFTWARE\Gromada\Locoland-test"
+if ($ResetTestKey -and (Test-Path $testKey)) { Remove-Item -LiteralPath $testKey -Recurse }
+if (-not (Test-Path $testKey)) { New-Item $testKey -Force | Out-Null }
+$rw, $rh = $Resolution.ToLower().Split("x")
+$dwords = [ordered]@{ ScreenX = [int]$rw; ScreenY = [int]$rh; BPP = 16; Device = 0; FullScreen = [int]($SetFull -eq 1)
+  Cheats = $Cheats; UnlockMissions = $UnlockMissions; FrameLimit = $FrameLimit; FpsCounter = $FpsCounter; UpdateCheckAtStart = 0 }
+foreach ($n in $dwords.Keys) { Set-ItemProperty $testKey -Name $n -Value $dwords[$n] -Type DWord }
+Set-ItemProperty $testKey -Name Language -Value $(if ($Language) { $Language } else { "pl" }) -Type String
+# -Reg "Name=1,Other=s:text": more values (a number is a DWORD, s: a text)
+foreach ($pair in ($Reg -split ",")) {
+  if (-not $pair) { continue }
+  $n, $v = $pair.Split("=", 2)
+  if ($v.StartsWith("s:")) { Set-ItemProperty $testKey -Name $n -Value $v.Substring(2) -Type String }
+  else { Set-ItemProperty $testKey -Name $n -Value ([int]$v) -Type DWord }
 }
+"Test key: $Resolution, full screen $($dwords.FullScreen), language $(if ($Language) { $Language } else { 'pl' })$(if ($Reg) { ', ' + $Reg })"
 $start = @{ FilePath = $Exe; WorkingDirectory = $dir; PassThru = $true }
 $arguments = @()
 if ($Editor) { $arguments += "--editor" }

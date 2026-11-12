@@ -18,6 +18,8 @@
 // worked - so the player keeps their progress.
 #include "patch.h"
 
+bool test_registry_on();   // test_registry.cpp
+
 namespace {
 
 constexpr uintptr_t REGISTRY_PARSE_PATH = 0x427340;
@@ -100,5 +102,6 @@ void install_player_registry() {
     g_original = reinterpret_cast<ParsePath_t>(patch::hook(
         REGISTRY_PARSE_PATH, prologue, sizeof prologue, reinterpret_cast<void*>(&ParsePath_players),
         "Registry_ParsePath"));
-    if (g_original) move_old_data();
+    // a test run's Players key (test_registry.cpp) starts empty: no player data copied into it
+    if (g_original && !test_registry_on()) move_old_data();
 }
