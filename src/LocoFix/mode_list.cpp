@@ -1,4 +1,4 @@
-// The display mode list of a device holds 16 modes, and the engine did not stop there (BUGS.md F29).
+// The display mode list of a device holds 16 modes, and the engine did not stop there (BUGS.md F30).
 //
 // Graphics_FilterDisplayMode (0x413e70, the EnumDisplayModes callback of Graphics_EnumDevice)
 // puts every mode of the card that is in the settings' list into the device's DisplayDevice:

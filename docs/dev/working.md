@@ -340,7 +340,7 @@ fills it). In full screen dgVoodoo scales the chosen mode to the monitor
 
 The launcher offers only modes that fit the screen (`resolutions.cpp`): no wider and no taller than
 a monitor in real pixels (the game is DPI-aware, `dpi_aware.cpp`), with each monitor's own size; a
-device's list has room for 16 (`BUGS.md` F29), so the settings' list (room for 31) keeps the modes in
+device's list has room for 16 (`BUGS.md` F30), so the settings' list (room for 31) keeps the modes in
 their order of worth - the game's own, each monitor's size, ours by use - and each device takes the first
 16 of them that fit its monitor. With a 4K TV next to a 2560x1440 screen (2026-11-12) the primary got 16
 (with one list of 16 for all it had 14, two places going to modes only the TV has), the TV 16 with its

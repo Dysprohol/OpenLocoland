@@ -11,7 +11,7 @@
 //
 // The list keeps only the modes no wider and no taller than a monitor in real pixels (real because
 // the game is DPI-aware, dpi_aware.cpp), plus each monitor's own size. A device's list has room
-// for 16 (BUGS.md F29, mode_list.cpp), and with monitors of different sizes one list of 16 for all
+// for 16 (BUGS.md F30, mode_list.cpp), and with monitors of different sizes one list of 16 for all
 // did not serve them: with a 4K TV next to a 2560x1440 screen, two of the
 // 16 were modes only the TV has and the primary got 14. So the settings' list (room for 31) keeps the
 // modes in the order of their worth - the game's own, each monitor's size, ours by use - and each
@@ -241,7 +241,7 @@ void install_resolutions() {
     Mode list[CAPACITY] = {};
     int n = 0;
     // the game's own modes, each monitor's own size, then ours - each only when it fits a
-    // monitor, in this order of worth (each device takes the first 16 that fit it, BUGS.md F29);
+    // monitor, in this order of worth (each device takes the first 16 that fit it, BUGS.md F30);
     // 640x480 always, so the list is never empty
     for (int i = 0; i < CAPACITY && widths[i] != 0; ++i)
         if (i == 0 || fits_any({widths[i], heights[i]})) add(list, n, {widths[i], heights[i]});
