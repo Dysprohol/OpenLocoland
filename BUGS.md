@@ -320,8 +320,11 @@ Harmless log errors:
   held it to (0,0)-(1600,1200) in full screen 1600x1200 and the engine read those screen pixels as
   game pixels one to one; after the fix the cursor reached every edge and the bar (and a click on it
   was taken) at 2560x1440 and 1600x1200, also with the window's saved place on a second monitor -
-  full screen opens on the device's monitor (the primary for Device 0, whatever the window's place). Not seen on a scaled screen (both monitors here are
-  at 100 %, and at consistent pixels dgVoodoo refuses a mode bigger than the screen). LocoFix's longer mode list also overflowed the engine's 16 places (F29).
+  full screen opens on the device's monitor (the primary for Device 0, whatever the window's place). Reproduced on a 4K TV at 200 %
+  (2026-11-12) with the build before the fixes (only the test registry key added): the unaware game sees the TV as
+  1920x1080, and in full screen at 3840x2160 or 2560x1440 the engine got the cursor only up to 1920 x 1080 of its
+  picture - the state bar out of reach - while at 1920x1080 everything was; with the fixes every edge and the bar
+  were reached at 3840x2160, 2560x1440 and 1600x1200 there. LocoFix's longer mode list also overflowed the engine's 16 places (F29).
 - In a window the game area was smaller than the chosen resolution and the picture and mouse
   were computed from the whole window (AdjustWindowRectEx, 6 GetWindowRect calls).
 - Only 640x480-1024x768 in the launcher; maps smaller than the screen sat at the right and

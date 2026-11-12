@@ -369,8 +369,9 @@ it; with 1280 x 720 picked in the start window (`-PickMode`) 1280x720 was saved.
 unaware process - at 125 % or 150 % smaller than the real one - and ticked and greyed the full
 screen box for every mode bigger than that; the full screen then was dgVoodoo's window of the
 scaled screen while the game's picture had the real mode's size, and the cursor could not reach
-the lower part of it (reported on v0.2.11; the mechanism is the code's, not seen on a scaled
-screen - `BUGS.md` "Running on current Windows"). In full screen dgVoodoo holds the real cursor to
+the lower part of it (reported on v0.2.11; reproduced on a 4K TV at 200 % with the build before the fixes, where the
+engine got the cursor only up to 1920 x 1080 of a 3840x2160 or 2560x1440 full screen - `BUGS.md`
+"Running on current Windows"). In full screen dgVoodoo holds the real cursor to
 (0,0)-(the mode) and the engine reads its screen position as game pixels: seen with the real cursor
 at 1600x1200 on a 2560x1440 screen (2026-11-12), where the cursor stopped at 1599,1199 and every edge
 and the bar were reached; full screen opens on the primary monitor even when the window's saved
