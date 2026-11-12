@@ -46,10 +46,14 @@ A window's place saved by an earlier version at 125 / 150 % (`WindowPositionX/Y`
 coordinates and is now read as real pixels, so the first start after the update puts the window nearer the
 screen's top left corner (at 150 % at two thirds of its old distance from it; `window.cpp` centres it again
 only when it is on no monitor); the place it is closed at is saved in real pixels, so this happens once. No
-correction: nothing tells an old value from a new one, and a guess would move correct places. On a second
-monitor of another scale the window's frame is computed with the primary's (`AdjustWindowRectEx`), so the
-game area can be a few pixels off the chosen mode there and the picture stretched by them - not seen (both
-monitors here are at 100 %).
+correction: nothing tells an old value from a new one, and a guess would move correct places. A window's frame
+has the size of its monitor's scale (twice as tall at 200 %), so `window.cpp` computes it for the monitor the
+window opens on (`AdjustWindowRectExForDpi`) and, when the window is moved to a monitor of another scale
+(`WM_DPICHANGED`), resizes it so that the game area keeps the chosen mode's size. Seen on a 4K TV at 200 %
+next to 100 % monitors (2026-11-12): before, a 1920x1080 window opened on the TV had a game area of 1920x1069,
+and dragged to a 100 % monitor Windows shrank it to 1439x800 while the engine kept working at 1920x1080 - the
+picture scaled and the mouse off (at the bottom right corner the engine saw 1438,799); after, 1920x1080 on the
+TV and after the drag, and the mouse matched (1919,1079 at the corner, the bar under it).
 
 **Configuration.** The game reads `<exe name>.cfg`, i.e. `Locoland.cfg`. Graphics settings
 (ScreenX, ScreenY, BPP, Device, FullScreen, SoundHighQuality, WindowPositionX/Y) are kept in

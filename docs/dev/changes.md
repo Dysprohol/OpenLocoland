@@ -125,7 +125,9 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
      at 0x41a832) - and so it does when the saved position is on no monitor: the game saves
      the window rectangle on exit, which is (-32000, -32000) for a minimised window, so
      the next start put the window out of sight; the menu bar of the editor mode is counted
-     in, so the game area keeps its size there too,
+     in, so the game area keeps its size there too; the frame is computed for the monitor the
+     window opens on, and a window moved to a monitor of another display scale keeps its game
+     area's size (`WM_DPICHANGED`, the game being DPI-aware - fix 46),
   3. picture and mouse are computed relative to the game area, not the whole window
      (6 GetWindowRect calls),
   4. more resolutions in the launcher: the built-in list (640x480, 800x600, 1024x768, in
