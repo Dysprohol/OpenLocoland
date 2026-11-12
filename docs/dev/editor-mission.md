@@ -638,7 +638,13 @@ to where the lost one stood when it patrolled. Read back, such an entry gives it
 none of it is offered for army 0. A pirate train needed a locomotive 10: a VID 5 of army 3 is the authors'
 reinforcement marker, which `ReinforcementInit` takes away at the start (seen: `ORDER 1 ... train 0`) - since
 v0.2.12 only on a map with reinforcement waves (`PLAYER_REINFORCEMENT` > 0; `game/maps/script/reinforcement.lgc.patch`
-keeps it on a custom map without them, `BUGS.md` F12), and only the first one `FirstUnit` finds. `FirstUnit` walks the
+keeps it on a custom map without them when it stands on the map - the rule: x and y of the engine, the ground
+under it, within `MapSizeX()` x `MapSizeY()`; one beyond the edge, as the missions' marks are, goes all the same,
+`BUGS.md` F12), and only the first one `FirstUnit` finds. The editor follows it (`reinforcement_marker`,
+`on_map_xy` with the grid's size): on such a map the first such engine beyond the edge is named the marker,
+IN PLAY: TAKEN AWAY AT THE START (OUTSIDE THE MAP), with its note `MsgPirateEngineOutside` when it is placed,
+dragged or given army 3 there (the editor's view stops at the map's edge, so in practice such an engine comes
+from a mission's copy); when a level is held LocoFix.log names the marker and what it is in play. `FirstUnit` walks the
 unit list of `g_objectMap` from its end, which a loaded level fills in the map file's order, and `Level_Save`
 writes each layer's list from its end (0x41e486), so in a map the editor saved the one taken is the first
 one in its layer's list - the first the editor's `for_each_object` meets, which `is_marker` names alone (the

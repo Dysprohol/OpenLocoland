@@ -1,10 +1,26 @@
 --- maps/script/reinforcement.lgc
 +++ maps/script/reinforcement.lgc
-@@ -11,2 +11,7 @@
-   int i;
+@@ -7,2 +7,18 @@
+ 
++// A custom map (CUSTOM_MAP) without the reinforcement (PLAYER_REINFORCEMENT 0) keeps a pirates' small
++// engine that stands on the map - its x and y (the ground under it, not the screen) within MapSizeX/Y;
++// one beyond the edge, where the authors' marks stand, is taken as ever
 +#ifdef CUSTOM_MAP
-+  // a custom map without the reinforcement keeps the pirates' engine as a train of theirs
-+  if( PLAYER_REINFORCEMENT<1 )
++PirateEngineKept(int i)
++{
++  if( PLAYER_REINFORCEMENT>0 )
 +    return 0;
++  return GetX(i)>=0 && GetX(i)<MapSizeX() && GetY(i)>=0 && GetY(i)<MapSizeY();
++}
++#else
++PirateEngineKept(int i)
++{
++  return 0;
++}
 +#endif
+ //инициализация, вызывается из InitDefault
+@@ -12,3 +28,3 @@
    for( i=FirstUnit(u_monster);i;i=NextUnit() )
+-    if( GetUnitVid(i)==5 && Action(i,act_getarmy,0,0)==3 )
++    if( GetUnitVid(i)==5 && Action(i,act_getarmy,0,0)==3 && !PirateEngineKept(i) )
+     {

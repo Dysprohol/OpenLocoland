@@ -533,8 +533,9 @@ pociągiem raz o czasie wymaga mapy z przyjazdami (starsze mapy: PRZESTAW w pane
   dlaczego. Pociąg bez **lokomotywy** nie pojedzie. Mała **Lokomotywa** piratów (VID 5) to znacznik gry,
   gdzie przybywają posiłki na mapie z falami posiłków: gra zabiera ją na starcie mapy (tylko jedną, jeśli jest
   ich więcej - wiersz stanu mówi, którą, gdy ją zaznaczysz), a wiersz stanu mówi to przy stawianiu jej albo przy zmianie jej armii na piratów.
-  Na mapie zrobionej w edytorze bez fal i w innej armii zostaje jako pociąg (misja kampanii otwarta
-  taka, jaka jest, nadal ją traci, a PRZESTAW NA PRZYJAZDY zabiera ją jako znacznik autorów).
+  Na mapie zrobionej w edytorze bez fal zostaje jako pociąg, gdy stoi na mapie (za krawędzią mapy, gdzie
+  misje trzymają swoje, i tak znika), a w innej armii zostaje; misja kampanii otwarta taka, jaka jest,
+  nadal ją traci, a PRZESTAW NA PRZYJAZDY zabiera ją jako znacznik autorów.
 
   ![Rząd Pojazdów nad paskiem](img/vehicles-strip-pl.jpg)
 
