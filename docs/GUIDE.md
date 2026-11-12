@@ -537,7 +537,8 @@ that runs arrivals (older maps: CONVERT in the Arrivals panel).
   arrive on a map with reinforcement waves: the game takes it away when the map starts (only one, if there
   are more - the status line names it when you select it), and the status line says so when you place it
   or give it the pirates' army.
-  On a map without waves, and in another army, it stays as a train.
+  On a map made in the editor without waves, and in another army, it stays as a train (a campaign
+  mission opened as it is still loses it, and CONVERT takes it away as the authors' mark).
 
   ![The Vehicles row above the bar](img/vehicles-strip-en.jpg)
 

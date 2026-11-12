@@ -12607,9 +12607,10 @@ void edit_convert_arrivals() {
     }
     const ArrivalsState before = mission_arrivals();
     ArrivalsState& s = mission_arrivals();
-    std::vector<uint8_t*> markers;
+    std::vector<uint8_t*> markers;   // every VID 5 of army 3 goes, as before v0.2.12 (the authors' point locomotives,
+                                     // which the converted map would otherwise keep as pirate trains with no waves)
     for_each_object([&](uint8_t* o) {
-        if (is_marker(o))
+        if (is_car(o) && nvid_of(o) == VID_LOCOMOTIVE && army_of(o) == 3)
             for (uint8_t* c : group_of(o))
                 if (std::find(markers.begin(), markers.end(), c) == markers.end()) markers.push_back(c);
     });
