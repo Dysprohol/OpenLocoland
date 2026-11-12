@@ -2,8 +2,8 @@ r"""Language packs: the game files that differ between language versions.
 
     python tools\languages.py capture [<code>] [--steam <game folder>] [--force]
 
-(the folder's language is told from Steam's appmanifest or from an edition's files, else give
-its code)
+(the folder's language is told from its strings.ini - Steam's versions and the editions -, else from
+Steam's appmanifest, else give its code)
 
 The language versions differ only in data files: texts (strings.ini, briefings, menus,
 objectives), fonts (the Polish ones have Polish letters in place of Cyrillic) and the
@@ -74,6 +74,17 @@ DEPOT_LANGUAGES = {352131: "en", 352132: "de", 352133: "hu", 352134: "pl", 35213
 # "Steamland" (US Action, 2003) - the Steam exe and files with Czech texts, all its fonts with the
 # Czech letters, no vid\logo.bmp (docs/dev/czech-edition.md).
 EDITIONS = {"85bec1a91b013ca0001a6917ade6dff771bf21e5707a6a1346e16b35788401c0": "cs"}
+# Steam's language versions by the SHA-256 of their strings.ini (tools/editions/<code>-steam.tsv): how a copy
+# of the game tells its own language without Steam's appmanifest next to it (a copy outside a Steam library,
+# a library whose manifest is gone or names a language not downloaded yet). The Portuguese depot is the
+# English game (the same files); the Polish CD 1.02 has the Polish depot's language files.
+STEAM_STRINGS = {
+    "a5cd0318e930ab872062abff8a575dc7c9e965e03369259e150f45f7d0ce92bb": "en",
+    "08732718f0d2a2dac131c88fae485098ce25ffaa06182d094b93a17a872cec62": "de",
+    "5ee5b5c01c46abb9772fccfdce413ebc0a5d3e86be0c7452317a5a8218096135": "hu",
+    "474c7c454e2aa0ae3c47734e24fc5e3081d4806ba0cc036bf54b2769172d9c88": "pl",
+    "35934e403fbc0f905dd0422a09ea842068cfadf404640222e3caa9ffc372949a": "ru",
+}
 EDITION_FOLDER = "Steamland"   # an edition's own folder name, looked for in and next to the Steam game's
 
 # Paths relative to the game folder, compared case-insensitively.
@@ -149,14 +160,19 @@ def captured(code):
     return os.path.isdir(os.path.join(CAPTURED, code))
 
 
-def edition_language(folder):
-    """The code of the known edition of the game (EDITIONS) whose files are in `folder`, or None."""
+def strings_sha(folder):
+    """The SHA-256 of `folder`'s strings.ini, or None."""
     import hashlib
     try:
         with open(os.path.join(folder, "strings.ini"), "rb") as f:
-            return EDITIONS.get(hashlib.sha256(f.read()).hexdigest())
+            return hashlib.sha256(f.read()).hexdigest()
     except OSError:
         return None
+
+
+def edition_language(folder):
+    """The code of the known edition of the game (EDITIONS) whose files are in `folder`, or None."""
+    return EDITIONS.get(strings_sha(folder))
 
 
 def edition_folders(game_folder):
@@ -229,8 +245,16 @@ def unofficial(code, have=None):
 
 
 def steam_language(game_folder):
-    """Code of the language Steam installed in `game_folder` (from its appmanifest), or
-    None when it cannot be told (not a Steam folder, unknown language)."""
+    """Code of the language of the Steam copy in `game_folder`: told from its own strings.ini
+    (STEAM_STRINGS), else from Steam's appmanifest of its library; None when neither tells it (a
+    changed strings.ini outside a Steam library, an edition Steam does not ship). The files come
+    first: they are what gets captured, whatever language the manifest names."""
+    return STEAM_STRINGS.get(strings_sha(game_folder)) or manifest_language(game_folder)
+
+
+def manifest_language(game_folder):
+    """Code of the language Steam's appmanifest next to `game_folder` names, or None (no Steam
+    library around it, unknown language)."""
     manifest = os.path.join(game_folder, "..", "..", f"appmanifest_{STEAM_APP_ID}.acf")
     try:
         text = open(manifest, encoding="utf-8", errors="replace").read()
