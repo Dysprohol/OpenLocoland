@@ -21,17 +21,14 @@
 // it grow with the scale. So it is opened with the thread's DPI awareness set to "unaware" for
 // the call (Windows 10 1607 and later; without it the dialog is simply aware) and Windows scales
 // it as a picture, as before. Inside it Windows gives unaware numbers again, so the start window's
-// own test of the screen size gets the real pixels from screen_pixels() (its two GetSystemMetrics
-// calls at 0x40d985 and 0x40d9a2).
+// own test of the screen size gets the real pixels instead (its two GetSystemMetrics calls at
+// 0x40d985 and 0x40d9a2, resolutions.cpp: the chosen device's monitor, measured before the dialog).
 #include "patch.h"
 #include <cstdio>
 
 namespace {
 
 constexpr uintptr_t IAT_DialogBoxParamA = 0x4751ac;
-constexpr uintptr_t IAT_GetSystemMetrics = 0x475160;
-constexpr uintptr_t LAUNCHER_SCREEN_WIDTH = 0x40d985;    // call [GetSystemMetrics] (SM_CXSCREEN)
-constexpr uintptr_t LAUNCHER_SCREEN_HEIGHT = 0x40d9a2;   // call [GetSystemMetrics] (SM_CYSCREEN)
 
 // DPI_AWARENESS_CONTEXT values (windef.h, Windows 10)
 const HANDLE CONTEXT_UNAWARE = reinterpret_cast<HANDLE>(-1);
@@ -81,12 +78,6 @@ int screen_pixels(int index) {
     return size;
 }
 
-namespace {
-
-int WINAPI launcher_screen_metric(int index) { return screen_pixels(index); }
-
-}  // namespace
-
 // First thing after the exe is recognised, before anything reads a size of the screen.
 void install_dpi_awareness() {
     g_set_thread_context = reinterpret_cast<SetThreadDpiAwarenessContext_t>(user32("SetThreadDpiAwarenessContext"));
@@ -116,10 +107,6 @@ void install_dpi_awareness() {
 // hooks' additions to it are created with the thread unaware.
 void install_dpi_launcher() {
     if (!g_aware) return;
-    patch::redirect_iat_call(LAUNCHER_SCREEN_WIDTH, IAT_GetSystemMetrics, reinterpret_cast<void*>(&launcher_screen_metric),
-                             "GetSystemMetrics (start window, width)");
-    patch::redirect_iat_call(LAUNCHER_SCREEN_HEIGHT, IAT_GetSystemMetrics, reinterpret_cast<void*>(&launcher_screen_metric),
-                             "GetSystemMetrics (start window, height)");
     g_dialog_box = *reinterpret_cast<DialogBoxParamA_t*>(IAT_DialogBoxParamA);
     void* dialog_box = reinterpret_cast<void*>(&DialogBoxParamA_unaware);
     patch::write(IAT_DialogBoxParamA, &dialog_box, sizeof dialog_box);

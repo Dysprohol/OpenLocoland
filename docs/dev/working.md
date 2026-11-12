@@ -337,8 +337,17 @@ fills it). In full screen dgVoodoo scales the chosen mode to the monitor
 (`ScalingMode = stretched_ar`).
 
 The launcher offers only modes that fit the screen (`resolutions.cpp`): no wider and no taller than
-the primary monitor in real pixels (the game is DPI-aware, `dpi_aware.cpp`), with the screen's own
-size, 16 at most (a device's list has room for 16, `BUGS.md` F29). dgVoodoo lists only modes up to
+a monitor in real pixels (the game is DPI-aware, `dpi_aware.cpp`), with each monitor's own size, 16
+at most (a device's list has room for 16, `BUGS.md` F29). `DirectDrawEnumerateExA` lists every
+monitor as a display device (here: 0 the primary display driver, 1 `\\.\DISPLAY2`, 2
+`\\.\DISPLAY1`), each with its monitor (`Graphics_EnumDevice`, hooked to note it), and dgVoodoo lists
+a device's modes only up to that monitor; the start window's test of the chosen mode and the saved
+mode's check use the device's own monitor. The start window has no device list (`patch_exe.py`
+moved it out), so the device is the registry's `Device`, 0 unless set by hand; a device other than
+the primary display driver cannot render in a window, so the engine starts it in full screen, on
+that monitor. Checked 2026-11-12 (quiet runs, test key): Device 2 listed up to 1920x1080 and a saved
+2560x1440 ran at 1920x1080 and stayed saved; with the primary taken as 1600x900 (`-TestScreen`)
+Device 2 still listed up to 1920x1080, devices 0 and 1 up to 1600x900. dgVoodoo lists only modes up to
 the desktop's size and refuses a bigger one in full screen ("Couldn't set the display mode", seen
 with 2560x1600 on a 2560x1440 screen), so a mode the list offers is one dgVoodoo can set. A saved
 mode bigger than the screen is replaced, for that run, by the largest mode of the device's list

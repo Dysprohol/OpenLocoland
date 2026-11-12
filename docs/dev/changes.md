@@ -130,8 +130,10 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
      (6 GetWindowRect calls),
   4. more resolutions in the launcher: the built-in list (640x480, 800x600, 1024x768, in
      the settings struct `0x47b1f0`) gets 1280x720 ... 3840x2160 and the desktop
-     resolution - only the modes no wider and no taller than the screen in real pixels (fix 46),
-     16 at most (fix 45); the game shows those the card supports. A saved mode bigger than the
+     resolution - only the modes no wider and no taller than a monitor in real pixels (fix 46),
+     each monitor's own size among them, 16 at most (fix 45), and each display device (a monitor:
+     the registry's Device, 0 = the primary display driver) measured against its own monitor - its
+     list, the start window's test and the saved mode's check; the game shows those the card supports. A saved mode bigger than the
      screen (another monitor, another display scale, a remote desktop) is replaced for that run
      by the largest mode of the list that fits (after `Graphics_Construct`, before the start
      window), so full screen is never bigger than the screen; the saved one stays in the

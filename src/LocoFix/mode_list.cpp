@@ -12,8 +12,12 @@
 // and "Couldn't set the display mode", the game closed.
 //
 // Here a mode that finds the list full is not added: the original runs on a scratch device, so it
-// still logs the mode as before, and a mode it would have taken is logged as left out.
+// still logs the mode as before, and a mode it would have taken is logged as left out. So is a mode
+// bigger than the monitor of the device being enumerated (resolutions.cpp; dgVoodoo lists each
+// device's modes only up to its monitor anyway - this is a safety net, not the limit).
 #include "patch.h"
+
+bool mode_fits_device(int width, int height);   // resolutions.cpp
 
 namespace {
 
@@ -26,14 +30,17 @@ using Filter_t = int(__stdcall*)(void* surface_desc, uint8_t* device);
 Filter_t g_filter = nullptr;
 
 int __stdcall filter_hook(void* surface_desc, uint8_t* device) {
-    if (*reinterpret_cast<int*>(device + MODE_COUNT) < MODES_MAX) return g_filter(surface_desc, device);
+    // DDSURFACEDESC2: dwHeight at +8, dwWidth at +0xc
+    const int width = *reinterpret_cast<const int*>(static_cast<uint8_t*>(surface_desc) + 0xc);
+    const int height = *reinterpret_cast<const int*>(static_cast<uint8_t*>(surface_desc) + 8);
+    const bool full = *reinterpret_cast<int*>(device + MODE_COUNT) >= MODES_MAX;
+    const bool fits = mode_fits_device(width, height);   // bigger than the device's monitor: left out too
+    if (!full && fits) return g_filter(surface_desc, device);
     alignas(4) uint8_t scratch[DEVICE_SIZE] = {};
     const int result = g_filter(surface_desc, scratch);
     if (*reinterpret_cast<int*>(scratch + MODE_COUNT) != 0) {
-        // DDSURFACEDESC2: dwHeight at +8, dwWidth at +0xc
-        const int width = *reinterpret_cast<const int*>(static_cast<uint8_t*>(surface_desc) + 0xc);
-        const int height = *reinterpret_cast<const int*>(static_cast<uint8_t*>(surface_desc) + 8);
-        patch::log("display mode %dx%d left out: the list holds %d modes", width, height, MODES_MAX);
+        if (!fits) patch::log("display mode %dx%d left out: bigger than the device's monitor", width, height);
+        else patch::log("display mode %dx%d left out: the list holds %d modes", width, height, MODES_MAX);
     }
     return result;
 }
