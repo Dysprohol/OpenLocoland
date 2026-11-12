@@ -354,7 +354,10 @@ point it finds three quarters out (scale 0.75) - which is the near point of the 
 only when that rail's end at the joint points the opposite way. So rails join where their
 end vectors are opposite: a straight horizontal rail and a straight diagonal that touch are
 not linked, the curve shapes join them (mission 1 never puts a horizontal straight next to
-a diagonal). Points closer than 2 px with the same z are shared (reference counted), which
+a diagonal). Points closer than 2 px with the same z are shared (reference counted; the
+coordinates are truncated to whole px, `RailMap_FindDot` takes |dx| and |dy| under 2), and the look-out
+finds a point the same way - so a rail laid half a rail along over another merges into it (The Factory's
+1739.5,725, MAP_RULES.md 3 "Where rails link"), and rails moved off the lattice link within 2 px. This
 is how a branch works: two rails with the same centre (a straight and a curve) share their
 first point. The shape and the height come from the frame of the direction,
 `((direction + dirHalfStep) & 255) * nDir >> 8` (3 and 37 for VID 610; the flat shapes are
@@ -408,7 +411,9 @@ point `RailPos_FindRoute` chooses the next link by a route search: `RailMap_Begi
 resets the costs, `RailDot_Search` goes depth first over the links, keeping the best cost per
 point and incoming link. A link is allowed by `RailDot_CanPass` (semaphore of the army,
 another train standing on the next point unless it has the same goal, push line); a turn
-sharper than 0x20 means reversing, which needs room for the whole train behind a switch
+of 0x20 or more from the link it came on (`Math_DirectionOfVector` of the points' dx, dy; rails linked end
+to end turn at most ~35 degrees, 25 of 256, at a point - only a V, two rails sharing a point, makes a
+train turn round between them) means reversing, which needs room for the whole train behind a switch
 (`RailDot_HasRoomToReverse`) and costs the train length. The route ends at the goal point,
 at a car of the goal train or at shooting distance; when the goal cannot be reached the point
 nearest to it is used. The route is kept in `Engine.path` (the player's train shows it with

@@ -129,8 +129,19 @@ the editor of the game (DEVELOPERS.md "Editor mode", `editor_edit.cpp`) applies 
   link added) - the missions have each; the rules only choose the shape a step means (one joining the
   line's last rail when there is one), and only a rail that would give a point a 7th link is not
   laid. `map_tool.py track` keeps every rule for the repository's maps, and `check-track` reports
-  such places on a saved map (the missions have 0-9 each: their dead ends, duplicates and joints at
-  two heights, which the game plays).
+  such places on a saved map (the missions have 0-9 each: rails laid twice, l12's four V's and l15's
+  joint at two heights, which the game plays).
+- **Where rails link** (`Rail_Action`, `RailMap_AddDot`, `RailMap_FindDot`): the points are whole px, a
+  point within 2 px (|dx|, |dy| < 2) at the same height is shared, and a point links to the one at its
+  look-out three quarters of the sprite out - so a rail laid half a rail along over another merges into
+  it, and rails moved off the lattice still link within 2 px. A train reverses where it turns 0x20 (45
+  degrees) or more from link to link (`RailDot_Search`); rails linked end to end never turn that much, so
+  the one linked joint a train cannot go through is a V: two rails sharing a point with nothing going on
+  the other way. `check-track` lists, besides the rails laid twice and the points of more than 6 links,
+  every rail end that is not linked and not just the end of a track: at **two heights**, **not joined**
+  (other rails end there at an angle), a **V**, and a **near miss** (an end with no other rail ending there
+  within 8 px of another rail's way) - `rail_end_state` / `track_report`, the same as `rail_rules.h`
+  (`tools/test_rail_rules.py`). **[editor]** the Track tool marks them (red) and the ends of track (yellow).
 - A point has at most 6 links ("Too many links"). The rail ends at a joint that point the same
   way at the same height share one point, which links to the far point of each of those rails
   and to the point of the rails ending the opposite way - so the limit is per point, not per

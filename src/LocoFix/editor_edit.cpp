@@ -3985,6 +3985,77 @@ std::vector<rail::Rail> rails_of(const std::vector<RailObject>& objects) {
     return out;
 }
 
+// ---- the track's joints (issue #7: "looks connected but is not") ----
+//
+// Two rails link only where the engine's rule links them (rail_rules.h end_state: their ends opposite
+// at the same height, or their points within 2 px), and a joint can be linked yet only a place to turn
+// round (a V). The Track tool shows every end of track: a small yellow mark at a rail end that is the
+// end of a track (rail::End::Loose - a siding, the main line beyond the map's edge: the missions have 2
+// to 40 each) and a bigger red one where the track looks joined and is not, or turns the trains round -
+// a near miss (an end within 8 px of another rail), rails meeting at two heights, at an angle the engine
+// does not link (a dead end), a V, a point of more than 6 links; the status line counts them, and Check
+// the track (the Menu) goes through them one by one. Rails laid twice are listed by the check only (the
+// engine just shares their points). The same report as map_tool.py check-track (rail::track_report);
+// it is a view: it adds nothing to the history and changes nothing of the map. Kept while the rails
+// are the same (a hash of every rail's place, height, direction and VID, taken once a frame), so a
+// frame costs a walk over the rails; a change of the track computes it again (The Factory: see the log's
+// "track joints" line for the time).
+struct TrackJoints {
+    bool valid = false;
+    uint64_t signature = 0;
+    std::vector<rail::Problem> report;   // with the loose ends
+    std::vector<float> draw_z;           // the height each is drawn at (its rail's z at that end)
+    int loose = 0, look = 0, twice = 0;  // the ends of track; the places to look at (not the rails laid twice); those
+    int counts[7] = {};                  // by rail::Joint
+} g_joints;
+
+std::vector<RailObject> live_rails() {
+    std::vector<RailObject> out;
+    for (const RailObject& r : map_rails())
+        if (!removed(r.object)) out.push_back(r);
+    return out;
+}
+
+const TrackJoints& track_joints() {
+    const std::vector<RailObject> objects = live_rails();
+    uint64_t h = 1469598103934665603ull;
+    auto mix = [&](uint64_t v) { h = (h ^ v) * 1099511628211ull; };
+    mix(objects.size());
+    for (const RailObject& r : objects) {
+        float f[3] = {at<float>(r.object, O_X), at<float>(r.object, O_Y), at<float>(r.object, O_Z)};
+        uint32_t bits[3];
+        std::memcpy(bits, f, sizeof bits);
+        for (uint32_t b : bits) mix(b);
+        mix(static_cast<uint32_t>(at<int>(r.object, O_DIRECTION)));
+        mix(static_cast<uint32_t>(nvid_of(r.object)));
+    }
+    if (g_joints.valid && h == g_joints.signature) return g_joints;
+    LARGE_INTEGER t0, t1, hz;
+    QueryPerformanceCounter(&t0);
+    TrackJoints j;
+    j.valid = true;
+    j.signature = h;
+    j.report = rail::track_report(rails_of(objects), true);
+    for (const rail::Problem& p : j.report) {
+        ++j.counts[static_cast<int>(p.kind)];
+        if (p.kind == rail::Joint::Loose) ++j.loose;
+        else if (p.kind == rail::Joint::Twice) ++j.twice;
+        else ++j.look;
+        const int nvid = p.rail >= 0 ? nvid_of(objects[static_cast<size_t>(p.rail)].object) : VID_RAIL;
+        j.draw_z.push_back(static_cast<float>(p.z - rail_altitude(nvid)));   // map_rails' height of a swamp rail's point is its own
+    }
+    QueryPerformanceCounter(&t1);
+    QueryPerformanceFrequency(&hz);
+    if (j.loose != g_joints.loose || j.look != g_joints.look || j.twice != g_joints.twice || !g_joints.valid)
+        patch::log("edit: track joints: %u rails, %d ends of track, %d to look at (%d near, %d at two heights, %d dead ends, %d V, %d over 6 links), "
+                   "%d laid twice (%.2f ms)", static_cast<unsigned>(objects.size()), j.loose, j.look, j.counts[static_cast<int>(rail::Joint::Near)],
+                   j.counts[static_cast<int>(rail::Joint::Heights)], j.counts[static_cast<int>(rail::Joint::DeadEnd)],
+                   j.counts[static_cast<int>(rail::Joint::Sharp)], j.counts[static_cast<int>(rail::Joint::Links)], j.twice,
+                   (t1.QuadPart - t0.QuadPart) * 1000.0 / static_cast<double>(hz.QuadPart));
+    g_joints = std::move(j);
+    return g_joints;
+}
+
 // The steps of the lattice: one rail of each shape, both ways.
 const std::vector<rail::Point>& lattice_steps() {
     static std::vector<rail::Point> steps;
@@ -7830,6 +7901,83 @@ void fill_rect(float l, float t, float r, float b, uint32_t argb) {
     if ((argb & 0xff000000) != 0xff000000) g_fill_batch->opaque = false;
 }
 
+// A triangle into the batch (FillBatch: its list takes three vertices as well as a rectangle's six; a
+// call of the list is 6 * 1024 vertices, a whole number of triangles), clockwise as fill_triangle puts
+// it; outside a batch fill_triangle.
+void fill_triangle_batched(float x0, float y0, float x1, float y1, float x2, float y2, uint32_t argb) {
+    if (!g_fill_batch) {
+        fill_triangle(x0, y0, x1, y1, x2, y2, argb);
+        return;
+    }
+    const float cross = (x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0);
+    if (cross == 0) return;
+    if (cross < 0) {
+        std::swap(x1, x2);
+        std::swap(y1, y2);
+    }
+    constexpr float Z = 0.99999988f;
+    for (const FillVertex& x : {FillVertex{x0, y0, Z, 1, argb, 0xffffffff}, FillVertex{x1, y1, Z, 1, argb, 0xffffffff},
+                                FillVertex{x2, y2, Z, 1, argb, 0xffffffff}})
+        g_fill_batch->v.push_back(x);
+    if ((argb & 0xff000000) != 0xff000000) g_fill_batch->opaque = false;
+}
+
+void fill_diamond(float x, float y, float r, uint32_t argb) {
+    fill_triangle_batched(x - r, y, x, y - r, x + r, y, argb);
+    fill_triangle_batched(x - r, y, x + r, y, x, y + r, argb);
+}
+
+// The marks of the track's joints (track_joints) in the Track tool: a small yellow square at an end of
+// track, a red diamond with a dark rim where it looks joined and is not or turns the trains round.
+// Direct3D triangles in one list (FillBatch), drawn after the regions' frames - no lock of the back
+// buffer, so no wait for the GPU.
+void draw_track_marks() {
+    const bool marks = tool() == Tool::Track;
+    if (!marks) return;
+    uint8_t* w = world();
+    const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
+    const Box v = view();
+    FillBatch batch;
+    {
+        const TrackJoints& j = track_joints();
+        for (size_t n = 0; n < j.report.size(); ++n) {
+            const rail::Problem& p = j.report[n];
+            if (p.kind == rail::Joint::Twice) continue;
+            const float x = static_cast<float>(p.at.x) - cam_x, y = static_cast<float>(p.at.y) - j.draw_z[n] - cam_y;
+            if (x < v.l - 12 || x > v.r + 12 || y < v.t - 12 || y > v.b + 12) continue;
+            if (p.kind == rail::Joint::Loose) {
+                fill_rect(x - 4, y - 4, x + 4, y + 4, 0xb0000000);
+                fill_rect(x - 2.5f, y - 2.5f, x + 2.5f, y + 2.5f, 0xe0f0d030);
+            } else {
+                fill_diamond(x, y, 10, 0xd0000000);
+                fill_diamond(x, y, 7, 0xf0ff3020);
+            }
+        }
+    }
+}
+
+// The Track tool's line of the marks: how many ends of track (yellow) and places to look at (red), by kind.
+std::string joints_status() {
+    const TrackJoints& j = track_joints();
+    std::string text = ui_printf(ui_format("StatusJoints", "track ends: %d (yellow)"), j.loose);
+    const std::string twice = j.twice ? ui_printf(ui_format("StatusJointsTwice", " - rails laid twice: %d"), j.twice) : std::string();
+    if (!j.look) return text + ui_text("StatusJointsFine", " - nothing to look at") + twice;
+    struct Kind {
+        rail::Joint kind;
+        const char* key;
+        const char* english;
+    };
+    static const Kind KINDS[] = {{rail::Joint::Near, "JointNear", "near miss %d"},
+                                 {rail::Joint::Heights, "JointHeights", "two heights %d"},
+                                 {rail::Joint::DeadEnd, "JointDeadEnd", "not joined %d"},
+                                 {rail::Joint::Sharp, "JointSharp", "trains turn round %d"},
+                                 {rail::Joint::Links, "JointLinks", "over 6 rails %d"}};
+    std::string kinds;
+    for (const Kind& k : KINDS)
+        if (const int n = j.counts[static_cast<int>(k.kind)]) kinds += (kinds.empty() ? "" : ", ") + ui_printf(ui_format(k.key, k.english), n);
+    return text + ui_printf(ui_format("StatusJointsLook", " - to look at: %d (red: %s)"), j.look, kinds.c_str()) + twice;
+}
+
 // The effects that draw nothing on a held level: the generators (their picture is vid\generator.vid,
 // empty), which make their bubbles, circles, smoke, sparks, fire, bears only while the level runs - the
 // palette's Effects but the lights, and the Water tool's circles. In the editor (never in play) each has a
@@ -11050,6 +11198,7 @@ void draw_overlay() {
     lap.to(prof::ED_TOOL);
     draw_regions();
     lap.to(prof::ED_REGIONS);
+    draw_track_marks();   // the Track tool's marks of the joints (Direct3D, no lock)
     draw_mines();
     lap.to(prof::ED_MARKS);
     {
@@ -11157,8 +11306,9 @@ void draw_overlay() {
                       : g_bed ? std::to_string(g_bed).c_str() : ui_text("WordNone", "none"));
         const std::string ground = std::string(bed) + ui_printf(ui_format("StatusRaiseGround", ", the ground under rising rails (G): %s"), raise_name());
         status_line(v.l, v.t + 2 * LINE_HEIGHT, ground.c_str());
+        status_line(v.l, v.t + 3 * LINE_HEIGHT, joints_status().c_str());   // the marks counted
     }
-    int below = tool() == Tool::Track || helps ? 3 : 2;   // below the tool's lines (the Track tool and the placing helps have two)
+    int below = tool() == Tool::Track ? 4 : helps ? 3 : 2;   // below the tool's lines (the Track tool has three, the placing helps two)
     if (!g_line_status.empty()) status_line(v.l, v.t + below++ * LINE_HEIGHT, g_line_status.c_str());   // the push line under the cursor
     if (!g_enemy_status.empty()) status_line(v.l, v.t + below * LINE_HEIGHT, g_enemy_status.c_str());
     locked.unlock();

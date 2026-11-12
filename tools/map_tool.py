@@ -3250,55 +3250,173 @@ def track_cells(segments, width, height):
     return cells, buffer
 
 
-def track_problems(rails):
-    """The joints of a map's rails (x, y, shape, z0, z1; ramps included, see rail_of) where
-    the engine's network is not what the track looks like: the same rail twice (it only
-    shares the points of the first, RailMap_AddDot), a rail point with more than 6 links
-    (rail_point_links: the engine drops the others, "Too many links"), and a joint where
-    several rails end but some rail end has no rail ending the opposite way at the height of
-    its point - there the track ends for the trains (a dead end of two rails, or rails at
-    different heights that do not link). A rail end alone is an end of the track.
-    [(point, text), ...]."""
+NEAR_MISS = 8.0    # px: a lone rail end this near another rail's way is a near miss
+
+
+def _way_distance(point, rail):
+    hx, hy = RAIL_HALF
+    (ax, ay), (bx, by) = [(rail[0] + e[0] * hx, rail[1] + e[1] * hy) for e in RAIL_ENDS[rail[2]]]
+    ux, uy = bx - ax, by - ay
+    length2 = ux * ux + uy * uy
+    t = ((point[0] - ax) * ux + (point[1] - ay) * uy) / length2 if length2 else 0.0
+    t = min(1.0, max(0.0, t))
+    return math.hypot(point[0] - ax - ux * t, point[1] - ay - uy * t)
+
+
+def _engine_point(centre, end, scale):
+    """A rail's point (scale 0.25) or its look-out (0.75) as Rail_Action takes it: the size times
+    the end's table entry, truncated to whole px (crt_ftol, RailMap_AddDot / RailMap_FindDot)."""
+    return (int(centre[0] + end[0] * 2 * RAIL_HALF[0] * scale), int(centre[1] + end[1] * 2 * RAIL_HALF[1] * scale))
+
+
+def _engine_links(centre, end, z, rail):
+    """True when the engine links the rail end (its rail's centre, end vector, the height of its
+    point) to a point of `rail`: its look-out within 2 px of that rail's point at the same height
+    (RailMap_FindDot), or that rail's look-out at its point."""
+    for k, e in enumerate(RAIL_ENDS[rail[2]]):
+        if rail[3 + k] != z:
+            continue
+        lx, ly = _engine_point(centre, end, 0.75)
+        px, py = _engine_point(rail[:2], e, 0.25)
+        if abs(px - lx) < 2 and abs(py - ly) < 2:
+            return True
+        bx, by = _engine_point(rail[:2], e, 0.75)
+        ax, ay = _engine_point(centre, end, 0.25)
+        if abs(ax - bx) < 2 and abs(ay - by) < 2:
+            return True
+    return False
+
+
+def rail_end_state(rails, point, end, z, self_index=None):
+    """What the rail end `end` (its point at height z) at the joint `point` is for the trains,
+    among `rails` (x, y, shape, z0, z1; `self_index` is that rail's index there, None for a rail
+    not laid yet): ("linked", None) - a rail ends there the opposite way at that height, or the
+    engine links it within its 2 px (_engine_links); ("heights", [other heights]) - rails end there
+    the opposite way only at other heights; ("sharp", None) - none the opposite way, another the same
+    way at that height: the two share one point, linked, but every way between them turns 45 degrees
+    or more (RailDot_Search: a reversal) - a V, trains only turn round there; ("deadend", None) - other
+    rails end there at an angle that does not link; ("near", None) - no other rail ends there but the
+    end lies within NEAR_MISS px of another rail's way; ("loose", None) - the end of a track.
+    The same as src/LocoFix/rail_rules.h end_state."""
+    hx, hy = RAIL_HALF
+    opposite = (-end[0], -end[1])
+    seen = same = False
+    others = []
+    for n, rail in enumerate(rails):
+        if n == self_index:
+            continue
+        for k, e in enumerate(RAIL_ENDS[rail[2]]):
+            if abs(rail[0] + e[0] * hx - point[0]) >= 0.01 or abs(rail[1] + e[1] * hy - point[1]) >= 0.01:
+                continue
+            seen = True
+            h = rail[3 + k]
+            if e == opposite and h == z:
+                return "linked", None
+            if e == opposite:
+                others.append(h)
+            if e == end and h == z:
+                same = True
+    centre = (point[0] - end[0] * hx, point[1] - end[1] * hy)
+    near = False
+    for n, rail in enumerate(rails):
+        if n == self_index:
+            continue
+        if _engine_links(centre, end, z, rail):
+            return "linked", None
+        if not seen and _way_distance(point, rail) <= NEAR_MISS:
+            near = True
+    if others:
+        return "heights", sorted(set(others))
+    if same:
+        return "sharp", None
+    if seen:
+        return "deadend", None
+    return ("near" if near else "loose"), None
+
+
+def track_report(rails, loose=False):
+    """The places of a map's rails (x, y, shape, z0, z1; ramps included, see rail_of) where the
+    engine's network is not what the track looks like, in order: the same rail twice ("twice", its
+    centre, the count - it only shares the points of the first, RailMap_AddDot: harmless, but one
+    stays when the other is deleted), then per joint (by x, y) and its points (by end vector and
+    height): a rail point with more than 6 links ("links": the engine drops the others, "Too many
+    links") and every rail end that is not linked (rail_end_state): "heights", "sharp", "deadend",
+    "near" and, with `loose`, "loose". [(kind, point, end, z, value), ...] - value: the count (for
+    "twice", whose `end` is the rail's shape and `z` its two heights), the links, the other heights,
+    None. The rails laid twice count once for the joints. The same as src/LocoFix/rail_rules.h
+    track_report (tools/test_rail_rules.py compares them)."""
     hx, hy = RAIL_HALF
     seen = Counter((round(x, 3), round(y, 3), shape, z0, z1) for x, y, shape, z0, z1 in rails)
-    problems = [((x, y), f"rail of shape {shape} at {x:g},{y:g} (points at {z0}, {z1}) {count} times")
-                for (x, y, shape, z0, z1), count in sorted(seen.items()) if count > 1]
-    unique = list(seen)
+    report = [("twice", (x, y), shape, (z0, z1), count)
+              for (x, y, shape, z0, z1), count in sorted(seen.items()) if count > 1]
+    unique = sorted(seen)
     joints = {}
-    for rail in unique:
-        for end in RAIL_ENDS[rail[2]]:
+    ending = {}
+    for n, rail in enumerate(unique):
+        for k, end in enumerate(RAIL_ENDS[rail[2]]):
             point = (round(rail[0] + end[0] * hx, 3), round(rail[1] + end[1] * hy, 3))
-            joints[point] = joints.get(point, 0) + 1
-    for point, count in sorted(joints.items()):
-        points = rail_point_links(unique, point)
-        for (end, height), links in sorted(points.items()):
-            if links > MAX_RAIL_LINKS:
-                problems.append((point, f"the rail point of the ends {end} at height {height} has "
-                                        f"{links} links (more than {MAX_RAIL_LINKS}: 'Too many links')"))
-        if count > 1:
-            for (end, height) in sorted(points):
-                if ((-end[0], -end[1]), height) in points:
-                    continue
-                others = sorted(h for (e, h) in points if e == (-end[0], -end[1]))
-                if others:
-                    text = (f"rail ends {end} at height {height} meet the opposite ends at height "
-                            f"{', '.join(map(str, others))}: they do not link")
-                else:
-                    text = (f"rail ends {end} at height {height} have no rail ending the opposite "
-                            f"way: the track ends there")
-                problems.append((point, text))
-    return problems
+            joints.setdefault(point, {}).setdefault((end, rail[3 + k]), n)
+            ending.setdefault(point, []).append(rail)
+    for point in sorted(joints):
+        links = rail_point_links(ending[point], point)
+        for (end, height) in sorted(joints[point]):
+            if links.get((end, height), 0) > MAX_RAIL_LINKS:
+                report.append(("links", point, end, height, links[(end, height)]))
+            state, value = rail_end_state(unique, point, end, height, joints[point][(end, height)])
+            if state != "linked" and (state != "loose" or loose):
+                report.append((state, point, end, height, value))
+    return report
 
 
-def check_track(path, objects_res=None, nvid=RAIL_NVID):
-    """map_tool.py check-track <map>: the track rules on every rail of a .map (or an
-    unpacked folder). Returns the problems (printed by main)."""
+def track_problems(rails):
+    """The joints of a map's rails where the engine's network is not what the track looks like
+    (track_report, without the plain ends of track) as texts: [(point, text), ...]."""
+    texts = []
+    for kind, point, end, z, value in track_report(rails):
+        if kind == "twice":
+            texts.append((point, f"rail of shape {end} at {point[0]:g},{point[1]:g} (points at {z[0]}, {z[1]}) "
+                                 f"{value} times"))
+        elif kind == "links":
+            texts.append((point, f"the rail point of the ends {end} at height {z} has {value} links (more than "
+                                 f"{MAX_RAIL_LINKS}: 'Too many links')"))
+        elif kind == "heights":
+            texts.append((point, f"rail ends {end} at height {z} meet the opposite ends at height "
+                                 f"{', '.join(map(str, value))}: they do not link"))
+        elif kind == "deadend":
+            texts.append((point, f"rail ends {end} at height {z} have no rail ending the opposite way: the track "
+                                 f"ends there"))
+        elif kind == "sharp":
+            texts.append((point, f"rail ends {end} at height {z} share one point and nothing goes on the other way: "
+                                 f"trains only turn round there (a V)"))
+        elif kind == "near":
+            texts.append((point, f"the rail end {end} at height {z} stops within {NEAR_MISS:g} px of another rail and "
+                                 f"does not link (a near miss)"))
+    return texts
+
+
+# The rail kinds and how much lower their points stand than a plain rail's at the same z: the swamp
+# rails' (600, its destroyed 601) stand 7 over them, not 10 (the editor's map_rails does the same).
+RAIL_KINDS = {610: 0, 611: 0, 600: -3, 601: -3}
+
+
+def every_rail(model):
+    """(x, y, shape, z0, z1) of all the map's rails of every kind (RAIL_KINDS), as one network - the
+    engine links a swamp rail to a plain one by the same rule."""
+    rails = []
+    for nvid, lower in RAIL_KINDS.items():
+        rails += [(x, y, shape, z0 + lower, z1 + lower) for x, y, shape, z0, z1 in map_rails(model, nvid)]
+    return rails
+
+
+def check_track(path, objects_res=None, nvid=None):
+    """map_tool.py check-track <map>: the track rules on every rail of a .map (or an unpacked
+    folder) - of every kind, or of the VID `nvid`. Returns the problems (printed by main)."""
     if os.path.isdir(path):
         model = load_map(path)
     else:
         with open(path, "rb") as f:
             model = read_map(f.read(), object_info(objects_res or find_objects_res(path)))
-    return track_problems(map_rails(model, nvid))
+    return track_problems(every_rail(model) if nvid is None else map_rails(model, nvid))
 
 
 # A grid cell more than this below the track height has the rail above it: the track leaves it.
@@ -4047,7 +4165,8 @@ def main(argv):
     p.add_argument("--items", help="place: build list of an object (a depot), e.g. 5 10 20 25")
     p.add_argument("--clear", action="store_true", help="track: remove the old rails first")
     p.add_argument("--shapes", help="track: the sprite shape of each step, e.g. 2,2,3")
-    p.add_argument("--rail", type=int, default=610, help="track: VID of the rail (610)")
+    p.add_argument("--rail", type=int, default=None,
+                   help="track: VID of the rail (610); check-track: only this rail VID (every kind by default)")
     a = p.parse_args(argv)
     counts = {"unpack": 2, "pack": 2, "new": 2, "ground": 3, "paint": 2, "apply": 3, "check": 1,
               "list": 1, "vids": 1, "place": 4, "copy": 3, "delete": 2, "track": 2,
@@ -4117,7 +4236,7 @@ def main(argv):
                 except ValueError:
                     p.error(f"track: {text} is not a point like 141.5,750")
             shapes = [int(s) for s in a.shapes.split(",")] if a.shapes else None
-            print(f"laid {track_objects(a.paths[0], points, a.rail, a.z, a.clear, shapes, a.objects)}"
+            print(f"laid {track_objects(a.paths[0], points, a.rail or RAIL_NVID, a.z, a.clear, shapes, a.objects)}"
                   f" rails")
         else:
             sys.exit(1 if check(a.paths[0]) else 0)

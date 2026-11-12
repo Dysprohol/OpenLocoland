@@ -237,6 +237,48 @@ gone); a locomotive of ours patrolling over it in Run the level, up, along and d
 grid with a unit's size, is not used: it is not implemented in the exe and is about one object's
 footprint, not the cells along a track.
 
+**The track's joints** (issue #7, "looks connected but is not"; `rail_rules.h` `end_state` and
+`track_report`, the same as `map_tool.py` `rail_end_state` and `track_report` - `check-track` prints it -,
+compared by `tools	est_rail_rules.py` on generated pieces of track and on every map of the game;
+the editor's `track_joints`, `draw_track_marks`, `joints_status`). How the engine links rails, read from
+the code (`Rail_Action`, `RailMap_AddDot`, `RailMap_FindDot`, `RailDot_Search`): a rail's two points are
+truncated to whole px, a point within 2 px (|dx| and |dy| under 2) at the same height is shared, and each
+point links to the point found at its look-out three quarters of the sprite out - on the lattice that is
+where two rail ends meet pointing opposite ways at the same height (MAP_RULES.md 3), off it within 2 px;
+a rail laid half a rail along over another merges into it. A train reverses where the turn between the
+link it came on and the next is 0x20 (45 degrees) or more; two rails linked end to end never turn that
+much (the 12 shapes: at most ~35 degrees at a point), so the one linked joint a train cannot go through
+is a V - two rails sharing a point, nothing the other way. So each rail end is one of: linked; **two
+heights** (rails end there the opposite way only at other heights); a **V** (trains turn round there);
+**not joined** (other rails end there at an angle the engine does not link: a horizontal and a diagonal
+touching); a **near miss** (no other rail ends there but the end lies within 8 px of another rail's way);
+or the **end of a track** (a siding, the line beyond the map's edge). The 8 px: on the lattice an end is
+on a joint or at least 25 px from the next one, and none of the 20 missions has a lone end within 14.5 px
+of another rail (l15's nearest); the engine's own reach is 2 px. The Track tool shows them all: a small
+yellow square at an end of track, a red diamond with a dark rim at the others and at a point of more than
+6 links, each at the height of its point (a ramp's raised end, two diamonds one above the other at a joint
+at two heights); the third status line counts them ("track ends: 37 (yellow) - to look at: 42 (red: near
+miss 4, two heights 14, not joined 19, trains turn round 4, over 6 rails 1)"). Rails laid twice are not
+marked (the engine only shares their points). What the campaign shows (the 20 missions, `check-track`):
+2-40 ends of track each (l14 40, l18 28, l08 26 - sidings, depot stubs, the main line past the edge), red
+on two maps only: l12's four V's (the ends of a double track hidden in the rocks, one place) and l15's one
+joint at two heights (1881,350: 142 against 153); 0 near misses, 0 not joined. **The issue's reference was
+wrong there**: the old `check-track` linked only ends that coincide exactly, and listed The Factory's
+1739.5,725 as a dead end - a diagonal laid half a rail along over the next one, whose point 1757,737 has
+two rails and links on to 1721,712 in the game (the test command `D`); its 26 ends lying on other rails are
+the same (curves centred half a step off, 3-link points of the line in the game). The Factory now: 14 ends
+of track, nothing to look at, 2 rails laid twice. The marks are a view: they add nothing to the history
+and change nothing of the map; the report is computed again only when a rail changes (a hash of every
+rail's place, height, direction and VID, a walk over the rails a frame - l12 1.6 ms, the test map 2.9 ms,
+once) and drawn as Direct3D triangles in one list (`FillBatch`, a triangle now goes into it as well as a
+rectangle) after the regions' frames - no lock of the back buffer. Checked in the game on `tjtest` (the
+sandbox with a V, an angle, two heights and a near miss each in its four mirror images, a point of 8 rails,
+plain and swamp rails at the same and at other points' heights, destroyed rails, a ramp the right and the
+wrong way, a rail twice): the log's count the same as `check-track`'s (37 ends of track, 42 to look at: 4
+near, 14 two heights, 19 not joined, 4 V, 1 over 6 links; 1 laid twice), the marks on their joints, and `D`
+showing the plain and swamp rails linked at the same points' height, apart at the swamp rail's lower point,
+and the 8-rail point with 7 refs and 6 links (the engine dropped two).
+
 **The ground under rising rails** (the Track tool's G, the row's GROUND UNDER RISING RAILS: AS IT IS /
 SOFT / HARD; `g_raise_ground` in `lay_step`; issue #5). AS IT IS, the default, is the rule above: a rail
 above the ground leaves it. HARD raises it the way a cutting is lowered: the cells the rail crosses go up

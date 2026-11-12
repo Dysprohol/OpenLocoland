@@ -10,10 +10,12 @@
 //                                                   track_cells(segments, width, height)
 //     R <x> <y> <z> <direction>                     rail_of(x, y, z, direction)
 //     J <n> {<x> <y> <shape> <z0> <z1>}*n <px> <py>  rail_point_links(rails, point)
+//     Q <n> {<x> <y> <shape> <z0> <z1>}*n <loose>    track_report(rails, loose)
 //
 // (z "any" = None) and gets one output line: the candidates "x y shape fx fy sx sy" separated by
 // ";", the plan "<code> <step> x y shape e0x e0y e1x e1y;...", the cells "cx,cy ...|cx,cy ..."
-// (sorted), the rail "x y shape z0 z1", the points "ex ey z links;..." (sorted).
+// (sorted), the rail "x y shape z0 z1", the points "ex ey z links;..." (sorted), the report
+// "kind x y ex ey z value;..." in its order ("twice x y shape z0 z1 count;" for a rail laid twice).
 #define _CRT_SECURE_NO_WARNINGS
 #include "../src/LocoFix/rail_rules.h"
 
@@ -121,6 +123,18 @@ int main() {
                                 " " + std::to_string(j.links) + ";");
             std::sort(items.begin(), items.end());
             for (const std::string& i : items) out += i;
+        } else if (kind == "Q") {
+            const std::vector<rail::Rail> rails = read_rails(in);
+            int loose = 0;
+            in >> loose;
+            for (const rail::Problem& p : rail::track_report(rails, loose != 0)) {
+                out += std::string(rail::joint_code(p.kind)) + " " + num(p.at.x) + " " + num(p.at.y) + " ";
+                if (p.kind == rail::Joint::Twice)
+                    out += std::to_string(p.shape) + " " + std::to_string(p.z) + " " + std::to_string(p.z1) + " " + std::to_string(p.value);
+                else
+                    out += std::to_string(p.end.x) + " " + std::to_string(p.end.y) + " " + std::to_string(p.z) + " " + std::to_string(p.value);
+                out += ";";
+            }
         }
         std::cout << out << "\n";
     }

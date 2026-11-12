@@ -350,6 +350,13 @@ is not laid (the game allows 6): its ends are **red** and the status line says s
 - a **crossing**: lay a line on across any track, also across the point where two of its rails meet;
   trains cross it but cannot turn onto the other track there. Help page 23 describes the lattice.
 
+**Joints.** Two rails join only where their ends meet pointing opposite ways at the same height, so
+track can look joined and not be. In the Track tool every end of track has a small **yellow** mark - a
+siding, a line beyond the edge - and a **red** one shows where the track looks joined but is not, or
+where trains can only turn round: an end a few px short of another rail, rails meeting at two heights or
+at an angle, a V (two rails from one point with nothing going on). The third status line counts them.
+Help page 33 sums it up.
+
 Lay the main line the way the missions do: from **past the west edge** (scroll out over the grid)
 along the map, so the trains come and go out of sight. Then a spur for the factory: a branch off
 the line through a Y, a straight piece ending in a **dead end**.

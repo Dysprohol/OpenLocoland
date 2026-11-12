@@ -12,6 +12,7 @@
 // frames 12-35 of the rail are ramps: the same shapes with one point raised (rail_of). A track
 // is laid along rail-network points, the places where two rails meet; every step is one rail.
 #pragma once
+#include <algorithm>
 #include <climits>
 #include <cmath>
 #include <cstdlib>
@@ -325,6 +326,220 @@ inline Plan plan(const std::vector<Rail>& rails, const std::vector<Point>& point
                 }
         }
     return p;
+}
+
+// ---- the joints of a track as the engine links them (map_tool.py track_report / check-track) ----
+//
+// What a rail end at a joint is for the trains, from the rails there (the rule of Rail_Action above:
+// the rail ends that point opposite ways at the same height link, those pointing the same way at
+// the same height share one point):
+//  - Linked: a rail ends there the opposite way at the height of its point - the track goes on;
+//  - Heights: rails end there the opposite way, but only at other heights - they do not link;
+//  - Sharp: no rail the opposite way, but another rail ends there the same way at that height - the
+//    two share one point and are linked, yet every way from one into the other turns more than 0x20
+//    (RailDot_Search: a turn of 45 degrees or more is a reversal), so a train only turns round there
+//    (a V; a joint of linked rails end to end never turns that much: the 12 shapes turn at most ~35
+//    degrees at a point);
+//  - DeadEnd: other rails end there, none the opposite way or the same way: at an angle the engine
+//    does not link (a straight horizontal and a diagonal touching, say) - it looks joined and is not;
+//  - Near: no other rail ends there, but the end lies within NEAR_MISS px of another rail's way (the line
+//    between its ends, on the map) - a branch ending on the side of a track, an end a few px short;
+//  - Loose: no other rail ends there and none is near: the end of a track (a siding, the main line
+//    beyond the map's edge).
+// A lone end that the engine links all the same - its look-out point (three quarters of the sprite
+// out, truncated to whole px as RailMap_AddDot / RailMap_FindDot take it) within 2 px of a point of
+// another rail at the same height, or the other's look-out at its point - is Linked: rails moved by
+// hand off the lattice still link within 2 px.
+enum class End { Linked, Heights, Sharp, DeadEnd, Near, Loose };
+
+constexpr double NEAR_MISS = 8.0;   // px: a lone end this near another rail's way is a near miss
+
+inline double way_distance(Point p, const Rail& r) {
+    const Point a = end_of(r, 0), b = end_of(r, 1);
+    const double ux = b.x - a.x, uy = b.y - a.y, len2 = ux * ux + uy * uy;
+    double t = len2 > 0 ? ((p.x - a.x) * ux + (p.y - a.y) * uy) / len2 : 0;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    return std::hypot(p.x - a.x - ux * t, p.y - a.y - uy * t);
+}
+
+// The engine's rail point of end i (scale 0.25) or its look-out (0.75), truncated as crt_ftol does.
+inline void engine_point(const Rail& r, int i, double scale, int& x, int& y) {
+    x = static_cast<int>(r.x + ENDS[r.shape][i].x * 2 * HALF_X * scale);
+    y = static_cast<int>(r.y + ENDS[r.shape][i].y * 2 * HALF_Y * scale);
+}
+
+inline bool engine_links(const Rail& a, int i, const Rail& b) {
+    int lx, ly;
+    engine_point(a, i, 0.75, lx, ly);
+    for (int k = 0; k < 2; ++k) {
+        if (height_of(b, k) != height_of(a, i)) continue;
+        int px, py, bx, by, ax, ay;
+        engine_point(b, k, 0.25, px, py);
+        if (std::abs(px - lx) < 2 && std::abs(py - ly) < 2) return true;   // a's look-out finds b's point
+        engine_point(b, k, 0.75, bx, by);
+        engine_point(a, i, 0.25, ax, ay);
+        if (std::abs(ax - bx) < 2 && std::abs(ay - by) < 2) return true;   // or b's finds a's
+    }
+    return false;
+}
+
+// What the end `end` at height z of a rail at the joint p is (above), among `rails`; `self` is that
+// rail's index in them (-1: a rail not among them yet - the Track tool's preview). `other` gets the
+// lowest other height for Heights.
+inline End end_state(const std::vector<Rail>& rails, Point p, Vec end, int z, int self, int* other = nullptr) {
+    bool any = false, same = false, opposite_other = false;
+    int lowest = INT_MAX;
+    for (size_t n = 0; n < rails.size(); ++n) {
+        if (static_cast<int>(n) == self) continue;
+        const Rail& r = rails[n];
+        for (int i = 0; i < 2; ++i) {
+            const Point e = end_of(r, i);
+            if (!close(e.x, p.x) || !close(e.y, p.y)) continue;
+            any = true;
+            const Vec v = ENDS[r.shape][i];
+            const int h = height_of(r, i);
+            if (v == end.opposite() && h == z) return End::Linked;
+            if (v == end.opposite()) {
+                opposite_other = true;
+                if (h < lowest) lowest = h;
+            }
+            if (v == end && h == z) same = true;
+        }
+    }
+    // the rail's end as the engine has it (or will have it: a preview's): only its centre, the end
+    // vector and the point's height count for its point and look-out
+    Rail mine = {p.x - end.x * HALF_X, p.y - end.y * HALF_Y, 0, z, z};
+    int i_mine = 0;
+    for (int s = 0; s < SHAPES; ++s)
+        for (int i = 0; i < 2; ++i)
+            if (ENDS[s][i] == end) {
+                mine.shape = s;
+                i_mine = i;
+            }
+    bool beside = false;
+    for (size_t n = 0; n < rails.size(); ++n) {
+        if (static_cast<int>(n) == self) continue;
+        if (engine_links(mine, i_mine, rails[n])) return End::Linked;   // within the engine's 2 px
+        if (!any && way_distance(p, rails[n]) <= NEAR_MISS) beside = true;
+    }
+    if (opposite_other) {
+        if (other) *other = lowest;
+        return End::Heights;
+    }
+    if (same) return End::Sharp;
+    if (any) return End::DeadEnd;
+    return beside ? End::Near : End::Loose;
+}
+
+// One place of a map's track to look at (track_report).
+enum class Joint { Twice, Links, Heights, Sharp, DeadEnd, Near, Loose };
+
+inline const char* joint_code(Joint j) {
+    switch (j) {
+    case Joint::Twice: return "twice";
+    case Joint::Links: return "links";
+    case Joint::Heights: return "heights";
+    case Joint::Sharp: return "sharp";
+    case Joint::DeadEnd: return "deadend";
+    case Joint::Near: return "near";
+    case Joint::Loose: return "loose";
+    }
+    return "?";
+}
+
+struct Problem {
+    Joint kind;
+    Point at;          // the joint (Twice: the rail's centre)
+    Vec end = {0, 0};  // the rail ends there (Twice: none)
+    int z = 0;         // the height of their point (Twice: of the rail's end 0)
+    int value = 0;     // Twice: how many times; Links: the links; Heights: the lowest other height
+    int rail = -1;     // a rail (its index in the input) with that end there, or the doubled one
+    int shape = -1;    // Twice: the doubled rail's shape and the height of its end 1
+    int z1 = 0;
+};
+
+// Every place of the track where the engine's network is not what the track looks like (map_tool.py
+// track_report, which check-track prints): a rail laid twice (Twice - its points are only shared, no
+// link added: harmless, but one of the two stays when the other is deleted), a rail point of more
+// than MAX_LINKS links (Links - the engine drops the others, "Too many links"), and every rail end
+// that is not Linked (end_state): Heights, Sharp, DeadEnd, Near and - with `loose` - Loose. The
+// rails laid twice count once for the joints. In the order map_tool.py gives them: the doubled rails
+// by their centre, then the joints by x, y, the ends of one joint by their end vector and height.
+inline std::vector<Problem> track_report(const std::vector<Rail>& rails, bool loose = false) {
+    struct Key {
+        double x, y;
+        int shape, z0, z1;
+        bool operator<(const Key& o) const {
+            if (x != o.x) return x < o.x;
+            if (y != o.y) return y < o.y;
+            if (shape != o.shape) return shape < o.shape;
+            if (z0 != o.z0) return z0 < o.z0;
+            return z1 < o.z1;
+        }
+    };
+    std::vector<Problem> out;
+    std::vector<Rail> unique;
+    std::vector<int> index;   // each unique rail's first index in `rails`
+    {
+        std::vector<std::pair<Key, int>> keys;
+        for (size_t n = 0; n < rails.size(); ++n)
+            keys.push_back({{round3(rails[n].x), round3(rails[n].y), rails[n].shape, rails[n].z0, rails[n].z1}, static_cast<int>(n)});
+        std::stable_sort(keys.begin(), keys.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+        for (size_t n = 0; n < keys.size();) {
+            size_t m = n;
+            while (m < keys.size() && !(keys[n].first < keys[m].first) && !(keys[m].first < keys[n].first)) ++m;
+            const Key& k = keys[n].first;
+            if (m - n > 1)
+                out.push_back({Joint::Twice, {k.x, k.y}, {0, 0}, k.z0, static_cast<int>(m - n), keys[n].second, k.shape, k.z1});
+            unique.push_back({k.x, k.y, k.shape, k.z0, k.z1});
+            index.push_back(keys[n].second);
+            n = m;
+        }
+    }
+    struct At {
+        double x, y;
+        Vec end;
+        int z, rail;
+    };
+    std::vector<At> ends;
+    for (size_t n = 0; n < unique.size(); ++n)
+        for (int i = 0; i < 2; ++i) {
+            const Point e = end_of(unique[n], i);
+            ends.push_back({round3(e.x), round3(e.y), ENDS[unique[n].shape][i], height_of(unique[n], i), static_cast<int>(n)});
+        }
+    std::sort(ends.begin(), ends.end(), [](const At& a, const At& b) {
+        if (a.x != b.x) return a.x < b.x;
+        if (a.y != b.y) return a.y < b.y;
+        if (a.end.x != b.end.x) return a.end.x < b.end.x;
+        if (a.end.y != b.end.y) return a.end.y < b.end.y;
+        if (a.z != b.z) return a.z < b.z;
+        return a.rail < b.rail;
+    });
+    for (size_t n = 0; n < ends.size();) {   // a joint
+        size_t m = n;
+        while (m < ends.size() && ends[m].x == ends[n].x && ends[m].y == ends[n].y) ++m;
+        const Point p = {ends[n].x, ends[n].y};
+        std::vector<Rail> there;
+        for (size_t k = n; k < m; ++k) there.push_back(unique[static_cast<size_t>(ends[k].rail)]);
+        const std::vector<JointPoint> links = point_links(there, p);
+        for (size_t k = n; k < m;) {   // one point of the joint: its end vector and height
+            size_t q = k;
+            while (q < m && ends[q].end == ends[k].end && ends[q].z == ends[k].z) ++q;
+            const At& a = ends[k];
+            const int rail = index[static_cast<size_t>(a.rail)];
+            for (const JointPoint& j : links)
+                if (j.end == a.end && j.z == a.z && j.links > MAX_LINKS)
+                    out.push_back({Joint::Links, p, a.end, a.z, j.links, rail});
+            int other = 0;
+            const End s = end_state(unique, p, a.end, a.z, a.rail, &other);
+            const Joint kind = s == End::Heights ? Joint::Heights : s == End::Sharp ? Joint::Sharp : s == End::DeadEnd ? Joint::DeadEnd
+                               : s == End::Near ? Joint::Near : Joint::Loose;
+            if (s != End::Linked && (s != End::Loose || loose)) out.push_back({kind, p, a.end, a.z, s == End::Heights ? other : 0, rail});
+            k = q;
+        }
+        n = m;
+    }
+    return out;
 }
 
 using Cell = std::pair<int, int>;   // column, row

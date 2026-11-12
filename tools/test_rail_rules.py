@@ -84,6 +84,17 @@ def model_points(rails, point):
                           for (e, z), links in map_tool.rail_point_links(rails, point).items()))
 
 
+def model_report(rails, loose):
+    out = ""
+    for kind, point, end, z, value in map_tool.track_report(rails, loose):
+        if kind == "twice":
+            out += f"twice {num(point[0])} {num(point[1])} {end} {z[0]} {z[1]} {value};"
+        else:
+            v = min(value) if kind == "heights" else value if kind == "links" else 0
+            out += f"{kind} {num(point[0])} {num(point[1])} {end[0]} {end[1]} {z} {v};"
+    return out
+
+
 def model_cells(width, height, segments):
     track, buffer = map_tool.track_cells([(a, b) for a, b in segments], width, height)
     return ("".join(f"{x},{y} " for x, y in sorted(track)) + "|" +
@@ -133,6 +144,20 @@ def valid_walk(rng, rails, start, length, z=None):
             dx, dy = rng.choice(STEPS + WRONG_STEPS)
             points.append((round(x + dx, 3), round(y + dy, 3)))
     return points
+
+
+def _walk_rails(rng, start, length):
+    """The rails of a random line of the lattice from `start` (any shapes: joined or not), at LEVEL."""
+    rails, at = [], start
+    for _ in range(length):
+        dx, dy = rng.choice(STEPS)
+        b = (round(at[0] + dx, 3), round(at[1] + dy, 3))
+        candidates = map_tool.rail_candidates(at, b)
+        if candidates:
+            x, y, shape, _f, _s = rng.choice(candidates)
+            rails.append((x, y, shape, LEVEL, LEVEL))
+        at = b
+    return rails
 
 
 def generate(rng, count):
@@ -222,6 +247,30 @@ def generate(rng, count):
             if rng.random() < 0.2:
                 rails.append(rails[-1])
         cases.append(("J", rails, point))
+    for _ in range(count // 8):
+        # a piece of track for track_report: lines through a few joints, branches and V's, rails over
+        # rails half a step along, rails twice, ramps, rails at other heights, and rails moved by hand a
+        # few px off the lattice (the engine links within 2 px, a near miss is within 8)
+        rails = []
+        base = random_point(rng)
+        for _ in range(rng.randrange(1, 6)):
+            start = (round(base[0] + rng.randrange(-3, 4) * HX, 3), round(base[1] + rng.randrange(-3, 4) * HY, 3))
+            for x, y, shape, z0, z1 in [r for r in _walk_rails(rng, start, rng.randrange(1, 6))]:
+                rails.append((x, y, shape, z0, z1))
+        for i in range(len(rails)):
+            x, y, shape, z0, z1 = rails[i]
+            roll = rng.random()
+            if roll < 0.08:
+                x = round(x + rng.choice((-1, 1)) * rng.choice((0.4, 1, 1.5, 2, 2.5, 3, 5, 7.5, 8, 9)), 3)
+            elif roll < 0.14:
+                y = round(y + rng.choice((-1, 1)) * rng.choice((0.4, 1, 1.5, 2, 2.5, 3, 5, 7.5, 8, 9)), 3)
+            elif roll < 0.2:
+                z0, z1 = z0 + rng.choice((-11, 11)), z1 + rng.choice((-11, 0, 11))
+            rails[i] = (x, y, shape, z0, z1)
+        for _ in range(rng.randrange(0, 3)):
+            if rails:
+                rails.append(rng.choice(rails))
+        cases.append(("Q", rails, rng.random() < 0.5))
     for _ in range(count - len(cases)):
         width, height = rng.randrange(1, 40), rng.randrange(1, 40)
         segments = []
@@ -452,6 +501,7 @@ def map_rail_cases():
             report.append(f"  {os.path.basename(path)}: not there, skipped")
             continue
         rails = map_rails_in_order(map_tool.read_map(open(path, "rb").read(), info))
+        cases.append(("Q", rails, True))
         cells = {}
         laid, strict, odd = 0, {}, 0
         refused = {}
@@ -502,6 +552,9 @@ def line_of(case):
     if case[0] == "J":
         _k, rails, point = case
         return f"J {rails_text(rails)} {point[0]} {point[1]}"
+    if case[0] == "Q":
+        _k, rails, loose = case
+        return f"Q {rails_text(rails)} {1 if loose else 0}"
     _k, width, height, segments = case
     return f"T {width} {height} {len(segments)} " + " ".join(f"{a[0]!r} {a[1]!r} {b[0]!r} {b[1]!r}"
                                                              for a, b in segments)
@@ -516,6 +569,8 @@ def model_of(case):
         return model_rail(*case[1:])
     if case[0] == "J":
         return model_points(case[1], case[2])
+    if case[0] == "Q":
+        return model_report(case[1], case[2])
     return model_cells(case[1], case[2], case[3])
 
 

@@ -349,6 +349,13 @@ a wiersz stanu to mówi. Dobrze wiedzieć:
 - **skrzyżowanie**: połóż linię w poprzek dowolnego toru, także przez punkt, w którym stykają się jego
   szyny; pociągi je przejeżdżają, ale nie skręcą tam na drugi tor. Strona 23 pomocy opisuje siatkę.
 
+**Styki.** Dwie szyny łączą się tylko tam, gdzie ich końce spotykają się zwrócone w przeciwne strony na
+tej samej wysokości, więc tor może wyglądać na połączony, choć nie jest. W narzędziu Tory każdy koniec
+toru ma mały **żółty** znak - bocznica, linia za krawędzią mapy - a **czerwony** pokazuje miejsce, gdzie
+tor wygląda na połączony, ale nie jest, albo gdzie pociągi mogą tylko zawrócić: koniec kilka pikseli od
+innej szyny, szyny stykające się na dwóch wysokościach albo pod kątem, V (dwie szyny z jednego punktu i
+nic dalej). Trzeci wiersz stanu je liczy. Strona 33 pomocy to podsumowuje.
+
 Główną linię połóż tak, jak robią to misje: **zza zachodniej krawędzi** (przewiń nad siatkę) przez
 mapę, żeby pociągi przyjeżdżały i odjeżdżały poza widokiem. Potem bocznica na fabrykę: odgałęzienie
 od linii przez Y, prosty odcinek kończący się **ślepym końcem**.
