@@ -182,7 +182,7 @@ constexpr int VID_BAR = 450, VID_BAR_SIDE = 938, VID_STRIP = 497, VID_SLOT_FRAME
 constexpr short DEPOT_UNITS[] = {5, 10, 20, 25, 80, 85, 45, 30, 35, 82, 97, 90, 75, 62};
 // menu ids of editor.cpp's Edit menu
 constexpr int ID_UNDO = 40030, ID_REDO = 40031, ID_DELETE = 40032, ID_ROTATE_RIGHT = 40033, ID_ROTATE_LEFT = 40034,
-              ID_ARMY = 40035, ID_SEMAPHORE = 40036;
+              ID_ARMY = 40035, ID_SEMAPHORE = 40036, ID_CHECK_TRACK = 40037;
 
 using DrawScene_t = void(__fastcall*)(void* g, void* edx, int draw);
 using DrawVid_t = void(__fastcall*)(void* g, void* edx, void* vid, int frame, float x, float y, float z);
@@ -8170,14 +8170,34 @@ void fill_diamond(float x, float y, float r, uint32_t argb) {
 // track, a red diamond with a dark rim where it looks joined and is not or turns the trains round.
 // Direct3D triangles in one list (FillBatch), drawn after the regions' frames - no lock of the back
 // buffer, so no wait for the GPU.
+bool g_check_on = false;           // Check the track: going through its list (J)
+rail::Point g_check_at = {0, 0};   // the place it stands at, and the height it is drawn at
+float g_check_z = 0;
+
 void draw_track_marks() {
     const bool marks = tool() == Tool::Track;
-    if (!marks) return;
+    if (!marks && !g_check_on) return;
     uint8_t* w = world();
     const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
     const Box v = view();
     FillBatch batch;
-    {
+    if (g_check_on) {   // the place the check stands at: a yellow ring with a dark rim that breathes, in any tool
+        const float x = static_cast<float>(g_check_at.x) - cam_x, y = static_cast<float>(g_check_at.y) - g_check_z - cam_y;
+        const DWORD t = GetTickCount() % 1000;
+        const float r = 22 + (t < 500 ? t : 1000 - t) * 0.016f;
+        auto band = [&](float inner, float outer, uint32_t argb) {
+            constexpr int SEGMENTS = 32;
+            for (int k = 0; k < SEGMENTS; ++k) {
+                const float a0 = k * 6.2831853f / SEGMENTS, a1 = (k + 1) * 6.2831853f / SEGMENTS;
+                const float c0 = std::cos(a0), s0 = std::sin(a0) * 0.7f, c1 = std::cos(a1), s1 = std::sin(a1) * 0.7f;
+                fill_triangle_batched(x + c0 * inner, y + s0 * inner, x + c0 * outer, y + s0 * outer, x + c1 * outer, y + s1 * outer, argb);
+                fill_triangle_batched(x + c0 * inner, y + s0 * inner, x + c1 * outer, y + s1 * outer, x + c1 * inner, y + s1 * inner, argb);
+            }
+        };
+        band(r - 2, r + 7, 0xc0000000);
+        band(r, r + 5, 0xf0ffe040);
+    }
+    if (marks) {
         const TrackJoints& j = track_joints();
         for (size_t n = 0; n < j.report.size(); ++n) {
             const rail::Problem& p = j.report[n];
@@ -8200,7 +8220,8 @@ std::string joints_status() {
     const TrackJoints& j = track_joints();
     std::string text = ui_printf(ui_format("StatusJoints", "track ends: %d (yellow)"), j.loose);
     const std::string twice = j.twice ? ui_printf(ui_format("StatusJointsTwice", " - rails laid twice: %d"), j.twice) : std::string();
-    if (!j.look) return text + ui_text("StatusJointsFine", " - nothing to look at") + twice;
+    const std::string check = j.look || j.twice ? ui_text("StatusJointsCheck", " - Menu, CHECK THE TRACK: one by one") : "";
+    if (!j.look) return text + ui_text("StatusJointsFine", " - nothing to look at") + twice + check;
     struct Kind {
         rail::Joint kind;
         const char* key;
@@ -8214,7 +8235,101 @@ std::string joints_status() {
     std::string kinds;
     for (const Kind& k : KINDS)
         if (const int n = j.counts[static_cast<int>(k.kind)]) kinds += (kinds.empty() ? "" : ", ") + ui_printf(ui_format(k.key, k.english), n);
-    return text + ui_printf(ui_format("StatusJointsLook", " - to look at: %d (red: %s)"), j.look, kinds.c_str()) + twice;
+    return text + ui_printf(ui_format("StatusJointsLook", " - to look at: %d (red: %s)"), j.look, kinds.c_str()) + twice + check;
+}
+
+// ---- Check the track (issue #7; the Menu's CHECK THE TRACK) ----
+//
+// What `map_tool.py check-track` lists (track_report without the ends of track: rails laid twice, points of
+// more than 6 links, joints at two heights, V's, rails meeting at an angle, near misses), in its order, one
+// at a time: the camera centred on the place, a ring round it (draw_track_marks, in any tool) and a status
+// line saying what is wrong there in plain words; J the next, Shift+J the one before (N is not free: it
+// turns "onto the track" on and off in every tool but Track and Push line), also while a panel is open,
+// and Esc ends it (before it would end the tool). A view: no step of the history. The list is taken again
+// at every J, so a place mended meanwhile is gone and J goes on from where it was. A map with nothing to
+// report says so and starts nothing.
+constexpr uintptr_t SET_POSITION = 0x41c680;   // World SetPosition: the centre of the view, clamped
+using SetPosition_t = void(__fastcall*)(void* world, void* edx, float x, float y, int mode);
+
+int g_check_index = 0;                         // in the list of the last step
+rail::Problem g_check_problem{rail::Joint::Loose, {0, 0}};
+std::string g_check_status;
+
+std::vector<size_t> check_list(const TrackJoints& j) {
+    std::vector<size_t> out;
+    for (size_t n = 0; n < j.report.size(); ++n)
+        if (j.report[n].kind != rail::Joint::Loose) out.push_back(n);
+    return out;
+}
+
+bool same_problem(const rail::Problem& a, const rail::Problem& b) {
+    return a.kind == b.kind && rail::close(a.at.x, b.at.x) && rail::close(a.at.y, b.at.y) && a.end == b.end && a.z == b.z;
+}
+
+std::string problem_words(const rail::Problem& p) {
+    switch (p.kind) {
+    case rail::Joint::Twice: return ui_text("CheckTwice", "the same rail is laid twice here - trains do not mind, but deleting one leaves the other");
+    case rail::Joint::Links: return ui_printf(ui_format("CheckLinks", "%d rails meet at one point - the game takes 6, the others do not join"), p.value);
+    case rail::Joint::Heights: return ui_printf(ui_format("CheckHeights", "rails meet at two heights (%d and %d) - they do not join"), p.z, p.value);
+    case rail::Joint::Sharp: return ui_text("CheckSharp", "two rails leave one point the same way and nothing goes on - trains can only turn round here");
+    case rail::Joint::DeadEnd: return ui_text("CheckDeadEnd", "rails meet at an angle the game does not join - trains stop here");
+    case rail::Joint::Near: return ui_text("CheckNear", "a rail end stops a few px from another rail and does not join it");
+    case rail::Joint::Loose: break;
+    }
+    return "";
+}
+
+void check_show(const TrackJoints& j, const std::vector<size_t>& list, int index) {
+    g_check_index = index;
+    const size_t n = list[static_cast<size_t>(index)];
+    g_check_problem = j.report[n];
+    g_check_at = g_check_problem.at;
+    g_check_z = j.draw_z[n];
+    if (uint8_t* w = world())
+        reinterpret_cast<SetPosition_t>(SET_POSITION)(w, nullptr, static_cast<float>(g_check_at.x), static_cast<float>(g_check_at.y) - g_check_z, 0);
+    g_check_status = ui_printf(ui_format("StatusCheck", "CHECK THE TRACK %d of %d - %.1f,%.1f: %s - J: the next, Shift+J: the one before, Esc: done"),
+                               index + 1, static_cast<int>(list.size()), g_check_at.x, g_check_at.y, problem_words(g_check_problem).c_str());
+    patch::log("edit: check the track %d of %d: %s at %.1f,%.1f", index + 1, static_cast<int>(list.size()), rail::joint_code(g_check_problem.kind),
+               g_check_at.x, g_check_at.y);
+}
+
+void check_end() {
+    if (g_check_on) MESSAGE("MsgCheckDone", "check the track: done");
+    g_check_on = false;
+    g_check_status.clear();
+}
+
+void check_track_start() {
+    const TrackJoints& j = track_joints();
+    const std::vector<size_t> list = check_list(j);
+    if (list.empty()) {
+        g_check_on = false;
+        g_check_status.clear();
+        MESSAGE("MsgCheckNothing", "check the track: nothing to report - every rail end joins the track or ends it, no rail is laid twice");
+        return;
+    }
+    g_check_on = true;
+    MESSAGE("MsgCheckStart", "check the track: %d places to look at (J: the next)", static_cast<int>(list.size()));
+    check_show(j, list, 0);
+}
+
+// J / Shift+J: the list again (a place mended is gone), from where it stood
+void check_step(int by) {
+    if (!g_check_on) return;
+    const TrackJoints& j = track_joints();
+    const std::vector<size_t> list = check_list(j);
+    if (list.empty()) {
+        g_check_on = false;
+        g_check_status.clear();
+        MESSAGE("MsgCheckNothingLeft", "check the track: nothing left to report");
+        return;
+    }
+    const int count = static_cast<int>(list.size());
+    int at = -1;
+    for (int k = 0; k < count; ++k)
+        if (same_problem(j.report[list[static_cast<size_t>(k)]], g_check_problem)) at = k;
+    const int next = at >= 0 ? at + by : by > 0 ? g_check_index : g_check_index - 1;   // gone: the one that took its place
+    check_show(j, list, ((next % count) + count) % count);
 }
 
 // The effects that draw nothing on a held level: the generators (their picture is vid\generator.vid,
@@ -11555,6 +11670,7 @@ void draw_overlay() {
         status_line(v.l, v.t + 3 * LINE_HEIGHT, joints_status().c_str());   // the marks counted
     }
     int below = tool() == Tool::Track ? 4 : helps ? 3 : 2;   // below the tool's lines (the Track tool has three, the placing helps two)
+    if (g_check_on) status_line(v.l, v.t + below++ * LINE_HEIGHT, g_check_status.c_str());   // Check the track
     if (!g_line_status.empty()) status_line(v.l, v.t + below++ * LINE_HEIGHT, g_line_status.c_str());   // the push line under the cursor
     if (!g_enemy_status.empty()) status_line(v.l, v.t + below * LINE_HEIGHT, g_enemy_status.c_str());
     locked.unlock();
@@ -11939,6 +12055,8 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         else if (ctrl && w == 'G') {
             g_grid_on = !g_grid_on;
             MESSAGE("MsgGrid", "placing on a grid of %d px (Ctrl+G): %s", g_grid_size, g_grid_on ? ui_text("WordOn", "on") : ui_text("WordOff", "off"));
+        } else if (!ctrl && w == 'J' && g_check_on) {   // Check the track: the next place (Shift: the one before)
+            check_step(shift_down() ? -1 : 1);
         } else if (!ctrl && w == 'N' && tool() != Tool::Track && tool() != Tool::PushLine) {
             g_snap_track = !g_snap_track;
             MESSAGE("MsgSnapTrack", "objects onto a nearby track's line (N): %s", g_snap_track ? ui_text("WordOn", "on") : ui_text("WordOff", "off"));
@@ -12022,6 +12140,8 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
                 end_line();
             } else if (tool() == Tool::PushLine && g_push_started) {
                 g_push_started = false;
+            } else if (g_check_on) {
+                check_end();
             } else {
                 choose_entry(0);
                 select(nullptr);
@@ -12066,6 +12186,7 @@ void edit_command(int id) {
     else if (id == ID_ROTATE_LEFT) turn(-1);
     else if (id == ID_ARMY) next_army();
     else if (id == ID_SEMAPHORE) toggle_semaphore();
+    else if (id == ID_CHECK_TRACK) check_track_start();
 }
 
 // A level goes away (or comes): its objects with it, and everything the editor kept of it - the
@@ -12081,6 +12202,9 @@ void edit_reset() {
     g_push_begin = {};
     g_line_level_known = false;
     g_line_nvid = VID_RAIL;
+    g_check_on = false;
+    g_check_status.clear();
+    g_snap_memo.valid = false;
     g_order_task = TASK_PATROL;
     g_show_heights = false;
     g_region_start = {-1, -1};
@@ -12882,11 +13006,16 @@ bool edit_arrival_picking() { return g_arrival_pick != ArrivalPick::None; }
 // Esc in the editor, before the Menu panel would open: it ends what is under way - an object's or a
 // line's panel, a line of track being laid, a push line's begin picked, a train's point being picked
 // -, else it leaves a tool for Select; true when it did one of them (the Menu opens otherwise).
+// editor_panel.cpp: Check the track's J also while a panel is open
+bool edit_check_on() { return g_check_on; }
+void edit_check_step(int by) { check_step(by); }
+
 bool edit_escape() {
     if (g_context || g_context_line >= 0) close_context();
     else if (g_patrol_train) g_patrol_train = nullptr;
     else if (tool() == Tool::Track && !g_line.empty()) end_line();
     else if (tool() == Tool::PushLine && g_push_started) g_push_started = false;
+    else if (g_check_on) check_end();
     else if (tool() != Tool::Select) choose_entry(0);
     else return false;
     return true;

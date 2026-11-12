@@ -79,6 +79,8 @@ void edit_fill(float l, float t, float r, float b, uint32_t argb);
 bool edit_escape();            // editor_edit.cpp: Esc ends what is under way there (true when it did)
 bool editor_level_held();      // editor.cpp
 bool edit_hints_on();           // editor_edit.cpp: the hints under the cursor (the Menu panel turns them off and on)
+bool edit_check_on();           // editor_edit.cpp: Check the track goes through its list - J, also over a panel
+void edit_check_step(int by);
 void edit_set_hints(bool on);
 
 namespace {
@@ -94,7 +96,7 @@ constexpr float PICTURE_DX = 22, PICTURE_DY = -18;           // the picture from
 constexpr float TITLE_X = -182, TITLE_Y = -101, TEXT_X = -175, TEXT_Y = -70;   // from the picture's middle
 constexpr float BUTTONS_Y = 131, PREVIOUS_X = -151, NEXT_X = 152;
 constexpr float ARROW_W = 63, START_W = 234, BUTTON_H = 22;
-constexpr float ROW_Y = -55, ROW_DY = 26, LEFT_X = -160, RIGHT_X = 10, LAMP_TEXT = 16, ROW_W = 160;
+constexpr float ROW_Y = -57, ROW_DY = 23, LEFT_X = -160, RIGHT_X = 10, LAMP_TEXT = 16, ROW_W = 160;
 // the help's contents (rows of two lines, a category's name GROUP_W wide), the strip above the title
 // (a page's CONTENTS and its number), the text's right end
 constexpr float CONTENTS_Y = -57, CONTENTS_DY = 30, GROUP_W = 125, PAGE_LAMP_X = -32, TEXT_RIGHT = 177;
@@ -104,7 +106,7 @@ constexpr int STEP = 10;   // in front of the bar (its parts are steps 0-4)
 // the window menu's commands (editor.cpp)
 constexpr int ID_LOAD = 40001, ID_SAVE = 40002, ID_EXIT = 40004, ID_RUN = 40010, ID_BACK = 40011, ID_PLAY = 40012,
               ID_MISSION = 40013, ID_NEW = 40014, ID_RESIZE = 40015, ID_EXPORT = 40016, ID_IMPORT = 40017, ID_FILES = 40018, ID_UNDO = 40030,
-              ID_REDO = 40031;
+              ID_REDO = 40031, ID_CHECK_TRACK = 40037;
 
 using CreateFileA_t = HANDLE(WINAPI*)(LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE);
 
@@ -113,18 +115,19 @@ struct Command {
     const char* english;
     int id;
 };
-// two columns of seven: the file, then playing, editing and leaving
+// two columns, of eight and seven: the file, then playing, editing (Check the track, issue #7) and leaving
 const Command COMMANDS[] = {
     {"PanelNew", "NEW MAP", ID_NEW},          {"PanelLoad", "LOAD MAP", ID_LOAD},
     {"PanelSave", "SAVE MAP", ID_SAVE},       {"PanelExport", "EXPORT MAP", ID_EXPORT},
     {"PanelImport", "IMPORT MAP", ID_IMPORT}, {"PanelFiles", "RENAME OR DELETE", ID_FILES},
     {"PanelMission", "MISSION SETTINGS", ID_MISSION}, {"PanelMapSize", "MAP SIZE", ID_RESIZE},
     {"PanelPlay", "PLAY THE SAVED MAP", ID_PLAY}, {"PanelUndo", "UNDO", ID_UNDO},
-    {"PanelRedo", "REDO", ID_REDO},           {"PanelRun", "QUICK TEST, NO SAVE", ID_RUN},
+    {"PanelRedo", "REDO", ID_REDO},           {"PanelCheckTrack", "CHECK THE TRACK", ID_CHECK_TRACK},
+    {"PanelRun", "QUICK TEST, NO SAVE", ID_RUN},
     {"PanelBack", "BACK TO THE MENU", ID_BACK}, {"PanelExit", "EXIT THE GAME", ID_EXIT},
 };
 constexpr int COMMAND_COUNT = sizeof COMMANDS / sizeof COMMANDS[0];
-constexpr int ROWS = 7;
+constexpr int ROWS = 8;
 
 enum class Panel { None, Help, Menu, Palette, Arrivals, Factory };
 Panel g_panel = Panel::None;
@@ -821,6 +824,8 @@ const char* panel_tip(POINT m) {
         if (row >= 0 && COMMANDS[row].id == ID_RUN)
             return ui_text("TipRun", "Quick test here (Ctrl+R): runs the map as it is now in this window and saves nothing; Ctrl+R comes "
                                      "back to the edits");
+        if (row >= 0 && COMMANDS[row].id == ID_CHECK_TRACK)
+            return ui_text("TipCheckTrack", "Check the track: the places where rails look joined but are not, one by one - J the next, Esc done");
         if (row >= 0 && COMMANDS[row].id == ID_FILES)
             return ui_text("TipFiles", "Rename the map (its folder and files) or delete it");
         if (on_hints(m))
@@ -843,6 +848,11 @@ bool panel_message(HWND window, UINT m, WPARAM w, POINT mouse) {
             if (!edit_escape()) open(Panel::Menu);   // Esc opens Menu when no panel is open and nothing is under way
         }
         else return false;
+        return true;
+    }
+    // Check the track: J (Shift+J) goes on to the next place also while a panel is open
+    if (m == WM_KEYDOWN && w == 'J' && edit_check_on() && GetKeyState(VK_CONTROL) >= 0) {
+        edit_check_step(GetKeyState(VK_SHIFT) < 0 ? -1 : 1);
         return true;
     }
     // the Arrivals panel's changes are steps of the editor's history: Ctrl+Z / Ctrl+Y go there

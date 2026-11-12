@@ -155,6 +155,7 @@ constexpr int ID_IMPORT = 40017;      // ours: File > Import map...
 constexpr int ID_FILES = 40018;       // ours: Rename or delete the map (the Menu panel)
 constexpr int ID_UNDO = 40030, ID_REDO = 40031, ID_DELETE = 40032, ID_ROTATE_RIGHT = 40033,
               ID_ROTATE_LEFT = 40034, ID_ARMY = 40035, ID_SEMAPHORE = 40036;   // ours: the Edit menu
+constexpr int ID_CHECK_TRACK = 40037;   // ours: Check the track (the Menu panel)
 constexpr int OPTIONS_POSITION = 1;   // the "Options" item (id 0xFFFF) on the menu bar
 constexpr int TEST_VIEW = 40040;      // test mode: WM_COPYDATA "x y" puts the view there
 constexpr int TEST_RAIL_POINTS = 40041;   // test mode: WM_COPYDATA "x y" logs the rail points there
@@ -1434,7 +1435,7 @@ void handle_command(HWND window, int id) {
         if (!ask_save(window)) return;
         leave_map("");
         restart_game(false, "", false);
-    } else if (id >= ID_UNDO && id <= ID_SEMAPHORE) {
+    } else if (id >= ID_UNDO && id <= ID_CHECK_TRACK) {
         if (g_held) edit_command(id);
     }
 }
@@ -1475,7 +1476,7 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
 #endif
         if (HIWORD(w) <= 1 && (LOWORD(w) == ID_LOAD || LOWORD(w) == ID_SAVE || LOWORD(w) == ID_ABOUT ||
                                (LOWORD(w) >= ID_RUN && LOWORD(w) <= ID_FILES) ||
-                               (LOWORD(w) >= ID_UNDO && LOWORD(w) <= ID_SEMAPHORE))) {
+                               (LOWORD(w) >= ID_UNDO && LOWORD(w) <= ID_CHECK_TRACK))) {
             handle_command(window, LOWORD(w));
             return 0;
         }

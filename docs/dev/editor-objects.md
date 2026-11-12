@@ -319,6 +319,26 @@ OFF - the row's tip shown, still OFF after Select and back - laying the first ca
 not joined 19 -> 20) and previewing the second unsnapped; the map saved after two snapped runs has every
 rail and bed of the map before unchanged, 4 rails and 4 beds more, the GRID the same.
 
+**Check the track** (the Menu's CHECK THE TRACK, after REDO - the Menu has two columns of eight and seven
+now; `check_track_start`, `check_step`). What `check-track` lists - rails laid twice, points of more than 6
+links, joints at two heights, V's, rails meeting at an angle, near misses: `track_report` without the ends
+of track - in its order, one at a time: the camera centred on the place (World `SetPosition`, as far as
+the held level's view goes past the map's edge), a yellow ring with a dark rim round it (`draw_track_marks`,
+in any tool) and a status line saying what is wrong there in plain words - "CHECK THE TRACK 2 of 43 -
+35.5,100.0: rails meet at an angle the game does not join - trains stop here - J: the next, Shift+J: the
+one before, Esc: done". **J** goes on, Shift+J back, round from the last to the first; it works in every
+tool and while a panel is open (the panel takes every other key). N, which the issue proposed, is not
+free: in every tool but Track and Push line it turns "onto the track" on and off (`g_snap_track`); J is
+no game key either (the debug keys are O, H, G, I, P, ~, R, E). Esc ends the check, after what it ends
+before (a panel, a line or a push line under way) and before it would leave the tool; a level change ends
+it too. The list is taken again at every J, so a place mended meanwhile is gone and J goes on from where it
+stood. A map with nothing to report says "check the track: nothing to report - every rail end joins the
+track or ends it, no rail is laid twice" and starts nothing. A view: no step of the history. Checked in
+the game: The Factory - 2 places, the rails laid twice at 852,1025 and 1065,1025, `check-track`'s two in
+its order (its dead end 1739.5,725 is linked in the game, above), J round and back, J with Help open,
+Esc; l01 - "nothing to report"; `tjtest` - 43 places in `check-track`'s order (1775,125 twice, 35.5,100 at
+two heights ...), a snapped run laid between two J's mending one: "4 of 42".
+
 **The ground under rising rails** (the Track tool's G, the row's GROUND UNDER RISING RAILS: AS IT IS /
 SOFT / HARD; `g_raise_ground` in `lay_step`; issue #5). AS IT IS, the default, is the rule above: a rail
 above the ground leaves it. HARD raises it the way a cutting is lowered: the cells the rail crosses go up

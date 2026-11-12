@@ -208,7 +208,7 @@ Co widać:
 
   **Przycisk menu** otwiera menu edytora ze wszystkimi poleceniami - **NOWA MAPA**, **WCZYTAJ MAPE**,
   **ZAPISZ MAPE**, **EKSPORT MAPY**, **IMPORT MAPY**, **ZMIEN NAZWE / USUN**, **USTAWIENIA MISJI**, **ROZMIAR MAPY**, **ZAGRAJ
-  ZAPISANA MAPE**, **COFNIJ**, **PONOW**, **TEST BEZ ZAPISU**, **POWROT DO MENU**, **WYJDZ Z GRY**;
+  ZAPISANA MAPE**, **COFNIJ**, **PONOW**, **SPRAWDZ TORY**, **TEST BEZ ZAPISU**, **POWROT DO MENU**, **WYJDZ Z GRY**;
   wiersz stanu mówi, co robi to pod myszą. Otwiera je też `Esc`, gdy żaden panel nie jest otwarty i
   nic nie jest w toku.
 
@@ -359,7 +359,9 @@ kliknięcie połączy się z torem, a **pomarańczowy** tam, gdzie skończy się
 stanu mówi dlaczego. **PRZYCIAGANIE: WL.** w rzędzie (domyślnie) kładzie ostatnie szyny takiego
 kliknięcia od nowa, tak żeby jego koniec trafił w pobliski koniec szyny i się z nim połączył - podgląd to
 pokazuje; **WYL.** kładzie szyny dokładnie tak, jak klikniesz, dla torów, które mają zostać osobno.
-Strona 33 pomocy to podsumowuje.
+Menu -> **SPRAWDZ TORY** przechodzi po kolei przez miejsca do sprawdzenia - kamera na każdym, żółty pierścień
+wokół i wiersz mówiący, co jest nie tak; `J` następne, `Shift+J` poprzednie, `Esc` koniec. Strona 33 pomocy
+to podsumowuje.
 
 Główną linię połóż tak, jak robią to misje: **zza zachodniej krawędzi** (przewiń nad siatkę) przez
 mapę, żeby pociągi przyjeżdżały i odjeżdżały poza widokiem. Potem bocznica na fabrykę: odgałęzienie
@@ -780,6 +782,7 @@ rzadziej stawiane rzeczy, na końcu dwa panele.
 | Ctrl+C / Ctrl+V / Ctrl+D | kopiuj zaznaczony obiekt / wstaw go pod wskaźnikiem / powiel obok oryginału |
 | Ctrl+G | stawianie na siatce (jej rozmiar w rzędzie) |
 | N | stawianie na linii pobliskiego toru |
+| J / Shift+J | Sprawdź tory (menu): następne / poprzednie miejsce |
 | Q | stawianie: obrót jak widać albo losowy |
 | X | stawianie: pojedynczo albo rozrzut przeciąganiem (dla wybranego obiektu) |
 | G | narzędzie Tory: teren pod wznoszącymi się szynami bez zmian / podniesiony łagodnie / ostro |

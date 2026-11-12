@@ -208,7 +208,7 @@ What you see:
 
   The **menu button** opens the editor's menu with every command - **NEW MAP**, **LOAD MAP**, **SAVE
   MAP**, **EXPORT MAP**, **IMPORT MAP**, **RENAME OR DELETE**, **MISSION SETTINGS**, **MAP SIZE**, **PLAY THE SAVED MAP**,
-  **UNDO**, **REDO**, **QUICK TEST, NO SAVE**, **BACK TO THE MENU**, **EXIT THE GAME**; the status line
+  **UNDO**, **REDO**, **CHECK THE TRACK**, **QUICK TEST, NO SAVE**, **BACK TO THE MENU**, **EXIT THE GAME**; the status line
   says what the one under the mouse does. `Esc` opens it too, when no panel is open and nothing is
   under way.
 
@@ -358,7 +358,9 @@ at an angle, a V (two rails from one point with nothing going on). The third sta
 While you lay a line, the preview's end is **green** where the click joins the track and **orange** where it
 ends at a rail without joining it; the status line says why. **SNAP: ON** in the row (the default) lays
 such a click's last rails again so that its end meets a rail end nearby and joins it - the preview shows
-it; **OFF** lays the rails exactly as clicked, for tracks meant to stay apart. Help page 33 sums it up.
+it; **OFF** lays the rails exactly as clicked, for tracks meant to stay apart. Menu -> **CHECK THE TRACK**
+goes through the places to look at one by one - the camera on each, a yellow ring round it and a line
+saying what is wrong; `J` the next, `Shift+J` the one before, `Esc` done. Help page 33 sums it up.
 
 Lay the main line the way the missions do: from **past the west edge** (scroll out over the grid)
 along the map, so the trains come and go out of sight. Then a spur for the factory: a branch off
@@ -782,6 +784,7 @@ tools, the rarer things placed, the two panels last.
 | Ctrl+C / Ctrl+V / Ctrl+D | copy the selected object / paste it under the pointer / duplicate it beside the original |
 | Ctrl+G | placing on a grid (its size in the row) |
 | N | placing onto a nearby track's line |
+| J / Shift+J | Check the track (the menu): the next / the one before |
 | Q | placing: turned as shown or at random |
 | X | placing: one at a time or scattered by a drag (for the object chosen) |
 | G | Track tool: the ground under rising rails as it is / raised soft / raised hard |
