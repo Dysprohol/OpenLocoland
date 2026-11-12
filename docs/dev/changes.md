@@ -133,7 +133,8 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
   4. more resolutions in the launcher: the built-in list (640x480, 800x600, 1024x768, in
      the settings struct `0x47b1f0`) gets 1280x720 ... 3840x2160 and the desktop
      resolution - only the modes no wider and no taller than a monitor in real pixels (fix 46),
-     each monitor's own size among them, 16 at most (fix 45), and each display device (a monitor:
+     each monitor's own size among them, each device the first 16 of them that fit its monitor
+     (fix 45), and each display device (a monitor:
      the registry's Device, 0 = the primary display driver) measured against its own monitor - its
      list, the start window's test and the saved mode's check; the game shows those the card supports. A saved mode bigger than the
      screen (another monitor, another display scale, a remote desktop) is replaced for that run
@@ -535,7 +536,8 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       every matching mode into a device's lists of 16 without a check, so a 17th overwrote the first
       mode's height and format (the start window's first line read "640 x 2560 x 0bpp" on a 2560 x
       1440 screen) and more would reach the device's flags; a mode that finds the list full is left
-      out and named in LocoFix.log, and `resolutions.cpp` offers 16 at most,
+      out and named in LocoFix.log, and `resolutions.cpp` gives each device the first 16 of its list
+      that fit its monitor,
   46. real pixels at any display scale (`dpi_aware.cpp`, "Graphics and dgVoodoo"): the game declares
       itself per-monitor DPI-aware when LocoFix loads, before any window; at 125 % or 150 % Windows no
       longer shrinks the screen the game measures (a 1920x1080 screen was 1536x864 / 1280x720 to it)

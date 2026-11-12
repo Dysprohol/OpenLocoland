@@ -10,8 +10,12 @@
 // the map size and the picture is stretched (screen_scaling.cpp).
 //
 // The list keeps only the modes no wider and no taller than a monitor in real pixels (real because
-// the game is DPI-aware, dpi_aware.cpp), plus each monitor's own size, and 16 of them at most - a
-// device's list has room for 16 (BUGS.md F29, mode_list.cpp). DirectDrawEnumerateExA lists every
+// the game is DPI-aware, dpi_aware.cpp), plus each monitor's own size. A device's list has room
+// for 16 (BUGS.md F29, mode_list.cpp), and with monitors of different sizes one list of 16 for all
+// did not serve them: with a 4K TV next to a 2560x1440 screen, two of the
+// 16 were modes only the TV has and the primary got 14. So the settings' list (room for 31) keeps the
+// modes in the order of their worth - the game's own, each monitor's size, ours by use - and each
+// device takes the first 16 of them that fit its monitor. DirectDrawEnumerateExA lists every
 // monitor as a device (Graphics_EnumDevice 0x4142e0 gets its HMONITOR; device 0 is the primary
 // display driver, without one) and dgVoodoo lists each device's modes only up to its monitor's size
 // (seen 2026-11-12: 2560x1440 for DISPLAY2, 1920x1080 for DISPLAY1), so the list is measured against
@@ -115,7 +119,7 @@ int WINAPI launcher_screen_metric(int index) {
 void add(Mode* list, int& n, Mode m) {
     for (int i = 0; i < n; ++i)
         if (list[i].width == m.width && list[i].height == m.height) return;
-    if (n < MODES_MAX) list[n++] = m;
+    if (n < CAPACITY - 1) list[n++] = m;
 }
 
 using Construct_t = void*(__fastcall*)(void* graphics, void* edx, void* settings);
@@ -192,8 +196,22 @@ bool redirect_call(uintptr_t at, uintptr_t to, void* hook, const char* name) {
 
 }  // namespace
 
-// For mode_list.cpp: does a mode fit the monitor of the device being enumerated (always outside).
-bool mode_fits_device(int width, int height) { return g_enumerating.width == 0 || fits({width, height}, g_enumerating); }
+// For mode_list.cpp: why the device being enumerated does not take a mode of the settings' list -
+// nullptr when it does: bigger than the device's monitor, or not one of the first 16 of the list
+// (in its order) that fit that monitor.
+const char* mode_refused_for_device(int width, int height) {
+    if (g_enumerating.width == 0) return nullptr;
+    if (!fits({width, height}, g_enumerating)) return "bigger than the device's monitor";
+    const auto* widths = reinterpret_cast<const int*>(SETTINGS + 0x100);
+    const auto* heights = reinterpret_cast<const int*>(SETTINGS + 0x180);
+    int rank = 0;
+    for (int i = 0; i < CAPACITY && widths[i] != 0; ++i) {
+        if (!fits({widths[i], heights[i]}, g_enumerating)) continue;
+        if (widths[i] == width && heights[i] == height) return rank < MODES_MAX ? nullptr : "not one of the device's 16";
+        ++rank;
+    }
+    return nullptr;   // not on the list: the engine leaves it out itself
+}
 
 void install_resolutions() {
     const uint8_t expected[] = {0x80, 0x02, 0x00, 0x00, 0x20, 0x03, 0x00, 0x00};   // 640, 800
@@ -223,8 +241,8 @@ void install_resolutions() {
     Mode list[CAPACITY] = {};
     int n = 0;
     // the game's own modes, each monitor's own size, then ours - each only when it fits a
-    // monitor, 16 at most (more would overflow the device's list, BUGS.md F29); 640x480 always,
-    // so the list is never empty
+    // monitor, in this order of worth (each device takes the first 16 that fit it, BUGS.md F29);
+    // 640x480 always, so the list is never empty
     for (int i = 0; i < CAPACITY && widths[i] != 0; ++i)
         if (i == 0 || fits_any({widths[i], heights[i]})) add(list, n, {widths[i], heights[i]});
     for (int i = 0; i < count; ++i)

@@ -339,8 +339,12 @@ fills it). In full screen dgVoodoo scales the chosen mode to the monitor
 (`ScalingMode = stretched_ar`).
 
 The launcher offers only modes that fit the screen (`resolutions.cpp`): no wider and no taller than
-a monitor in real pixels (the game is DPI-aware, `dpi_aware.cpp`), with each monitor's own size, 16
-at most (a device's list has room for 16, `BUGS.md` F29). `DirectDrawEnumerateExA` lists every
+a monitor in real pixels (the game is DPI-aware, `dpi_aware.cpp`), with each monitor's own size; a
+device's list has room for 16 (`BUGS.md` F29), so the settings' list (room for 31) keeps the modes in
+their order of worth - the game's own, each monitor's size, ours by use - and each device takes the first
+16 of them that fit its monitor. With a 4K TV next to a 2560x1440 screen (2026-11-12) the primary got 16
+(with one list of 16 for all it had 14, two places going to modes only the TV has), the TV 16 with its
+3840x2160 and 2560x1600 (left out: 1280x960, 1920x1440, 2560x1080), the 1920x1080 monitor the 12 that fit. `DirectDrawEnumerateExA` lists every
 monitor as a display device (here: 0 the primary display driver, 1 `\\.\DISPLAY2`, 2
 `\\.\DISPLAY1`), each with its monitor (`Graphics_EnumDevice`, hooked to note it), and dgVoodoo lists
 a device's modes only up to that monitor; the start window's test of the chosen mode and the saved
