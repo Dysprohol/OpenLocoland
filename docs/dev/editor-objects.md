@@ -329,6 +329,15 @@ is laid as clicked (that case: two verticals, orange, "laid twice" stays 1). Lay
 before - snap only acts when the run would end unjoined (a rail laid along an existing one, checked: laid, "laid
 twice" 1 -> 2).
 
+**Deleted rails** (the review of 2026-11-12, finding 4). The worry: rails marked deleted might stay in `map_rails()`
+and count for the 6-link limit and the start's direction while the marks, the dot and the snap leave them out. They
+do not stay: a deletion or an undone lay is `ACT_UNDO_REMOVE`, which takes the object out of the layer lists (not
+drawn, not updated, not saved; a rail also leaves the network, `rail_take_out`), and `map_rails()` walks the layer
+lists - so every path sees the same rails and main's behaviour was right. Checked in the game on `tjtest`: at a
+joint of the sandbox's line four rails laid from one point, a fifth refused ("this point already has 6 rails");
+after one of the four was undone (Ctrl+Z), and in another run deleted with the middle button, the same fifth was
+laid. The editor's own filters for deleted rails, which could never match, are gone: one list for all.
+
 **The level a new line is laid at** (the review of 2026-11-12, finding 1; `plan_laid`, `new_line_level`). A line
 that goes on from a rail keeps that rail point's height; a new one is laid at the ground under its first rail's
 centre (as `map_tool.py track` does). The preview, the dot and the snap planned with the ground at the start point

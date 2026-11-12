@@ -3968,6 +3968,10 @@ struct RailObject {
     rail::Rail rail;
 };
 
+// The rails of the level, from the layer lists: a rail deleted or undone (ACT_UNDO_REMOVE) has left them, the
+// rail network (rail_take_out) and the save, so none of the Track tool's answers - the 6-link limit, the start's
+// direction, the marks, the dot, the snap, Check the track - sees it (checked in the game, the review of
+// 2026-11-12, finding 4: a rail refused at a 6-link point is laid once one of the six is deleted or undone).
 std::vector<RailObject> map_rails() {
     std::vector<RailObject> out;
     for_each_object([&](uint8_t* o) {
@@ -4009,13 +4013,6 @@ struct TrackJoints {
     int counts[7] = {};                  // by rail::Joint
 } g_joints;
 
-std::vector<RailObject> live_rails() {
-    std::vector<RailObject> out;
-    for (const RailObject& r : map_rails())
-        if (!removed(r.object)) out.push_back(r);
-    return out;
-}
-
 // draw_overlay's frames: while it draws, track_joints walks the rails once a frame (the marks, the status
 // line and the preview's snap ask for it); a click, a key or an undo between frames walks them again
 unsigned g_overlay_frame = 0;
@@ -4025,7 +4022,7 @@ const TrackJoints& track_joints() {
     static unsigned walked = ~0u;
     if (g_joints.valid && g_overlay_drawing && walked == g_overlay_frame) return g_joints;   // walked this frame already
     walked = g_overlay_drawing ? g_overlay_frame : ~0u;
-    const std::vector<RailObject> objects = live_rails();
+    const std::vector<RailObject> objects = map_rails();
     uint64_t h = 1469598103934665603ull;
     auto mix = [&](uint64_t v) { h = (h ^ v) * 1099511628211ull; };
     mix(objects.size());
@@ -4440,9 +4437,7 @@ TrackStep next_step(const std::vector<RailObject>& rails) {
     g_snap_memo.rails = signature;
     g_snap_memo.z = z;
     g_snap_memo.ramp = g_ramp;
-    std::vector<rail::Rail> live;
-    for (const RailObject& r : rails)
-        if (!removed(r.object)) live.push_back(r.rail);
+    const std::vector<rail::Rail> live = rails_of(rails);
     LARGE_INTEGER t0, t1, hz;
     QueryPerformanceCounter(&t0);
     g_snap_memo.result = snap_run(live, s, z);
@@ -8164,9 +8159,7 @@ RunEnd run_end_now(const std::vector<RailObject>& rails, const TrackStep& s) {
     const bool at0 = rail::close(last.end0.x, s.to.x) && rail::close(last.end0.y, s.to.y);
     out.at = s.to;
     out.z = at0 ? last.z0 : last.z1;
-    std::vector<rail::Rail> there;
-    for (const RailObject& r : rails)
-        if (!removed(r.object)) there.push_back(r.rail);
+    std::vector<rail::Rail> there = rails_of(rails);
     for (size_t k = 0; k + 1 < s.segments.size(); ++k)
         there.push_back({s.segments[k].x, s.segments[k].y, s.segments[k].shape, s.segments[k].z0, s.segments[k].z1});
     out.state = rail::end_state(there, s.to, rail::ENDS[last.shape][at0 ? 0 : 1], out.z, -1);
