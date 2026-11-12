@@ -246,6 +246,8 @@ FactoryState& mission_factories();
 int mission_reinforcement_waves();
 // The waves the map's script gets as PLAYER_REINFORCEMENT (the arrivals' waves when it runs them).
 int mission_waves_in_play();
+// The map's script keeps every VID 5 of army 3 as a pirate train (CUSTOM_MAP and no waves).
+bool mission_keeps_pirate_engines();
 std::vector<int> mission_reinforcement_train();
 // Why the map's script cannot run arrivals (empty: it can) - a campaign map, the sandbox, a script
 // without "TrainsTact();" in its main().

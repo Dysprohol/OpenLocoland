@@ -1712,7 +1712,9 @@ void select(uint8_t* o) {
     if (tool() != Tool::PushLine) g_push_selected = -1;   // a line selected in the Select tool
     if (o && is_marker(o)) {   // its parking army 3 is not what it is in play
         MESSAGE("MsgSelectedMarker", "selected the reinforcement's point locomotive at %.0f,%.0f - in play: %s", at<float>(o, O_X),
-                at<float>(o, O_Y), ui_text("CtxArrivesOurs", "OURS ARRIVE HERE (THE AUTHORS' REINFORCEMENT)"));
+                at<float>(o, O_Y),
+                mission_waves_in_play() > 0 ? ui_text("CtxArrivesOurs", "OURS ARRIVE HERE (THE AUTHORS' REINFORCEMENT)")
+                                            : ui_text("CtxTakenAway", "TAKEN AWAY AT THE START (NO WAVES)"));
         return;
     }
     if (o)
@@ -9886,7 +9888,7 @@ int g_context_line = -1;        // or the push line (an index of the editor's li
 // saves it the one taken is the first one met in its layer's list, the first for_each_object meets
 // (every VID 5 is on the same layer). Any other VID 5 in army 3 stays, on any map.
 uint8_t* reinforcement_marker() {
-    if (mission_waves_in_play() < 1) return nullptr;
+    if (mission_keeps_pirate_engines()) return nullptr;
     uint8_t* found = nullptr;
     for_each_object([&](uint8_t* o) {
         if (!found && is_car(o) && nvid_of(o) == VID_LOCOMOTIVE && army_of(o) == 3) found = o;
@@ -10309,7 +10311,11 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
     if (is_marker(o)) {
         // the authors' reinforcement point (a map with waves): the army it gets in play (never its
         // parking army 3, which ReinforcementInit takes it away by), and the panel that makes such trains now
-        rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{UiText{"CtxArrivesOurs", "OURS ARRIVE HERE (THE AUTHORS' REINFORCEMENT)"}, true, [] {}}}});
+        const bool arrives = mission_waves_in_play() > 0;   // else a script without CUSTOM_MAP: taken all the same
+        rows.push_back({{"CtxInPlay", "IN PLAY:"},
+                        {{arrives ? UiText{"CtxArrivesOurs", "OURS ARRIVE HERE (THE AUTHORS' REINFORCEMENT)"}
+                                  : UiText{"CtxTakenAway", "TAKEN AWAY AT THE START (NO WAVES)"},
+                          true, [] {}}}});
         rows.push_back({{"CtxArrivals", "ARRIVALS:"},
                         {{{"CtxOpenArrivals", "OPEN THE PANEL (0)"}, false, [] {
                               g_context = nullptr;
@@ -10933,7 +10939,7 @@ void draw_overlay() {
                                                nvid_of(p.couple_to));
                 }
                 if (place_nvid() == VID_LOCOMOTIVE && (p.couple_to ? army_of(p.couple_to) : place_army()) == 3 &&
-                    mission_waves_in_play() > 0 && !reinforcement_marker())   // the only one: the one taken away (is_marker)
+                    !mission_keeps_pirate_engines() && !reinforcement_marker())   // the only one: the one taken away (is_marker)
                     g_place_status = ui_text("MsgPirateEngine", PIRATE_ENGINE_NOTE);
             } else {
                 g_place_status = std::string(place_label()) + ": " + p.why.get();

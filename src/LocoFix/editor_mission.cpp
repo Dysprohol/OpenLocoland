@@ -3512,6 +3512,12 @@ ArrivalsState& mission_arrivals() { return g_arrivals; }
 FactoryState& mission_factories() { return g_mission.factories; }
 int mission_reinforcement_waves() { return g_mission.reinforcements; }
 int mission_waves_in_play() { return g_arrivals.on ? g_arrivals.waves : g_mission.reinforcements; }
+// game/maps/script/reinforcement.lgc.patch keeps the pirates' small engine only in a script that defines
+// CUSTOM_MAP (every script with the editor's blocks: the editor writes it; else as the script reads)
+// and has no waves - not a campaign mission or a map folder of another script opened as it is.
+bool mission_keeps_pirate_engines() {
+    return (g_managed || g_parsed.defines.count("CUSTOM_MAP")) && mission_waves_in_play() < 1;
+}
 std::vector<int> mission_reinforcement_train() {
     std::vector<int> cars;
     for (size_t a = 0; a <= g_mission.train.size();) {
