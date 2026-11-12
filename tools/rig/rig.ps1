@@ -14,9 +14,11 @@
 #   .\tools\rig\rig.ps1 -Job game -Game build\game -Resolution 1366x768 -Registry @{ FrameLimit = 0 } -TestArgs @{ ... }
 #   .\tools\rig\rig.ps1 -Job setup -Setup build\setup\OpenLocoland-...-Setup.exe [-SetupArgs "--auto"]
 #   .\tools\rig\rig.ps1 -Job probe [-Resolution 1920x1080] [-Scale 200]
-#   .\tools\rig\rig.ps1 -Status | -Monitors | -Look | -Show | -Hide | -Stop | -Kill
+#   .\tools\rig\rig.ps1 -Status | -Monitors | -Look | -Peek [-Front] | -Hide | -Stop | -Kill   (tools\rig\peek.cmd = -Peek)
 #
 # -Game        the built game folder (build.py --target); read-only for the box, copied inside
+# -Tools       the tools folder whose test_game.ps1 / test_missions.ps1 run (default: this repository's),
+#              e.g. another worktree's, to test its build with its own scripts
 # -TestArgs    parameters of tools\test_game.ps1 (-Job game) or tools\test_missions.ps1 (-Job missions);
 #              the box runs THIS repository's tools\ (a worktree's own scripts)
 # -Registry    values set under the guest's HKCU\SOFTWARE\Gromada\Locoland (or -RegistryKey) before
@@ -30,25 +32,33 @@
 # -SetupArgs   Setup's options for -Job setup (default --silent; --auto = its window, installing by
 #              itself); Setup is copied in and marked as downloaded (Zone.Identifier) unless -NoMotw;
 #              the installed game then runs mission 1 unless -NoGame
+# -Parallel    (-Job missions) how many missions run at once, each lane with its own copy of the game
+#              (default 4; 1 = one after another, as on the host)
+# -Sound       let this job's sound out (it plays on the host's speakers): the guest's playback is
+#              muted from the box's start and before every job, never the host's mixer
 # -Script      (-Job script) a .ps1 under the host folder run inside the box; -ScriptArgs its parameters
-# -IdleMinutes the box shuts itself down after this long without a job (default 20; set when it starts)
+# -MemoryMB    the box's memory (default 6144, set when it starts): the guest uses 1.9 GB idle and 3.4 GB
+#              with 4 mission lanes at once (file cache included); the host gives only what the guest touches
+# -IdleMinutes the box shuts itself down after this long without a job (default 10; set when it starts)
 # -DgVoodoo    values set in the guest's copy of dgVoodoo.conf, e.g. @{ OutputAPI = "d3d11warp" }
 # -Warp        the same as -DgVoodoo @{ OutputAPI = "d3d11warp" }: Direct3D 11 in software (WARP). The box
 #              itself always has the GPU: Windows Sandbox 0.8 ignores <VGpu>Disable</VGpu>
 # -Status      the box, its agent, the queue          -Monitors  the host's monitors and their scales
 # -Look        the guest's screen as a picture (taken every 5 s while a job runs), opened
-# -Show        a window onto the box on YOUR desktop (it takes the session over: the guest then has
-#              that window's size and scale); -Hide closes it and gives the session back to the rig
+# -Peek        a window onto the box on YOUR desktop, minimised to a taskbar button (-Front: shown at once).
+#              It takes the session over: the job goes on, but the guest has that window's size and
+#              scale while it is open. Closing it closes only the view; the rig connects its own hidden
+#              client again (and puts back the size the last job asked for). -Hide closes it for you.
 # -Stop        shut the box down (waits for a running job); -Kill stops it at once
 param(
   [ValidateSet("", "probe", "game", "missions", "setup", "script")][string]$Job = "",
-  [string]$Game = "", [hashtable]$TestArgs = @{}, [hashtable]$Registry = @{}, [string]$RegistryKey = "",
+  [string]$Game = "", [string]$Tools = "", [hashtable]$TestArgs = @{}, [hashtable]$Registry = @{}, [string]$RegistryKey = "",
   [int]$Scale = 0, [string]$Resolution = "",
   [string]$Setup = "", [string]$SetupArgs = "--silent", [switch]$NoMotw, [switch]$NoGame,
   [string]$Script = "", [hashtable]$ScriptArgs = @{},
-  [hashtable]$DgVoodoo = @{}, [switch]$Warp,
-  [string]$Out = "", [double]$Timeout = 30, [switch]$Fresh, [int]$IdleMinutes = 20,
-  [switch]$Status, [switch]$Monitors, [switch]$Look, [switch]$Show, [switch]$Hide, [switch]$Stop, [switch]$Kill
+  [hashtable]$DgVoodoo = @{}, [switch]$Warp, [switch]$Sound, [int]$Parallel = 0, [int]$MemoryMB = 6144,
+  [string]$Out = "", [double]$Timeout = 30, [switch]$Fresh, [int]$IdleMinutes = 10,
+  [switch]$Status, [switch]$Monitors, [switch]$Look, [Alias("Show")][switch]$Peek, [switch]$Front, [switch]$Hide, [switch]$Stop, [switch]$Kill
 )
 $ErrorActionPreference = "Stop"
 $rigDir = $PSScriptRoot
@@ -104,7 +114,7 @@ function AgentState {
 }
 function BoxUp { $s = AgentState; return ($s -and $s.age -lt 15 -and $s.state -ne "stopping" -and (BoxRunning)) }
 function Queued { @(Get-ChildItem (Join-Path $io "queue") -Filter *.json -ErrorAction SilentlyContinue) }
-# the box's client windows: the rig's, on its own desktop, and the user's own (-Show)
+# the box's client windows: the rig's, on its own desktop, and the user's own (-Peek)
 function HiddenClient { [void][RigHost]::SandboxWindows($desktop); [RigHost]::ClientWindow($desktop) }
 function UserClient { [RigHost]::ClientWindow($null) }
 function ClientWidth($h) { if ($h -eq [IntPtr]::Zero) { return 0 }; $c = New-Object RigHost+RECT; [void][RigHost]::GetClientRect($h, [ref]$c); return $c.R }
@@ -126,6 +136,12 @@ function Attach-Client {
   if ((ClientWidth $h) -le 700) {
     if ($h -ne [IntPtr]::Zero) { [void][RigHost]::Capture($h, (Join-Path $home_ "client-error.png")) }
     throw "the box's client did not connect in 60 s (its window: $home_\client-error.png)"
+  }
+  # a new client has the default size: the display the last job asked for is made again
+  $b = if (Test-Path $boxFile) { Get-Content $boxFile -Raw | ConvertFrom-Json } else { $null }
+  if ($b -and $b.display) {
+    $deadline = (Get-Date).AddSeconds(30); do { Start-Sleep -Milliseconds 500 } while (-not (AgentState).screen -and (Get-Date) -lt $deadline)
+    Say "client connected again - $(Set-BoxDisplay $b.display.res $b.display.scale)"
   }
 }
 function Close-Clients([int]$grace = 10) {
@@ -159,6 +175,7 @@ function Start-Box {
     throw "a Windows Sandbox is running that is not the rig's, or its agent does not answer - only one can run at a time; close it, or rig.ps1 -Kill"
   }
   Close-Clients 0   # a client left from a box that shut itself down
+  Remove-Item $boxFile -ErrorAction SilentlyContinue   # the old box's display request is not this one's
   # A fresh io folder for each box (the old box's results went out with its jobs).
   if (Test-Path $io) { Remove-Item $io -Recurse -Force }
   New-Item -ItemType Directory -Force (Join-Path $io "agent"), (Join-Path $io "queue"), (Join-Path $io "jobs") | Out-Null
@@ -172,7 +189,7 @@ function Start-Box {
   $gpu = "Enable"   # Disable is ignored by Windows Sandbox 0.8.114 (the guest keeps the GPU) - -Warp instead
   # no double quotes anywhere: the text goes to wsb.exe on its command line
   $config = "<Configuration><VGpu>$gpu</VGpu><Networking>Disable</Networking><AudioInput>Disable</AudioInput><VideoInput>Disable</VideoInput>" +
-            "<ClipboardRedirection>Disable</ClipboardRedirection><PrinterRedirection>Disable</PrinterRedirection><MemoryInMB>8192</MemoryInMB>" +
+            "<ClipboardRedirection>Disable</ClipboardRedirection><PrinterRedirection>Disable</PrinterRedirection><MemoryInMB>$MemoryMB</MemoryInMB>" +
             "<MappedFolders>$($maps -join '')</MappedFolders>" +
             "<LogonCommand><Command>powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Minimized -File $agent</Command></LogonCommand></Configuration>"
   $wsbFile = Join-Path $home_ "box.wsb"
@@ -226,6 +243,9 @@ function Set-BoxDisplay([string]$res, [int]$scale) {
   if ($res) { if ($res -notmatch '^(\d+)x(\d+)$') { throw "-Resolution '$res' is not WxH" }; $w = [int]$Matches[1]; $h = [int]$Matches[2] }
   else { $null = $s.screen -match '^(\d+)x(\d+)@'; $w = [int]$Matches[1]; $h = [int]$Matches[2] }
   $want = "${w}x${h}@$($mon.Dpi)"
+  $b = Get-Content $boxFile -Raw | ConvertFrom-Json
+  $b | Add-Member display ([pscustomobject]@{ res = "${w}x$h"; scale = $scale }) -Force
+  ($b | ConvertTo-Json) | Set-Content $boxFile -Encoding utf8
   if ($s.screen -eq $want) { return "guest display $w x $h at $($mon.Scale) % (as it was)" }
   # The client area holds the guest's screen and the window's own title strip; the strip's height is
   # corrected from what the guest gets.
@@ -257,10 +277,20 @@ if ($Look) {
   if (Test-Path $png) { Say "the guest's screen at $((Get-Item $png).LastWriteTime.ToString('HH:mm:ss')) (taken every 5 s while a job runs): $png"; Invoke-Item $png } else { Say "no picture of the guest's screen yet" }
   return
 }
-if ($Show) {
-  if (-not $wsbExe -or -not (BoxRunning)) { Say "no box to show$(if (-not $wsbExe) { ' (and no wsb.exe: the box''s window cannot be opened twice)' })"; return }
-  Start-Process $wsbExe -ArgumentList @("connect", "--id", ((BoxIds) | Select-Object -First 1))
-  Say "a window onto the box opens on your desktop; it holds the session while open (the guest takes its size and scale). Close it or rig.ps1 -Hide when done."
+if ($Peek) {
+  if (-not $wsbExe -or -not (BoxRunning)) { Say "no box to look into$(if (-not $wsbExe) { ' (and no wsb.exe: the box''s window cannot be opened twice)' })"; return }
+  if ((UserClient) -ne [IntPtr]::Zero) { Say "your window onto the box is already open"; return }
+  $id = (BoxIds) | Select-Object -First 1
+  if ($Front) { Start-Process $wsbExe -ArgumentList @("connect", "--id", $id) }
+  else {
+    # minimised without activation; the watcher minimises the window again whenever it shows itself
+    # in the first 20 s (the client restores itself once while it connects)
+    [RigHost]::Watch($true)
+    [void][RigHost]::Run($wsbExe, ('"' + $wsbExe + '" connect --id ' + $id), $null)
+    $deadline = (Get-Date).AddSeconds(20); while ((Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 500 }
+    [RigHost]::StopWatch()
+  }
+  Say "a window onto the box is $(if ($Front) { 'open' } else { 'on your taskbar (Windows Sandbox), minimised' }). While it is open the box shows there and the guest has its size and scale; a running job goes on. Its sound is muted inside the guest - the guest's own speaker icon (bottom right in that window) unmutes it until the next job starts. Closing the window closes only the view, not the box."
   return
 }
 if ($Hide) {
@@ -293,13 +323,17 @@ try {
 } finally { if ($lock) { $lock.Dispose() } }
 
 $id = "{0:yyyyMMdd-HHmmss}-{1}-{2}" -f (Get-Date), $Job, (Get-Random -Maximum 9999)
-$spec = [ordered]@{ Job = $Job; TimeoutMinutes = $Timeout; Runner = (GuestPath (Join-Path $rigDir "guest\runjob.ps1")); Tools = (GuestPath (Join-Path $repo "tools")) }
+$toolsDir = if ($Tools) { $Tools } else { Join-Path $repo "tools" }
+$spec = [ordered]@{ Job = $Job; TimeoutMinutes = $Timeout; Runner = (GuestPath (Join-Path $rigDir "guest\runjob.ps1")); Tools = (GuestPath $toolsDir) }
+if (-not $spec.Tools) { throw "-Tools must be under $hostRoot" }
 if ($Scale) { $spec.Scale = $Scale }
 if ($Resolution) { $spec.Resolution = $Resolution }
 if ($TestArgs.Count) { $spec.Args = $TestArgs }
 if ($Registry.Count) { $spec.Registry = $Registry }
 if ($RegistryKey) { $spec.RegistryKey = $RegistryKey }
 if ($Warp) { $DgVoodoo["OutputAPI"] = "d3d11warp" }
+if ($Sound) { $spec.Sound = $true }
+if ($Job -eq "missions") { $spec.Parallel = if ($Parallel) { $Parallel } else { 4 } }
 if ($DgVoodoo.Count) { $spec.DgVoodoo = $DgVoodoo }
 if ($Game) {
   if (-not (Test-Path (Join-Path $Game "Locoland.exe"))) { throw "no Locoland.exe in $Game" }
@@ -327,11 +361,10 @@ $jobDir = Join-Path $io "jobs\$id"; $doneFile = Join-Path $jobDir "done.json"
 $deadline = (Get-Date).AddMinutes($Timeout + 5); $n = 0
 while (-not (Test-Path $doneFile)) {
   Start-Sleep -Seconds 1; $n++
-  if ($n % 10 -eq 0) {
-    if (-not (BoxRunning)) { throw "the box went away during job $id" }
-    # a job of this session waits in the queue while others run; the client must stay connected
-    if ((Test-Path $jobDir) -and (UserClient) -eq [IntPtr]::Zero -and (ClientWidth (HiddenClient)) -le 700) { Say "the box's client lost its session - connecting a new one"; Attach-Client }
-  }
+  if ($n % 10 -eq 0 -and -not (BoxRunning)) { throw "the box went away during job $id" }
+  # the client must stay connected (a game cannot start in a disconnected session): when a peek window
+  # was closed, or the client lost its session, the rig's own is connected again at once
+  if ($n % 2 -eq 0 -and (UserClient) -eq [IntPtr]::Zero -and (ClientWidth (HiddenClient)) -le 700) { Say "the box has no connected client - connecting the rig's own again"; Attach-Client }
   if ((Test-Path $jobDir) -and (Get-Date) -gt $deadline) { New-Item -ItemType File -Force (Join-Path $jobDir "cancel") | Out-Null; Say "job ${id} over its time - cancel asked"; $deadline = (Get-Date).AddMinutes(2) }
 }
 Start-Sleep -Milliseconds 500

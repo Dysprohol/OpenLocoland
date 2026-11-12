@@ -14,13 +14,14 @@ param([string]$Io = "C:\rig\io")
 $ErrorActionPreference = "Continue"
 $agentDir = Join-Path $Io "agent"; $queue = Join-Path $Io "queue"; $jobs = Join-Path $Io "jobs"
 New-Item -ItemType Directory -Force $agentDir, $queue, $jobs | Out-Null
-$config = @{ IdleMinutes = 30; ScreenSeconds = 5 }
+$config = @{ IdleMinutes = 10; ScreenSeconds = 5 }
 $cfgFile = Join-Path $agentDir "config.json"
 if (Test-Path $cfgFile) { (Get-Content $cfgFile -Raw | ConvertFrom-Json).PSObject.Properties | ForEach-Object { $config[$_.Name] = $_.Value } }
 $logFile = Join-Path $agentDir "agent.log"
 function Log($s) { Add-Content -Path $logFile -Value "$(Get-Date -Format 'HH:mm:ss.fff') $s" -Encoding utf8 }
 Add-Type -AssemblyName System.Drawing, System.Windows.Forms
 . (Join-Path $PSScriptRoot "display.ps1")   # the heartbeat carries the guest's screen (rig.ps1 sizes the window by it)
+. (Join-Path $PSScriptRoot "audio.ps1")     # the guest's sound is muted: it would come out of the host's speakers
 function Save-Screen {
   try {
     $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
@@ -38,6 +39,7 @@ function Beat($state) {
   $tmp = Join-Path $agentDir "state.tmp"; ($s | ConvertTo-Json -Compress) | Set-Content $tmp -Encoding utf8
   Move-Item $tmp (Join-Path $agentDir "state.json") -Force
 }
+Log "sound: $(Set-GuestMute $true)"
 Log "agent up; uptime $([int]((Get-Date) - $boot).TotalSeconds) s; idle limit $($config.IdleMinutes) min"
 Beat "idle"
 while ($true) {
@@ -51,6 +53,10 @@ while ($true) {
   $job = Get-Content (Join-Path $dir "job.json") -Raw | ConvertFrom-Json
   $timeout = if ($job.TimeoutMinutes) { [double]$job.TimeoutMinutes } else { 30 }
   Log "job $id ($($job.Job)) started, timeout $timeout min"
+  # every job starts muted (also after someone unmuted by hand while looking in); -Sound unmutes in runjob.ps1
+  $muteLine = Set-GuestMute $true
+  "$(Get-Date -Format 'HH:mm:ss') before the job: $muteLine" | Add-Content (Join-Path $dir "audio.txt") -Encoding utf8
+  $lastSessions = ""
   Beat "running"
   $t = Get-Date
   $runner = if ($job.Runner) { $job.Runner } else { Join-Path $PSScriptRoot "runjob.ps1" }
@@ -60,7 +66,17 @@ while ($true) {
   $why = ""; $nextShot = Get-Date
   while (-not $p.HasExited) {
     Start-Sleep -Milliseconds 500
-    if ($config.ScreenSeconds -gt 0 -and (Get-Date) -ge $nextShot) { Save-Screen; $nextShot = (Get-Date).AddSeconds($config.ScreenSeconds) }
+    if ($config.ScreenSeconds -gt 0 -and (Get-Date) -ge $nextShot) {
+      Save-Screen; $nextShot = (Get-Date).AddSeconds($config.ScreenSeconds)
+      # which processes have a sound stream open (the game's sound runs, only into a muted endpoint)
+      # the guest's memory (for the box's memory size): in use, committed, the games' working sets
+      $os = Get-CimInstance Win32_OperatingSystem
+      $games = @(Get-Process Locoland, Setup -ErrorAction SilentlyContinue | ForEach-Object { [int]($_.WorkingSet64 / 1MB) })
+      "$(Get-Date -Format 'HH:mm:ss') used $([int](($os.TotalVisibleMemorySize - $os.FreePhysicalMemory) / 1KB)) MB, committed $([int](($os.TotalVirtualMemorySize - $os.FreeVirtualMemory) / 1KB)) MB, games $($games -join '+') MB" |
+        Add-Content (Join-Path $dir "memory.txt") -Encoding utf8
+      $sess = Get-AudioSessions
+      if ($sess -ne $lastSessions) { "$(Get-Date -Format 'HH:mm:ss') audio streams: $sess" | Add-Content (Join-Path $dir "audio.txt") -Encoding utf8; $lastSessions = $sess }
+    }
     Beat "running"
     if (Test-Path (Join-Path $dir "cancel")) { $why = "cancelled" }
     elseif (((Get-Date) - $t).TotalMinutes -ge $timeout) { $why = "timeout after $timeout min" }
@@ -73,6 +89,7 @@ while ($true) {
     }
   }
   $p.WaitForExit(10000) | Out-Null
+  "$(Get-Date -Format 'HH:mm:ss') after the job: $(Set-GuestMute $true)" | Add-Content (Join-Path $dir "audio.txt") -Encoding utf8
   $code = if ($why) { 124 } else { $p.ExitCode }
   $secs = [int]((Get-Date) - $t).TotalSeconds
   Save-Screen

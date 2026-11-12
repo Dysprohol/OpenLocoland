@@ -185,7 +185,7 @@ registry key, and so the guest - a throw-away Windows of its own - can be set up
     .\tools\rig\rig.ps1 -Status | -Monitors | -Look | -Show | -Hide | -Stop | -Kill
 
 - *How it runs.* One sandbox (the box) serves every session's jobs from one queue, one at a time:
-  the first job starts it (about 12 s), it stays up until `-Stop` or 20 minutes without a job
+  the first job starts it (about 12 s), it stays up until `-Stop` or 10 minutes without a job
   (`-IdleMinutes`; it shuts itself down), and only one Windows Sandbox can run on the machine at a
   time (a second start is refused, `CO_E_APPSINGLEUSE`). The box is started with `wsb.exe`, the
   Sandbox app's command line (its `wsb` alias is not registered, `rig.ps1` finds it through the
@@ -204,15 +204,16 @@ registry key, and so the guest - a throw-away Windows of its own - can be set up
   values), runs this repository's `tools\test_game.ps1` / `test_missions.ps1`, and its logs,
   screenshots and the game's `logs\` / `Screens\` come back to `build\rig\<job id>` (`-Out`).
   `-Job setup` gets a box no earlier job has touched (the running one is closed first) and closes
-  it afterwards. The guest is Windows 11 Enterprise (the host's build), 8 GB, no network, no sound
-  device, Windows PowerShell 5.1 with the C# compiler (all the test scripts need), no Python.
+  it afterwards. The guest is Windows 11 Enterprise (the host's build), 6 GB (`-MemoryMB`), no
+  network, one playback device (the remote desktop's, muted - see Sound), Windows PowerShell 5.1
+  with the C# compiler (all the test scripts need), no Python.
 - *The picture.* dgVoodoo's Direct3D 11 runs on the host's GPU (vGPU: the guest lists the RTX 4070
   Ti SUPER and the integrated AMD, dgVoodoo enumerates the NVIDIA one), 60 fps with the default
   limit, 207-280 fps without it in mission 8 at 640x480. `<VGpu>Disable</VGpu>` is ignored by
   Sandbox 0.8.114 (the guest keeps the GPU), so `-Warp` sets dgVoodoo's own `OutputAPI = d3d11warp`
   (Direct3D 11 in software, 106 fps there) in the guest's copy (`-DgVoodoo @{...}` for any
   setting). The game's screenshots are real pictures; the frame rate does not depend on the box's
-  window being on a desktop nobody sees. The 20 missions take 4.7 minutes there (3.9 with WARP).
+  window being on a desktop nobody sees. The 20 missions take 1.3-1.9 minutes in 4 lanes, 5 one after another (3.9 with WARP; the host: 6-8).
 - *Resolution and scale.* The guest's screen is the client window's area (remote desktop with
   dynamic resolution), and its scale is the scale of the host monitor that window is on; inside the
   guest neither can be changed (the scale's range is 100..100 %, `ChangeDisplaySettingsEx` reports
@@ -227,18 +228,58 @@ registry key, and so the guest - a throw-away Windows of its own - can be set up
   `SendInput` (relative and absolute) - with the game full screen there, without touching the
   host's cursor; the engine follows it (`tools\rig\guest\cursor_job.ps1`: the cursor's place, the
   clip rectangle and the engine's mouse at the corners and edges).
-- *Looking in.* `-Look` opens the guest's screen as the agent last saved it (every 5 s while a job
-  runs; `test_missions.ps1` runs the game on a desktop of its own inside the guest too, so only
-  `-Visible` game runs show there). `-Show` opens a window onto the box on the user's desktop: it
-  takes the session over (the rig's own client is left with "connection lost"), the guest then has
-  that window's size and scale, and the running job goes on (checked: a game run with the session
-  moved away and back drew and closed normally). After `-Hide`, or when that window is closed, the
-  rig connects its own client again before the next job; clicks into the guest do not disturb a
-  run with the virtual test cursor (the engine ignores the real mouse in test mode - checked).
+- *Sound.* The guest's sound would come out of the host's speakers (the remote desktop's audio
+  redirection; the `.wsb` file can switch off only audio input). The agent mutes every playback
+  endpoint of the guest when the box starts and again before every job (`guest\audio.ps1`, Core
+  Audio): the devices stay, so the game's DirectSound start and playing are the same as on a real
+  machine, only silent - while a job runs the agent logs the processes with an open sound stream
+  (`audio.txt`; the game's own logs say nothing about its sound start). Stopping the guest's audio
+  service instead would leave the game without any device, a different test. `-Sound` lets one job's
+  sound out. The host's own volume mixer is never touched. Scripted runs stay quiet as before too
+  (`LOCOFIX_QUIET`), the mute is the outer guarantee.
+- *Looking in.* `tools\rig\peek.cmd` (`rig.ps1 -Peek`) opens a window onto the running box on the
+  user's desktop, minimised to a taskbar button (`-Front`: shown at once). It takes the session over:
+  the rig's own hidden client is left with "connection lost", the guest has the peek window's size
+  and scale while it is open, and a running job goes on (checked: a game run with the session moved
+  away and back drew and closed normally). Its sound is muted inside - the guest's own speaker icon
+  in that window unmutes it, until the next job mutes it again. Closing the window closes only the
+  view: the box runs on, and the rig connects its own client again at once (a game cannot start in a
+  disconnected session) and puts back the size the last job asked for. Clicks into the guest do not
+  disturb a run with the virtual test cursor (the engine ignores the real mouse in test mode -
+  checked with real clicks sent inside the guest). `-Look` opens the guest's screen as the agent saved
+  it last (every 5 s while a job runs); `test_missions.ps1` runs the game on a desktop of its own
+  inside the guest too, so only `-Visible` game runs show on the guest's screen.
+- *Another worktree's build.* `-Game <its build\game> -Tools <its tools>` runs it with its own
+  scripts (a branch's `test_game.ps1` may set things the main one does not, e.g. a test registry key).
+- *Missions in parallel.* `-Job missions` runs 4 lanes at once by default (`-Parallel`, 1 = one after
+  another as on the host): the missions dealt out round-robin, each lane with its own copy of the
+  game folder and results folder, every run on its own desktop inside the guest (as `test_game.ps1`
+  runs quietly), the lanes' reports merged into one `report.txt`.
+- *The same results as the host* (2026-11-12, `tools\rig\compare_runs.py <host results> <rig
+  results>`): the fullscreen-cursor branch's build, whose 20 missions had run on the host with its own
+  scripts, run in the box with the same build and scripts (`-Tools`), one after another and in 4
+  lanes: all three reports the same row for row - every verdict and every script's compile line
+  (byte code, variables, defines, stack). The screenshots: where the view is the same (missions 1-5,
+  9, 10, 19: 0.6-5 % of the pixels differ) only moving things differ - units, smoke, fire, fountains;
+  ground, buildings, the bar, texts and the minimap are the same to the pixel, so the picture is drawn
+  the same. Elsewhere the view itself is a few to a hundred pixels off, or lava and water animate the
+  whole screen: the test cursor starts where the real cursor was and the edge scrolling moves a big
+  map's view before the screenshot, and the shot is taken at a slightly different moment of the
+  animation - and two runs in the box differ from each other exactly as much as the host's run
+  differs from the box's. So verdicts, logs and script results are comparable; screenshots are
+  comparable in what is drawn, not pixel for pixel, on the host either.
+- *What it takes from the machine* (`tools\rig\load.ps1`, performance counters, 24 logical
+  processors, 64 GB): an idle box with the agent waiting 0.3 % of the CPU (at most 1.7 %), no GPU,
+  2.8 GB of memory; the 20 missions in 4 lanes 11 % of the CPU on average (at most 23 %, about five
+  cores), memory up to the box's 6 GB (the guest itself used at most 2.9 GB, the rest its file cache),
+  the host's whole 3D engine at 3 % on average (the VM's own share cannot be told apart in the
+  counters); the installer 5 % (at most 31 %) and 4.2 GB. The box shuts itself down after 10 idle
+  minutes. Not chosen: a faster game clock - the missions test waits for a load, not for game time,
+  and a different clock would be a different test.
 - *Not covered* - these still need the real machine: frame-rate measurements that matter (the
   host's own desktop, monitor and refresh), the GPU's own driver path (the guest's is the
   paravirtual one), the monitors' real scales and modes (125, 150 and 175 % only where a host
-  monitor has them), exclusive full screen and display-mode switches, sound, what SmartScreen and
+  monitor has them), exclusive full screen and display-mode switches, how the sound sounds, what SmartScreen and
   Defender do with the unsigned Setup (Defender's service is stopped in the sandbox and SmartScreen
   has no network), Steam itself, and anything older than the host's Windows build.
 

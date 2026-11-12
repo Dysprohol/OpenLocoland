@@ -111,7 +111,7 @@ Paragraphs: Map exchange; The texts of the editor; The Help and Menu buttons; Ct
 
 Sections: "Changes from the original".
 
-### [working.md](docs/dev/working.md) (~27 KB)
+### [working.md](docs/dev/working.md) (~31 KB)
 
 Sections: "Working with the code"; "Resolutions and widescreen"; "Status and known bugs".
 

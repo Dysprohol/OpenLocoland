@@ -11,6 +11,7 @@
 #           Setup    the Setup.exe (guest path), SetupArgs, Steam (guest path of the original)
 #           Script   (script job) a .ps1 to run, ScriptArgs its parameters
 #           DgVoodoo values set in the guest copy's dgVoodoo.conf, e.g. OutputAPI = d3d11warp (software rendering)
+#           Sound    true: the guest's sound is on for this run (the agent mutes it again afterwards)
 #           KeepRegistry  leave HKCU\SOFTWARE\Gromada as an earlier job left it (default: removed)
 #           Registry values set before the run under HKCU\SOFTWARE\Gromada\<RegistryKey> (default
 #                    Locoland; a number is a DWORD, the rest strings), e.g. FrameLimit 0, ScreenX 1920
@@ -27,6 +28,7 @@ try {
   $left = @(Get-Process Locoland, Setup -ErrorAction SilentlyContinue)
   if ($left.Count) { Log "ending $($left.Count) process(es) left by an earlier job: $(($left | ForEach-Object { "$($_.ProcessName) $($_.Id)" }) -join ', ')"; $left | Stop-Process -Force; Start-Sleep 1 }
   . (Join-Path $PSScriptRoot "display.ps1")
+  if ($job.Sound) { . (Join-Path $PSScriptRoot "audio.ps1"); Log "sound ON for this job (rig.ps1 -Sound): $(Set-GuestMute $false)" }
   # rig.ps1 makes the display from the host (window size, monitor) before it queues the job; here
   # it is only checked, so a job never runs on a display other than the one asked for.
   Log "display: $(Get-DisplayReport)"
@@ -80,7 +82,41 @@ try {
     "missions" {
       $p = ArgsOf $job.Args
       $t = Get-Date
+      $lanes = if ($job.Parallel) { [int]$job.Parallel } else { 1 }
+      if ($lanes -gt 1) {
+        # Parallel lanes: the missions dealt out round-robin, each lane with a copy of the game folder of
+        # its own (the game writes logs and settings beside itself) and its own results folder, every
+        # run on its own desktop as test_game.ps1 runs quietly; the lanes' reports merged into one.
+        $list = if ($p.ContainsKey("Missions")) { @($p["Missions"]) } elseif ($p["Quick"]) { @(1, 2, 8) } else { @(1..20) }
+        $rest = @(); foreach ($k in $p.Keys) { if ($k -notin "Missions", "Quick") { $rest += "-$k"; $rest += "'$($p[$k])'" } }
+        $procs = @()
+        for ($i = 0; $i -lt $lanes; $i++) {
+          $mine = @(for ($j = $i; $j -lt $list.Count; $j += $lanes) { $list[$j] }); if (-not $mine.Count) { continue }
+          $copy = "$game-lane$i"
+          robocopy $game $copy /MIR /NFL /NDL /NJH /NJS /NP /MT:16 | Out-Null
+          $cmd = "& '$tools\test_missions.ps1' -Missions $($mine -join ',') -Game '$copy' -Results '$Dir\missions\lane$i' $($rest -join ' ') *> '$Dir\missions_lane$i.txt'"
+          $procs += Start-Process powershell -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $cmd) -PassThru -WindowStyle Minimized
+        }
+        $procs | ForEach-Object { $null = $_.Handle }
+        $procs | ForEach-Object { $_.WaitForExit() }
+        $res = Join-Path $Dir "missions"; $rows = @(); $header = @()
+        for ($i = 0; $i -lt $lanes; $i++) {
+          $ld = Join-Path $res "lane$i"; if (-not (Test-Path $ld)) { continue }
+          Get-ChildItem $ld -File | Where-Object { $_.Name -ne "report.txt" } | Move-Item -Destination $res -Force
+          $r = Get-Content (Join-Path $ld "report.txt") -ErrorAction SilentlyContinue
+          if (-not $header.Count) { $header = @($r | Select-Object -First 3) }
+          $rows += @($r | Where-Object { $_ -match '^\s*\d+\s+(True|False)' })
+          Remove-Item $ld -Recurse -Force
+        }
+        $rows = $rows | Sort-Object { [int](($_ -split '\s+' | Where-Object { $_ })[0]) }
+        ($header + $rows + "", "") | Set-Content (Join-Path $res "report.txt") -Encoding utf8
+        $failed = @($rows | Where-Object { $_ -match '^\s*\d+\s+False' })
+        $text = ((Get-ChildItem $Dir -Filter "missions_lane*.txt" | ForEach-Object { Get-Content $_.FullName -Raw }) -join "`n") +
+                "`n" + ($header + $rows -join "`n") + "`n" + $(if ($failed.Count -or $rows.Count -ne $list.Count) { "FAILED: $($failed.Count) failed, $($rows.Count) of $($list.Count) reported" } else { "all $($rows.Count) mission(s) passed ($lanes lanes)" })
+        Log "missions in $lanes parallel lanes"
+      } else {
       $text = & (Join-Path $tools "test_missions.ps1") -Game $game -Results (Join-Path $Dir "missions") @p *>&1 | Out-String -Width 400
+      }
       $text | Set-Content (Join-Path $Dir "test_missions.txt") -Encoding utf8
       $code = if ($text -match "all \d+ mission\(s\) passed") { 0 } else { 1 }
       Log "test_missions.ps1 exit $code in $([int]((Get-Date) - $t).TotalSeconds) s"
