@@ -339,6 +339,20 @@ its order (its dead end 1739.5,725 is linked in the game, above), J round and ba
 Esc; l01 - "nothing to report"; `tjtest` - 43 places in `check-track`'s order (1775,125 twice, 35.5,100 at
 two heights ...), a snapped run laid between two J's mending one: "4 of 42".
 
+**What the joints cost a frame** (The Factory, 369 rails, 1889 objects; 1920 x 1080 in a window,
+`LOCOFIX_PROFILE=1`, `-Visible`, one run of each build against 9f602d3; the shared settings had the frame
+limit at 75). Select: 57.5-61.6 fps before, 58.6-65.2 after - the marks are not drawn there (`ed-marks`
+0.01 ms in both). Track, no line under way: 51.0-52.5 before, 49.0-54.2 after; `ed-marks` 0.01 -> 0.03 ms
+(the walk over the rails for the hash and 14 yellow squares in one list), `ed-tool` 0.21 -> 0.22,
+`ed-status` 0.39 -> 0.35, `ed-rows` 3.26 -> 3.46 (the SNAP group's three texts, in the rows' passes - no
+lock of their own). Track with a line under way: 47.7-50.1 before, 45.3-50.3 after; first `ed-tool` went
+2.52 -> 2.79 ms - the dot's `end_state` over every rail, 0.19 ms a frame when taken afresh (timed in a
+build of its own) - so `run_end` is now kept while the run, the line's level, the ramp and the rails are
+the same (`ed-tool` 2.52 again), the run's points and the dot go into one list of triangles, and
+`track_joints` walks the rails once a frame while the overlay draws (a click, a key or an undo between
+frames walks them again). The snap's search runs only when the run changes (0.06-1.0 ms on `tjtest`, 0.1
+on The Factory) and is kept otherwise (0.00-0.01 ms a frame). The run-to-run noise is 2-4 fps.
+
 **The ground under rising rails** (the Track tool's G, the row's GROUND UNDER RISING RAILS: AS IT IS /
 SOFT / HARD; `g_raise_ground` in `lay_step`; issue #5). AS IT IS, the default, is the rule above: a rail
 above the ground leaves it. HARD raises it the way a cutting is lowered: the cells the rail crosses go up

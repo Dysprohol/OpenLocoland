@@ -222,4 +222,6 @@ Measured back to back on The Factory, 1920 x 1080 in a window, 14 s Select then 
 57.2-59.9 and 49.3-50.4 fps with the Menu (ed-panels 3.6-4.8 ms, max 5.2-7.1, wait 0), after 59.8-60.2 in both
 (3.6-3.7 ms, max 4.2-4.7, wait 0.1-0.7 ms); Select 60 in all; Help, the Arrivals panel and the palette drawn as
 before. Not measured in full screen (the automatic tests do not switch the mode); the bar's own lock is
-needed for its plates, which are software pictures.
+needed for its plates, which are software pictures. The track's joints of issue #7 (the Track tool's marks,
+the preview's dot, snap, Check the track's ring) are Direct3D triangles in the regions' batch and their
+answers are kept while the rails are the same: see editor-objects.md "What the joints cost a frame".

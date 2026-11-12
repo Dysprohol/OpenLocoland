@@ -4016,7 +4016,15 @@ std::vector<RailObject> live_rails() {
     return out;
 }
 
+// draw_overlay's frames: while it draws, track_joints walks the rails once a frame (the marks, the status
+// line and the preview's snap ask for it); a click, a key or an undo between frames walks them again
+unsigned g_overlay_frame = 0;
+bool g_overlay_drawing = false;
+
 const TrackJoints& track_joints() {
+    static unsigned walked = ~0u;
+    if (g_joints.valid && g_overlay_drawing && walked == g_overlay_frame) return g_joints;   // walked this frame already
+    walked = g_overlay_drawing ? g_overlay_frame : ~0u;
     const std::vector<RailObject> objects = live_rails();
     uint64_t h = 1469598103934665603ull;
     auto mix = [&](uint64_t v) { h = (h ^ v) * 1099511628211ull; };
@@ -7946,115 +7954,6 @@ int frame_for(uint8_t* v, int direction) {
     return index * (std::max)(1, at<int>(v, V_ANIM_FRAMES));
 }
 
-// A small square at a map point at a height (the rail ends of the track preview).
-void mark(float x, float y, float z, uint32_t argb) {
-    uint8_t* w = world();
-    const float sx = x - at<float>(w, W_CAMERA_X), sy = y - z - at<float>(w, W_CAMERA_Y);
-    reinterpret_cast<FillRect_t>(FILL_RECT)(graphics(), nullptr, sx - 4, sy - 4, sx + 4, sy + 4, argb);
-}
-
-std::string g_track_status;   // the status line's part for the Track tool
-
-void fill_diamond(float x, float y, float r, uint32_t argb);
-
-// What the end of the rails a click lays will be (issue #7: the dot while laying): rail::end_state of
-// the run's last rail end at its far point among the rails there and the run's own rails before it -
-// Linked: green, it joins the track there; Near / Heights / DeadEnd / Sharp: orange, it ends at a rail
-// without joining it; Loose: a new end of track. `px` gets how far the nearest rail's way is (Near).
-struct RunEnd {
-    rail::End state = rail::End::Loose;
-    rail::Point at = {};
-    int z = 0;
-    double px = 0;
-};
-
-RunEnd run_end(const std::vector<RailObject>& rails, const TrackStep& s) {
-    RunEnd out;
-    if (s.segments.empty()) return out;
-    const rail::Segment& last = s.segments.back();
-    const bool at0 = rail::close(last.end0.x, s.to.x) && rail::close(last.end0.y, s.to.y);
-    out.at = s.to;
-    out.z = at0 ? last.z0 : last.z1;
-    std::vector<rail::Rail> there;
-    for (const RailObject& r : rails)
-        if (!removed(r.object)) there.push_back(r.rail);
-    for (size_t k = 0; k + 1 < s.segments.size(); ++k)
-        there.push_back({s.segments[k].x, s.segments[k].y, s.segments[k].shape, s.segments[k].z0, s.segments[k].z1});
-    out.state = rail::end_state(there, s.to, rail::ENDS[last.shape][at0 ? 0 : 1], out.z, -1);
-    out.px = 1e9;
-    for (const rail::Rail& r : there) out.px = (std::min)(out.px, rail::way_distance(s.to, r));
-    return out;
-}
-
-// The words of the run's end for the status line (after "Track: a -> b").
-std::string run_end_words(const RunEnd& e) {
-    switch (e.state) {
-    case rail::End::Linked: return ui_text("RunEndJoins", "ok, the end joins the track there (green)");
-    case rail::End::Near:
-        return ui_printf(ui_format("RunEndNear", "ok, but the end stops %d px from a rail without joining it (orange)"),
-                         static_cast<int>(std::lround(e.px)));
-    case rail::End::Heights: return ui_text("RunEndHeights", "ok, but the end meets a rail at another height - not joined (orange)");
-    case rail::End::DeadEnd: return ui_text("RunEndAngle", "ok, but the end meets rails at an angle - not joined (orange)");
-    case rail::End::Sharp: return ui_text("RunEndSharp", "ok, but trains could only turn round at the end (a V, orange)");
-    case rail::End::Loose: break;
-    }
-    return ui_text("WordOk", "ok");
-}
-
-void draw_track() {
-    uint8_t* w = world();
-    const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
-    const std::vector<RailObject> rails = map_rails();
-    char text[400];
-    if (g_line.empty()) {
-        const rail::Point p = line_start(rails);
-        int level = 0;
-        uint8_t* r = rail_ending_at(rails, p, &level);
-        int cx = (std::max)(0, (std::min)(grid_width() - 1, static_cast<int>(p.x) / 8));
-        int cy = (std::max)(0, (std::min)(grid_height() - 1, static_cast<int>(p.y) / 8));
-        const float z = (r ? level : ground_cell(cx, cy)) - 4.0f;
-        mark(static_cast<float>(p.x), static_cast<float>(p.y), z, 0xc0ffff00);
-        std::snprintf(text, sizeof text, ui_format("StatusTrackStart", "Track: click a start point (%.1f,%.1f%s)"), p.x, p.y,
-                      r ? ui_text("StatusRailEnd", ", the end of a rail") : "");
-        g_track_status = std::string(text) + ui_text("StatusTrackKeys", " - the right button cancels, a middle click deletes the rail under the cursor");
-        return;
-    }
-    // the rails the click lays, always drawn - wherever the cursor is, also over the bar - the end
-    // its dot (run_end), all red only for a rail the engine's limit of links keeps out
-    const TrackStep s = next_step(rails);
-    const int nvid = RAIL_KINDS[g_rail_kind];
-    // every rail of the run a step higher or lower than the one before (the ramp mode), as lay_step lays them
-    const float z = line_rail_z(nvid);
-    const float step = static_cast<float>(g_ramp * rail::RAMP);
-    if (uint8_t* v = vid_by_number(nvid))
-        for (size_t k = 0; k < s.segments.size() && k + 1 < s.points.size(); ++k)
-            draw_vid(v, frame_for(v, step_direction(s.segments[k], s.points[k], g_ramp)), static_cast<float>(s.segments[k].x) - cam_x,
-                     static_cast<float>(s.segments[k].y) - cam_y, z + step * k - (g_ramp < 0 ? rail::RAMP : 0));
-    // the points of the run small and light, its end the dot: green where it joins the track, orange where it
-    // stops at a rail without joining it, light where it is a new end of track; all red when refused
-    const RunEnd end = s.valid ? run_end(rails, s) : RunEnd();
-    for (size_t k = 0; k + 1 < s.points.size(); ++k)
-        mark(static_cast<float>(s.points[k].x), static_cast<float>(s.points[k].y), z + step * k, s.valid ? 0xa0f0f0f0 : 0xc0ff2020);
-    {
-        const size_t k = s.points.size() - 1;
-        const float ex = static_cast<float>(s.points[k].x) - cam_x, ey = static_cast<float>(s.points[k].y) - (z + step * k) - cam_y;
-        const uint32_t dot = !s.valid ? 0xf0ff2020 : end.state == rail::End::Linked ? 0xf020e020 : end.state == rail::End::Loose ? 0xe0f0f0f0 : 0xf0ff9010;
-        fill_diamond(ex, ey, 10, 0xd0000000);
-        fill_diamond(ex, ey, 7, dot);
-    }
-    const std::string words = !s.valid ? std::string(s.reason.get())
-                              : s.snapped ? ui_printf(ui_format("RunEndSnapped", "ok, snapped: the end meets the rail end at %.1f,%.1f and joins it (green)"),
-                                                      s.to.x, s.to.y)
-                                          : run_end_words(end);
-    std::snprintf(text, sizeof text, ui_format("StatusTrackSection", "Track: %.1f,%.1f -> %.1f,%.1f %s"),
-                  g_line.back().x, g_line.back().y, s.to.x, s.to.y, words.c_str());
-    g_track_status = std::string(text) +
-                     (s.valid && s.segments.size() > 1 ? ui_printf(ui_format("StatusTrackRun", " - a click lays %u rails"),
-                                                                   static_cast<unsigned>(s.segments.size()))
-                                                       : std::string(ui_text("StatusTrackOne", " - a click lays this rail"))) +
-                     ui_text("StatusTrackKeys", " - the right button cancels, a middle click deletes the rail under the cursor");
-}
-
 // Untextured pre-transformed vertices drawn the way Graphics_FillRect (0x412cd0) draws its rectangle:
 // the back buffer unlocked if a software picture left it locked, no texture, opaque or blended with
 // the source alpha, no z writes, x, y, z 0.99999988, rhw 1, the colour and specular white.
@@ -8165,6 +8064,142 @@ void fill_diamond(float x, float y, float r, uint32_t argb) {
     fill_triangle_batched(x - r, y, x, y - r, x + r, y, argb);
     fill_triangle_batched(x - r, y, x + r, y, x, y + r, argb);
 }
+
+// A small square at a map point at a height (the rail ends of the track preview).
+void mark(float x, float y, float z, uint32_t argb) {
+    uint8_t* w = world();
+    const float sx = x - at<float>(w, W_CAMERA_X), sy = y - z - at<float>(w, W_CAMERA_Y);
+    fill_rect(sx - 4, sy - 4, sx + 4, sy + 4, argb);
+}
+
+std::string g_track_status;   // the status line's part for the Track tool
+
+void fill_diamond(float x, float y, float r, uint32_t argb);
+
+// What the end of the rails a click lays will be (issue #7: the dot while laying): rail::end_state of
+// the run's last rail end at its far point among the rails there and the run's own rails before it -
+// Linked: green, it joins the track there; Near / Heights / DeadEnd / Sharp: orange, it ends at a rail
+// without joining it; Loose: a new end of track. `px` gets how far the nearest rail's way is (Near).
+struct RunEnd {
+    rail::End state = rail::End::Loose;
+    rail::Point at = {};
+    int z = 0;
+    double px = 0;
+};
+
+RunEnd run_end_now(const std::vector<RailObject>& rails, const TrackStep& s);
+
+// Kept while the run and the rails are the same (0.19 ms a frame on The Factory when taken afresh).
+RunEnd run_end(const std::vector<RailObject>& rails, const TrackStep& s) {
+    static struct {
+        bool valid = false;
+        uint64_t rails = 0;
+        int level = 0, ramp = 0;
+        std::vector<rail::Point> points;
+        RunEnd end;
+    } memo;
+    const uint64_t signature = track_joints().signature;
+    if (memo.valid && memo.rails == signature && memo.level == g_line_level && memo.ramp == g_ramp && memo.points.size() == s.points.size() &&
+        std::equal(s.points.begin(), s.points.end(), memo.points.begin(),
+                   [](const rail::Point& a, const rail::Point& b) { return rail::close(a.x, b.x) && rail::close(a.y, b.y); }))
+        return memo.end;
+    memo.valid = true;
+    memo.rails = signature;
+    memo.level = g_line_level;
+    memo.ramp = g_ramp;
+    memo.points = s.points;
+    memo.end = run_end_now(rails, s);
+    return memo.end;
+}
+
+RunEnd run_end_now(const std::vector<RailObject>& rails, const TrackStep& s) {
+    RunEnd out;
+    if (s.segments.empty()) return out;
+    const rail::Segment& last = s.segments.back();
+    const bool at0 = rail::close(last.end0.x, s.to.x) && rail::close(last.end0.y, s.to.y);
+    out.at = s.to;
+    out.z = at0 ? last.z0 : last.z1;
+    std::vector<rail::Rail> there;
+    for (const RailObject& r : rails)
+        if (!removed(r.object)) there.push_back(r.rail);
+    for (size_t k = 0; k + 1 < s.segments.size(); ++k)
+        there.push_back({s.segments[k].x, s.segments[k].y, s.segments[k].shape, s.segments[k].z0, s.segments[k].z1});
+    out.state = rail::end_state(there, s.to, rail::ENDS[last.shape][at0 ? 0 : 1], out.z, -1);
+    out.px = 1e9;
+    for (const rail::Rail& r : there) out.px = (std::min)(out.px, rail::way_distance(s.to, r));
+    return out;
+}
+
+// The words of the run's end for the status line (after "Track: a -> b").
+std::string run_end_words(const RunEnd& e) {
+    switch (e.state) {
+    case rail::End::Linked: return ui_text("RunEndJoins", "ok, the end joins the track there (green)");
+    case rail::End::Near:
+        return ui_printf(ui_format("RunEndNear", "ok, but the end stops %d px from a rail without joining it (orange)"),
+                         static_cast<int>(std::lround(e.px)));
+    case rail::End::Heights: return ui_text("RunEndHeights", "ok, but the end meets a rail at another height - not joined (orange)");
+    case rail::End::DeadEnd: return ui_text("RunEndAngle", "ok, but the end meets rails at an angle - not joined (orange)");
+    case rail::End::Sharp: return ui_text("RunEndSharp", "ok, but trains could only turn round at the end (a V, orange)");
+    case rail::End::Loose: break;
+    }
+    return ui_text("WordOk", "ok");
+}
+
+void draw_track() {
+    uint8_t* w = world();
+    const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
+    const std::vector<RailObject> rails = map_rails();
+    char text[400];
+    if (g_line.empty()) {
+        const rail::Point p = line_start(rails);
+        int level = 0;
+        uint8_t* r = rail_ending_at(rails, p, &level);
+        int cx = (std::max)(0, (std::min)(grid_width() - 1, static_cast<int>(p.x) / 8));
+        int cy = (std::max)(0, (std::min)(grid_height() - 1, static_cast<int>(p.y) / 8));
+        const float z = (r ? level : ground_cell(cx, cy)) - 4.0f;
+        mark(static_cast<float>(p.x), static_cast<float>(p.y), z, 0xc0ffff00);
+        std::snprintf(text, sizeof text, ui_format("StatusTrackStart", "Track: click a start point (%.1f,%.1f%s)"), p.x, p.y,
+                      r ? ui_text("StatusRailEnd", ", the end of a rail") : "");
+        g_track_status = std::string(text) + ui_text("StatusTrackKeys", " - the right button cancels, a middle click deletes the rail under the cursor");
+        return;
+    }
+    // the rails the click lays, always drawn - wherever the cursor is, also over the bar - the end
+    // its dot (run_end), all red only for a rail the engine's limit of links keeps out
+    const TrackStep s = next_step(rails);
+    const int nvid = RAIL_KINDS[g_rail_kind];
+    // every rail of the run a step higher or lower than the one before (the ramp mode), as lay_step lays them
+    const float z = line_rail_z(nvid);
+    const float step = static_cast<float>(g_ramp * rail::RAMP);
+    if (uint8_t* v = vid_by_number(nvid))
+        for (size_t k = 0; k < s.segments.size() && k + 1 < s.points.size(); ++k)
+            draw_vid(v, frame_for(v, step_direction(s.segments[k], s.points[k], g_ramp)), static_cast<float>(s.segments[k].x) - cam_x,
+                     static_cast<float>(s.segments[k].y) - cam_y, z + step * k - (g_ramp < 0 ? rail::RAMP : 0));
+    // the points of the run small and light, its end the dot: green where it joins the track, orange where it
+    // stops at a rail without joining it, light where it is a new end of track; all red when refused
+    const RunEnd end = s.valid ? run_end(rails, s) : RunEnd();
+    FillBatch batch;   // the points and the dot: one list of triangles
+    for (size_t k = 0; k + 1 < s.points.size(); ++k)
+        mark(static_cast<float>(s.points[k].x), static_cast<float>(s.points[k].y), z + step * k, s.valid ? 0xa0f0f0f0 : 0xc0ff2020);
+    {
+        const size_t k = s.points.size() - 1;
+        const float ex = static_cast<float>(s.points[k].x) - cam_x, ey = static_cast<float>(s.points[k].y) - (z + step * k) - cam_y;
+        const uint32_t dot = !s.valid ? 0xf0ff2020 : end.state == rail::End::Linked ? 0xf020e020 : end.state == rail::End::Loose ? 0xe0f0f0f0 : 0xf0ff9010;
+        fill_diamond(ex, ey, 10, 0xd0000000);
+        fill_diamond(ex, ey, 7, dot);
+    }
+    const std::string words = !s.valid ? std::string(s.reason.get())
+                              : s.snapped ? ui_printf(ui_format("RunEndSnapped", "ok, snapped: the end meets the rail end at %.1f,%.1f and joins it (green)"),
+                                                      s.to.x, s.to.y)
+                                          : run_end_words(end);
+    std::snprintf(text, sizeof text, ui_format("StatusTrackSection", "Track: %.1f,%.1f -> %.1f,%.1f %s"),
+                  g_line.back().x, g_line.back().y, s.to.x, s.to.y, words.c_str());
+    g_track_status = std::string(text) +
+                     (s.valid && s.segments.size() > 1 ? ui_printf(ui_format("StatusTrackRun", " - a click lays %u rails"),
+                                                                   static_cast<unsigned>(s.segments.size()))
+                                                       : std::string(ui_text("StatusTrackOne", " - a click lays this rail"))) +
+                     ui_text("StatusTrackKeys", " - the right button cancels, a middle click deletes the rail under the cursor");
+}
+
 
 // The marks of the track's joints (track_joints) in the Track tool: a small yellow square at an end of
 // track, a red diamond with a dark rim where it looks joined and is not or turns the trains round.
@@ -11399,6 +11434,11 @@ void draw_overlay() {
     uint8_t* w = world();
     void* g = graphics();
     if (!w || !g) return;
+    ++g_overlay_frame;
+    struct Drawing {
+        Drawing() { g_overlay_drawing = true; }
+        ~Drawing() { g_overlay_drawing = false; }
+    } drawing;
     const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
     const bool over_bar = on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)) ||
                           on_options(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y));
