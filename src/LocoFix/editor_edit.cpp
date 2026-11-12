@@ -7565,7 +7565,8 @@ int g_held_button = 0;
 // Dragging an entry's mark (the Select tool; GitHub issue #9): the button pressed on an entry's square
 // or its "ENTRY n" begins it (start_entry_drag), the mark follows the rail point under the cursor, and
 // let go there every arrival from that entry comes from it (finish_entry_drag: one step of the history,
-// as the panel's ENTRY pick); let go where it began - a click - it chooses the arrival as before.
+// as the panel's ENTRY pick); let go where it began - a click - it chooses the arrival as before. Any
+// other end of it (end_strokes' other reasons) cancels it: the mark stays, no step, no panel.
 struct EntryDrag {
     bool active = false, moved = false;
     int x = 0, y = 0;   // the entry as it was
@@ -7620,7 +7621,17 @@ void end_strokes(const char* why) {
         mouse_on_map(sx, sy);
         finish_region(sx, sy);
     }
-    finish_entry_drag();
+    // the entry's mark: only the button let go in the window puts it there; any other end (a tool, a
+    // panel, undo, a save, the menu, Alt+Tab, the capture lost) leaves it where it was - no step, no panel
+    if (g_entry_drag.active) {
+        if (why && std::strcmp(why, "the button let go") == 0) {
+            finish_entry_drag();
+        } else {
+            patch::log("edit: entry drag cancelled - %s; the entry stays at %d,%d", why ? why : "ended by the editor", g_entry_drag.x,
+                       g_entry_drag.y);
+            g_entry_drag = EntryDrag();
+        }
+    }
     if (!g_test && GetCapture()) ReleaseCapture();
     // let go outside the window: the brush's outline does not stay where the cursor left it
     if (g_view_window && !cursor_in_window(g_view_window)) g_mouse = {-1, -1};

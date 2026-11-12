@@ -492,7 +492,11 @@ Select tool (since v0.2.12, GitHub issue #9; `start_entry_drag`, `finish_entry_d
 its "ENTRY n" the mark follows the rail point under the cursor (`cursor_dot`, drawn cyan), and let go there
 every arrival of that entry gets the rail point - one step of the history, `OpArrivalEntry` as the panel's
 ENTRY pick; let go within 3 px of where it began it is the click it was (the arrival in its panel), off the
-view or on its own rail point the entry stays (`MsgEntryStays`). A deletion of rails that
+view or on its own rail point the entry stays (`MsgEntryStays`). Only the button let go ends it so: any other
+end of the strokes (`end_strokes`: a tool chosen, a panel opened, undo or redo, a save, the menu, Alt+Tab, the
+capture lost) cancels it - the mark where it was, no step, no panel. (The Select tool's object drag and the
+Region tool's rectangle do take what they have at such an end: `end_drag` and `finish_region` run for any
+reason.) A deletion of rails that
 takes an entry's or a point's rail point unsets it in the same step of the history
 (`edit_arrivals_track_gone`), so no marker stays in the grass and Ctrl+Z brings it back. Test mode: `arrival:` lines
 of the `M<file>` settings (`arrival_of_line`: `army=`, `cars=`, `at=x,y,z`, `first=`, `every=`,
