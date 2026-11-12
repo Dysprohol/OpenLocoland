@@ -37,6 +37,11 @@ scaling", an overlay injected into the process - the calls are refused and `SetP
 report success (seen with `test_game.ps1 -TestDpi unaware`, which fixes it beforehand in test mode: "unaware
 (asked: system)"), and then the screen is measured the way the process sees it, scaled, so the mode list
 still fits the screen its windows get.
+Windows 7, 8.1 and 10 before 1607 have no per-thread switch, so there the start window opens aware: its
+controls grow with the font at 125 / 150 %, and the picture - a static control of 171 x 158 dialog units
+(256 x 257 px at 100 %) with `SS_CENTERIMAGE | SS_REALSIZEIMAGE` - keeps its 256 x 256 pixels centred in a
+frame of about 342 x 316 / 385 x 395 px: a grey margin of 40 - 65 px around it, the rest of the window in
+place. Read from the template, not seen (no such system here); no guard for it.
 
 **Configuration.** The game reads `<exe name>.cfg`, i.e. `Locoland.cfg`. Graphics settings
 (ScreenX, ScreenY, BPP, Device, FullScreen, SoundHighQuality, WindowPositionX/Y) are kept in
