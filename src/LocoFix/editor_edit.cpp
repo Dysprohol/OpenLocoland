@@ -4277,6 +4277,16 @@ std::vector<rail::Vec> entry_at(const std::vector<rail::Rail>& rails, const std:
     return out;
 }
 
+// A rail of the plan that lies there already, the same shape at the same place and heights (the review of
+// 2026-11-12, finding 2): a snap that re-lays a run along an existing rail - reaching its far end through it - would
+// lay a second copy, harmless for the trains but listed by Check the track; such a way is not a snap.
+bool doubles_a_rail(const std::vector<rail::Rail>& there, const rail::Plan& plan) {
+    for (const rail::Segment& g : plan.segments)
+        for (const rail::Rail& r : there)
+            if (r.shape == g.shape && rail::close(r.x, g.x) && rail::close(r.y, g.y) && r.z0 == g.z0 && r.z1 == g.z1) return true;
+    return false;
+}
+
 TrackStep snap_run(const std::vector<rail::Rail>& there, const TrackStep& s, int z) {
     if (!s.valid || s.segments.empty()) return s;
     auto state_of = [&](const std::vector<rail::Segment>& segs, rail::Point to) {
@@ -4339,6 +4349,7 @@ TrackStep snap_run(const std::vector<rail::Rail>& there, const TrackStep& s, int
             int level = 0;
             const rail::Plan plan = plan_laid(there, points, level);
             if (plan.error != rail::Error::None || state_of(plan.segments, points.back()) != rail::End::Linked) continue;
+            if (doubles_a_rail(there, plan)) continue;   // a rail that is there already: not this way
             best = s;
             best.level = level;
             best.points = points;
@@ -4369,6 +4380,7 @@ TrackStep snap_run(const std::vector<rail::Rail>& there, const TrackStep& s, int
             int level = 0;
             const rail::Plan plan = plan_laid(there, points, level);
             if (plan.error != rail::Error::None || state_of(plan.segments, points.back()) != rail::End::Linked) continue;
+            if (doubles_a_rail(there, plan)) continue;
             TrackStep moved = s;
             moved.level = level;
             moved.points = points;
