@@ -192,6 +192,13 @@ $dir = Split-Path $Exe
 $logs = Join-Path $dir "logs"   # the game's error logs and LocoFix.log (build.py, LocoFix make it)
 # LOCOFIX_TEST=1: the game listens only to the mouse from the test (src/LocoFix/test.cpp),
 # so clicks land where they should and the user's mouse is neither moved nor taken into account.
+# The variables this script sets for the game are put back as they were when it ends (the finally at
+# the bottom), so a game started later from the same PowerShell session is not in test mode - and so not on
+# the test key, where its progress would look gone and what is played would be saved.
+$envBefore = @{}
+foreach ($n in "LOCOFIX_TEST", "LOCOFIX_QUIET", "LOCOFIX_TEST_KEY", "LOCOFIX_TEST_SCREEN", "LOCOFIX_TEST_DPI") {
+  $envBefore[$n] = [Environment]::GetEnvironmentVariable($n, "Process") }
+try {
 $env:LOCOFIX_TEST = "1"
 if ($quiet) { $env:LOCOFIX_QUIET = "1" } else { Remove-Item Env:LOCOFIX_QUIET -ErrorAction SilentlyContinue }
 # The game's settings for the run, in the test key: in test mode LocoFix opens
@@ -632,3 +639,6 @@ foreach ($h in $wins) { [void][W]::PostMessage($h, 0x0010, [IntPtr]::Zero, [IntP
 $deadline = (Get-Date).AddSeconds(10)
 do { Start-Sleep -Milliseconds 250; $p.Refresh() } while (-not $p.HasExited -and (Get-Date) -lt $deadline)
 if (-not $p.HasExited) { "Did not close by itself - killing it"; Stop-Process -Id $p.Id -Force } else { "Closed normally" }
+} finally {
+  foreach ($n in $envBefore.Keys) { [Environment]::SetEnvironmentVariable($n, $envBefore[$n], "Process") }
+}

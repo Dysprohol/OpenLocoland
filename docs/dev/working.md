@@ -85,7 +85,9 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
   for more; the rest of the test key (Players, the window's place, the editor's settings) stays from
   run to run, `-ResetTestKey` starts from an empty one (its `Players` is not filled from old data, as
   `player_registry.cpp` does for a player's first start). `LOCOFIX_TEST_KEY=1` gives the test key without
-  the rest of test mode, for a scripted check with the real mouse and focus (full screen). Checked 2026-11-12: two runs (a mission at
+  the rest of test mode, for a scripted check with the real mouse and focus (full screen). The script puts
+  the `LOCOFIX_*` variables it sets back as they were when it ends, so a game started later from the same
+  PowerShell session is not in test mode (it was, and so on the test key). Checked 2026-11-12: two runs (a mission at
   1280x720 in English, the editor at 1600x900 in German with `EditorHints` and `EditorScatter` set)
   left `reg export` of the player's key and its `Players` byte for byte the same. What still uses the
   player's key: Setup and the installed game (`tools\release.py`, `tools\installer.py`, the release
