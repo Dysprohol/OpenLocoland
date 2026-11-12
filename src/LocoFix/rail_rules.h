@@ -17,6 +17,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <set>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -383,13 +384,45 @@ inline bool engine_links(const Rail& a, int i, const Rail& b) {
     return false;
 }
 
+// The rails by their centres in square cells of BUCKET px (the review of 2026-11-12, finding 3: track_report
+// asked every rail at every joint, O(rails^2) - 1.7 s for 16660 rails). What can matter at a joint p lies within
+// 90 px of it: a rail ending there (its centre 43.4 px off at most), one the engine links within 2 px through
+// either look-out (89 px: 1.5 of the half-diagonal and the point's 21.7), one whose way passes within NEAR_MISS
+// (43.4 + 8) - so the 3 x 3 cells round p's cell hold all of them.
+constexpr double BUCKET = 96;
+
+struct RailGrid {
+    std::unordered_map<long long, std::vector<int>> cells;
+    static long long key(long long cx, long long cy) { return cx * 1000003LL + cy; }
+    static long long cell(double v) { return static_cast<long long>(std::floor(v / BUCKET)); }
+    explicit RailGrid(const std::vector<Rail>& rails) {
+        for (size_t n = 0; n < rails.size(); ++n) cells[key(cell(rails[n].x), cell(rails[n].y))].push_back(static_cast<int>(n));
+    }
+    // the indices of the rails whose centres lie in the 3 x 3 cells round p, in their order in `rails`
+    std::vector<int> around(Point p) const {
+        std::vector<int> out;
+        const long long cx = cell(p.x), cy = cell(p.y);
+        for (long long dy = -1; dy <= 1; ++dy)
+            for (long long dx = -1; dx <= 1; ++dx) {
+                const auto found = cells.find(key(cx + dx, cy + dy));
+                if (found != cells.end()) out.insert(out.end(), found->second.begin(), found->second.end());
+            }
+        std::sort(out.begin(), out.end());
+        return out;
+    }
+};
+
 // What the end `end` at height z of a rail at the joint p is (above), among `rails`; `self` is that
 // rail's index in them (-1: a rail not among them yet - the Track tool's preview). `other` gets the
-// lowest other height for Heights.
-inline End end_state(const std::vector<Rail>& rails, Point p, Vec end, int z, int self, int* other = nullptr) {
+// lowest other height for Heights. `only`: the indices of the rails to look at (RailGrid::around), or all.
+inline End end_state(const std::vector<Rail>& rails, Point p, Vec end, int z, int self, int* other = nullptr,
+                     const std::vector<int>* only = nullptr) {
     bool any = false, same = false, opposite_other = false;
     int lowest = INT_MAX;
-    for (size_t n = 0; n < rails.size(); ++n) {
+    const size_t count = only ? only->size() : rails.size();
+    auto index = [&](size_t k) { return only ? static_cast<size_t>((*only)[k]) : k; };
+    for (size_t k = 0; k < count; ++k) {
+        const size_t n = index(k);
         if (static_cast<int>(n) == self) continue;
         const Rail& r = rails[n];
         for (int i = 0; i < 2; ++i) {
@@ -417,7 +450,8 @@ inline End end_state(const std::vector<Rail>& rails, Point p, Vec end, int z, in
                 i_mine = i;
             }
     bool beside = false;
-    for (size_t n = 0; n < rails.size(); ++n) {
+    for (size_t k = 0; k < count; ++k) {
+        const size_t n = index(k);
         if (static_cast<int>(n) == self) continue;
         if (engine_links(mine, i_mine, rails[n])) return End::Linked;   // within the engine's 2 px
         if (!any && way_distance(p, rails[n]) <= NEAR_MISS) beside = true;
@@ -515,6 +549,7 @@ inline std::vector<Problem> track_report(const std::vector<Rail>& rails, bool lo
         if (a.z != b.z) return a.z < b.z;
         return a.rail < b.rail;
     });
+    const RailGrid grid(unique);
     for (size_t n = 0; n < ends.size();) {   // a joint
         size_t m = n;
         while (m < ends.size() && ends[m].x == ends[n].x && ends[m].y == ends[n].y) ++m;
@@ -522,6 +557,7 @@ inline std::vector<Problem> track_report(const std::vector<Rail>& rails, bool lo
         std::vector<Rail> there;
         for (size_t k = n; k < m; ++k) there.push_back(unique[static_cast<size_t>(ends[k].rail)]);
         const std::vector<JointPoint> links = point_links(there, p);
+        const std::vector<int> nearby = grid.around(p);
         for (size_t k = n; k < m;) {   // one point of the joint: its end vector and height
             size_t q = k;
             while (q < m && ends[q].end == ends[k].end && ends[q].z == ends[k].z) ++q;
@@ -531,7 +567,7 @@ inline std::vector<Problem> track_report(const std::vector<Rail>& rails, bool lo
                 if (j.end == a.end && j.z == a.z && j.links > MAX_LINKS)
                     out.push_back({Joint::Links, p, a.end, a.z, j.links, rail});
             int other = 0;
-            const End s = end_state(unique, p, a.end, a.z, a.rail, &other);
+            const End s = end_state(unique, p, a.end, a.z, a.rail, &other, &nearby);
             const Joint kind = s == End::Heights ? Joint::Heights : s == End::Sharp ? Joint::Sharp : s == End::DeadEnd ? Joint::DeadEnd
                                : s == End::Near ? Joint::Near : Joint::Loose;
             if (s != End::Linked && (s != End::Loose || loose)) out.push_back({kind, p, a.end, a.z, s == End::Heights ? other : 0, rail});

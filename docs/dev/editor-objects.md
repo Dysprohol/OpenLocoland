@@ -374,6 +374,16 @@ the same (`ed-tool` 2.52 again), the run's points and the dot go into one list o
 `track_joints` walks the rails once a frame while the overlay draws (a click, a key or an undo between
 frames walks them again). The snap's search runs only when the run changes (0.06-1.0 ms on `tjtest`, 0.1
 on The Factory) and is kept otherwise (0.00-0.01 ms a frame). The run-to-run noise is 2-4 fps.
+The report itself (`track_report`) asked every rail at every joint - O(rails squared), the review of 2026-11-12
+(finding 3) - and is taken again at every change of the track (a click, an undo, a deletion, Check the track). Now
+the rails are kept in square cells of 96 px by their centres (`RailGrid`) and a joint asks only the 3 x 3 cells round
+it: everything that can matter there lies within 90 px (a rail ending there, one the engine links within 2 px through
+either look-out, one whose way passes within 8 px). The test host, families of parallel lines (straight every 25 and
+35.5 px, diagonals every 71): 315 rails 3.0 -> 0.7 ms a report, 960 20.4 -> 4.4, 4080 184 -> 15.3, 16660 1729 -> 58.5;
+in the game, at the start of the Track tool and after a rail laid: a synthetic map of 5070 rails 196-204 -> 11-14 ms,
+The Factory 3.3-3.5 -> 0.6 ms, the same counts. `test_rail_rules.py` still finds the C++ and `map_tool.py` the same
+(and on the synthetic 960 and 4080 rails); `map_tool.py` keeps the plain loop (5.9 s for 4080 rails - a check of a
+saved map, not a frame).
 
 **The ground under rising rails** (the Track tool's G, the row's GROUND UNDER RISING RAILS: AS IT IS /
 SOFT / HARD; `g_raise_ground` in `lay_step`; issue #5). AS IT IS, the default, is the rule above: a rail
