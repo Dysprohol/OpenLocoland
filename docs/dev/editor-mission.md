@@ -175,7 +175,7 @@ follows l19's way. An **arrival** (`Arrival`, `editor_mission.h`) is the army, t
 rail point: screen x, y and its z), the first time, the time between waves and their number (0: no
 end), a condition (`ArrivalIf`: none, the player has no train / fewer than n / fewer units than n /
 no factory, a neutral factory stands, the enemy has fewer than n trains, fewer than n attack, the
-player pays n, the campaign's "no train and a neutral factory"; for a factory's plan also the player has more than n trains - code 11, after the others, so the codes of older maps stay, shown in the list beside fewer than n, GitHub issue #13) that either gates the time ("only
+player pays n, the campaign's "no train and a neutral factory"; for a factory's plan also the player has more than n trains - code 11, after the others, so the codes of older maps stay, shown in the list beside fewer than n, GitHub issue #13; maps using it need v0.2.12 to be edited - the editor of v0.2.11 clamps an unknown code to 10 and saves the entry as NO TRAIN, A FACTORY OF ITS OWN) that either gates the time ("only
 then", as l01-l13) or brings the wave earlier ("also earlier", as l19), the task after it (the
 enemy's: `ATA_FIGHT`, `ATA_FIGHT_FORT`, `ATA_STANDn` at a point, `ATA_PATROLn` between two points -
 the AI of `TrainsTact` runs them, only army 1 has one -; ours, the neutrals' and the pirates':
