@@ -42,6 +42,14 @@ controls grow with the font at 125 / 150 %, and the picture - a static control o
 (256 x 257 px at 100 %) with `SS_CENTERIMAGE | SS_REALSIZEIMAGE` - keeps its 256 x 256 pixels centred in a
 frame of about 342 x 316 / 385 x 395 px: a grey margin of 40 - 65 px around it, the rest of the window in
 place. Read from the template, not seen (no such system here); no guard for it.
+A window's place saved by an earlier version at 125 / 150 % (`WindowPositionX/Y`) is in Windows' scaled
+coordinates and is now read as real pixels, so the first start after the update puts the window nearer the
+screen's top left corner (at 150 % at two thirds of its old distance from it; `window.cpp` centres it again
+only when it is on no monitor); the place it is closed at is saved in real pixels, so this happens once. No
+correction: nothing tells an old value from a new one, and a guess would move correct places. On a second
+monitor of another scale the window's frame is computed with the primary's (`AdjustWindowRectEx`), so the
+game area can be a few pixels off the chosen mode there and the picture stretched by them - not seen (both
+monitors here are at 100 %).
 
 **Configuration.** The game reads `<exe name>.cfg`, i.e. `Locoland.cfg`. Graphics settings
 (ScreenX, ScreenY, BPP, Device, FullScreen, SoundHighQuality, WindowPositionX/Y) are kept in
