@@ -119,6 +119,7 @@ bool resize_map(const std::string& map, int w, int h, std::string& error);   // 
 void edit_map_size(int& w, int& h);              // editor_edit.cpp
 int edit_outside(int w, int h, bool remove);     // editor_edit.cpp
 void edit_log_rail_points(float x, float y);
+void edit_log_building_posts(const char* tag);   // editor_edit.cpp: test mode - every building's posts
 void test_cursor_to_middle(HWND window);   // test.cpp
 std::string editor_new_map_title();   // below: the new map's title until it is saved
 
@@ -174,6 +175,7 @@ constexpr int TEST_PICK = 40050;      // test mode: WM_COPYDATA "nvid army" - th
 constexpr int TEST_PANEL_ROW = 40051;   // test mode: WM_COPYDATA "n" or "=[k|]text" - the middle of the factory panel's n-th
                                         // text or choice, or of the k-th (1st) whose text begins so
 constexpr int TEST_PANEL_ROWS = 40052;  // test mode: WM_COPYDATA - the factory panel's texts and choices into the log
+constexpr int TEST_POSTS = 40053;     // test mode: WM_COPYDATA "<tag>" - the factories', repair points' posts into the log
 #if LOCOFIX_SAVE_TEST
 constexpr int TEST_VID_CHECK = 40090;   // the test build: c40090 reads and writes every ground image both ways (editor_newmap.cpp)
 #endif
@@ -1594,6 +1596,11 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
             if (data->dwData == TEST_PICK) {   // "nvid army": the palette's object to place
                 int nvid = 0, army = -1;
                 return std::sscanf(path.c_str(), "%d %d", &nvid, &army) >= 1 && edit_test_pick(nvid, army) ? TRUE : FALSE;
+            }
+            if (data->dwData == TEST_POSTS) {   // "<tag>": every factory's and repair point's posts into the log
+                if (!world()) return FALSE;
+                edit_log_building_posts(path.c_str());
+                return TRUE;
             }
             if (data->dwData == TEST_RAIL_POINTS) {   // "x y": the rail points there into the log
                 float x = 0, y = 0;

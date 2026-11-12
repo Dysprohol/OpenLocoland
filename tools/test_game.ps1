@@ -30,6 +30,7 @@
 #           middle of the game area, so the edge scrolling leaves the view there (editor test mode);
 #           P<nvid>[:<army>] picks that object of the palette to place (editor test mode);
 #           D<x>:<y> writes the rail points near that map point to LocoFix.log (editor test mode);
+#           B<tag> writes every factory's and repair point's lines and the posts near it to LocoFix.log (editor test mode);
 #           F<x>:<y> opens the panel of the factory at that map point (editor test mode);
 #           H writes the open factory panel's texts and choices with their boxes to LocoFix.log, and
 #           G<n>[:<ms>] clicks the middle of its n-th one (the numbers of H) as k does, T[<k>|]<text> the k-th
@@ -486,6 +487,9 @@ if ($Steps) {
     } elseif ($vk -cmatch '^V(-?\d+):(-?\d+)$') {
       # editor test mode: the top-left of the view on the map
       "View $($Matches[1]),$($Matches[2]): " + [W]::Command($game, 40040, "$($Matches[1]) $($Matches[2])")
+    } elseif ($vk -cmatch '^B(.*)$') {
+      # editor test mode: every factory's and repair point's lines and posts into LocoFix.log, tagged
+      "Posts $($Matches[1]): " + [W]::Command($game, 40053, $Matches[1])
     } elseif ($vk -cmatch '^F(-?\d+):(-?\d+)$') {
       # editor test mode: the panel of the factory at a map point (its plan, its build list)
       "Factory panel $($Matches[1]),$($Matches[2]): " + [W]::Command($game, 40047, "$($Matches[1]) $($Matches[2])")

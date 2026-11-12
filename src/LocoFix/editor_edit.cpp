@@ -13338,6 +13338,48 @@ void edit_pick_object(int nvid, int army) {
     else MESSAGE("MsgPlaceArmy", "place: %s (VID %d), army %d (%s)", place_label(), nvid, place_army(), army_name(place_army()));
 }
 
+// Test mode (WM_COPYDATA "<tag>", test_game.ps1 B<tag>): every factory and repair point of the map with
+// its lines (the editor's, the script's passing it), the places its lines' rule gives posts and the
+// semaphores within 160 px of it - each with its place, direction, colour, its line's place within 30 px
+// and the building it is known to belong to - and the map's count of semaphores, into LocoFix.log.
+void edit_log_building_posts(const char* tag) {
+    unsigned total = 0;
+    for_each_object([&](uint8_t* o) {
+        if (!removed(o) && nvid_of(o) == VID_SEMAPHORE) ++total;
+    });
+    patch::log("edit test posts [%s]: %u semaphores, %u lines of the editor, %u of the script", tag, total,
+               static_cast<unsigned>(mission_push_lines().size()), static_cast<unsigned>(mission_script_push_lines().size()));
+    for_each_object([&](uint8_t* b) {
+        if (removed(b) || (nvid_of(b) != VID_DEPOT && nvid_of(b) != VID_WORKSHOP)) return;
+        const float bx = at<float>(b, O_X), by = at<float>(b, O_Y);
+        std::string lines, places, posts;
+        for (int i : lines_of(b)) {
+            const PushLine& l = mission_push_lines()[i];
+            lines += ui_printf(" e%d(%d,%d->%d,%d)", i, l.bx, l.by, l.ex, l.ey);
+            for (const Post& p : line_posts(trace(l))) places += ui_printf(" (%.0f,%.0f d%d %s)", p.x, p.y, p.direction, p.red ? "red" : "green");
+        }
+        for (const PushLine& l : mission_script_push_lines())
+            for (uint8_t* d : trace(l).path)
+                if (std::hypot(dot_wx(d) - bx, dot_wy(d) - by) < 30) {
+                    lines += ui_printf(" s(%d,%d->%d,%d)", l.bx, l.by, l.ex, l.ey);
+                    break;
+                }
+        unsigned nearby = 0;
+        for_each_object([&](uint8_t* p) {
+            if (removed(p) || nvid_of(p) != VID_SEMAPHORE) return;
+            const float px = at<float>(p, O_X), py = at<float>(p, O_Y);
+            if (std::hypot(px - bx, py - by) > 160) return;
+            ++nearby;
+            uint8_t* owner = post_owner(p);
+            posts += ui_printf(" (%.0f,%.0f d%d %s%s)", px, py, at<int>(p, O_DIRECTION), red(p) ? "red" : "green",
+                               owner == b ? " own" : owner ? " other's" : "");
+        });
+        patch::log("edit test posts [%s]: VID %d at %.0f,%.0f d%d - lines:%s; places:%s; %u semaphores within 160:%s", tag, nvid_of(b), bx, by,
+                   at<int>(b, O_DIRECTION), lines.empty() ? " none" : lines.c_str(), places.empty() ? " none" : places.c_str(), nearby,
+                   posts.c_str());
+    });
+}
+
 // Test mode (WM_COPYDATA "nvid army", test_game.ps1 P<nvid>:<army>): the palette's object to place,
 // in that army (-1: the missions', the army row's first choice).
 bool edit_test_pick(int nvid, int army) {
