@@ -40,7 +40,8 @@ jego folder o nazwie `Steamland` obok folderu gry ze Steama - albo wskaż go jak
 nie masz kopii ze Steama: instalator użyje wtedy jego własnych tekstów i czcionek dla czeskiego. Pozostałe są wyszarzone, a obok jest wiersz, który pobiera
 je ze Steama (np. `download_depot 352130 352132` dla niemieckiego): wpisz go w konsoli Steama
 (`steam://open/console` w pasku adresu przeglądarki albo w Win+R), poczekaj, aż Steam go pobierze,
-i uruchom instalator ponownie - zostawi wybrany język i doda nowy.
+i uruchom instalator ponownie - zostawi wybrany język i doda nowy. Instalator wybiera język
+Windowsa, gdy się da, inaczej angielski, a inaczej język twojej kopii ze Steama; zmienisz go na liście.
 
 ![Lista języków w instalatorze](img/setup-languages-pl.jpg)
 

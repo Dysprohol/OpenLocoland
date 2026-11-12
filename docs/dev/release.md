@@ -121,8 +121,12 @@ run stopped half way"), the clean-up of what earlier versions left (`build.clean
 install folder, as before), the two options into the registry
 (`Cheats`, `UnlockMissions` next to LocoFix's settings - Setup shows their current values, so
 running it again keeps them), the game's language (`Language`: a new install sets the one chosen -
-the system's display language when there is a pack for it, else English; an update writes it only
-when it was changed in the window, so the language chosen in the game's launcher stays), the
+the system's display language when it can be built, else English, else the Steam copy's own
+language (`installer.first_game_language`; the window and `--silent` choose alike; up to v0.2.11 the
+last step was the first pack in the sorted list, which gave a non-English copy on a system of
+another language the unofficial Czech pack); none when nothing can be built - the box then says the
+game stays as in its files; an update writes it only when it was changed in the window, so the
+language chosen in the game's launcher stays), the
 shortcuts (in Setup's own process through the shell's ShellLink object - IShellLinkW and
 IPersistFile through `ctypes`, `installer.make_shortcut`: the same calls WScript.Shell makes, and the
 `.lnk` files are byte for byte the ones PowerShell's `WScript.Shell` made up to v0.2.10; the editor's
@@ -156,7 +160,10 @@ which says "Steamland" - and before a game is found it is the project's name in 
 the window, with its log in `logs\install.log` of the install folder and exit code 0 when it worked;
 `Setup.exe --auto [--target <folder>] [--no-shortcuts]` opens the window, which installs at once with what it
 shows and closes at the end (the same log and exit code - a test of the window
-itself, since Tk's buttons take no posted clicks). The Install / Update button has the focus,
+itself, since Tk's buttons take no posted clicks); `--test-system-language <code>` (tests only) sets the
+display language Setup sees - its window's language and the game language's first choice
+(`tools\test_setup_language.py` checks that choice for every edition without running Setup;
+`tools\rig\guest\setup_language_job.ps1` runs Setups in the test rig and starts each install). The Install / Update button has the focus,
 so Enter or Space installs. The window started without `--target` (by the launcher of v0.2.10 and
 before, by a double-click) opens on the existing install (`installer.find_install`): the folder of a
 running Locoland.exe (a player with two installs who updates one from its own launcher), else the

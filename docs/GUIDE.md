@@ -40,7 +40,8 @@ folder, named `Steamland`, next to the Steam game's folder - or choose it as the
 you have no Steam copy: Setup then uses its own texts and fonts for Czech. The others are greyed, with the line that gets them from Steam
 (e.g. `download_depot 352130 352132` for German): type it into the Steam console
 (`steam://open/console` in the browser's address bar or Win+R), wait until Steam has downloaded it
-and run Setup again - it keeps your chosen language and adds the new one.
+and run Setup again - it keeps your chosen language and adds the new one. Setup picks your
+Windows language when it can, otherwise English, otherwise your Steam copy's own; change it in the list.
 
 ![Setup's list of languages](img/setup-languages-en.jpg)
 

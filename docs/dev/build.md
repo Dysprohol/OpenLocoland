@@ -137,7 +137,8 @@ in LocoFix, and the keys our scripts add (the custom maps page's `MenuCustomEdit
 `MenuBackToEditor` ...) to the English in the script (`if(s=="") s="MAP EDITOR";`). And LocoFix
 takes the English pack for a saved language without a pack, or without an English pack the pack
 of the root's language - the one `build.py` writes into `lang\root.txt`: `en`, or with no English
-capture the language Steam installed.
+capture the Steam copy's own language (told from its `strings.ini`, else Steam's appmanifest - see
+"Languages" in setup.md).
 With no saved choice it follows the system language when there is a pack for it (Polish,
 German, Hungarian, Russian, Czech), otherwise English; a saved choice is kept, and the launcher's
 list switches it. Portuguese has no pack: its Steam depot is byte for byte the English one, so a

@@ -12,9 +12,10 @@ editor" in English) on the desktop and in the Start menu. In its window, under t
 (read from the Steam copy): the window's language (the system's when the window has it -
 English, Czech, German, Hungarian, Polish, Portuguese, Russian - otherwise English), the Steam
 folder and the install folder (both can be chosen by hand), the game's language (for a new
-install the system's when there is a pack for it, otherwise English; an update keeps the one
-chosen; only the languages that can be built are listed, with the Steam console commands for
-the others) and the two options below. Running Setup again over the install updates it; Uninstall
+install the system's when it can be built, otherwise English, otherwise the Steam copy's own; an
+update keeps the one chosen; only the languages that can be built can be chosen, the others are
+greyed with the Steam console commands for them; when none can be built - a copy whose language
+Setup cannot tell - the box says the game stays as in its files) and the two options below. Running Setup again over the install updates it; Uninstall
 in the same window removes it. The player's guide is `docs/PRZEWODNIK.md` / `docs/GUIDE.md`.
 
 **Options** (off by default; chosen in Setup and as two boxes in the game's launcher window,
@@ -130,7 +131,10 @@ download_depot 352130 352136    Russian
 (The Steam name of each depot is `Locoland ENG/GER/HUN/POL/POR/RUS`. 352135 Portuguese -
 Portugal is a copy of 352131 English, every file byte for byte (`tools\editions.py diff en-steam
 pt-steam`, 2026-11-06); so there is no `lang/pt`.) Steam
-puts them in `steamapps\content\app_352130\depot_<id>\`. `build.py` captures the language
+puts them in `steamapps\content\app_352130\depot_<id>\`. The installed game's language is told
+from its own `strings.ini` (the SHA-256 of each depot's, `languages.STEAM_STRINGS`; the Polish CD
+1.02 has the Polish depot's files), else from Steam's `appmanifest_352130.acf` of its library
+(`languages.steam_language`) - so a copy outside a Steam library is known too. `build.py` captures the language
 files of the installed game and of every downloaded depot into `captured/<code>/` (outside
 git) and assembles the packs that have a capture (a fan translation such as Czech: its base's,
 else any captured language - "Czech" below); the others are skipped with the command to
