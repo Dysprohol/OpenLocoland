@@ -314,7 +314,8 @@ Harmless log errors:
   Windows cuts at the scaled screen's edge: the lower part (and a strip at the right) of the game
   could not be reached. LocoFix makes the game per-monitor DPI-aware (`dpi_aware.cpp`; the start
   window stays scaled by Windows as before) and offers only modes that fit the screen, a saved mode
-  that no longer fits becoming the screen's own size (`resolutions.cpp`). The mechanism is the
+  that no longer fits replaced for that run by the largest listed mode that fits, the saved one
+  staying in the registry (`resolutions.cpp`). The mechanism is the
   code's and the confinement was seen at 100 %: with the real cursor (2026-11-12, mission 2) dgVoodoo
   held it to (0,0)-(1600,1200) in full screen 1600x1200 and the engine read those screen pixels as
   game pixels one to one; after the fix the cursor reached every edge and the bar (and a click on it

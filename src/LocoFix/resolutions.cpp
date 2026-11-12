@@ -18,12 +18,16 @@
 //
 // The mode saved in the registry (ScreenX, ScreenY; World_Construct reads them into the
 // settings at +0x228/+0x22c and Graphics_Construct into the graphics at +0x20c/+0x210) may no
-// longer fit - another monitor, another display scale, an older version's list. The start
-// window would select it if dgVoodoo lists it, or Graphics_Init would take it as it is when the
-// start window is turned off (Locoland.cfg StartDialog=0), and in full screen nothing else
-// limits it. So right after Graphics_Construct (its call in World_Construct at 0x41a518) a saved
-// mode that does not fit becomes the screen's own size; a window of it is limited further by the
-// engine as before (Graphics_Init clamps a window to the screen).
+// longer fit - another monitor, another display scale, an older version's list, a remote desktop
+// session. The start window would select it if dgVoodoo lists it, or Graphics_Init would take it as
+// it is when the start window is skipped (Locoland.cfg StartDialog=0, a restart by restart.cpp), and
+// in full screen nothing else limits it. So right after Graphics_Construct (its call in
+// World_Construct at 0x41a518) a saved mode that does not fit is replaced, for this run, by the
+// largest mode of the device's list that fits - one dgVoodoo can set (the screen's raw size may not
+// be one of its modes, e.g. a remote desktop's 1916x1036). Graphics_Init writes the mode it starts
+// with to the registry (ScreenX, ScreenY); when that is still the replacement - the player did not
+// choose another in the start window - the saved one is written back right after it (the call at
+// 0x41a887), so one start on a smaller screen does not lower the player's choice for good.
 #include "patch.h"
 
 int screen_pixels(int index);   // dpi_aware.cpp
@@ -34,6 +38,11 @@ constexpr uintptr_t SETTINGS = 0x47b1f0;
 constexpr int CAPACITY = 32;   // entries in the list (the last one must stay zero)
 constexpr uintptr_t CONSTRUCT_CALL = 0x41a518;   // World_Construct: call Graphics_Construct (ecx = graphics)
 constexpr uintptr_t GRAPHICS_CONSTRUCT = 0x4140b0;
+constexpr uintptr_t INIT_CALL = 0x41a887;   // World_Construct: call Graphics_Init (ecx = graphics, push hwnd)
+constexpr uintptr_t GRAPHICS_INIT = 0x40dc10;
+constexpr char REG_KEY[] = "SOFTWARE\\Gromada\\Locoland";   // RegPath in Locoland.cfg
+constexpr int DEVICES = 0x234, DEVICE_SIZE = 0x10c, DEVICE = 0xa94;   // Graphics.devices[8], Graphics.device
+constexpr int MODE_COUNT = 0x40, MODE_WIDTH = 0x44, MODE_HEIGHT = 0x84;   // DisplayDevice
 
 struct Mode { int width, height; };
 
@@ -58,21 +67,75 @@ void add(Mode* list, int& n, Mode m) {
 }
 
 using Construct_t = void*(__fastcall*)(void* graphics, void* edx, void* settings);
+using Init_t = int(__fastcall*)(void* graphics, void* edx, HWND window);
+
+struct Replaced { bool on; Mode saved, used; } g_replaced = {};
+
+// The largest mode of the graphics' current device that fits `s`; {0, 0} when none does.
+Mode largest_listed(const uint8_t* graphics, Mode s) {
+    int device = *reinterpret_cast<const int*>(graphics + DEVICE);
+    if (device < 0 || device > 7) device = 0;
+    const uint8_t* d = graphics + DEVICES + device * DEVICE_SIZE;
+    const int count = *reinterpret_cast<const int*>(d + MODE_COUNT);
+    Mode best = {0, 0};
+    for (int i = 0; i < count && i < MODES_MAX; ++i) {
+        const Mode m = {reinterpret_cast<const int*>(d + MODE_WIDTH)[i], reinterpret_cast<const int*>(d + MODE_HEIGHT)[i]};
+        if (fits(m, s) && m.width * m.height > best.width * best.height) best = m;
+    }
+    return best;
+}
 
 void* __fastcall construct_graphics(void* graphics, void* edx, void* settings) {
     void* result = reinterpret_cast<Construct_t>(GRAPHICS_CONSTRUCT)(graphics, edx, settings);
-    auto* size = reinterpret_cast<float*>(static_cast<uint8_t*>(graphics) + 0x20c);   // width, height
+    auto* g = static_cast<uint8_t*>(graphics);
+    auto* size = reinterpret_cast<float*>(g + 0x20c);   // width, height
     const Mode s = screen();
     const Mode saved = {static_cast<int>(size[0]), static_cast<int>(size[1])};
     patch::log("saved mode %dx%d, %s", saved.width, saved.height,
                *static_cast<uint32_t*>(graphics) & 0x80 ? "full screen" : "window");
     if (s.width > 0 && s.height > 0 && !fits(saved, s)) {
-        patch::log("saved mode %dx%d is bigger than the screen (%dx%d) - the screen's size instead",
-                   saved.width, saved.height, s.width, s.height);
-        size[0] = static_cast<float>(s.width);
-        size[1] = static_cast<float>(s.height);
+        Mode used = largest_listed(g, s);
+        if (used.width == 0) used = s;
+        patch::log("saved mode %dx%d is bigger than the screen (%dx%d) - %dx%d for this run, the saved one stays",
+                   saved.width, saved.height, s.width, s.height, used.width, used.height);
+        size[0] = static_cast<float>(used.width);
+        size[1] = static_cast<float>(used.height);
+        g_replaced = {true, saved, used};
     }
     return result;
+}
+
+// After Graphics_Init has saved the mode it starts with: the player's own choice back, unless the
+// start window chose another one.
+int __fastcall init_graphics(void* graphics, void* edx, HWND window) {
+    const int result = reinterpret_cast<Init_t>(GRAPHICS_INIT)(graphics, edx, window);
+    const auto* size = reinterpret_cast<const float*>(static_cast<uint8_t*>(graphics) + 0x20c);
+    if (g_replaced.on && static_cast<int>(size[0]) == g_replaced.used.width &&
+        static_cast<int>(size[1]) == g_replaced.used.height) {
+        HKEY key;
+        if (RegCreateKeyExA(HKEY_CURRENT_USER, REG_KEY, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &key, nullptr) == ERROR_SUCCESS) {
+            const DWORD w = g_replaced.saved.width, h = g_replaced.saved.height;
+            RegSetValueExA(key, "ScreenX", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&w), sizeof w);
+            RegSetValueExA(key, "ScreenY", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&h), sizeof h);
+            RegCloseKey(key);
+            patch::log("saved mode %dx%d kept in the registry", g_replaced.saved.width, g_replaced.saved.height);
+        }
+    } else if (g_replaced.on) {
+        patch::log("the start window chose %dx%d - saved", static_cast<int>(size[0]), static_cast<int>(size[1]));
+    }
+    return result;
+}
+
+bool redirect_call(uintptr_t at, uintptr_t to, void* hook, const char* name) {
+    uint8_t call[5] = {0xE8};
+    const int32_t rel = static_cast<int32_t>(to - (at + 5));
+    std::memcpy(call + 1, &rel, 4);
+    if (!patch::check(at, call, sizeof call)) {
+        patch::log("skipped %s @ %08X: unexpected bytes", name, static_cast<unsigned>(at));
+        return false;
+    }
+    patch::write_call(at, nullptr, 0, hook, sizeof call);
+    return true;
 }
 
 }  // namespace
@@ -102,12 +165,6 @@ void install_resolutions() {
     }
     patch::log("resolutions: %d modes up to the screen's %dx%d", n, s.width, s.height);
 
-    // e8 <rel32 to Graphics_Construct>
-    uint8_t call[5] = {0xE8};
-    const int32_t rel = static_cast<int32_t>(GRAPHICS_CONSTRUCT - (CONSTRUCT_CALL + 5));
-    std::memcpy(call + 1, &rel, 4);
-    if (patch::check(CONSTRUCT_CALL, call, sizeof call))
-        patch::write_call(CONSTRUCT_CALL, nullptr, 0, reinterpret_cast<void*>(&construct_graphics), sizeof call);
-    else
-        patch::log("skipped saved mode check @ %08X: unexpected bytes", static_cast<unsigned>(CONSTRUCT_CALL));
+    if (redirect_call(CONSTRUCT_CALL, GRAPHICS_CONSTRUCT, reinterpret_cast<void*>(&construct_graphics), "saved mode check"))
+        redirect_call(INIT_CALL, GRAPHICS_INIT, reinterpret_cast<void*>(&init_graphics), "saved mode kept");
 }

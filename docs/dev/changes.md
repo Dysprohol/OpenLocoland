@@ -132,9 +132,11 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
      the settings struct `0x47b1f0`) gets 1280x720 ... 3840x2160 and the desktop
      resolution - only the modes no wider and no taller than the screen in real pixels (fix 46),
      16 at most (fix 45); the game shows those the card supports. A saved mode bigger than the
-     screen (another monitor, another display scale) becomes the screen's own size (after
-     `Graphics_Construct`, before the start window), so full screen is never bigger than the
-     screen,
+     screen (another monitor, another display scale, a remote desktop) is replaced for that run
+     by the largest mode of the list that fits (after `Graphics_Construct`, before the start
+     window), so full screen is never bigger than the screen; the saved one stays in the
+     registry unless the player chooses another in the start window (written back after
+     `Graphics_Init`, which saves the mode it starts with),
   5. a map smaller than the screen sits in the middle instead of at the right and bottom
      edge (`SetPosition` hooked - while the camera is clamped, the map bounds are widened
      to the view size; for a level held in editor mode by 300 px more on every side),

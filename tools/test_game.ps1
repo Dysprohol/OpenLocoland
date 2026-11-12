@@ -55,6 +55,11 @@
 # -Cheats, -UnlockMissions (0/1, default 0), -FrameLimit (default 60), -FpsCounter (0/1, default 0)
 # -Reg      more settings, "Name=1,Other=s:text" (a number is a DWORD, s: a text), e.g. "EditorHints=0"
 # -ResetTestKey  start from an empty test key (no Players, no window place, no editor settings)
+# -TestScreen <w>x<h>  the game takes the screen as that size (LOCOFIX_TEST_SCREEN, test mode only:
+#           LocoFix's mode list, the start window's test and the saved mode's check - not the engine's
+#           window limit or dgVoodoo), e.g. a smaller screen than this one
+# -PickMode <text>  with -ClickOk, chooses that line of the start window's resolution list before OK
+#           ("1280 x 720"), as a player would
 #           All of these go to the test key HKCU\SOFTWARE\Gromada\Locoland-test, which LocoFix's test mode
 #           uses instead of the player's HKCU\SOFTWARE\Gromada\Locoland (src/LocoFix/test_registry.cpp):
 #           a test never reads or writes the player's own settings and puts nothing back.
@@ -76,7 +81,7 @@
 # If the full screen box is disabled and the test should run in a window, the game is
 # closed without clicking OK - so the display mode is not switched.
 param([string]$Exe = (Join-Path (Split-Path (Split-Path $PSScriptRoot)) "Locoland\Locoland.exe"), [int]$Wait = 10, [string]$Shot = "", [int]$ClickOk = 0, [switch]$Screen, [int]$SetFull = -1, [string]$Steps = "", [string]$WaitFor = "", [int]$LogWait = 60, [string]$Language = "", [string]$Map = "", [switch]$LastShotOnly, [switch]$Menu, [switch]$Editor, [switch]$Visible,
-      [string]$Resolution = "1024x768", [int]$Cheats = 0, [int]$UnlockMissions = 0, [int]$FrameLimit = 60, [int]$FpsCounter = 0, [string]$Reg = "", [switch]$ResetTestKey)
+      [string]$Resolution = "1024x768", [int]$Cheats = 0, [int]$UnlockMissions = 0, [int]$FrameLimit = 60, [int]$FpsCounter = 0, [string]$Reg = "", [switch]$ResetTestKey, [string]$TestScreen = "", [string]$PickMode = "")
 Add-Type @"
 using System; using System.Runtime.InteropServices; using System.Text;
 public class W {
@@ -207,7 +212,9 @@ $arguments = @()
 if ($Editor) { $arguments += "--editor" }
 if ($Map) { $arguments += @("--test-map", "`"$Map`"") }
 if ($arguments) { $start.ArgumentList = $arguments }
+if ($TestScreen) { $env:LOCOFIX_TEST_SCREEN = $TestScreen }
 $p = Start-Process @start
+Remove-Item Env:LOCOFIX_TEST_SCREEN -ErrorAction SilentlyContinue   # the game has its copy
 function Get-Wins { $script:wins = New-Object System.Collections.ArrayList
   $cb = [W+EnumProc]{ param($h, $x) $id = 0; [void][W]::GetWindowThreadProcessId($h, [ref]$id); if ($id -eq $p.Id -and [W]::IsWindowVisible($h)) { [void]$script:wins.Add($h) }; $true }
   [void][W]::EnumWindows($cb, [IntPtr]::Zero) }
@@ -269,6 +276,9 @@ if ($ClickOk -gt 0) {
   Get-Wins
   $gp = [W]::Rd($p.Id, 0x4a9a14); "at the dialog: P=0x{0:X8} flags=0x{1:X8}" -f $gp, [W]::Rd($p.Id, $gp)
   foreach ($h in $wins) { $fs = [W]::GetDlgItem($h, 1005); if ($fs -ne [IntPtr]::Zero) { "Box enabled: " + [W]::IsWindowEnabled($fs); if ($SetFull -eq 0 -and -not [W]::IsWindowEnabled($fs)) { "STOP: box disabled - not clicking OK"; Stop-Process -Id $p.Id -Force; return }; "Full screen ticked: " + [W]::SendMessage($fs, 0xF0, [IntPtr]::Zero, [IntPtr]::Zero); $cur = [int][W]::SendMessage($fs, 0xF0, [IntPtr]::Zero, [IntPtr]::Zero); if ($SetFull -ge 0 -and $cur -ne $SetFull) { [void][W]::SendMessage($fs, 0xF1, [IntPtr]$SetFull, [IntPtr]::Zero); "Setting the box -> " + [W]::SendMessage($fs, 0xF0, [IntPtr]::Zero, [IntPtr]::Zero) } }
+    $list = [W]::GetDlgItem($h, 1001)
+    if ($list -ne [IntPtr]::Zero) { $sel = [int][W]::SendMessage($list, 0x147, [IntPtr]::Zero, [IntPtr]::Zero); "Resolution selected: line $sel" }
+    if ($PickMode -and $list -ne [IntPtr]::Zero) { $i = [int][W]::SendText($list, 0x14D, [IntPtr](-1), $PickMode); "Picking '$PickMode' -> line $i"; [void][W]::SendMessage($h, 0x0111, [IntPtr]((1 -shl 16) -bor 1001), $list) }
     $ok = [W]::GetDlgItem($h, 1); if ($ok -ne [IntPtr]::Zero) { "Clicking OK"; [void][W]::PostMessage($h, 0x0111, [IntPtr]1, $ok) } }
   Start-Sleep -Seconds $ClickOk
   $p.Refresh(); "Process alive after OK: $(-not $p.HasExited)"

@@ -341,9 +341,16 @@ the primary monitor in real pixels (the game is DPI-aware, `dpi_aware.cpp`), wit
 size, 16 at most (a device's list has room for 16, `BUGS.md` F29). dgVoodoo lists only modes up to
 the desktop's size and refuses a bigger one in full screen ("Couldn't set the display mode", seen
 with 2560x1600 on a 2560x1440 screen), so a mode the list offers is one dgVoodoo can set. A saved
-mode bigger than the screen becomes the screen's own size right after `Graphics_Construct` (the
-call at 0x41a518), before the start window selects it and also when the start window is turned
-off. Before, the start window measured the mode against the screen as Windows reported it to an
+mode bigger than the screen is replaced, for that run, by the largest mode of the device's list
+that fits, right after `Graphics_Construct` (the call at 0x41a518), before the start window selects
+it and also when the start window is skipped (StartDialog=0, a restart) - a listed mode, since the
+screen's raw size may not be one dgVoodoo can set (a remote desktop's 1916x1036). `Graphics_Init`
+saves the mode it starts with (ScreenX, ScreenY); when that is still the replacement, LocoFix writes
+the player's saved mode back right after it (the call at 0x41a887), so one start on a smaller
+screen does not lower it for good; a mode chosen in the start window is saved as usual. Checked
+2026-11-12 with a test screen of 1916x1036 (`test_game.ps1 -TestScreen`, test mode only) and a
+saved 2560x1440: 1600x900 for the run and 2560x1440 still saved, with the start window and without
+it; with 1280 x 720 picked in the start window (`-PickMode`) 1280x720 was saved. Before, the start window measured the mode against the screen as Windows reported it to an
 unaware process - at 125 % or 150 % smaller than the real one - and ticked and greyed the full
 screen box for every mode bigger than that; the full screen then was dgVoodoo's window of the
 scaled screen while the game's picture had the real mode's size, and the cursor could not reach

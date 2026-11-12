@@ -24,6 +24,7 @@
 // own test of the screen size gets the real pixels from screen_pixels() (its two GetSystemMetrics
 // calls at 0x40d985 and 0x40d9a2).
 #include "patch.h"
+#include <cstdio>
 
 namespace {
 
@@ -61,6 +62,18 @@ INT_PTR WINAPI DialogBoxParamA_unaware(HINSTANCE instance, LPCSTR name, HWND par
 // The screen's size in real pixels whatever the calling thread's DPI awareness (the start
 // window's thread is unaware while it is open); SM_CXSCREEN / SM_CYSCREEN, the primary monitor.
 int screen_pixels(int index) {
+    // test mode only: LOCOFIX_TEST_SCREEN=<w>x<h> stands for a smaller screen (test_game.ps1 -TestScreen)
+    static int fake[2] = {-1, -1};
+    if (fake[0] < 0) {
+        fake[0] = fake[1] = 0;
+        char test[8] = {}, size[32] = {};
+        if (GetEnvironmentVariableA("LOCOFIX_TEST", test, sizeof test) && test[0] == '1' &&
+            GetEnvironmentVariableA("LOCOFIX_TEST_SCREEN", size, sizeof size) &&
+            std::sscanf(size, "%dx%d", &fake[0], &fake[1]) != 2)
+            fake[0] = fake[1] = 0;
+        if (fake[0] > 0) patch::log("test mode: the screen taken as %dx%d (LOCOFIX_TEST_SCREEN)", fake[0], fake[1]);
+    }
+    if (fake[0] > 0 && (index == SM_CXSCREEN || index == SM_CYSCREEN)) return index == SM_CXSCREEN ? fake[0] : fake[1];
     if (!g_aware || !g_set_thread_context) return GetSystemMetrics(index);
     HANDLE old = g_set_thread_context(CONTEXT_PER_MONITOR_V2);
     const int size = GetSystemMetrics(index);
