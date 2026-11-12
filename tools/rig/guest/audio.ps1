@@ -44,6 +44,12 @@ public static class GuestAudio {
     foreach (var d in Render()) { var v = Vol(d); v.SetMute(mute, ref ctx); bool m; float s; v.GetMute(out m); v.GetMasterVolumeLevelScalar(out s); string id; d.GetId(out id);
       parts.Add(string.Format("{0}: mute {1}, volume {2:0} %", id.Length > 20 ? id.Substring(id.Length - 12) : id, m, s * 100)); }
     return parts.Count == 0 ? "no playback endpoint" : parts.Count + " playback endpoint(s): " + string.Join("; ", parts.ToArray()); }
+  // the same line as Mute() without changing anything (the host's own check: tools\rig\hostcheck.ps1)
+  public static string State() {
+    var parts = new List<string>();
+    foreach (var d in Render()) { var v = Vol(d); bool m; float s; v.GetMute(out m); v.GetMasterVolumeLevelScalar(out s); string id; d.GetId(out id);
+      parts.Add(string.Format("{0}: mute {1}, volume {2:0} %", id.Length > 20 ? id.Substring(id.Length - 12) : id, m, s * 100)); }
+    return parts.Count == 0 ? "no playback endpoint" : parts.Count + " playback endpoint(s): " + string.Join("; ", parts.ToArray()); }
   public static string Sessions() {
     var pids = new List<string>();
     foreach (var d in Render()) {

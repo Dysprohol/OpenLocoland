@@ -1,10 +1,14 @@
 # One job of the rig, INSIDE the sandbox (started by agent.ps1 in a process of its own, so a hung
 # job can be killed). Reads <Dir>\job.json, writes results into <Dir>; exit code = the job's.
+# -Slot n (n > 0): the job shares the box with others and runs as the guest user rigslot<n> (agent.ps1
+#   starts it so): its HKCU - the game's test registry key among it - is its own, its game copy is
+#   C:\work\games\<build>-s<n>, and it touches no other process. -Slot 0: the job runs alone (as the
+#   box's own user, as before).
 #
 # job.json: Job      probe | game | missions | setup | script
 #           Game     the built game folder as the guest sees it (C:\host\... - read-only), copied to
-#                    C:\work\games\<n> before the run (robocopy /MIR: a later job with the same game
-#                    copies only what changed and starts from the built state again)
+#                    C:\work\games\<n>[-s<slot>] before the run (robocopy /MIR: a later job with the same
+#                    game in the same slot copies only what changed and starts from the built state again)
 #           Tools    the tools folder whose test_game.ps1 / test_missions.ps1 run (C:\host\...)
 #           Args     parameters of test_game.ps1 / test_missions.ps1 (an object: name -> value)
 #           Scale    guest display scale in %, Resolution "WxH": made by rig.ps1, checked here
@@ -15,7 +19,7 @@
 #           KeepRegistry  leave HKCU\SOFTWARE\Gromada as an earlier job left it (default: removed)
 #           Registry values set before the run under HKCU\SOFTWARE\Gromada\<RegistryKey> (default
 #                    Locoland; a number is a DWORD, the rest strings), e.g. FrameLimit 0, ScreenX 1920
-param([string]$Dir, [string]$Fresh = "0")
+param([string]$Dir, [string]$Fresh = "0", [int]$Slot = 0)
 $ErrorActionPreference = "Continue"
 $job = Get-Content (Join-Path $Dir "job.json") -Raw | ConvertFrom-Json
 $log = Join-Path $Dir "job.log"
@@ -24,9 +28,16 @@ function ArgsOf($o) { $h = @{}; if ($o) { foreach ($k in $o.PSObject.Properties)
 $code = 0
 try {
   Log "job $($job.Job) in $Dir (fresh box: $Fresh)"
-  # a game or Setup an earlier job left behind (killed on its timeout, or a script that did not close it)
-  $left = @(Get-Process Locoland, Setup -ErrorAction SilentlyContinue)
-  if ($left.Count) { Log "ending $($left.Count) process(es) left by an earlier job: $(($left | ForEach-Object { "$($_.ProcessName) $($_.Id)" }) -join ', ')"; $left | Stop-Process -Force; Start-Sleep 1 }
+  $runInfo = $null; try { $runInfo = Get-Content (Join-Path $Dir "run.json") -Raw -ErrorAction Stop | ConvertFrom-Json } catch { }
+  if ($Slot) { Log "shares the box: slot $Slot, guest user $env:USERNAME (registry and game copy of its own)$(if ($runInfo) { "; alongside $(@($runInfo.alongside).Count) running job(s), $($runInfo.gamesRunning) game(s) already running, limits $($runInfo.limits)" })" }
+  else {
+    Log "runs alone in the box$(if ($runInfo -and $runInfo.exclusive) { ": $($runInfo.exclusive)" })"
+    # a game or Setup an earlier job left behind (killed on its timeout, or a script that did not close
+    # it) - only a job that runs alone may end them: in a shared box they are other jobs' games
+    $left = @(Get-Process Locoland, Setup -ErrorAction SilentlyContinue)
+    if ($left.Count) { Log "ending $($left.Count) process(es) left by an earlier job: $(($left | ForEach-Object { "$($_.ProcessName) $($_.Id)" }) -join ', ')"; $left | Stop-Process -Force; Start-Sleep 1 }
+  }
+  if ($runInfo -and $runInfo.note) { Log "note: $($runInfo.note)" }
   . (Join-Path $PSScriptRoot "display.ps1")
   if ($job.Sound) { . (Join-Path $PSScriptRoot "audio.ps1"); Log "sound ON for this job (rig.ps1 -Sound): $(Set-GuestMute $false)" }
   # rig.ps1 makes the display from the host (window size, monitor) before it queues the job; here
@@ -48,7 +59,7 @@ try {
   $game = $null
   if ($job.Game) {
     $n = [BitConverter]::ToString((New-Object Security.Cryptography.SHA1Managed).ComputeHash([Text.Encoding]::UTF8.GetBytes($job.Game.ToLower()))).Replace("-", "").Substring(0, 10)
-    $game = "C:\work\games\$n"
+    $game = "C:\work\games\$n" + $(if ($Slot) { "-s$Slot" } else { "" })
     $t = Get-Date
     robocopy $job.Game $game /MIR /NFL /NDL /NJH /NJS /NP /MT:16 | Out-Null
     Log "game $($job.Game) -> $game in $([int]((Get-Date) - $t).TotalSeconds) s (robocopy $LASTEXITCODE)"

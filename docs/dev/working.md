@@ -204,8 +204,8 @@ registry key, and so the guest - a throw-away Windows of its own - can be set up
     .\tools\rig\rig.ps1 -Job setup -Setup build\setup\<Setup>.exe [-SetupArgs --auto]   # a clean install
     .\tools\rig\rig.ps1 -Status | -Monitors | -Look | -Show | -Hide | -Stop | -Kill
 
-- *How it runs.* One sandbox (the box) serves every session's jobs from one queue, one at a time:
-  the first job starts it (about 12 s), it stays up until `-Stop` or 10 minutes without a job
+- *How it runs.* One sandbox (the box) serves every session's jobs from one queue, several at once
+  (see *Side by side* below): the first job starts it (about 12 s), it stays up until `-Stop` or 10 minutes without a job
   (`-IdleMinutes`; it shuts itself down), and only one Windows Sandbox can run on the machine at a
   time (a second start is refused, `CO_E_APPSINGLEUSE`). The box is started with `wsb.exe`, the
   Sandbox app's command line (its `wsb` alias is not registered, `rig.ps1` finds it through the
@@ -219,12 +219,15 @@ registry key, and so the guest - a throw-away Windows of its own - can be set up
   `C:\steam`, and `<host folder>\rig\io` read-write as `C:\rig\io` (not under `%LOCALAPPDATA%`:
   the sandbox fails to start with a mapped folder or `.wsb` there, 0x80070003). Inside, an agent
   (`tools\rig\guest\agent.ps1`, the logon command) takes the queue's jobs and runs each in a process
-  of its own (`runjob.ps1`), killed at `-Timeout`; a job copies the game in (`C:\work\games\...`,
-  robocopy, a second for 550 MB), starts with an empty `HKCU\SOFTWARE\Gromada` (plus `-Registry`
+  of its own (`runjob.ps1`, always the agent's own copy), killed at `-Timeout`; a job copies the game
+  in (`C:\work\games\...`, robocopy: 1-3 s for 550 MB the first time, 0 s when the same build ran in
+  that slot before), starts with an empty `HKCU\SOFTWARE\Gromada` (plus `-Registry`
   values), runs this repository's `tools\test_game.ps1` / `test_missions.ps1`, and its logs,
-  screenshots and the game's `logs\` / `Screens\` come back to `build\rig\<job id>` (`-Out`).
-  `-Job setup` gets a box no earlier job has touched (the running one is closed first) and closes
-  it afterwards. The guest is Windows 11 Enterprise (the host's build), 6 GB (`-MemoryMB`), no
+  screenshots and the game's `logs\` / `Screens\` come back to `build\rig\<job id>` (`-Out`), with
+  `run.json` (slot, guest user, display, the jobs beside it) and `done.json` (exit, time, how many
+  games ran at once at most, whether the display changed during the run).
+  `-Job setup` gets a box no earlier job has touched: it waits until the box is empty, the box is
+  restarted (the queue is kept) and it runs first in the new one. The guest is Windows 11 Enterprise (the host's build), 8 GB (`-MemoryMB`), no
   network, one playback device (the remote desktop's, muted - see Sound), Windows PowerShell 5.1
   with the C# compiler (all the test scripts need), no Python.
 - *The picture.* dgVoodoo's Direct3D 11 runs on the host's GPU (vGPU: the guest lists the RTX 4070
