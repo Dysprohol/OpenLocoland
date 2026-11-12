@@ -113,6 +113,8 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
   `-Game <folder>` tests another assembled copy
   (`build.py --target <folder>`), so tests of different changes don't share one
   game folder; `test_game.ps1` takes `-Exe`.
+- `tools\rig\rig.ps1` - the test rig: runs `test_game.ps1`, `test_missions.ps1` or the installer
+  inside Windows Sandbox, off the user's screen, at a chosen guest resolution; see "The test rig".
 - `tools\test_rail_rules.py` - differential test of the track rules: builds
   `tools\test_rail_rules.cpp` (which includes `src/LocoFix/rail_rules.h`, the rules of the editor's
   Track tool) and compares it with `map_tool.py` (`rail_candidates`, `plan_track`, `track_cells`,
@@ -171,6 +173,74 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
   (engine functions 65-254). Data: `Objects_Load`, `Level_Load`, `Sound_LoadSFX`.
 - Addresses: in this exe file offset = VA - 0x400000 for `.text`, `.rdata`, `.data`;
   `.rsrc` is placed differently (VA 0x5d6000, file 0x8a000).
+
+**The test rig.** `tools\rig\rig.ps1` runs the tests in Windows Sandbox (the Windows feature
+"Windows Sandbox" must be on), so they neither show on the user's screen nor share his game's
+registry key, and so the guest - a throw-away Windows of its own - can be set up as a test needs:
+
+    .\tools\rig\rig.ps1 -Job missions -Game build\game                 # the 20 missions (-TestArgs @{ Quick = $true })
+    .\tools\rig\rig.ps1 -Job game -Game build\game -TestArgs @{ Map = "maps\l01\l01.map"; WaitFor = "test map: loaded"; ClickOk = 1; SetFull = 0; Visible = $true }
+    .\tools\rig\rig.ps1 -Job game -Game build\game -Resolution 1366x768 -Registry @{ FrameLimit = 0 } -TestArgs @{ ... }
+    .\tools\rig\rig.ps1 -Job setup -Setup build\setup\<Setup>.exe [-SetupArgs --auto]   # a clean install
+    .\tools\rig\rig.ps1 -Status | -Monitors | -Look | -Show | -Hide | -Stop | -Kill
+
+- *How it runs.* One sandbox (the box) serves every session's jobs from one queue, one at a time:
+  the first job starts it (about 12 s), it stays up until `-Stop` or 20 minutes without a job
+  (`-IdleMinutes`; it shuts itself down), and only one Windows Sandbox can run on the machine at a
+  time (a second start is refused, `CO_E_APPSINGLEUSE`). The box is started with `wsb.exe`, the
+  Sandbox app's command line (its `wsb` alias is not registered, `rig.ps1` finds it through the
+  package's folder), with no window; its client window is opened on a Win32 desktop of the rig's
+  own (`CreateDesktop`, as `test_game.ps1` runs quietly), which is never shown - nothing comes up
+  on the user's screen, takes the focus, flashes or gets a taskbar button (the start logs the
+  user's desktop with a WinEvent hook: `<host folder>\rig\start-desktop-events.txt`). The client is
+  needed: the guest's user logs on only once a client connects, and the game cannot create its
+  DirectDraw device in a disconnected session. The host folder that holds the repository (all
+  worktrees and builds) is mapped read-only as `C:\host`, the Steam original read-only as
+  `C:\steam`, and `<host folder>\rig\io` read-write as `C:\rig\io` (not under `%LOCALAPPDATA%`:
+  the sandbox fails to start with a mapped folder or `.wsb` there, 0x80070003). Inside, an agent
+  (`tools\rig\guest\agent.ps1`, the logon command) takes the queue's jobs and runs each in a process
+  of its own (`runjob.ps1`), killed at `-Timeout`; a job copies the game in (`C:\work\games\...`,
+  robocopy, a second for 550 MB), starts with an empty `HKCU\SOFTWARE\Gromada` (plus `-Registry`
+  values), runs this repository's `tools\test_game.ps1` / `test_missions.ps1`, and its logs,
+  screenshots and the game's `logs\` / `Screens\` come back to `build\rig\<job id>` (`-Out`).
+  `-Job setup` gets a box no earlier job has touched (the running one is closed first) and closes
+  it afterwards. The guest is Windows 11 Enterprise (the host's build), 8 GB, no network, no sound
+  device, Windows PowerShell 5.1 with the C# compiler (all the test scripts need), no Python.
+- *The picture.* dgVoodoo's Direct3D 11 runs on the host's GPU (vGPU: the guest lists the RTX 4070
+  Ti SUPER and the integrated AMD, dgVoodoo enumerates the NVIDIA one), 60 fps with the default
+  limit, 207-280 fps without it in mission 8 at 640x480. `<VGpu>Disable</VGpu>` is ignored by
+  Sandbox 0.8.114 (the guest keeps the GPU), so `-Warp` sets dgVoodoo's own `OutputAPI = d3d11warp`
+  (Direct3D 11 in software, 106 fps there) in the guest's copy (`-DgVoodoo @{...}` for any
+  setting). The game's screenshots are real pictures; the frame rate does not depend on the box's
+  window being on a desktop nobody sees. The 20 missions take 4.7 minutes there (3.9 with WARP).
+- *Resolution and scale.* The guest's screen is the client window's area (remote desktop with
+  dynamic resolution), and its scale is the scale of the host monitor that window is on; inside the
+  guest neither can be changed (the scale's range is 100..100 %, `ChangeDisplaySettingsEx` reports
+  success and changes nothing, the only mode listed is the current one). So `-Resolution WxH`
+  sizes the window (on the rig's desktop, invisible) until the guest has exactly that size
+  (1024x768, 1366x768, 1920x1080, 2560x1440 checked; a new size is there in about a second, for
+  running programs too), and `-Scale <percent>` puts the window on a host monitor with that scale -
+  or says that none has it (`-Monitors` lists them). The window cannot be wider than the host's
+  screens together: 3840 wide needs the 4K TV switched on. Every job logs what the guest really
+  had (`job.log`: real pixels, dpi, what a DPI-unaware program sees) and is not run on another.
+- *The real mouse.* Inside the guest a script moves the guest's own cursor - `SetCursorPos` and
+  `SendInput` (relative and absolute) - with the game full screen there, without touching the
+  host's cursor; the engine follows it (`tools\rig\guest\cursor_job.ps1`: the cursor's place, the
+  clip rectangle and the engine's mouse at the corners and edges).
+- *Looking in.* `-Look` opens the guest's screen as the agent last saved it (every 5 s while a job
+  runs; `test_missions.ps1` runs the game on a desktop of its own inside the guest too, so only
+  `-Visible` game runs show there). `-Show` opens a window onto the box on the user's desktop: it
+  takes the session over (the rig's own client is left with "connection lost"), the guest then has
+  that window's size and scale, and the running job goes on (checked: a game run with the session
+  moved away and back drew and closed normally). After `-Hide`, or when that window is closed, the
+  rig connects its own client again before the next job; clicks into the guest do not disturb a
+  run with the virtual test cursor (the engine ignores the real mouse in test mode - checked).
+- *Not covered* - these still need the real machine: frame-rate measurements that matter (the
+  host's own desktop, monitor and refresh), the GPU's own driver path (the guest's is the
+  paravirtual one), the monitors' real scales and modes (125, 150 and 175 % only where a host
+  monitor has them), exclusive full screen and display-mode switches, sound, what SmartScreen and
+  Defender do with the unsigned Setup (Defender's service is stopped in the sandbox and SmartScreen
+  has no network), Steam itself, and anything older than the host's Windows build.
 
 ## Resolutions and widescreen
 

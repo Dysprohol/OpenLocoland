@@ -111,11 +111,11 @@ Paragraphs: Map exchange; The texts of the editor; The Help and Menu buttons; Ct
 
 Sections: "Changes from the original".
 
-### [working.md](docs/dev/working.md) (~18 KB)
+### [working.md](docs/dev/working.md) (~27 KB)
 
 Sections: "Working with the code"; "Resolutions and widescreen"; "Status and known bugs".
 
-Paragraphs: Frame rate at high resolutions; CI.
+Paragraphs: The test rig; Frame rate at high resolutions; CI.
 
 ### [release.md](docs/dev/release.md) (~41 KB)
 
