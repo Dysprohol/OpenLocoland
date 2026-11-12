@@ -185,6 +185,7 @@ TEXTS = {
         "depots_local": "The game's other languages are not found (no Steam depots in skip-verify mode):",
         "no_language": "No language of the game can be built - is Locoland installed through Steam?",
         "unofficial": "(unofficial)",
+        "files_language": "As in the game's files",
         "needs_depot": "needs the Steam depot: {line}",
         "needs_files": "needs the files of {base}: {line}",
         "not_found": "not found in the game folder",
@@ -261,6 +262,7 @@ TEXTS = {
         "no_language": "Keine Sprache des Spiels kann erstellt werden - ist Locoland über Steam installiert?",
         "depots_local": "Die weiteren Sprachen des Spiels wurden nicht gefunden (ohne Versionsprüfung keine Steam-Depots):",
         "unofficial": "(inoffiziell)",
+        "files_language": "Wie in den Spieldateien",
         "needs_depot": "braucht das Steam-Depot: {line}",
         "needs_files": "braucht die Dateien von {base}: {line}",
         "not_found": "nicht im Spielordner gefunden",
@@ -337,6 +339,7 @@ TEXTS = {
         "no_language": "A játék egyik nyelve sem építhető fel - a Locoland a Steamen keresztül van telepítve?",
         "depots_local": "A játék további nyelvei nem találhatók (verzióellenőrzés nélkül nincsenek Steam depotok):",
         "unofficial": "(nem hivatalos)",
+        "files_language": "Ahogy a játék fájljaiban van",
         "needs_depot": "a Steam depot kell hozzá: {line}",
         "needs_files": "{base} fájljai kellenek hozzá: {line}",
         "not_found": "nincs a játék mappájában",
@@ -412,6 +415,7 @@ TEXTS = {
         "no_language": "Nie da się zbudować żadnego języka gry - czy Locoland jest zainstalowany przez Steam?",
         "depots_local": "Pozostałych języków gry nie znaleziono (bez weryfikacji wersji nie ma depotów Steama):",
         "unofficial": "(nieoficjalne)",
+        "files_language": "Jak w plikach gry",
         "needs_depot": "wymaga depotu Steama: {line}",
         "needs_files": "wymaga plików wersji {base}: {line}",
         "not_found": "nie ma w folderze gry",
@@ -487,6 +491,7 @@ TEXTS = {
         "no_language": "Nenhum idioma do jogo pode ser criado - o Locoland está instalado através do Steam?",
         "depots_local": "Os outros idiomas do jogo não foram encontrados (sem verificação de versão não há depots do Steam):",
         "unofficial": "(não oficial)",
+        "files_language": "Como nos ficheiros do jogo",
         "needs_depot": "precisa do depot do Steam: {line}",
         "needs_files": "precisa dos ficheiros de {base}: {line}",
         "not_found": "não encontrado na pasta do jogo",
@@ -562,6 +567,7 @@ TEXTS = {
         "no_language": "Ни один язык игры не может быть собран - установлена ли Locoland через Steam?",
         "depots_local": "Другие языки игры не найдены (без проверки версии депотов Steam нет):",
         "unofficial": "(неофициальный)",
+        "files_language": "Как в файлах игры",
         "needs_depot": "нужен депот Steam: {line}",
         "needs_files": "нужны файлы версии {base}: {line}",
         "not_found": "нет в папке игры",
@@ -637,6 +643,7 @@ TEXTS = {
         "no_language": "Nelze sestavit žádný jazyk hry - je Locoland nainstalován přes Steam?",
         "depots_local": "Další jazyky hry nebyly nalezeny (bez kontroly verze nejsou depoty Steamu):",
         "unofficial": "(neoficiální)",
+        "files_language": "Jako v souborech hry",
         "needs_depot": "vyžaduje depot Steamu: {line}",
         "needs_files": "vyžaduje soubory verze {base}: {line}",
         "not_found": "není ve složce hry",
@@ -699,8 +706,13 @@ UI_LANGUAGES = [("en", TEXTS["en"]["name"])] + sorted(((c, t["name"]) for c, t i
                                                       key=lambda ct: ct[0])
 
 
+TEST_SYSTEM_LANGUAGE = None   # --test-system-language <code> (tests): the display language Setup sees
+
+
 def system_language():
     """The code of Windows' display language ("pl" for pl-PL), or None."""
+    if TEST_SYSTEM_LANGUAGE:
+        return TEST_SYSTEM_LANGUAGE
     import ctypes
     import locale
     try:
@@ -939,17 +951,19 @@ def saved_game_language():
     return value if kind == winreg.REG_SZ else None
 
 
-def first_game_language(buildable, update):
-    """The game language the window starts with: on an update the one chosen before (when it can
-    be built), otherwise the system's language when there is a pack for it, else English, or the
-    first one there is."""
+def first_game_language(buildable, update, own=None):
+    """The game language Setup chooses (the window shows it first, --silent installs it): on an
+    update the one chosen before (when it can be built), otherwise the system's language when it
+    can be built, else English, else `own` - the Steam copy's own language (languages.steam_language)
+    -, else the first that is not a fan translation, else the first; None when none can be built."""
     saved = saved_game_language()
     if update and saved in buildable:
         return saved
-    for code in (system_language(), DEFAULT_GAME_LANGUAGE):
-        if code in buildable:
+    for code in (system_language(), DEFAULT_GAME_LANGUAGE, own):
+        if code and code in buildable:
             return code
-    return buildable[0] if buildable else None
+    official = [c for c in buildable if not languages.fan_pack(c)]
+    return (official or buildable or [None])[0]
 
 
 def special_folder(csidl):
@@ -1885,7 +1899,9 @@ class Installer:
     def target_changed(self):
         """An install there or not: the game language shown first is the saved one or English."""
         target = self.target.get().strip()
-        self.first_language = first_game_language(self.buildable, bool(target) and read_manifest(target) is not None)
+        steam = self.steam.get().strip()
+        own = languages.steam_language(steam) if is_game(steam) else None
+        self.first_language = first_game_language(self.buildable, bool(target) and read_manifest(target) is not None, own)
         self.game_language_code.set(self.first_language or "")
         self.refresh()
 
@@ -1913,7 +1929,10 @@ class Installer:
 
     def show_game_language(self):
         code = self.game_language_code.get()
-        self.game_language.set(self.language_label(code) if code else "")
+        if code:
+            self.game_language.set(self.language_label(code))
+        else:   # nothing can be built: the game keeps the language of its own files, and the box says so
+            self.game_language.set(self.t("files_language") if is_game(self.steam.get().strip()) else "")
 
     def show_language_note(self):
         """The log starts with what the box "install as it is" gives up while it is ticked, then how to get
@@ -2107,7 +2126,8 @@ def silent(a):
     update = read_manifest(target) is not None
     skip_verify = getattr(a, "skip_verify", False)
     buildable, missing, _ = game_languages(steam, skip_verify=skip_verify)
-    language = a.game_lang or (None if update else first_game_language(buildable, False))
+    own = languages.steam_language(steam) if is_game(steam) else None
+    language = a.game_lang or (None if update else first_game_language(buildable, False, own))
     choices = {"cheats": a.cheats == "1", "unlock": a.unlock == "1", "desktop": not a.no_shortcuts, "clean": not a.no_clean,
                "start_menu": not a.no_shortcuts, "lang": a.lang or first_ui_language(), "game_language": language, "skip_verify": skip_verify}
     status = {}
@@ -2191,7 +2211,7 @@ def main():
                    help="the window installs at once and closes at the end (tests of the window)")
     p.add_argument("--cheats", choices=["0", "1"], help="the option (default: as it is in the registry)")
     p.add_argument("--unlock", choices=["0", "1"], help="the option (default: as it is in the registry)")
-    p.add_argument("--game-lang", help="the game's language (default for a new install: the system's if there is a pack, else English; kept on an update)")
+    p.add_argument("--game-lang", help="the game's language (default for a new install: the system's if it can be built, else English, else the Steam copy's own; kept on an update)")
     p.add_argument("--no-shortcuts", action="store_true", help="no shortcuts (the window: both boxes unticked)")
     p.add_argument("--lang", choices=codes, help="the language of the shortcuts' names (default: the system's, else en)")
     p.add_argument("--no-clean", action="store_true",
@@ -2205,6 +2225,8 @@ def main():
     # tests: the process ends hard at that point of the install, as a kill there would end it
     p.add_argument("--test-stop", choices=["built", "before-journal", "moving", "record"], help=argparse.SUPPRESS)
     p.add_argument("--test-free-mb", type=int, help=argparse.SUPPRESS)   # tests: the free space the check sees
+    # tests: the system's display language Setup sees (its window's language and the game's first choice)
+    p.add_argument("--test-system-language", help=argparse.SUPPRESS)
     # tests: Setup's own state (the remembered install) in that folder instead of %LOCALAPPDATA%\OpenLocoland
     p.add_argument("--state-folder", help=argparse.SUPPRESS)
     a = p.parse_args()
@@ -2217,6 +2239,9 @@ def main():
     if a.test_free_mb is not None:
         global TEST_FREE_MB
         TEST_FREE_MB = a.test_free_mb
+    if a.test_system_language:
+        global TEST_SYSTEM_LANGUAGE
+        TEST_SYSTEM_LANGUAGE = a.test_system_language
     if a.state_folder:
         global STATE_FOLDER, STATE_GIVEN
         STATE_FOLDER, STATE_GIVEN = os.path.abspath(a.state_folder), True
