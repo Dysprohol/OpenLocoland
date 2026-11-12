@@ -356,7 +356,10 @@ tor wygląda na połączony, ale nie jest, albo gdzie pociągi mogą tylko zawr�
 innej szyny, szyny stykające się na dwóch wysokościach albo pod kątem, V (dwie szyny z jednego punktu i
 nic dalej). Trzeci wiersz stanu je liczy. Gdy kładziesz linię, koniec podglądu jest **zielony** tam, gdzie
 kliknięcie połączy się z torem, a **pomarańczowy** tam, gdzie skończy się przy szynie bez połączenia; wiersz
-stanu mówi dlaczego. Strona 33 pomocy to podsumowuje.
+stanu mówi dlaczego. **PRZYCIAGANIE: WL.** w rzędzie (domyślnie) kładzie ostatnie szyny takiego
+kliknięcia od nowa, tak żeby jego koniec trafił w pobliski koniec szyny i się z nim połączył - podgląd to
+pokazuje; **WYL.** kładzie szyny dokładnie tak, jak klikniesz, dla torów, które mają zostać osobno.
+Strona 33 pomocy to podsumowuje.
 
 Główną linię połóż tak, jak robią to misje: **zza zachodniej krawędzi** (przewiń nad siatkę) przez
 mapę, żeby pociągi przyjeżdżały i odjeżdżały poza widokiem. Potem bocznica na fabrykę: odgałęzienie

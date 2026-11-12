@@ -4133,6 +4133,9 @@ struct TrackStep {
     rail::Point to = {};                  // where the click takes the line
     std::vector<rail::Point> points;      // the line's end, then the end of each rail laid
     std::vector<rail::Segment> segments;  // the rails (one, or a run toward a far cursor)
+    bool snapped = false;                 // SNAP: its end re-aimed to meet a rail end (snap_run)
+    rail::Point unsnapped = {};           // where it would have ended
+    bool shifted = false;                 // the snap moved a new line's start a few px (off the lattice)
 };
 
 UiText reason_of(rail::Error e) {
@@ -4197,6 +4200,148 @@ std::vector<rail::Point> run_to_cursor(const std::vector<rail::Rail>& rails, rai
     return points;
 }
 
+// ---- snap (issue #7) ----
+//
+// SNAP: ON (the Track tool's row; on by default, kept while the editor runs like the row's other
+// choices): when the rails of a click would end at a rail without joining it - within 8 px of its way
+// (a near miss), at a joint at an angle the engine does not link, or as a V (rail::end_state) - the run's
+// end is re-aimed to a rail end within RAIL_SNAP_REACH px of where it would end, where its last rail links:
+// the last one to three rails of the run are laid again by up to one rail more, along the lattice, so that
+// they reach that end pointing the opposite way at the height of its point; the nearest such end wins,
+// then the fewest rails. Off the lattice (a rail end a few px from the lattice of a new line, rails moved
+// by hand) a new line's first run is moved by those px instead, its start with it. Nothing already laid
+// moves, a run that ends at two heights is left (that would take a ramp), and with SNAP: OFF the run is
+// laid exactly as clicked. The preview shows the snapped run and the status line says so; the click lays
+// it as one step of the history, as any run. Kept for the frame while the run and the rails are the same.
+bool g_snap = true;
+constexpr double RAIL_SNAP_REACH = 44;   // px from where the run would end: half a diagonal rail (43.4)
+
+struct SnapMemo {
+    bool valid = false;
+    std::vector<rail::Point> points;
+    uint64_t rails = 0;
+    int z = 0, ramp = 0;
+    TrackStep result;
+} g_snap_memo;
+
+const TrackJoints& track_joints();
+
+// The end vectors a rail from the k-th point of the run may start with to go on: the opposite of the
+// run's rail before it, of the line's last rail, or of the rails of the map ending there at the line's
+// height; none - any rail - at a free point.
+std::vector<rail::Vec> entry_at(const std::vector<rail::Rail>& rails, const std::vector<rail::Point>& points,
+                                const std::vector<rail::Segment>& segments, size_t k, int z) {
+    if (k > 0) {
+        const rail::Segment& before = segments[k - 1];
+        const bool at0 = rail::close(before.end0.x, points[k].x) && rail::close(before.end0.y, points[k].y);
+        return {rail::ENDS[before.shape][at0 ? 0 : 1].opposite()};
+    }
+    if (g_line.size() >= 2 && !g_line_ends.empty()) return {g_line_ends.back().opposite()};
+    std::vector<rail::Vec> out;
+    for (const rail::Vec& e : rail::ends_at(rails, points[0], z)) out.push_back(e.opposite());
+    return out;
+}
+
+TrackStep snap_run(const std::vector<rail::Rail>& there, const TrackStep& s, int z) {
+    if (!s.valid || s.segments.empty()) return s;
+    auto state_of = [&](const std::vector<rail::Segment>& segs, rail::Point to) {
+        std::vector<rail::Rail> with = there;
+        for (size_t k = 0; k + 1 < segs.size(); ++k) with.push_back({segs[k].x, segs[k].y, segs[k].shape, segs[k].z0, segs[k].z1});
+        const rail::Segment& last = segs.back();
+        const bool at0 = rail::close(last.end0.x, to.x) && rail::close(last.end0.y, to.y);
+        return rail::end_state(with, to, rail::ENDS[last.shape][at0 ? 0 : 1], at0 ? last.z0 : last.z1, -1);
+    };
+    const rail::Point e = s.to;
+    const rail::End now = state_of(s.segments, e);
+    if (now != rail::End::Near && now != rail::End::DeadEnd && now != rail::End::Sharp) return s;
+    // the rail ends within reach of where it would end (each end vector: what an arrival must oppose)
+    struct Target {
+        rail::Point at;
+        rail::Vec end;
+        double d;
+    };
+    std::vector<Target> ends;
+    for (const rail::Rail& r : there)
+        for (int i = 0; i < 2; ++i) {
+            const rail::Point j = rail::end_of(r, i), p = {rail::round3(j.x), rail::round3(j.y)};
+            const double d = distance(p, e);
+            if (d <= RAIL_SNAP_REACH) ends.push_back({p, rail::ENDS[r.shape][i], d});
+        }
+    TrackStep best = s;
+    double best_d = 1e9;
+    size_t best_rails = 0;
+    const size_t n = s.points.size() - 1;   // rails of the run
+    for (size_t back = 1; back <= 3 && back <= n && !ends.empty(); ++back) {   // lay again its last `back` rails, up to one more
+        const size_t k = n - back;
+        std::vector<rail::Point> path(s.points.begin(), s.points.begin() + static_cast<long>(k) + 1);
+        std::vector<std::pair<std::vector<rail::Point>, double>> found;
+        std::function<void(rail::Point, std::vector<rail::Vec>, size_t)> walk = [&](rail::Point at, std::vector<rail::Vec> entry, size_t depth) {
+            for (const rail::Point& d : lattice_steps()) {
+                const rail::Point to = {rail::round3(at.x + d.x), rail::round3(at.y + d.y)};
+                double nearest = 1e9;
+                for (const Target& t : ends) nearest = (std::min)(nearest, distance(to, t.at));
+                if (nearest > (depth - 1) * 87.0 + 2) continue;   // too far to come to one of them
+                for (const rail::Candidate& c : rail::candidates(at, to)) {
+                    if (!entry.empty() && !rail::contains(entry, c.first)) continue;
+                    path.push_back(to);
+                    // at a rail end (or within the engine's 2 px of it), arriving the opposite way: a way to try
+                    for (const Target& t : ends)
+                        if (distance(to, t.at) < 2.0 && c.second == t.end.opposite()) {
+                            found.push_back({path, t.d});
+                            break;
+                        }
+                    if (depth > 1) walk(to, {c.second.opposite()}, depth - 1);
+                    path.pop_back();
+                    break;   // one rail a step: the one plan() takes (the first that joins)
+                }
+            }
+        };
+        walk(s.points[k], entry_at(there, s.points, s.segments, k, z), back + 1);
+        for (const auto& f : found) {
+            const std::vector<rail::Point>& points = f.first;
+            const size_t rails = (points.size() - 1) * 4 + back;   // the fewest rails, then the fewest laid again
+            if (f.second > best_d + 0.01 || (f.second > best_d - 0.01 && rails >= best_rails)) continue;
+            const rail::Plan plan = rail::plan(there, points, {}, z, true, true, g_ramp);
+            if (plan.error != rail::Error::None || state_of(plan.segments, points.back()) != rail::End::Linked) continue;
+            best = s;
+            best.points = points;
+            best.segments = plan.segments;
+            best.to = points.back();
+            best.snapped = true;
+            best.unsnapped = e;
+            best_d = f.second;
+            best_rails = rails;
+        }
+    }
+    if (best.snapped) return best;
+    // off the lattice: a new line's first run moved by a few px onto a rail end it then joins
+    bool free_start = g_line.size() == 1;
+    for (const rail::Rail& r : there)
+        for (int i = 0; i < 2 && free_start; ++i) {
+            const rail::Point q = rail::end_of(r, i);
+            if (rail::close(q.x, g_line[0].x) && rail::close(q.y, g_line[0].y)) free_start = false;
+        }
+    std::sort(ends.begin(), ends.end(), [](const Target& x, const Target& y) { return x.d < y.d; });
+    if (free_start)
+        for (const Target& target : ends) {
+            if (target.d > rail::NEAR_MISS) break;
+            if (target.d < 0.01) continue;
+            const double dx = target.at.x - e.x, dy = target.at.y - e.y;
+            std::vector<rail::Point> points;
+            for (const rail::Point& p : s.points) points.push_back({rail::round3(p.x + dx), rail::round3(p.y + dy)});
+            const rail::Plan plan = rail::plan(there, points, {}, z, true, true, g_ramp);
+            if (plan.error != rail::Error::None || state_of(plan.segments, points.back()) != rail::End::Linked) continue;
+            TrackStep moved = s;
+            moved.points = points;
+            moved.segments = plan.segments;
+            moved.to = points.back();
+            moved.snapped = moved.shifted = true;
+            moved.unsnapped = e;
+            return moved;
+        }
+    return s;
+}
+
 // The rails the click lays toward the cursor (run_to_cursor), laid as the Track tool lays what is
 // clicked (rail::plan's `lay`: over other rails, across their joints, as a dead end, turning sharply,
 // at another height, where the same rail lies - the engine takes them all); only a point of more than
@@ -4229,7 +4374,31 @@ TrackStep next_step(const std::vector<RailObject>& rails) {
     }
     s.valid = true;
     s.segments = plan.segments;
-    return s;
+    if (!g_snap) return s;
+    // snap (above), kept while the run and the rails are the same
+    const uint64_t signature = track_joints().signature;
+    if (g_snap_memo.valid && g_snap_memo.rails == signature && g_snap_memo.z == z && g_snap_memo.ramp == g_ramp &&
+        g_snap_memo.points.size() == s.points.size() &&
+        std::equal(s.points.begin(), s.points.end(), g_snap_memo.points.begin(),
+                   [](const rail::Point& a, const rail::Point& b) { return rail::close(a.x, b.x) && rail::close(a.y, b.y); }))
+        return g_snap_memo.result;
+    g_snap_memo.valid = true;
+    g_snap_memo.points = s.points;
+    g_snap_memo.rails = signature;
+    g_snap_memo.z = z;
+    g_snap_memo.ramp = g_ramp;
+    std::vector<rail::Rail> live;
+    for (const RailObject& r : rails)
+        if (!removed(r.object)) live.push_back(r.rail);
+    LARGE_INTEGER t0, t1, hz;
+    QueryPerformanceCounter(&t0);
+    g_snap_memo.result = snap_run(live, s, z);
+    QueryPerformanceCounter(&t1);
+    QueryPerformanceFrequency(&hz);
+    const double ms = (t1.QuadPart - t0.QuadPart) * 1000.0 / static_cast<double>(hz.QuadPart);
+    if (ms > 2 || g_test) patch::log("edit: track: snap looked at a run of %u rails in %.2f ms%s", static_cast<unsigned>(s.segments.size()), ms,
+                                     g_snap_memo.result.snapped ? " - snapped" : "");
+    return g_snap_memo.result;
 }
 
 void end_line() {
@@ -4238,6 +4407,13 @@ void end_line() {
     g_line.clear();
     g_line_cells.clear();
     g_line_original.clear();
+}
+
+void set_snap(bool on) {
+    g_snap = on;
+    g_snap_memo.valid = false;
+    MESSAGE("MsgSnapRails", "track: snap %s", on ? ui_text("WordSnapOn", "on - an end near a rail's end is laid to meet it and join")
+                                                : ui_text("WordSnapOff", "off - the rails are laid as clicked"));
 }
 
 // The ramp mode (the row, the wheel, PgUp / PgDn): 1 every rail laid climbs a step (11) after the one
@@ -4290,6 +4466,10 @@ void lay_step() {
                 s.reason.get());
         return;
     }
+    if (s.shifted && !g_line.empty()) g_line.back() = s.points[0];   // a new line moved onto the lattice of the rail it meets
+    if (s.snapped)
+        MESSAGE("MsgTrackSnapped", "track: snapped - the end meets the rail end at %.1f,%.1f (it would end at %.1f,%.1f)", s.to.x, s.to.y,
+                s.unsnapped.x, s.unsnapped.y);
     g_line_nvid = RAIL_KINDS[g_rail_kind];
     const bool swamp = swamp_rail(g_line_nvid);
     if (!g_line_level_known && !s.segments.empty()) {   // the first rail of a new line: the ground under its centre
@@ -7862,7 +8042,10 @@ void draw_track() {
         fill_diamond(ex, ey, 10, 0xd0000000);
         fill_diamond(ex, ey, 7, dot);
     }
-    const std::string words = s.valid ? run_end_words(end) : std::string(s.reason.get());
+    const std::string words = !s.valid ? std::string(s.reason.get())
+                              : s.snapped ? ui_printf(ui_format("RunEndSnapped", "ok, snapped: the end meets the rail end at %.1f,%.1f and joins it (green)"),
+                                                      s.to.x, s.to.y)
+                                          : run_end_words(end);
     std::snprintf(text, sizeof text, ui_format("StatusTrackSection", "Track: %.1f,%.1f -> %.1f,%.1f %s"),
                   g_line.back().x, g_line.back().y, s.to.x, s.to.y, words.c_str());
     g_track_status = std::string(text) +
@@ -9197,6 +9380,7 @@ struct OptionItem {
     int object = 0;         // or an object of the strip, its palette icon (-1 an empty cell)
     bool lit = false, button = false;
     std::function<void()> act;
+    const char* tip = nullptr;   // a text button's tip above it (draw_row_tip), as the pictures have their names
 };
 using OptionGroup = std::vector<OptionItem>;
 
@@ -9205,6 +9389,7 @@ struct OptionHit {
     std::function<void()> act;
     int object = 0;   // the object of a strip's icon
     int rail = 0;     // or a kind of rail of the Track tool's row
+    const char* tip = nullptr;   // or a text button's tip
 };
 std::vector<OptionHit> g_option_hits;    // the buttons where the last frame drew them
 std::vector<Box> g_option_rows;          // the rows' boxes
@@ -9427,6 +9612,11 @@ std::vector<OptionGroup> option_groups() {
                 MESSAGE("MsgRaiseGround", "track: the ground under rising rails %s", raise_name());
             };
         };
+        OptionGroup snap{option_label({"OptSnapRails", "SNAP:"}), option_button({"OptOn", "ON"}, g_snap, [] { set_snap(true); }),
+                         option_button({"OptOff", "OFF"}, !g_snap, [] { set_snap(false); })};
+        snap[1].tip = ui_text("TipSnapOn", "a run that would stop at a rail without joining it is laid to meet a rail end there");
+        snap[2].tip = ui_text("TipSnapOff", "the rails are laid as clicked - for tracks meant to stay apart");
+        groups.push_back(snap);
         groups.push_back({option_label({"OptRaiseGround", "GROUND UNDER RISING RAILS:"}),
                           option_button({"OptRaiseOff", "AS IT IS"}, g_raise_ground == Raise::Off, raise(Raise::Off)),
                           option_button({"OptRaiseSoft", "SOFT"}, g_raise_ground == Raise::Soft, raise(Raise::Soft)),
@@ -9724,7 +9914,7 @@ void draw_options() {
                 if (pass == 2) draw_text(i.lit || hover ? CONTEXT_FONT_LIT : CONTEXT_FONT_VID, x + (i.button ? 0 : 0), cy - ch / 2, text, false, OPTION_STEP);
                 if (pass == 1 && i.lit) fill(graphics(), nullptr, x, cy + ch / 2 + 1, x + iw - 8, cy + ch / 2 + 3, 0xe0f0e080);
             }
-            if (pass == 2 && i.button) g_option_hits.push_back({x - 2, cy - SLOT / 2, x + iw, cy + SLOT / 2, i.act, i.object, i.rail});
+            if (pass == 2 && i.button) g_option_hits.push_back({x - 2, cy - SLOT / 2, x + iw, cy + SLOT / 2, i.act, i.object, i.rail, i.tip});
         });
     }
 }
@@ -9753,12 +9943,12 @@ const char* rail_kind_tip(int nvid) {
 void draw_row_tip() {
     if (panel_open()) return;
     for (const OptionHit& h : g_option_hits) {
-        if ((h.object <= 0 && h.rail <= 0) || g_mouse.x < h.l || g_mouse.x >= h.r || g_mouse.y < h.t || g_mouse.y >= h.b) continue;
-        const char* name = h.rail > 0 ? rail_kind_tip(h.rail) : object_name(h.object);
+        if ((h.object <= 0 && h.rail <= 0 && !h.tip) || g_mouse.x < h.l || g_mouse.x >= h.r || g_mouse.y < h.t || g_mouse.y >= h.b) continue;
+        const char* name = h.tip ? h.tip : h.rail > 0 ? rail_kind_tip(h.rail) : object_name(h.object);
         uint8_t* font = vid_by_number(FONT_TIPS);
         if (!name || !*name || !font) return;
         // a bed is the swap of the track's bed, not a decal to drop: the tip says what its brush does
-        const int bed = h.rail > 0 ? -1 : bed_kind_of(h.object);
+        const int bed = h.rail > 0 || h.tip ? -1 : bed_kind_of(h.object);
         const std::string shown = std::string(" ") +
                                   (bed >= 0 ? ui_printf(ui_format("TipBedBrush", "gravel bed: %s - click / drag on the track"), bed_kind_label(bed))
                                             : std::string(name)) + " ";

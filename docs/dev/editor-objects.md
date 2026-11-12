@@ -293,6 +293,32 @@ side (V), a destroyed swamp line's rail onto the swamp rail at the plain rails' 
 diagonal onto the joint of the two-heights cluster (angle), and a line laid (two rails, one step of the
 history: the counts 37 -> 39 ends of track, Ctrl+Z 37, Ctrl+Y 39).
 
+**Snap** (`snap_run`, the row's SNAP: ON / OFF, on by default and kept while the editor runs like the
+row's other choices; `g_snap`). When the rails of a click would end at a rail without joining it - a near
+miss, an angle, a V; not two heights, which would take a ramp - the run's last one to three rails are laid
+again along the lattice, by at most one rail more, so that the run reaches a rail end within 44 px of
+where it would end (half a diagonal rail) pointing the opposite way at the height of its point (or within
+the engine's 2 px of it); the nearest such end wins, then the fewest rails. Off the lattice - a rail end
+up to 8 px from the lattice of a new line, whose first run is not tied to a rail yet - the run is moved by
+those px instead, its start with it. Nothing already laid moves; the preview shows the snapped run, its dot
+green, and the status line says "ok, snapped: the end meets the rail end at x,y and joins it (green)"; the
+click lays it as one step of the history and the log names where it would have ended. With SNAP: OFF
+`next_step` returns before the snap: the rails are laid exactly as before. What it can and cannot do: on
+the lattice two lines meet only at the joints of their rails, and a turn shifts a line by whole steps, so a
+run that ends on the side of a straight line mid-rail, or arrives square to it, usually needs more than a
+few rails to turn into a junction - snap leaves those (orange, said in the status line). Tried on random
+pieces of track with the rules of `map_tool.py` (the editor's search, ported): of 122 runs ending at a rail
+unlinked, laying again the last 1-3 rails by at most one more joined 18; two more joined 24, but with
+loops round to come back from the other side, which is not a snap. The search plans only the ways that
+arrive at a rail end the opposite way, and is kept while the run and the rails are the same: 0.06-1.0 ms on
+`tjtest` (13-15 ms before that filter). Checked in the game on `tjtest`: a straight run ending at a
+diagonal's end at an angle laid as two curves that join it (not joined 19 -> 18, Ctrl+Z / Ctrl+Y one step
+each), a near miss 5 px from a vertical re-aimed onto the next loose end, a new line 3 px off the lattice
+of a rail it meets moved onto it (laid at x 74 and 145 instead of 71 and 142, ending at 180.5,875), SNAP:
+OFF - the row's tip shown, still OFF after Select and back - laying the first case as clicked (two straights,
+not joined 19 -> 20) and previewing the second unsnapped; the map saved after two snapped runs has every
+rail and bed of the map before unchanged, 4 rails and 4 beds more, the GRID the same.
+
 **The ground under rising rails** (the Track tool's G, the row's GROUND UNDER RISING RAILS: AS IT IS /
 SOFT / HARD; `g_raise_ground` in `lay_step`; issue #5). AS IT IS, the default, is the rule above: a rail
 above the ground leaves it. HARD raises it the way a cutting is lowered: the cells the rail crosses go up
