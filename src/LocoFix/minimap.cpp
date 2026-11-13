@@ -24,15 +24,19 @@
 // 7 x 5 px (times the size below) around the view's middle and inside the rectangle; the dots
 // kept inside the rectangle too.
 //
-// The size is the player's choice on the game's settings page (the main menu's and the Esc
-// menu's; game/maps/script/optfields.lgc): the script keeps it with SetReg next to the sound and
-// music settings, the value MinimapSize ("1", "2" or "3") of the Players key (player_registry.cpp:
-// HKCU\SOFTWARE\Gromada\Locoland\Players); absent = the original size, the default. It is read
-// each time the bar is built - at a mission's start and when the Esc menu closes (the bar is given
-// up while it is hidden, so it is built again) - and used only where it fits the game's screen:
-// never so wide that the frame would reach the bar's controls (the slots end 740 px into the
-// centred 1024 px base), else the biggest that fits (a small map's logical screen,
-// screen_scaling.cpp - mission 1: 1024x768, stretched as a whole - takes twice at most).
+// The size follows the interface's (interface_scale.cpp) unless the player chose one on the game's
+// settings page (the main menu's and the Esc menu's; game/maps/script/optfields.lgc): the script
+// keeps it with SetReg next to the sound and music settings, the value MinimapSize of the Players key
+// (player_registry.cpp: HKCU\SOFTWARE\Gromada\Locoland\Players) - "0" or absent: as the interface
+// (the default; at the normal interface the original size), "1", "2" or "3": that size whatever the
+// interface's. It is read each time the bar is built - at a mission's start and when the Esc menu
+// closes (the bar is given up while it is hidden, so it is built again) - and used only where it fits
+// the game's screen: never so wide that the frame would reach the bar's controls (the slots end 228
+// px right of the screen's middle, times the interface's scale), else the biggest that fits (a small
+// map's logical screen, screen_scaling.cpp - mission 1: 1024x768, stretched as a whole - takes twice
+// at most). The camera's room below the map is the engine's (the bar's height) while the frame is no
+// bigger than the interface - at the same scale the corner it hides is the original's in proportion;
+// a frame bigger than the interface gets its own room (minimap_bounds), a strip below the map.
 // The bigger frames are VIDs 950 and 951 (game/objects.override): the frame's picture enlarged
 // two and three times pixel by pixel (patch_data.make_minimap_frames), the size of the menu
 // item's box with it. Player_ShowStateBar takes the frame's VID from World.vids[464], so while
@@ -42,6 +46,10 @@
 // step's size at their own scaled place.
 #include "patch.h"
 #include <cstdlib>
+
+int interface_scale();                 // interface_scale.cpp
+int interface_original_nvid(int nvid);
+int interface_scale_for_window();
 
 namespace {
 
@@ -64,7 +72,7 @@ constexpr int MAX_SIZE = 3;
 // the opening of the frame's picture (104 x 78): from (8, 9), 14 and 13 px narrower
 constexpr int OPENING_LEFT = 8, OPENING_TOP = 9, OPENING_LESS_W = 14, OPENING_LESS_H = 13;
 constexpr int FRAME_W = 104;
-constexpr int BAR_WIDTH = 1024, BAR_CONTROLS_END = 740;   // the slots end there in the base
+constexpr int BAR_CONTROLS_RIGHT = 228;   // the slots end there right of the screen's middle (times the scale)
 constexpr float HIGHLIGHT_MIN_W = 7, HIGHLIGHT_MIN_H = 5;
 constexpr int BAR_MINIMAP = 73;            // the frame's place in PlayerBase.bar
 constexpr int WORLD_BOUNDS_BOTTOM = 0x40;  // World: the camera's limits (left, right, top, bottom from +0x34)
@@ -85,7 +93,7 @@ int vid_count() { return at<int>(world(), 0x290); }
 
 int g_size = 1;   // the step of the minimap the frame in use was made for
 // The player's choice: MinimapSize of the Players key, the text the script's SetReg writes (a
-// DWORD is taken too); 1 when it is absent or not 1-3.
+// DWORD is taken too); 0 (as the interface) when it is absent or not 1-3.
 int chosen_size() {
     HKEY key;
     if (RegOpenKeyExA(HKEY_CURRENT_USER, REG_KEY, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) return 1;
@@ -96,17 +104,18 @@ int chosen_size() {
     int value = 0;
     if (r == ERROR_SUCCESS && type == REG_SZ) value = std::atoi(text);
     if (r == ERROR_SUCCESS && type == REG_DWORD && size == 4) std::memcpy(&value, text, 4);
-    return value >= 1 && value <= MAX_SIZE ? value : 1;
+    return value >= 1 && value <= MAX_SIZE ? value : 0;
 }
 
 // The frame stays right of the bar's controls (the bar's base is centred).
-bool fits(int size, int screen_w) {
-    return size <= 1 || screen_w - size * FRAME_W >= (screen_w - BAR_WIDTH) / 2 + BAR_CONTROLS_END;
+bool fits(int size, int bar_scale, int screen_w) {
+    return size <= 1 || screen_w - size * FRAME_W >= screen_w / 2 + BAR_CONTROLS_RIGHT * bar_scale;
 }
 
-int size_for(int screen_w) {
+int size_for(int screen_w, int bar_scale) {
     int size = chosen_size();
-    while (size > 1 && !fits(size, screen_w)) --size;
+    if (size == 0) size = bar_scale;
+    while (size > 1 && !fits(size, bar_scale, screen_w)) --size;
     return size < 1 ? 1 : size;
 }
 
@@ -238,7 +247,7 @@ int __fastcall menu_nvid_under_cursor(uint8_t* menu) {
     const int nvid = at<int>(at<uint8_t*>(hover, 0x1c), 4);
     for (int big : VID_MINIMAP_BIG)
         if (nvid == big) return VID_MINIMAP;
-    return nvid;
+    return interface_original_nvid(nvid);   // the interface's bigger VIDs
 }
 
 bool g_installed = false;
@@ -251,7 +260,7 @@ bool g_installed = false;
 void* minimap_frame_for_screen() {
     if (!g_installed || !world() || !graphics()) return nullptr;
     const float* screen = reinterpret_cast<float*>(graphics() + 0x20c);   // width, height
-    const int k = size_for(static_cast<int>(screen[0]));
+    const int k = size_for(static_cast<int>(screen[0]), interface_scale());
     if (k < 2) return nullptr;
     const int nvid = VID_MINIMAP_BIG[k - 2];
     if (nvid >= vid_count() || !vid_slot(nvid) || !vid_slot(VID_MINIMAP)) {
@@ -271,28 +280,31 @@ void* minimap_frame_for_screen() {
     return original;
 }
 
-// menu_version.cpp: the size the bar would get on a screen this wide (the settings page's preview).
-int minimap_size_for_screen(int screen_w) { return size_for(screen_w); }
+// menu_version.cpp: the size the bar would get on a screen this wide (the settings page's preview), with the
+// interface's scale as it would be on the window.
+int minimap_size_for_screen(int screen_w) { return size_for(screen_w, interface_scale_for_window()); }
 
 void minimap_frame_back(void* original) {
     if (original) vid_slot(VID_MINIMAP) = static_cast<uint8_t*>(original);
 }
 
-// status_bar.cpp, after every Player_ShowStateBar: the camera's room below the map for a bigger
-// frame. The engine lets the camera go past the map's bottom by the bar's height less 2
+// status_bar.cpp, after every Player_ShowStateBar: the camera's room below the map for a frame bigger
+// than the interface. The engine lets the camera go past the map's bottom by the bar's height less 2
 // (boundsBottom = map height + 48), so the bar hides none of the map; the frame stands above the
 // bar in the corner - the original's 104 x 78 one hides the map's last 30 rows there, a part the
 // original never shows. A bigger frame would hide 208 x 108 px (twice) or 312 x 186 px (three
 // times) of the map's bottom right corner for good: units, trains and buildings there could not be
 // seen or clicked. So with a bigger frame the camera goes down as far as the frame is high, the
 // map's bottom edge up to the frame's top, and nothing the original shows is hidden. Below the map
-// the engine draws black (Graphics_DrawScene clears the view where it leaves the map).
+// the engine draws black (Graphics_DrawScene clears the view where it leaves the map). A frame of the
+// interface's own scale needs none of it: the bar is as many times higher, the engine's room with it
+// (the bar's height less 2), and the frame hides the original's corner in proportion - no strip.
 void minimap_bounds(void* player) {
     if (!g_installed || !world()) return;
     const int count = at<int>(player, 0x18);   // PlayerBase.bar
     if (count <= BAR_MINIMAP) return;
     uint8_t* frame = at<uint8_t**>(player, 0x20)[BAR_MINIMAP];
-    if (!frame || size_of_frame(frame) < 2) return;
+    if (!frame || size_of_frame(frame) <= interface_scale()) return;
     const float height = static_cast<float>(at<short>(at<uint8_t*>(frame, 0x1c), 0x2a8));
     float& bottom = at<float>(world(), WORLD_BOUNDS_BOTTOM);
     const float wanted = at<float>(world(), 0x2c) + height;
@@ -327,5 +339,5 @@ void install_minimap() {
                     reinterpret_cast<void*>(&menu_nvid_under_cursor), "MenuNVidUnderCursor");
     patch::write_call(DRAW_BRIGHTEN, nullptr, 0, reinterpret_cast<void*>(&brighten_call), 5);
     g_installed = true;
-    if (chosen_size() > 1) patch::log("minimap: size %d chosen on the settings page", chosen_size());
+    if (chosen_size() > 0) patch::log("minimap: size %d chosen on the settings page", chosen_size());
 }

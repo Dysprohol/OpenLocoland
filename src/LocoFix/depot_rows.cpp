@@ -22,7 +22,18 @@
 // hotkeys F11, F12, [ and ], which pass the unit's place in the list) are refused when the
 // icon says the depot cannot build the unit - the engine's own test reads bar object
 // 79 + entry, which for them is a label.
+//
+// At the interface's scale s (interface_scale.cpp) the list is the engine's, made with the bigger
+// VIDs and spaced s times wider: while Player_SetPanel runs, World.vids[455], [497] and [8] name the
+// scale's bigger copies (the engine makes the icons, the strip and the labels from them, so they are
+// counted, drawn and hit-tested as theirs), and afterwards every object the panel added is moved
+// from its place relative to the first slot's type icon (bar object 23, already at the scale) to s
+// times that - the strip, which the engine centres on the screen, only up. Our second row is a row
+// of the scale's height above.
 #include "patch.h"
+
+int interface_scale();                          // interface_scale.cpp
+uint8_t* interface_vid(int nvid, int scale);
 
 #include <cstdio>
 
@@ -33,6 +44,7 @@ constexpr uintptr_t HANDLE_PANEL_ACTION = 0x430ff0;
 constexpr uintptr_t OBJECTLIST_ADD = 0x44b970;
 constexpr uintptr_t OBJECT_SET_DIRECTION = 0x448660;
 constexpr uintptr_t OBJECT_SET_ARMY = 0x448550;
+constexpr uintptr_t OBJECT_MOVE_TO = 0x446640;
 constexpr uintptr_t PLAYER_CAN_BUILD = 0x432390;
 constexpr uintptr_t VID_GET_BUILD_TIME_SEC = 0x44e440;
 constexpr uintptr_t G_WORLD = 0x4a9d38;
@@ -42,6 +54,8 @@ constexpr int ACT_SET_BEHAVE = 95;
 constexpr int ACT_SET_TEXT = 120;
 constexpr int B_DEPO = 0x18;
 constexpr int PANEL_DEPOT_LIST = 2;
+constexpr int PANEL_DEPOT_QUEUE = 5;
+constexpr int FIRST_TYPE_ICON = 23;  // the bar's first slot's type icon: where the panel's rows start
 constexpr int ROW = 10;              // slots in a row
 constexpr float ROW_HEIGHT = 41.0f;  // the icon pitch of the panel
 
@@ -60,6 +74,7 @@ using CreateObject_t = uint8_t*(__fastcall*)(void* world, void* edx, void* vid, 
                                              float z, unsigned direction, void* parent);
 using ObjectListAdd_t = void(__fastcall*)(void* list, void* edx, void* object);
 using SetInt_t = void(__fastcall*)(void* object, void* edx, int value);
+using MoveTo_t = void(__fastcall*)(void* object, void* edx, float x, float y, float z);
 using CanBuild_t = int(__fastcall*)(void* player, void* edx, void* vid);
 using BuildTime_t = int(__fastcall*)(void* vid, void* edx);
 using Action_t = int(__fastcall*)(void* object, void* edx, int act, int var1, int var2, int var3);
@@ -100,7 +115,7 @@ uint8_t* copy_up(void* player, uint8_t* source, int rows_up) {
     auto create = reinterpret_cast<CreateObject_t>(at<void**>(world(), 0)[0x20 / 4]);
     const float x = at<float>(source, 0x30) - at<float>(world(), WORLD_CAMERA_X);
     const float y = at<float>(source, 0x34) - at<float>(world(), WORLD_CAMERA_X + 4);
-    uint8_t* object = create(world(), nullptr, at<void*>(source, 0x1c), x, y - ROW_HEIGHT * rows_up,
+    uint8_t* object = create(world(), nullptr, at<void*>(source, 0x1c), x, y - ROW_HEIGHT * interface_scale() * rows_up,
                              at<float>(source, 0x38), 0, nullptr);
     if (object)
         reinterpret_cast<ObjectListAdd_t>(OBJECTLIST_ADD)(static_cast<uint8_t*>(player) + 0x14, nullptr,
@@ -137,8 +152,8 @@ void add_second_row(void* player) {
     const short* list = at<short*>(depot, 0x9c);
     if (count <= ROW || !list) return;
     uint8_t** items = bar_items(player);
-    if (at<int>(at<uint8_t*>(items[FIRST_ICON], 0x1c), 4) != 455 ||
-        at<int>(at<uint8_t*>(items[STRIP], 0x1c), 4) != 497)
+    if (at<uint8_t*>(items[FIRST_ICON], 0x1c) != interface_vid(455, interface_scale()) ||
+        at<uint8_t*>(items[STRIP], 0x1c) != interface_vid(497, interface_scale()))
         return;   // not the bar this code knows
 
     copy_up(player, items[STRIP], 1);
@@ -180,8 +195,45 @@ void add_second_row(void* player) {
     }
 }
 
+// The panel's objects (bar objects from 80) s times as far from the first slot's type icon as the engine
+// put them; the strip (VID 497, centred on the screen by the engine) only in height.
+void scale_panel(void* player, int s) {
+    const int count = bar_count(player);
+    if (count <= FIRST_ICON) return;
+    uint8_t** items = bar_items(player);
+    uint8_t* anchor = items[FIRST_TYPE_ICON];
+    const float ax = at<float>(anchor, 0x30), ay = at<float>(anchor, 0x34) - at<float>(anchor, 0x38);
+    uint8_t* strip = interface_vid(497, s);
+    for (int i = FIRST_ICON; i < count; ++i) {
+        uint8_t* o = items[i];
+        if (!o) continue;
+        const float x = at<float>(o, 0x30), z = at<float>(o, 0x38), y = at<float>(o, 0x34) - z;
+        const float nx = at<uint8_t*>(o, 0x1c) == strip ? x : ax + (x - ax) * s;
+        const float ny = ay + (y - ay) * s;
+        reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, nx, ny + z, z);
+    }
+}
+
 void __fastcall set_panel(void* player, void* edx, int panel) {
+    const int s = interface_scale();
+    const int wanted = panel & ~0x10;
+    if (s <= 1 || bar_count(player) == 0 || (wanted != PANEL_DEPOT_LIST && wanted != PANEL_DEPOT_QUEUE)) {
+        g_set_panel(player, edx, panel);
+        if (s > 1) scale_panel(player, s);   // a panel that falls back to the unit bar adds nothing
+        add_second_row(player);
+        return;
+    }
+    // the engine makes the list's objects from World.vids: the scale's bigger copies meanwhile
+    uint8_t** vids = reinterpret_cast<uint8_t**>(world() + 0x294);
+    constexpr int SWAPPED[] = {455, 497, 8};
+    uint8_t* kept[3] = {};
+    for (int i = 0; i < 3; ++i) {
+        kept[i] = vids[SWAPPED[i]];
+        if (uint8_t* big = interface_vid(SWAPPED[i], s)) vids[SWAPPED[i]] = big;
+    }
     g_set_panel(player, edx, panel);
+    for (int i = 0; i < 3; ++i) vids[SWAPPED[i]] = kept[i];
+    scale_panel(player, s);
     add_second_row(player);
 }
 

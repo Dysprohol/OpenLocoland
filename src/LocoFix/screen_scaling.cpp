@@ -468,6 +468,15 @@ ATOM WINAPI RegisterClassA_scaling(const WNDCLASSA* cls) {
 // A point in the game area of the window -> the logical screen the game works in.
 void window_to_logical(POINT& p) { to_logical(p); }
 
+// The game area of the window in real pixels - the launcher's resolution (interface_scale.cpp); `w` and `h`
+// are left as they are before the first level has loaded.
+void window_size(int& w, int& h) {
+    if (g_window_w > 0 && g_window_h > 0) {
+        w = g_window_w;
+        h = g_window_h;
+    }
+}
+
 // True while a menu drawn for 1024x768 is shown (main menu, end screens, Esc menu).
 bool menu_background_shown() { return menu_on_screen(); }
 
