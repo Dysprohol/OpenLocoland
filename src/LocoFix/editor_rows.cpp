@@ -21,7 +21,10 @@ void PanelRows::begin(POINT mouse) {
     edit_font_size(FONT, cw, ch);
 }
 
-void PanelRows::tip(float l, float t, float r, float b, const std::string& text) { tips_.push_back({l, t, r, b, text}); }
+void PanelRows::tip(float l, float t, float r, float b, const std::string& text, bool first) {
+    if (first) tips_.insert(tips_.begin(), {l, t, r, b, text});
+    else tips_.push_back({l, t, r, b, text});
+}
 
 const char* PanelRows::tip_at(POINT m) const {
     if (GetTickCount() - drawn_ > 250) return nullptr;

@@ -1091,6 +1091,9 @@ void panel_open_factory(void* factory) {
     open(Panel::Factory);
 }
 
+// The arrow back of the Arrivals and factory panels' sub-pages, under the mouse (for its tip).
+bool panel_on_previous(POINT m) { return on_previous(m); }
+
 // editor_arrivals.cpp's frame: the device and the picture with the title, the picture's middle.
 void panel_frame(int picture_vid, const char* title) { draw_frame(picture_vid, title); }
 void panel_picture(float& x, float& y) {

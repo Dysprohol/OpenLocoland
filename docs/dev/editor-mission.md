@@ -560,6 +560,36 @@ Checked in play: with a limit of 1 on VID 20, F3 twice queued one and F4 (no lim
 a unit put into the list at 30 s (`UNLOCK vid 30 at 30 s, factory 1`) was there the next time the
 factory was selected (a factory already selected keeps showing its old list); the keys stay the game's
 own per unit (a list without the airship cart leaves F8 out).
+**The panel's rows** (2026-11-13; the maintainer's report: in the enemy factory's list of the authors' trains
+the last row lay on the page arrow, and every page should read more plainly - what can be clicked and what
+cannot). A page has 13 rows (`ROWS` from `TOP`, 14 px apart, the last clear of the button bar) and the strip
+above the title, and a row means the same in every army's factory (`ROW_HEAD`, `ROW_NOTE`, `ROW_LINE`,
+`ROW_ACTIONS` ... of `editor_factory.cpp`, named for the coming interface scale): row 0 the tabs (ours, the
+neutrals', the pirates': BUILD LIST, TRAINS IT BUILDS) or what the list under it is (the enemy's plan, the
+authors' trains, the AI's settings); row 1 (rows 1-2 on the build list) a note on what the factory does with
+it - ours: a click puts a unit in or takes it out, a neutral or pirate one: the AI builds nothing there -;
+then the page; under a list a groove line (row 11) and the actions (row 12) at the left - + NEW, COPY n,
+DELETE n, AI... - with the pages `< n/m >` at the row's right end; an entry's problem and the button that
+mends it in the strip above the title, as an arrival's in the Arrivals panel. The plan shows 4 entries a
+page (two rows each, row 10 kept for the game AI's limit once reached), the authors' trains 10 - both from the
+rows there are (`LIST_PAGE`, `TEMPLATE_PAGE`). The editor's own signs, the same on every page: a label ends
+with ":" and a note is in parentheses - neither is ever clicked -; a choice is lit under the mouse, and lit and
+underlined when it is set; "..." at its end opens another page (TEMPLATE..., AI..., CONVERT IT IN THE
+ARRIVALS PANEL...); - + change a number, < > move a car or turn the pages; a list entry's two rows are one
+choice. A text longer than its row is cut and ends with "." (an abbreviation's dot; trailing spaces and commas
+dropped first) and its whole text is the status line's while the mouse is over it (`fit`); a long note wraps
+at spaces into its rows (`note`). The arrow back at the bottom left says so in the status line ("Back one
+page", Esc and the right button too). What the old layout got wrong (found with the test steps `H` and `G<n>`,
+below, and `tools\rig\panel_rows_check.py`): the authors' trains' 12th row lay on the page arrows' row - a
+click on > took that train into the entry instead of turning the page; a neutral or pirate factory's note
+was drawn over the limit's note; with WHILE and a number, a repeat, NEXT and a point an entry's problem line
+fell into the button bar; texts cut at the panel's edge without a mark, a condition's > could go past it;
+"(CONVERT IT IN THE ARRIVALS PANEL)" was a choice that looked like a note and FROM THE START, AFTER THE LAST,
+AFTER TRAIN n IS MADE notes that looked like choices; a list entry joined name and task with ": " after
+names that hold one ("MORTAR + CARS: 7: PATROLS", now " - "). What the panel does did not change: the same
+choices, the same steps of the history, the same data. Test mode: `H` writes the open factory panel's texts
+and choices with their boxes to `LocoFix.log` (WM_COPYDATA 40052), `G<n>` clicks the middle of the n-th one
+(40051) as `k<x>:<y>` does - the same numbers in every language, so one list of steps walks all six.
 
 **A factory's plan** (`editor_factory.cpp` the panel, `editor_mission.cpp` "factories" and the
 runner's `PlanTact`). What a script can make a factory build, seen in play (probe maps of the

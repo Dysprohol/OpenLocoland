@@ -49,6 +49,7 @@ void edit_factory_change(void* factory, const std::vector<int>& items, const Fac
 void edit_commit_factories(const UiText& what, const FactoryState& before);
 void edit_pick_queue_point(void* factory, int train);
 // editor_panel.cpp
+bool panel_on_previous(POINT m);   // the arrow at the bottom left of the button bar
 void panel_frame(int picture_vid, const char* title);
 void panel_picture(float& x, float& y);
 void panel_open_vehicles_for_train(bool factory);
@@ -63,15 +64,30 @@ namespace {
 constexpr int STEP = PanelRows::STEP;
 constexpr int VID_PICTURE = 484, VID_ICONS = 944, VID_FRAME = 456;
 constexpr float LEFT = -182, LABEL = 88, ROW = PanelRows::ROW, ICON = 41;
-constexpr float TOP = -70, BOTTOM = 98;    // the first and the last row under the title, clear of the button bar
 constexpr int WIDTH = 46;                  // characters a row
+// A page's rows, from the picture's middle: ROWS of them from TOP down by ROW, the last one clear of the
+// button bar, and the strip above the title. Each row means the same for every army's factory
+// (DEVELOPERS.md "The panel" of a factory, the mock-ups in docs/dev/editor-mission.md):
+constexpr float TOP = -70, PROBLEM_ROW = -128;   // the first row; the strip: an entry's problem, as an arrival's
+constexpr int ROWS = 13;
+constexpr int ROW_HEAD = 0;       // the tabs, or what the list under it is
+constexpr int ROW_NOTE = 1;       // what the factory does, a note (two rows at most)
+constexpr int ROW_ICONS = 3;      // the build list's two rows of seven icons, from this row's top
+constexpr float ICONS_GAP = 2;    // ... and this far below it, clear of the note's last row
+constexpr int ROW_CHOSEN = 9;     // the build list's unit chosen last; its time and its limit under it
+constexpr int LIST_FIRST = 2;     // a plan list's first row
+constexpr int ROW_SPARE = ROWS - 3;     // under a list: the game AI's limit once reached
+constexpr int ROW_LINE = ROWS - 2;      // the line between a list and its actions
+constexpr int ROW_ACTIONS = ROWS - 1;   // the actions at the left, the pages at the right
+constexpr int LIST_PAGE = (ROW_SPARE - LIST_FIRST) / 2;   // entries a page, two rows each (4)
+constexpr int TEMPLATE_PAGE = ROW_LINE - 1;               // names a page, under the header (10)
+constexpr const char* CUT = ".";  // ends a text cut to its row (its whole text in the status line)
+constexpr uint32_t LINE_DARK = 0x90000000, LINE_LIGHT = 0x40f0e080;   // the line under a list: a groove
 constexpr int UNITS[] = {5, 10, 20, 25, 80, 85, 45, 30, 35, 82, 97, 90, 75, 62};   // the game's list, F1 ... ]
 const char* const KEYS[] = {"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "[", "]"};
 constexpr int UNIT_COUNT = sizeof UNITS / sizeof UNITS[0];
 constexpr int SHOWN_CARS = 6;
 constexpr int MAX_CARS = 16;   // the AI builds and takes a train of ARR_LENGTH (16) cars (ai_events.lgc, TrainsTactFunctions.lgc)
-constexpr int LIST_PAGE = 5;   // entries a page of the list (two rows each)
-constexpr int TEMPLATE_PAGE = 12;
 
 // What the panel offers - only what was seen working in play (DEVELOPERS.md, the factories).
 constexpr bool LATER_OFFERED = true;   // a unit in the list from a time on
@@ -135,10 +151,76 @@ const char* unit_name(int nvid) {
     return n ? n : "?";
 }
 
-// A text cut to the characters left of a row from x.
-std::string fit(const std::string& text, float x) {
-    const int room = static_cast<int>((g_px + LEFT + WIDTH * g_cw - x) / g_cw);
-    return room <= 0 ? std::string() : static_cast<int>(text.size()) <= room ? text : text.substr(0, room);
+float row_y(int k) { return g_py + TOP + k * ROW; }
+float left() { return g_px + LEFT; }
+float right_end() { return g_px + LEFT + WIDTH * g_cw; }   // where every row ends
+
+// A text cut to the characters left of the row at y from x: cut, it ends with CUT (trailing spaces and
+// commas dropped) and its whole text is the status line's while the mouse is over it.
+std::string fit(const std::string& text, float x, float y) {
+    const int room = static_cast<int>((right_end() - x) / g_cw);
+    if (room <= 0) return std::string();
+    if (static_cast<int>(text.size()) <= room) return text;
+    std::string cut = text.substr(0, room - std::strlen(CUT));
+    while (!cut.empty() && std::strchr(" ,:;-(", cut.back())) cut.pop_back();
+    g_rows.tip(x - 2, y - ROW / 2, right_end(), y + ROW / 2, text, true);
+    return cut + CUT;
+}
+
+// `head` + `tail` in the row at y from x; too long, `head` is cut (fit's mark) and `tail` - the task, the
+// price - stays whole; the whole text in the status line.
+std::string fit_head(const std::string& head, const std::string& tail, float x, float y) {
+    const int room = static_cast<int>((right_end() - x) / g_cw) - static_cast<int>(tail.size());
+    if (static_cast<int>(head.size()) <= room) return fit(head + tail, x, y);
+    if (room <= 2) return fit(head + tail, x, y);
+    std::string cut = head.substr(0, room - std::strlen(CUT));
+    while (!cut.empty() && std::strchr(" ,:;-(", cut.back())) cut.pop_back();
+    g_rows.tip(x - 2, y - ROW / 2, right_end(), y + ROW / 2, head + tail, true);
+    return cut + CUT + tail;
+}
+
+// A note - what something means, never a choice: in parentheses.
+std::string paren(const std::string& text) { return text.empty() || text.front() == '(' ? text : "(" + text + ")"; }
+
+// A note over `rows` rows from row k, wrapped at spaces; the last row cut (fit) when it is still too long.
+// (`rows` >= 1)
+void note(int k, int rows, const std::string& text) {
+    const std::string all = paren(text);
+    const size_t room = static_cast<size_t>(WIDTH);
+    std::vector<std::string> lines;
+    std::string line;
+    for (size_t p = 0; p < all.size();) {
+        size_t e = all.find(' ', p);
+        if (e == std::string::npos) e = all.size();
+        const std::string word = all.substr(p, e - p);
+        p = e + 1;
+        if (!line.empty() && line.size() + 1 + word.size() > room && static_cast<int>(lines.size()) < rows - 1) {
+            lines.push_back(line);
+            line.clear();
+        }
+        line += (line.empty() ? "" : " ") + word;
+    }
+    lines.push_back(line);
+    lines.resize(rows);   // a row each, an empty one too: the same texts in every language (the test's numbers)
+    for (int i = 0; i < rows; ++i) put(left(), row_y(k + i), fit(lines[i], left(), row_y(k + i)));
+}
+
+// The groove between a list and its actions.
+void line_under(int k) {
+    const float y = row_y(k);
+    edit_fill(left() - 2, y - 1, right_end() + 2, y, LINE_DARK);
+    edit_fill(left() - 2, y, right_end() + 2, y + 1, LINE_LIGHT);
+}
+
+// A list's pages at the right end of the actions' row: < n/m >.
+void pages_at_right(int* page, int count) {
+    if (count <= 1) return;
+    const float y = row_y(ROW_ACTIONS);
+    const std::string shown = ui_printf("%d/%d", *page + 1, count);
+    float x = right_end() - (shown.size() + 4) * g_cw;
+    x = put(x, y, "<", false, [page] { *page = (std::max)(0, *page - 1); });
+    x = put(x, y, shown);
+    put(x, y, ">", false, [page, count] { *page = (std::min)(count - 1, *page + 1); });
 }
 
 int army() { return (std::max)(0, (std::min)(3, edit_object_army(g_factory))); }
@@ -192,8 +274,9 @@ void set_limit(int nvid, int max) {
 
 int plan_size();   // below
 
-// The tabs of ours, the neutrals' and the pirates' factory: the build list, the trains of its plan.
-void draw_tabs(float y) {
+// The tabs of ours, the neutrals' and the pirates' factory (the head row): the build list, the trains of its plan.
+void draw_tabs() {
+    const float y = row_y(ROW_HEAD);
     float x = put(g_px + LEFT, y, ui_text("FactoryTabList", "BUILD LIST"), g_screen == Screen::Builds, [] { g_screen = Screen::Builds; });
     put(x + 2 * g_cw, y, ui_printf(ui_format("FactoryTabTrains", "TRAINS IT BUILDS: %d"), plan_size()), g_screen != Screen::Builds,
         [] { g_screen = Screen::Plan; });
@@ -201,11 +284,21 @@ void draw_tabs(float y) {
 
 void draw_list() {
     const std::vector<int> items = edit_factory_items(g_factory);
-    draw_tabs(g_py + TOP);
+    draw_tabs();
+    // what this list is for: the player's own, or the list of a factory the AI builds nothing in
+    if (army() == 2)
+        note(ROW_NOTE, 2, std::string(ui_text("FactoryIdle1", "THE AI BUILDS NOTHING HERE: THE PLAYER BUILDS")) + " " +
+                              ui_text("FactoryIdle2", "THIS LIST ONCE THE FACTORY IS CAPTURED"));
+    else if (army() == 3)   // only a neutral one is captured (CaptureTact, as the missions' LDepoCapture)
+        note(ROW_NOTE, 2, std::string(ui_text("FactoryPirate1", "THE AI BUILDS NOTHING HERE, AND THE PLAYER")) + " " +
+                              ui_text("FactoryPirate2", "CAPTURES ONLY NEUTRAL FACTORIES"));
+    else
+        note(ROW_NOTE, 2, ui_text("FactoryListNote", "A CLICK PUTS A UNIT IN THE LIST OR TAKES IT OUT"));
     int key = 0;
+    const float icons = row_y(ROW_ICONS) - ROW / 2 + ICONS_GAP + ICON / 2;   // the first row's middle
     for (int i = 0; i < UNIT_COUNT; ++i) {
         const int nvid = UNITS[i];
-        const float x = g_px + LEFT + (i % 7) * ICON + ICON / 2, y = g_py - 40 + (i / 7) * ICON;
+        const float x = g_px + LEFT + (i % 7) * ICON + ICON / 2, y = icons + (i / 7) * ICON;
         const bool in = std::find(items.begin(), items.end(), nvid) != items.end();
         const int later = later_of(nvid);
         const int frame = palette_icon(nvid);
@@ -221,32 +314,27 @@ void draw_list() {
     }
     const int nvid = UNITS[g_chosen];
     const bool in = std::find(items.begin(), items.end(), nvid) != items.end(), later = later_of(nvid) >= 0;
-    float x = label(g_py + 34, "FactoryChosen", "CHOSEN:");
-    put(x, g_py + 34, fit(ui_printf("%s (VID %d)", unit_name(nvid), nvid), x));
+    const float chosen = row_y(ROW_CHOSEN), from = row_y(ROW_CHOSEN + 1), most = row_y(ROW_CHOSEN + 2), why = row_y(ROW_CHOSEN + 3);
+    float x = label(chosen, "FactoryChosen", "CHOSEN:");
+    put(x, chosen, fit(ui_printf("%s (VID %d)", unit_name(nvid), nvid), x, chosen));
     if (!runs()) {
-        put(g_px + LEFT, g_py + 50, ui_text("FactoryNeedsArrivals", "LATER UNITS, LIMITS: IN A MAP WITH ARRIVALS"));
-        put(g_px + LEFT, g_py + 64, ui_text("FactoryConvert", "(CONVERT IT IN THE ARRIVALS PANEL)"), false, [] { panel_open_arrivals(); });
+        note(ROW_CHOSEN + 1, 1, ui_text("FactoryNeedsArrivals", "LATER UNITS, LIMITS: IN A MAP WITH ARRIVALS"));
+        put(g_px + LEFT, most, fit(ui_text("FactoryConvert", "CONVERT IT IN THE ARRIVALS PANEL..."), g_px + LEFT, most), false,
+            [] { panel_open_arrivals(); });
     } else {
         if (LATER_OFFERED && (in || later)) {
-            x = label(g_py + 50, "FactoryFrom", "IN THE LIST:");
+            x = label(from, "FactoryFrom", "IN THE LIST:");
             const int t = (std::max)(0, later_of(nvid));
-            number(x, g_py + 50, t ? ui_printf(ui_format("FactoryAfter", "AFTER %s"), seconds(t).c_str()) : ui_text("ArrAtStart", "AT THE START"),
+            number(x, from, t ? ui_printf(ui_format("FactoryAfter", "AFTER %s"), seconds(t).c_str()) : ui_text("ArrAtStart", "AT THE START"),
                    [nvid, t](int by) { set_unit(nvid, true, (std::max)(0, t + by * 30), {"OpFactoryLater", "factory unit later"}); });
         }
         if (LIMIT_OFFERED) {
-            x = label(g_py + 64, "FactoryLimit", "AT MOST:");
+            x = label(most, "FactoryLimit", "AT MOST:");
             const int max = limit_of(nvid);
-            number(x, g_py + 64, max ? std::to_string(max) : ui_text("FactoryNoLimit", "NO LIMIT"),
+            number(x, most, max ? std::to_string(max) : ui_text("FactoryNoLimit", "NO LIMIT"),
                    [nvid, max](int by) { set_limit(nvid, (std::max)(0, max + by)); });
-            put(g_px + LEFT, g_py + 78, ui_text("FactoryLimitNote", "(OF THE PLAYER'S ON THE MAP, BUILT OR QUEUED)"));
+            put(g_px + LEFT, why, fit(paren(ui_text("FactoryLimitNote", "(OF THE PLAYER'S ON THE MAP, BUILT OR QUEUED)")), g_px + LEFT, why));
         }
-    }
-    if (army() == 2) {
-        put(g_px + LEFT, g_py + BOTTOM - ROW, ui_text("FactoryIdle1", "THE AI BUILDS NOTHING HERE: THE PLAYER BUILDS"));
-        put(g_px + LEFT, g_py + BOTTOM, ui_text("FactoryIdle2", "THIS LIST ONCE THE FACTORY IS CAPTURED"));
-    } else if (army() == 3) {   // only a neutral one is captured (CaptureTact, as the missions' LDepoCapture)
-        put(g_px + LEFT, g_py + BOTTOM - ROW, ui_text("FactoryPirate1", "THE AI BUILDS NOTHING HERE, AND THE PLAYER"));
-        put(g_px + LEFT, g_py + BOTTOM, ui_text("FactoryPirate2", "CAPTURES ONLY NEUTRAL FACTORIES"));
     }
 }
 
@@ -395,40 +483,41 @@ void open_entry(int i) {
 }
 
 void draw_plan_list() {
-    float y = g_py + TOP;
-    if (enemy()) put(g_px + LEFT, y, ui_text("PlanEnemyHead", "THE AI BUILDS THEM IN ITS FIRST FREE FACTORY:"));
-    else draw_tabs(y);
-    y += ROW;
+    if (enemy()) put(g_px + LEFT, row_y(ROW_HEAD), fit(ui_text("PlanEnemyHead", "THE AI BUILDS THEM IN ITS FIRST FREE FACTORY:"), g_px + LEFT, row_y(ROW_HEAD)));
+    else draw_tabs();
     if (!enemy() && !runs()) {   // the runner orders the factory: a map that runs arrivals
-        put(g_px + LEFT, y, ui_text("PlanNeedsArrivals", "TRAINS BY THE SCRIPT: IN A MAP WITH ARRIVALS"));
-        put(g_px + LEFT, y + ROW, ui_text("FactoryConvert", "(CONVERT IT IN THE ARRIVALS PANEL)"), false, [] { panel_open_arrivals(); });
+        note(ROW_NOTE, 1, ui_text("PlanNeedsArrivals", "TRAINS BY THE SCRIPT: IN A MAP WITH ARRIVALS"));
+        const float y = row_y(ROW_NOTE + 1);
+        put(g_px + LEFT, y, fit(ui_text("FactoryConvert", "CONVERT IT IN THE ARRIVALS PANEL..."), g_px + LEFT, y), false, [] { panel_open_arrivals(); });
         return;
     }
+    // what the factory does with them
+    note(ROW_NOTE, 1, enemy() ? ui_printf(ui_format("PlanEnemyNote", "ONE AT A TIME, WHILE FEWER THAN %d ATTACK"), mission_factories().ai.limit)
+                              : std::string(ui_text("PlanOwnNote", "CAR BY CAR, PAID BY ITS ARMY, ANY CARS")));
     const std::vector<int> e = entries();
     const int n = static_cast<int>(e.size());
     const int pages = (std::max)(1, (n + LIST_PAGE - 1) / LIST_PAGE);
     g_list_page = (std::max)(0, (std::min)(g_list_page, pages - 1));
+    float y = row_y(LIST_FIRST);
     if (n == 0)
-        put(g_px + LEFT, y, enemy() ? ui_text("PlanEmpty", "NOTHING YET: + NEW MAKES ONE")
-                                    : ui_text("PlanEmptyOwn", "NOTHING YET: + NEW ORDERS A TRAIN"));
+        note(LIST_FIRST, 1, enemy() ? ui_text("PlanEmpty", "NOTHING YET: + NEW MAKES ONE") : ui_text("PlanEmptyOwn", "NOTHING YET: + NEW ORDERS A TRAIN"));
+    // an entry: two rows, one choice - its number, name and task; when and how often
     for (int k = g_list_page * LIST_PAGE; k < n && k < (g_list_page + 1) * LIST_PAGE; ++k) {
         const int i = e[k];
         const FactoryTrain& t = queue()[i];
         const float x = g_px + LEFT;
-        std::string head = std::to_string(k + 1) + ". " + train_words(t) + ": " + ui_text(TASK_KEYS[t.task], TASK_NAMES[t.task]);
-        const bool over = g_rows.hover(x - 2, y - ROW / 2, x + WIDTH * g_cw, y + ROW * 1.5f);
-        put(x, y, fit(head, x), i == g_entry || over);
-        put(x + 3 * g_cw, y + ROW, fit(when_words(t, i), x + 3 * g_cw), i == g_entry || over);
-        g_rows.area(x - 2, y - ROW / 2, x + WIDTH * g_cw, y + ROW * 1.5f, [i] { open_entry(i); });
+        const std::string head = std::to_string(k + 1) + ". " + train_words(t), task = std::string(" - ") + ui_text(TASK_KEYS[t.task], TASK_NAMES[t.task]);
+        const bool over = g_rows.hover(x - 2, y - ROW / 2, right_end(), y + ROW * 1.5f);
+        put(x, y, fit_head(head, task, x, y), i == g_entry || over);
+        put(x + 3 * g_cw, y + ROW, fit(when_words(t, i), x + 3 * g_cw, y + ROW), i == g_entry || over);
+        g_rows.area(x - 2, y - ROW / 2, right_end(), y + ROW * 1.5f, [i] { open_entry(i); });
         y += 2 * ROW;
     }
-    // what the factory does with them
-    std::string note = enemy() ? ui_printf(ui_format("PlanEnemyNote", "ONE AT A TIME, WHILE FEWER THAN %d ATTACK"), mission_factories().ai.limit)
-                               : ui_text("PlanOwnNote", "CAR BY CAR, PAID BY ITS ARMY, ANY CARS");
-    if (enemy() && !ai_limit().empty()) note = ai_limit();
-    put(g_px + LEFT, g_py + BOTTOM - ROW, fit(note, g_px + LEFT));
-    // + NEW, COPY n, DELETE n (the entry opened last), AI..., the pages
-    float x = put(g_px + LEFT, g_py + BOTTOM, ui_text("ArrNew", "+ NEW"), false, [] {
+    if (enemy()) put(g_px + LEFT, row_y(ROW_SPARE), fit(ai_limit(), g_px + LEFT, row_y(ROW_SPARE)));   // empty until reached
+    line_under(ROW_LINE);
+    // + NEW, COPY n, DELETE n (the entry opened last), AI... at the left, the pages at the right
+    y = row_y(ROW_ACTIONS);
+    float x = put(g_px + LEFT, y, ui_text("ArrNew", "+ NEW"), false, [] {
         change_all({"OpQueueAdd", "factory queue train"}, [](FactoryState& f) {
             FactoryTrain t;
             const std::vector<int> e = entries();
@@ -445,29 +534,24 @@ void draw_plan_list() {
     });
     if (valid()) {
         const int shown = number_of(g_entry);
-        x = put(x + g_cw, g_py + BOTTOM, ui_printf(ui_format("ArrCopyN", "COPY %d"), shown), false, [] {
+        x = put(x + g_cw, y, ui_printf(ui_format("ArrCopyN", "COPY %d"), shown), false, [] {
             change_all({"OpPlanCopy", "factory plan copy"}, [](FactoryState& f) { f.queue.insert(f.queue.begin() + g_entry + 1, f.queue[g_entry]); });
         });
-        x = put(x + g_cw, g_py + BOTTOM, ui_printf(ui_format("ArrDeleteN", "DELETE %d"), shown), false, [] {
+        x = put(x + g_cw, y, ui_printf(ui_format("ArrDeleteN", "DELETE %d"), shown), false, [] {
             change_all({"OpQueueDelete", "factory queue train deleted"}, [](FactoryState& f) { f.queue.erase(f.queue.begin() + g_entry); });
             g_entry = -1;
         });
     }
-    if (enemy()) x = put(x + g_cw, g_py + BOTTOM, ui_text("PlanAi", "AI..."), false, [] { g_screen = Screen::Ai; });
-    if (pages > 1) {
-        x = put(x + g_cw, g_py + BOTTOM, "<", false, [] { --g_list_page; });
-        x = put(x, g_py + BOTTOM, ui_printf("%d/%d", g_list_page + 1, pages));
-        put(x, g_py + BOTTOM, ">", false, [pages] { g_list_page = (std::min)(pages - 1, g_list_page + 1); });
-    }
+    if (enemy()) x = put(x + g_cw, y, ui_text("PlanAi", "AI..."), false, [] { g_screen = Screen::Ai; });
+    pages_at_right(&g_list_page, pages);
 }
 
 // ---- an entry ----
 
 float draw_name(const FactoryTrain& t, float y) {
     float x = label(y, "PlanTrain", "TRAIN:");
-    std::string name = train_words(t);
-    if (!enemy()) name += ui_printf(ui_format("PlanPrice", ", PRICE %d"), price_of(t));
-    put(x, y, fit(name, x));
+    const std::string price = enemy() ? std::string() : ui_printf(ui_format("PlanPrice", ", PRICE %d"), price_of(t));
+    put(x, y, fit_head(train_words(t), price, x, y));
     return y + ROW;
 }
 
@@ -565,9 +649,12 @@ float draw_when(const FactoryTrain& t, float y) {
     float x = label(y, "ArrWhen", "WHEN:");
     x = put(x, y, ui_text("PlanWhenAt", "AT"), t.when == WHEN_AT, pick(WHEN_AT));
     if (!runs()) {   // the authors' queue: each entry once, at its time
-        number(g_px + LEFT + LABEL, y + ROW, seconds(t.time), time);
-        put(g_px + LEFT + LABEL, y + 2 * ROW, ui_text("PlanMoreArrivals", "MORE IN A MAP WITH ARRIVALS"), false, [] { panel_open_arrivals(); });
-        return y + 3 * ROW;
+        const float vx = g_px + LEFT + LABEL;
+        number(vx, y + ROW, seconds(t.time), time);
+        put(vx, y + 2 * ROW, fit(paren(ui_text("PlanMoreArrivals", "MORE IN A MAP WITH ARRIVALS")), vx, y + 2 * ROW));
+        put(vx, y + 3 * ROW, fit(ui_text("FactoryConvert", "CONVERT IT IN THE ARRIVALS PANEL..."), vx, y + 3 * ROW), false,
+            [] { panel_open_arrivals(); });
+        return y + 4 * ROW;
     }
     x = put(x + g_cw, y, ui_text("PlanWhenAfter", "AFTER ANOTHER"), t.when == WHEN_AFTER, pick(WHEN_AFTER));
     put(x + g_cw, y, ui_text("PlanWhenIf", "WHILE"), t.when == WHEN_IF, pick(WHEN_IF));
@@ -579,7 +666,7 @@ float draw_when(const FactoryTrain& t, float y) {
                                         r.cond_n = mission_condition(r.cond).first;
                                     }); });
         const Condition& c = mission_condition(t.cond);
-        x = put(x, y, fit(ui_text(c.key, c.english), x), true);
+        x = put(x, y, fit(ui_text(c.key, c.english), x + 2 * g_cw, y), true);   // room for " >"
         x = put(x, y, ">", false, [] { change({"OpPlanWhen", "factory plan time"}, [](FactoryTrain& r) {
                                         r.cond = next_condition(r.cond, 1);
                                         r.cond_n = mission_condition(r.cond).first;
@@ -598,10 +685,10 @@ float draw_when(const FactoryTrain& t, float y) {
     } else if (t.when == WHEN_AFTER) {   // the entry before it in this list
         x = number(vx, y, seconds(t.time), time);
         const int before = number_of(g_entry) - 1;
-        if (before > 0) put(x, y, fit(ui_printf(ui_format("PlanAfterBuilt", "AFTER TRAIN %d IS MADE"), before), x));
+        if (before > 0) put(x, y, fit(paren(ui_printf(ui_format("PlanAfterBuilt", "AFTER TRAIN %d IS MADE"), before)), x, y));
     } else {
         x = number(vx, y, seconds(t.time), time);
-        put(x, y, fit(ui_text("PlanFromStart", "FROM THE START"), x));
+        put(x, y, fit(paren(ui_text("PlanFromStart", "FROM THE START")), x, y));
     }
     return y + ROW;
 }
@@ -626,13 +713,13 @@ float draw_repeat(const FactoryTrain& t, float y) {
         x = number(x, y, seconds(t.every), [](int by) {
             change({"OpPlanRepeat", "factory plan repeat"}, [by](FactoryTrain& r) { r.every = (std::max)(10, r.every + by * edit_time_step()); });
         });
-        put(x, y, fit(ui_text("PlanEveryNote", "AFTER THE LAST"), x));
+        put(x, y, fit(paren(ui_text("PlanEveryNote", "AFTER THE LAST")), x, y));
         y += ROW;
         if (army() != 0) {   // an AI army's: counted from the last one made, or rebuilt once it is lost
             x = label(y, "PlanNext", "NEXT:");
             x = put(x, y, ui_text("PlanAfterMade", "AFTER THE LAST IS MADE"), !t.renew,
                     [] { change({"OpPlanRepeat", "factory plan repeat"}, [](FactoryTrain& r) { r.renew = false; }); });
-            put(x + g_cw, y, fit(ui_text("PlanAfterLost", "ITS LOSS"), x + g_cw), t.renew,
+            put(x + g_cw, y, fit(ui_text("PlanAfterLost", "ITS LOSS"), x + g_cw, y), t.renew,
                 [] { change({"OpPlanRepeat", "factory plan repeat"}, [](FactoryTrain& r) { r.renew = true; }); });
             y += ROW;
         }
@@ -662,17 +749,18 @@ void draw_entry() {
         return;
     }
     const FactoryTrain t = queue()[g_entry];
-    float y = g_py + TOP;
+    float y = row_y(0);
     y = draw_name(t, y);
     y = draw_cars(t, y);
     y = draw_when(t, y);
     y = draw_repeat(t, y);
-    y = draw_then(t, y);
+    y = draw_then(t, y);   // at most the last row (WHILE with a number, repeated, NEXT, a point)
+    // the problem and the button that mends it: in the strip above the title, as an arrival's
     Problem p;
     if (problem_of(t, p)) {
-        const float py = (std::max)(y, g_py + BOTTOM);
-        const float x = put(g_px + LEFT, py, p.text);
-        put(x, py, fit(p.button, x), false, p.act);
+        const float py = g_py + PROBLEM_ROW;
+        const float x = put(g_px + LEFT, py, fit(p.text, g_px + LEFT, py));
+        put(x, py, fit(p.button, x, py), false, p.act);
     }
 }
 
@@ -682,11 +770,11 @@ void draw_templates() {
     const std::vector<AuthorTrain>& t = mission_author_trains();
     const int pages = (std::max)(1, (static_cast<int>(t.size()) + TEMPLATE_PAGE - 1) / TEMPLATE_PAGE);
     g_template_page = (std::max)(0, (std::min)(g_template_page, pages - 1));
-    float y = g_py + TOP;
-    put(g_px + LEFT, y, ui_text("ArrTemplatesHead", "THE AUTHORS' TRAINS (A CLICK TAKES ONE):"));
+    float y = row_y(ROW_HEAD);
+    put(g_px + LEFT, y, fit(ui_text("ArrTemplatesHead", "THE AUTHORS' TRAINS (A CLICK TAKES ONE):"), g_px + LEFT, y));
     y += ROW;
     for (int i = g_template_page * TEMPLATE_PAGE; i < static_cast<int>(t.size()) && i < (g_template_page + 1) * TEMPLATE_PAGE; ++i) {
-        put(g_px + LEFT + 2 * g_cw, y, fit(mission_author_train_name(t[i]), g_px + LEFT + 2 * g_cw), false, [i] {
+        put(g_px + LEFT + 2 * g_cw, y, fit(mission_author_train_name(t[i]), g_px + LEFT + 2 * g_cw, y), false, [i] {
             const std::vector<int> cars = mission_author_trains()[i].cars;
             change({"OpQueueCars", "factory queue train"}, [cars](FactoryTrain& r) {
                 r.cars = cars;
@@ -697,11 +785,8 @@ void draw_templates() {
         });
         y += ROW;
     }
-    if (pages > 1) {
-        float x = put(g_px + LEFT, g_py + BOTTOM, "<", false, [] { --g_template_page; });
-        x = put(x, g_py + BOTTOM, ui_printf("%d/%d", g_template_page + 1, pages));
-        put(x, g_py + BOTTOM, ">", false, [pages] { g_template_page = (std::min)(pages - 1, g_template_page + 1); });
-    }
+    line_under(ROW_LINE);
+    pages_at_right(&g_template_page, pages);
 }
 
 // ---- the AI's knobs, three rows each: what it is and its value, the authors' name, what the game
@@ -717,7 +802,7 @@ void change_ai(const std::function<void(AiKnobs&)>& f) {
 float knob_rows(float y, const char* key, const char* english, const char* name, const char* note_key, const char* note) {
     put(g_px + LEFT, y, ui_text(key, english));
     put(g_px + LEFT + 2 * g_cw, y + ROW, name);
-    put(g_px + LEFT + 2 * g_cw, y + 2 * ROW, fit(ui_text(note_key, note), g_px + LEFT + 2 * g_cw));
+    put(g_px + LEFT + 2 * g_cw, y + 2 * ROW, fit(paren(ui_text(note_key, note)), g_px + LEFT + 2 * g_cw, y + 2 * ROW));
     return y + 3 * ROW + 4;
 }
 
@@ -737,7 +822,7 @@ float knob_choice(float y, const char* key, const char* english, const char* nam
 void draw_ai() {
     const AiKnobs ai = mission_factories().ai;
     g_ai_page = (std::max)(0, (std::min)(g_ai_page, AI_PAGES - 1));
-    float y = g_py + TOP;
+    float y = row_y(ROW_HEAD);
     put(g_px + LEFT, y, ui_text("AiHead", "THE AI'S SETTINGS:"));
     y += ROW + 4;
     if (g_ai_page == 0) {
@@ -778,9 +863,8 @@ void draw_ai() {
                         [](int by) { change_ai([by](AiKnobs& a) { a.all_attack = (std::max)(0, a.all_attack + by); }); }, "AiAllAttackNote",
                         "ONLY MISSION 2 READS IT: NO EFFECT HERE");
     }
-    float x = put(g_px + LEFT, g_py + BOTTOM, "<", false, [] { g_ai_page = (std::max)(0, g_ai_page - 1); });
-    x = put(x, g_py + BOTTOM, ui_printf("%d/%d", g_ai_page + 1, AI_PAGES));
-    put(x, g_py + BOTTOM, ">", false, [] { g_ai_page = (std::min)(AI_PAGES - 1, g_ai_page + 1); });
+    line_under(ROW_LINE);
+    pages_at_right(&g_ai_page, AI_PAGES);
 }
 
 }  // namespace
@@ -816,6 +900,8 @@ void factory_draw(POINT m) {
     g_hold_tip = under ? ui_printf(ui_format("TipHoldUnit", "%s (VID %d): let go to put it here"), unit_name(under), under) : std::string();
 }
 
+bool factory_has_back();   // below
+
 // Test mode (editor.cpp's panel commands): what the panel's last frame drew.
 const PanelRows& factory_rows() { return g_rows; }
 
@@ -823,6 +909,7 @@ bool factory_click(POINT m) { return g_rows.press(m) || g_rows.click(m); }
 bool factory_release(POINT m) { return g_rows.release(m); }   // as arrivals_release
 const char* factory_tip(POINT m) {
     if (!g_hold_tip.empty() && g_rows.held()) return g_hold_tip.c_str();
+    if (factory_has_back() && panel_on_previous(m)) return ui_text("TipPanelBack", "Back one page (Esc and the right button too)");
     return g_rows.tip_at(m);
 }
 

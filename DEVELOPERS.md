@@ -93,7 +93,7 @@ Paragraphs: Editing objects; Placing over objects, the track as a help; Placing 
 
 Sections: "Editor mode" (continued).
 
-Paragraphs: Mission settings and push lines; The enemy's trains of the script; Train arrivals; Capturing; The AI and the trains of an editor map - the review of 2026-11-05; The trains' orders; A train placed on a light's line did nothing; A target and a start; Every army the same orders; guarding an area; AREA watches from where the train stands; The armies' fight rules; What a row does, and click-and-hold; The templates; The panel; A factory's build options; A factory's plan; The data; The script; Rebuilt when lost; The AI's knobs.
+Paragraphs: Mission settings and push lines; The enemy's trains of the script; Train arrivals; Capturing; The AI and the trains of an editor map - the review of 2026-11-05; The trains' orders; A train placed on a light's line did nothing; A target and a start; Every army the same orders; guarding an area; AREA watches from where the train stands; The armies' fight rules; What a row does, and click-and-hold; The templates; The panel; A factory's build options; The panel's rows; A factory's plan; The data; The script; Rebuilt when lost; The AI's knobs.
 
 ### [editor-ground.md](docs/dev/editor-ground.md) (~95 KB)
 
