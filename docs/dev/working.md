@@ -305,10 +305,16 @@ registry key, and so the guest - a throw-away Windows of its own - can be set up
   longest ago goes next, and while it waits (for the box to empty, its display, room) no later job
   overtakes it. *Limits* (set when the box starts): at most `-MaxJobs` 4 jobs and `-MaxGames` 6 games
   at once (a missions job counts its lanes; a single larger job still runs, then alone), box memory
-  `-MemoryMB` 8192. *Checked* (2026-11-13): three builds at once, each its own language and frame
-  limit; a hung job killed at its timeout while the job beside it closed normally; an exclusive job
-  waiting for the running one and then holding the box; the turns of two callers; the 20 missions
-  alone and beside two other game jobs (6 games at once): the same report rows, 89 and 90 s.
+  `-MemoryMB` 8192. *Checked* (2026-11-13, in the shared box while other sessions used it): three
+  builds at once at one resolution, each its own language and frame limit; two resolutions never at
+  once; a job asking 150 % (the TV) and the next naming none getting the default; a hung job killed
+  at its timeout while the jobs beside it closed normally; an exclusive job waiting for the running
+  ones and then holding the box; a fresh-box job restarting the box with the queue kept; the turns of
+  two callers; an older `rig.ps1` queuing into the new agent and the other way round; the 20 missions
+  alone and beside two other game jobs (6 games at once): the same report rows (screenshots differ as
+  much as any two runs do), 89 and 90 s. 8 and 12 games at once still passed (missions 10-20 % and
+  30-45 % slower). Under that load `test_game.ps1` once read the game's screenshot before the game
+  had finished writing it (it waited a fixed 300 ms); it now waits until the file is whole.
 - *Reading `-Status`.* `agent protocol 2: several jobs at once`, then the display (and the default),
   how many games and jobs run of the limits, one line per running job (slot, or `ALONE` and why;
   seconds of its timeout) and one per waiting job with why it waits: `waits its turn: <job> goes

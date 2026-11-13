@@ -321,8 +321,14 @@ function Game-Shot($h, $file) {
     $tga = Get-ChildItem $screens -Filter *.tga -ErrorAction SilentlyContinue | Where-Object { $before -notcontains ($_.FullName + $_.LastWriteTime.Ticks) } | Select-Object -First 1
   } while (-not $tga -and (Get-Date) -lt $deadline)
   if (-not $tga) { return $false }
-  Start-Sleep -Milliseconds 300
-  $b = [IO.File]::ReadAllBytes($tga.FullName)
+  # read once the game has let go of the file and it is whole: on a busy machine (the test rig runs
+  # several games at once) writing it takes longer than the 300 ms that used to be waited
+  $b = $null; $deadline = (Get-Date).AddSeconds(10)
+  do { Start-Sleep -Milliseconds 300
+    try { $b = [IO.File]::ReadAllBytes($tga.FullName) } catch { $b = $null }
+    if ($b -and ($b.Length -lt 18 -or $b.Length -lt 18 + $b[0] + [BitConverter]::ToUInt16($b, 12) * [BitConverter]::ToUInt16($b, 14) * ($b[16] / 8))) { $b = $null }
+  } while (-not $b -and (Get-Date) -lt $deadline)
+  if (-not $b) { return $false }
   $w = [BitConverter]::ToUInt16($b, 12); $hh = [BitConverter]::ToUInt16($b, 14); $bpp = $b[16]; $top = ($b[17] -band 0x20) -ne 0
   $bytes = $bpp / 8; $off = 18 + $b[0]
   $fmt = if ($bytes -eq 4) { [Drawing.Imaging.PixelFormat]::Format32bppRgb } else { [Drawing.Imaging.PixelFormat]::Format24bppRgb }
