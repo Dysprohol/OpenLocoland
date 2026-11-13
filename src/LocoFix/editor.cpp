@@ -171,7 +171,8 @@ constexpr int TEST_RENAME = 40048;    // test mode: WM_COPYDATA <name> - the map
 constexpr int TEST_DELETE = 40049;    // test mode: WM_COPYDATA - the map deleted (Rename or delete)
 constexpr int TEST_FACTORY = 40047;   // test mode: WM_COPYDATA "x y" - the panel of the factory there
 constexpr int TEST_PICK = 40050;      // test mode: WM_COPYDATA "nvid army" - that object of the palette to place
-constexpr int TEST_PANEL_ROW = 40051;   // test mode: WM_COPYDATA "n" - the middle of the factory panel's n-th text or choice
+constexpr int TEST_PANEL_ROW = 40051;   // test mode: WM_COPYDATA "n" or "=[k|]text" - the middle of the factory panel's n-th
+                                        // text or choice, or of the k-th (1st) whose text begins so
 constexpr int TEST_PANEL_ROWS = 40052;  // test mode: WM_COPYDATA - the factory panel's texts and choices into the log
 #if LOCOFIX_SAVE_TEST
 constexpr int TEST_VID_CHECK = 40090;   // the test build: c40090 reads and writes every ground image both ways (editor_newmap.cpp)
@@ -1561,7 +1562,20 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
                                    rows[i].l, rows[i].t, rows[i].r, rows[i].b, rows[i].text.c_str());
                     return TRUE;
                 }
-                const int n = std::atoi(path.c_str());
+                int n = std::atoi(path.c_str());
+                if (!path.empty() && path[0] == '=') {   // by its text: the same steps for builds with other numbers
+                    std::string text = path.substr(1);
+                    int k = 1;
+                    const size_t bar = text.find('|');
+                    if (bar != std::string::npos && bar > 0 && bar <= 2 && std::isdigit(static_cast<unsigned char>(text[0]))) {
+                        k = std::atoi(text.c_str());
+                        text = text.substr(bar + 1);
+                    }
+                    n = -1;
+                    for (size_t i = 0; i < rows.size() && n < 0; ++i)
+                        if (rows[i].text.compare(0, text.size(), text) == 0 && !rows[i].text.empty() && --k == 0) n = static_cast<int>(i);
+                    if (n < 0) patch::log("panel row \"%s\": none", path.c_str() + 1);
+                }
                 if (n < 0 || n >= static_cast<int>(rows.size())) return 0;
                 const PanelRows::Drawn& d = rows[n];
                 const int x = static_cast<int>((d.l + d.r) / 2), y = static_cast<int>((d.t + d.b) / 2);
