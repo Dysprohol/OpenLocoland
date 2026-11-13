@@ -559,23 +559,60 @@ map point (the mouse's map position is taken from the rectangle), and the cursor
 minimap's. The frame's opening is columns 8-97 and rows 9-73 of the picture; the engine's
 rectangle starts at row 10 (one too low) and the view's highlight follows the camera 48 px past the
 map's bottom (`boundsBottom` = map height + 50 - 2, so the map's last rows can come up over the
-bar) - fixed in LocoFix. LocoFix also lets the player make the minimap twice or three times as big
-(a row of ours on the game's settings page, `game/maps/script/optfields.lgc`, which keeps
-`MinimapSize` "1"-"3" in the Players key like the sound settings; absent = the original size; read
-each time the bar is built, so it applies from the next mission or when the Esc menu closes; a size
-is used only where it keeps the frame clear of the bar's slots, else the biggest that does), as VIDs
-950 and 951
+bar) - fixed in LocoFix. In LocoFix the minimap follows the interface's size ("The interface's
+size" below) or the player's own choice: a row of ours on the game's settings page
+(`game/maps/script/optfields.lgc`) keeps `MinimapSize` in the Players key like the sound settings -
+"0" or absent = as the interface, "1"-"3" = that size; read each time the bar is built, so it
+applies from the next mission or when the Esc menu closes; a size is used only where it keeps the
+frame clear of the bar's slots (228 px right of the screen's middle, times the interface's scale),
+else the biggest that does. The bigger frames are VIDs 950 and 951
 - the frame enlarged pixel by pixel (`patch_data.make_minimap_frames`), the menu box with it - put
 into `World.vids[464]` while `Player_ShowStateBar` builds the bar, so the engine places it by its
 own size; `MenuNVidUnderCursor` answers 464 for them, and the points, dots and the smallest
 highlight (7 x 5 px) grow by the same step. The frame stands above the bar in the map's bottom right
 corner - the original one hides the map's last 30 rows there, the bigger ones would hide 208 x 108 or
-312 x 186 px for good - so with a bigger frame the camera may go below the map as far as the frame is
-high (`boundsBottom` = map height + the frame's height, set after every `Player_ShowStateBar`); there
+312 x 186 px for good - so with a frame bigger than the interface the camera may go below the map as
+far as the frame is high (`boundsBottom` = map height + the frame's height, set after every
+`Player_ShowStateBar`); with a frame of the interface's own scale the bar is as many times higher and
+the engine's own room (the bar's height less 2) leaves the corner hidden in the original's proportion,
+with no strip below the map; there
 the engine draws what it draws outside a map: the edge of the map's ground (flat lava on mission
 13, water on mission 8) or black (mission 17); at the original size the bounds are the engine's
 own. The held editor shows no minimap: it releases the state bar
 (`Player_ReleaseLevel`) and draws its own bar; Run the level has the game's.
+
+**The interface's size** (LocoFix `interface_scale.cpp`): the bar, its texts and the minimap at two or
+three times their size on a big screen, the world still drawn one map pixel to one screen pixel. The
+engine already sizes most of the bar by its pictures - the base at the bottom of the view by its
+picture's height, the minimap in the corner and the money plate at the top by their pictures and
+boxes, a text's letters by its font's box, hit-testing by each item's box (`Menu_Update`, the OBJ
+record's sizeX/sizeY), and the camera's room below the map by the base's height - so the build makes
+bigger pictures (`patch_data.add_interface_rows` / `make_interface_pictures`: every picture of the bar
+and its fonts enlarged pixel by pixel, VIDs 1100 + i for twice and 1150 + i for three times, i the
+place in `INTERFACE_VIDS`; their rows are the edition's own rows of the originals with the box times
+the scale) and the engine places them itself. What the engine has as fixed numbers is ours in C++
+with one scale factor: `Player_ShowStateBar` (`status_bar.cpp`: the slots around width / 2 - 225 with a
+pitch of 41, the buttons, the lines, the texts from the view's right edge - every offset times the
+scale; at the normal size the same VIDs at the same places and depths as the engine's), the factory
+list (`depot_rows.cpp`: `World.vids[455/497/8]` name the bigger VIDs while `Player_SetPanel` makes the
+list - an object is counted per VID (`Vid+0x358`), so its VID cannot be changed afterwards - and the
+list's offsets from the first slot's icon are then multiplied), and the slot under the cursor
+(`Player_HandleInput` divides the icon's distance by 41 three times; replaced at 0x431d6b by the same
+with 41 times the scale). `MenuNVidUnderCursor` answers the original's number for a bigger VID, so the
+bar's clicks, the scripts' `MenuVid()` and the mouse tips work unchanged; the icon atlas' army colours
+(the scripts' `SetVid(455, VID_GAMMA + army, ...)`) are copied to its bigger copies whenever the bar is
+built. The choice is `InterfaceScale` "1"-"3" of the Players key (a row of ours on the settings page,
+which offers only what the window takes: script function 207 `InterfaceSizeMax()`), read when the bar
+is built and used only as far as the game's screen takes it: twice from 960 px of height and 1328 of
+width, three times from 1440 and 1992 (the bar at most about a tenth of the screen's height, and the
+minimap at the same scale clear of the bar's controls); a small map's logical screen (mission 1, 1024 x
+768, stretched by `screen_scaling.cpp`) keeps the normal size, already shown bigger by the stretch. A
+texture the engine loads is at most 256 x 256 at 16 bits (`GroundVid_LoadImage` unpacks it into a
+buffer of 0x20008 bytes - a bigger one overruns it), so the enlarged texture pictures (the icon atlas
+455, the buttons 498/499, the message strip 449) have their tiles packed anew into sheets of that size.
+A font picture is a 16 x 16 grid of cells, each a letter and a one-pixel grid line right and below
+(`FontVidConverter_Load` cuts a sixteenth of the width and height less one), so a bigger font is made
+cell by cell with the line kept one pixel.
 
 **Panels** (`Player.panel`, `Player_SetPanel`): 0 the unit bar, 1 the cars of the flagman train, 2 the
 build list of the flagman factory, 5 the queue of that factory, 6 hidden. The ten bar slots

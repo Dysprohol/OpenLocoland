@@ -108,15 +108,21 @@ Misje grają się tak jak zawsze. Co się zmieniło:
 
 - **Pasek stanu na całą szerokość.** Na szerokim ekranie pasek na dole biegnie od krawędzi do
   krawędzi zamiast kończyć się na środku.
-- **Wielkość minimapy.** W ustawieniach gry (Ustawienia w menu głównym i w menu pod Esc w misji)
-  **WIELKOSC MINIMAPY** powiększa minimapę w prawym dolnym rogu dwa albo trzy razy; domyślnie jest
-  normalna. Póki ta strona jest otwarta, w prawym dolnym rogu ekranu widać ramkę minimapy tak dużą
-  i tam, gdzie stanie w misji. Zmienia się, gdy wracasz do gry albo zaczynasz misję, a na ekranie za
-  wąskim na wybraną wielkość minimapa jest tak duża, jak się zmieści (róg pokazuje właśnie tę). Przy większej widok da się przesunąć trochę dalej
-  w dół, za dolną krawędź mapy - widać tam wtedy pas, a minimapa niczego z mapy nie zasłania.
-  Kliknięcie w minimapę dalej
-  przenosi tam, gdzie się kliknęło, a jasna ramka, która pokazuje, na co patrzysz, nie wychodzi poza
-  nią i nawet na ogromnej mapie nie robi się tak mała, że nie da się jej znaleźć.
+- **Większy interfejs.** W ustawieniach gry (Ustawienia w menu głównym i w menu pod Esc w misji)
+  **WIELKOSC INTERFEJSU** powiększa dwa albo trzy razy pasek na dole, jego numery i napisy, pieniądze
+  i minimapę; sama mapa zostaje tak samo ostra. Do wyboru są tylko wielkości, na które ekran ma
+  miejsce: dwa razy od ekranu wysokiego na 1080 pikseli, trzy razy od 1440. Zmienia się, gdy wracasz
+  do gry albo zaczynasz misję. Misja 1 to mała mapa, którą gra i tak powiększa na cały ekran, więc
+  jej pasek zostaje, jaki był.
+- **Wielkość minimapy.** **WIELKOSC MINIMAPY** na tej samej stronie: **JAK INTERFEJS** (domyślnie)
+  albo normalna, dwa lub trzy razy większa niezależnie od interfejsu. Póki ta strona jest otwarta, w
+  prawym dolnym rogu ekranu widać ramkę minimapy tak dużą i tam, gdzie stanie w misji. Na ekranie za
+  wąskim na wybraną wielkość minimapa jest tak duża, jak się zmieści (róg pokazuje właśnie tę).
+  Minimapa większa niż interfejs pozwala przesunąć widok trochę dalej w dół, za dolną krawędź mapy -
+  widać tam wtedy pas, a minimapa niczego z mapy nie zasłania; przy wielkości interfejsu pasa nie ma.
+  Kliknięcie w minimapę dalej przenosi tam, gdzie się kliknęło, a jasna ramka, która pokazuje, na co
+  patrzysz, nie wychodzi poza nią i nawet na ogromnej mapie nie robi się tak mała, że nie da się jej
+  znaleźć.
 - **Drugi rząd w panelu fabryki.** Fabryka może budować do 14 rodzajów wagonów (klawisze F1 - F12,
   `[` i `]`), ale jej panel pokazywał dziesięć. Jedenasty i dalsze są teraz w drugim rzędzie nad
   pierwszym i można je klikać.

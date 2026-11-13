@@ -107,16 +107,21 @@ The missions play as they always did. What changed:
 
 - **The state bar across the whole screen.** On a wide screen the bar at the bottom runs from edge
   to edge instead of stopping in the middle.
-- **The minimap's size.** In the game's settings (Options in the main menu, and in a mission's Esc
-  menu), **MINIMAP SIZE** makes the minimap in the bottom right corner twice or three times as big;
-  normal is the default. While the page is open, the bottom right corner of the screen shows the
-  minimap's frame as big and where it will stand in a mission. It changes when you go back to the
-  game or start a mission, and on a screen too narrow for the size you chose the minimap is as big as
-  fits (the corner shows that size). A bigger minimap lets the view go
-  a little further down, past the map's bottom edge, so a strip shows there and the minimap covers
-  nothing of the map. A click on the minimap
-  still takes you to the place you clicked, and the bright frame that shows what you are looking at
-  stays inside it and never gets too small to find, even on a huge map.
+- **A bigger interface.** In the game's settings (Options in the main menu, and in a mission's Esc
+  menu), **INTERFACE SIZE** makes the bar at the bottom, its numbers and texts, the money and the
+  minimap twice or three times as big; the map itself stays as sharp as before. Only the sizes your
+  screen has room for are offered: twice from a screen 1080 pixels high, three times from 1440. It
+  changes when you go back to the game or start a mission. Mission 1 is a small map that is already
+  shown enlarged to fill the screen, so its bar stays as it is there.
+- **The minimap's size.** **MINIMAP SIZE** on the same page: **AS THE INTERFACE** (the default) or
+  normal, twice or three times as big whatever the interface's size. While the page is open, the
+  bottom right corner of the screen shows the minimap's frame as big and where it will stand in a
+  mission. On a screen too narrow for the size you chose the minimap is as big as fits (the corner
+  shows that size). A minimap bigger than the interface lets the view go a little further down, past
+  the map's bottom edge, so a strip shows there and the minimap covers nothing of the map; at the
+  interface's own size there is no strip. A click on the minimap still takes you to the place you
+  clicked, and the bright frame that shows what you are looking at stays inside it and never gets too
+  small to find, even on a huge map.
 - **A second row in the factory panel.** A factory can build up to 14 kinds of cars (keys F1 - F12,
   `[` and `]`), but its panel showed ten. The 11th and further now show in a second row above the
   first, and a click on them works.

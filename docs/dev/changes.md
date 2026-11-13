@@ -543,6 +543,21 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       longer shrinks the screen the game measures (a 1920x1080 screen was 1536x864 / 1280x720 to it)
       nor enlarges the game's window as a picture. The start window opens unaware and looks as
       before (its picture has fixed pixels); its test of the screen size gets the real pixels,
+  47. the interface's size (`interface_scale.cpp`, `status_bar.cpp`, `depot_rows.cpp`, `minimap.cpp`,
+      engine.md "The interface's size"): the state bar - its base and side tiles, the slot numbers,
+      icons, lines and texts, the two round buttons, the factory list and its second row, the money
+      plate with the speed and money texts - and the minimap twice or three times as big, the map
+      drawn as before. `Player_ShowStateBar` is ours in C++ (at the normal size the same objects at
+      the same places as the engine's), the pictures are VIDs 1100-1172 made by `build.py` (the
+      originals enlarged pixel by pixel, their boxes with them; an edition whose pictures cannot be
+      enlarged keeps the normal size), the slot under the cursor is found with the bigger pitch and
+      the camera's room below the map follows the bar's height by itself. The choice is a row of ours
+      on the game's settings page (**INTERFACE SIZE**, arrows VIDs 954/955, `InterfaceScale` "1"-"3"
+      of the Players key; absent = normal), offering only what the window takes (twice from 960 px of
+      height, three times from 1440); applied when the bar is built (a mission's start, the way back
+      from the Esc menu); a small map's logical screen (mission 1) keeps the normal size. The
+      minimap's row got a first value, as the interface (`MinimapSize` "0" or absent, the default);
+      only a minimap bigger than the interface leaves a strip below the map,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that

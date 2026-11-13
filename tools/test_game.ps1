@@ -448,9 +448,13 @@ if ($Steps) {
       $pos = { param($i) if ($i -lt $count) { $o = [long][W]::Rd($p.Id, $items + 4 * $i); "{0},{1}" -f [int](& $g $o 0x30), [int]((& $g $o 0x34) - (& $g $o 0x38)) } else { "-" } }
       $flagman = [long][W]::Rd($p.Id, $player + 0x10)
       $queue = if ($flagman -ne 0) { $qn = [W]::Rd($p.Id, $flagman + 0x494); $q = @(); for ($i = 0; $i -lt [Math]::Min($qn, 10); $i++) { $q += [W]::Rd($p.Id, $flagman + 0xa4 + 2 * $i) -band 0xffff }; "$qn [" + ($q -join " ") + "]" } else { "-" }
-      $baseAt = "-"; for ($i = 0; $i -lt $count; $i++) { $o = [long][W]::Rd($p.Id, $items + 4 * $i); if ($o -ne 0 -and ([W]::Rd($p.Id, [long][W]::Rd($p.Id, $o + 0x1c) + 4)) -eq 450) { $baseAt = "{0},{1},{2}" -f [int](& $g $o 0x30), [int](& $g $o 0x34), [int](& $g $o 0x38) } }
-      "Bar base (VID 450) x,y,z: $baseAt"
-      "Bar: panel={0} objects={1} icon80={2} icon102={3} queue={4}" -f (([W]::Rd($p.Id, $player + 0x2c)) -band 0xffef), $count, (& $pos 80), (& $pos 102), $queue
+      $baseAt = "-"; for ($i = 0; $i -lt $count; $i++) { $o = [long][W]::Rd($p.Id, $items + 4 * $i); if ($o -ne 0 -and ([W]::Rd($p.Id, [long][W]::Rd($p.Id, $o + 0x1c) + 4)) -in 450, 1100, 1150) { $baseAt = "{0},{1},{2}" -f [int](& $g $o 0x30), [int](& $g $o 0x34), [int](& $g $o 0x38) } }
+      "Bar base (VID 450, or 1100/1150 at twice/three times its size) x,y,z: $baseAt"
+      # every bar object as index:VID@x,y (its position minus z: the screen position plus the camera)
+      $some = foreach ($i in 0..($count - 1)) { if ($i -ge 0 -and $i -lt $count) { $o = [long][W]::Rd($p.Id, $items + 4 * $i); "${i}:" + [W]::Rd($p.Id, [long][W]::Rd($p.Id, $o + 0x1c) + 4) + "@" + (& $pos $i) } }
+      "Bar objects: " + ($some -join " ")
+      $fm = if ($flagman -ne 0) { "{0}@{1},{2}" -f [W]::Rd($p.Id, [long][W]::Rd($p.Id, $flagman + 0x1c) + 4), [int](& $g $flagman 0x30), [int](& $g $flagman 0x34) } else { "-" }
+      "Bar: panel={0} objects={1} icon80={2} icon102={3} queue={4} flagman={5}" -f (([W]::Rd($p.Id, $player + 0x2c)) -band 0xffef), $count, (& $pos 80), (& $pos 102), $queue, $fm
     } elseif ($vk -eq 't') {
       # the tooltip under the virtual cursor: MouseTip_Update 0x4257f0 keeps the current
       # tip text in the String at 0x4a9d58, so a test can check that a hover hit the
