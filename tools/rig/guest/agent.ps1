@@ -244,6 +244,9 @@ function Start-Run($c) {
     $s = Slot-User $slot; $s.Job = $id; $user = $s.User
   }
   $dir = Join-Path $jobs $id; New-Item -ItemType Directory -Force $dir | Out-Null
+  # The heartbeat says "running" BEFORE the job leaves the queue: an older rig.ps1 changes the display
+  # when it sees the agent idle and the queue empty, and must never see both while a job starts.
+  $script:starting = $id; Beat "running"; Start-Sleep -Milliseconds 300
   Move-Item $c.File (Join-Path $dir "job.json") -Force
   "$(Get-Date -Format 'HH:mm:ss') before the job: $muteLine" | Add-Content (Join-Path $dir "audio.txt") -Encoding utf8
   $with = @($running.Keys)

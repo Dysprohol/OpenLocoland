@@ -38,14 +38,14 @@ function Wait-Report($runs) {
     Get-Content $r.Log -ErrorAction SilentlyContinue | Where-Object { $_ -match "waiting|running|display for|fresh|restart|older|queued again|went away|THE DISPLAY|ran " } | Select-Object -First 12 | ForEach-Object { "      $_" }
   }
 }
-$l01 = '@{ Map = "maps\l01\l01.map"; WaitFor = "test map: loaded"; ClickOk = 1; SetFull = 0; LastShotOnly = $true; Steps = "w@8"'
+$l01 = '@{ Map = "maps\l01\l01.map"; WaitFor = "test map: loaded"; ClickOk = 1; SetFull = 0; LastShotOnly = $true'
 foreach ($sc in ($Scenarios -split ",")) {
   Say "---- $sc"
   switch ($sc) {
     "same" {
-      $runs = @((Launch "same-pl" "-Job game -Game '$b\game' -Resolution 1366x768 -TestArgs $l01; Language = 'pl' }"),
-                (Launch "same-en" "-Job game -Game '$b\game2' -Resolution 1366x768 -TestArgs $l01; Language = 'en' }"),
-                (Launch "same-de" "-Job game -Game '$b\game3' -Resolution 1366x768 -TestArgs $l01; Language = 'de' }"))
+      $runs = @((Launch "same-pl" "-Job game -Game '$b\game' -Resolution 1366x768 -TestArgs $l01; Language = 'pl'; Steps = 'w@8' }"),
+                (Launch "same-en" "-Job game -Game '$b\game2' -Resolution 1366x768 -TestArgs $l01; Language = 'en'; Steps = 'w@8' }"),
+                (Launch "same-de" "-Job game -Game '$b\game3' -Resolution 1366x768 -TestArgs $l01; Language = 'de'; Steps = 'w@8' }"))
       Wait-Report $runs
     }
     "differ" {

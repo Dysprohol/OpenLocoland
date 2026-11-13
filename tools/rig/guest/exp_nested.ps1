@@ -102,6 +102,16 @@ foreach ($sc in ($Scenarios -split ",")) {
       L "  order started: $((($ids | ForEach-Object { $r = Get-Content "$io2\jobs\$_\run.json" -Raw | ConvertFrom-Json; [pscustomobject]@{ id = $_; t = [datetime]$r.started } }) | Sort-Object t | ForEach-Object { $_.id.Split('-')[-1] }) -join ', ')"
       Stop-Agent
     }
+    "stress" {
+      # the 20 missions as 2, then 3 jobs of 4 lanes at once (8, then 12 games): how long, and do they pass
+      Start-Agent "stress" @{ MaxJobs = 6; MaxGames = 12 }
+      foreach ($k in 2, 3) {
+        $ids = @(for ($i = 1; $i -le $k; $i++) { Q "x$k-$i" "caller-$i" @{ Job = "missions"; Game = "$build\game$(if ($i -gt 1) { $i })"; Parallel = 4; TimeoutMinutes = 15 } })
+        [void](Wait-All $ids 900); Show $ids
+        foreach ($m in $ids) { L "  $m : $((Get-Content "$io2\jobs\$m\test_missions.txt" | Select-Object -Last 1)) | $((Get-Content "$io2\jobs\$m\memory.txt" | ForEach-Object { if ($_ -match 'used (\d+) MB') { [int]$Matches[1] } } | Measure-Object -Maximum).Maximum) MB guest peak" }
+      }
+      Stop-Agent
+    }
     "missions" {
       Start-Agent "missions" @{}
       $m1 = Q "alone" "caller-m" @{ Job = "missions"; Game = "$build\game"; Parallel = 4; TimeoutMinutes = 15 }
@@ -116,3 +126,4 @@ foreach ($sc in ($Scenarios -split ",")) {
   }
 }
 L "C: free $([int]((Get-PSDrive C).Free / 1GB)) GB; game copies: $((Get-ChildItem C:\work\games -Directory | ForEach-Object { $_.Name }) -join ', ')"
+exit 0
