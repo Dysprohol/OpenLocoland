@@ -16,8 +16,8 @@ and, with --notes, what to look at (not counted):
 - EDGE        a text ends exactly at the right end: an exact fit, or (the old panel) a cut without a mark;
 - CUT         a text cut to its row with the mark (".").
 
-The panel's place comes from the resolution (editor_panel.cpp: the picture's middle is the view's
-middle + (22, -18); editor_factory.cpp: LEFT -182, TOP -70, BOTTOM 98, 46 characters of 8 px).
+The panel's place is read from each page's first text, its head row (editor_factory.cpp: LEFT -182,
+TOP -70, BOTTOM 98, 46 characters of 8 px, the strip above the title at -128).
 """
 import argparse
 import pathlib
@@ -102,6 +102,8 @@ def main():
         ps = pages(log)
         print(f"== {run.name}: {len(ps)} pages at {w}x{h}")
         for n, page in enumerate(ps, 1):
+            if page:   # the page's first text is its head row at LEFT, TOP: the panel's place on this screen
+                px, py = page[0]["l"] - LEFT, page[0]["t"] + CH // 2 + 1 - TOP
             faults = check(page, px, py, a.notes)
             total += sum(1 for f in faults if not f.startswith(("EDGE", "CUT")))
             head = page[0]["text"] if page else ""

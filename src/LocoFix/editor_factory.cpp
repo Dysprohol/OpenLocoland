@@ -137,10 +137,10 @@ void row_tip(float y, const char* key) {
         if (std::strcmp(t.label, key) == 0) g_rows.tip(g_px + LEFT - 4, y - ROW / 2, g_px + LEFT + WIDTH * g_cw, y + ROW / 2, ui_text(t.key, t.english));
 }
 
+// A row's label in the left column; its value starts at the value column, or a character after a longer label.
 float label(float y, const char* key, const char* english) {
     row_tip(y, key);
-    put(g_px + LEFT, y, ui_text(key, english));
-    return g_px + LEFT + LABEL;
+    return (std::max)(put(g_px + LEFT, y, ui_text(key, english)), g_px + LEFT + LABEL);
 }
 
 float number(float x, float y, const std::string& shown, std::function<void(int)> by) { return g_rows.number(x, y, shown, std::move(by)); }
