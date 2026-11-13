@@ -66,10 +66,12 @@
 #include "editor_exchange.h"
 #include "editor_ground.h"
 #include "editor_mission.h"
+#include "editor_rows.h"
 #include "editor_text.h"
 #include <shobjidl.h>
 #include <cctype>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 bool level_save_succeeded();   // level_save.cpp
@@ -105,6 +107,7 @@ void edit_commit_mission(const ArrivalsState& arrivals_before, const FactoryStat
 void panel_open_arrivals();   // editor_panel.cpp
 void edit_open_enemy_factory();   // editor_edit.cpp: the panel of the map's first enemy factory
 bool edit_open_factory_at(float x, float y);   // editor_edit.cpp: the panel of the factory at a map point
+const PanelRows& factory_rows();                // editor_factory.cpp: what the panel's last frame drew (test mode)
 bool edit_test_pick(int nvid, int army);   // editor_edit.cpp: test mode - the palette object to place
 void new_map_dialog(HWND owner);                // editor_newmap.cpp
 bool new_map_for_test(const std::string& text);  // editor_newmap.cpp
@@ -168,6 +171,8 @@ constexpr int TEST_RENAME = 40048;    // test mode: WM_COPYDATA <name> - the map
 constexpr int TEST_DELETE = 40049;    // test mode: WM_COPYDATA - the map deleted (Rename or delete)
 constexpr int TEST_FACTORY = 40047;   // test mode: WM_COPYDATA "x y" - the panel of the factory there
 constexpr int TEST_PICK = 40050;      // test mode: WM_COPYDATA "nvid army" - that object of the palette to place
+constexpr int TEST_PANEL_ROW = 40051;   // test mode: WM_COPYDATA "n" - the middle of the factory panel's n-th text or choice
+constexpr int TEST_PANEL_ROWS = 40052;  // test mode: WM_COPYDATA - the factory panel's texts and choices into the log
 #if LOCOFIX_SAVE_TEST
 constexpr int TEST_VID_CHECK = 40090;   // the test build: c40090 reads and writes every ground image both ways (editor_newmap.cpp)
 #endif
@@ -1544,7 +1549,27 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
                 edit_assign_orders();   // its order: lines
                 return TRUE;
             }
+            if (data->dwData == TEST_PANEL_ROW || data->dwData == TEST_PANEL_ROWS) {
+                // the factory panel's last frame, as PanelRows recorded it (recording starts with the
+                // first F step): every text and choice with its box - or the middle of the n-th one,
+                // (y << 16) | x, for test_game.ps1 to click there as the mouse would (0: none)
+                const std::vector<PanelRows::Drawn>& rows = factory_rows().drawn();
+                if (data->dwData == TEST_PANEL_ROWS) {
+                    patch::log("panel rows: %d", static_cast<int>(rows.size()));
+                    for (size_t i = 0; i < rows.size(); ++i)
+                        patch::log("panel row %d %s %.0f,%.0f-%.0f,%.0f %s", static_cast<int>(i), rows[i].choice ? "choice" : "text",
+                                   rows[i].l, rows[i].t, rows[i].r, rows[i].b, rows[i].text.c_str());
+                    return TRUE;
+                }
+                const int n = std::atoi(path.c_str());
+                if (n < 0 || n >= static_cast<int>(rows.size())) return 0;
+                const PanelRows::Drawn& d = rows[n];
+                const int x = static_cast<int>((d.l + d.r) / 2), y = static_cast<int>((d.t + d.b) / 2);
+                patch::log("panel row %d clicked at %d,%d: %s %s", n, x, y, d.choice ? "choice" : "text", d.text.c_str());
+                return (y << 16) | x;
+            }
             if (data->dwData == TEST_FACTORY) {   // "x y": the panel of the factory there
+                PanelRows::record = true;
                 float x = 0, y = 0;
                 return std::sscanf(path.c_str(), "%f %f", &x, &y) == 2 && edit_open_factory_at(x, y) ? TRUE : FALSE;
             }

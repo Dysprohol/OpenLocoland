@@ -9,9 +9,12 @@ float edit_draw_text(int font, float x, float y, const char* text, int step);
 bool edit_font_size(int font, float& w, float& h);
 void edit_fill(float l, float t, float r, float b, uint32_t argb);
 
+bool PanelRows::record = false;
+
 void PanelRows::begin(POINT mouse) {
     mouse_ = mouse;
     items_.clear();
+    shown_.clear();
     tips_.clear();
     holds_.clear();
     drawn_ = GetTickCount();
@@ -30,7 +33,8 @@ const char* PanelRows::tip_at(POINT m) const {
 }
 
 void PanelRows::hold_area(float l, float t, float r, float b, std::function<void()> click, std::vector<int> choices,
-                          std::function<void(int)> pick) {
+                          std::function<void(int)> pick, const char* name) {
+    if (record) shown_.push_back({l, t, r, b, name, true});
     holds_.push_back({l, t, r, b, std::move(click), std::move(choices), std::move(pick)});
 }
 
@@ -39,7 +43,7 @@ float PanelRows::hold_text(float x, float y, const std::string& text, std::funct
     const float w = text.size() * cw, t = y - ch / 2;
     const bool over = hover(x - 2, y - ROW / 2, x + w + 2, y + ROW / 2) || (pressed_ && hold_.l == x - 2 && hold_.t == y - ROW / 2);
     edit_draw_text(over ? LIT : FONT, x, t, text.c_str(), STEP);
-    hold_area(x - 2, y - ROW / 2, x + w + 2, y + ROW / 2, std::move(click), std::move(choices), std::move(pick));
+    hold_area(x - 2, y - ROW / 2, x + w + 2, y + ROW / 2, std::move(click), std::move(choices), std::move(pick), text.c_str());
     return x + w + cw;
 }
 
@@ -106,6 +110,7 @@ float PanelRows::put(float x, float y, const std::string& text, bool current, st
     const bool over = act && hover(x - 2, y - ROW / 2, x + w + 2, y + ROW / 2);
     edit_draw_text(current || over ? LIT : FONT, x, t, text.c_str(), STEP);
     if (current && act) edit_fill(x, t + ch, x + w, t + ch + 2, 0xe0f0e080);
+    if (record) shown_.push_back({x, t, x + w, t + ch, text, act != nullptr});
     if (act) items_.push_back({x - 2, y - ROW / 2, x + w + 2, y + ROW / 2, std::move(act)});
     return x + w + cw;
 }
@@ -116,7 +121,8 @@ float PanelRows::number(float x, float y, const std::string& shown, std::functio
     return put(x, y, "+", false, [by] { by(1); });
 }
 
-void PanelRows::area(float l, float t, float r, float b, std::function<void()> act) {
+void PanelRows::area(float l, float t, float r, float b, std::function<void()> act, const char* name) {
+    if (record) shown_.push_back({l, t, r, b, name, true});
     items_.push_back({l, t, r, b, std::move(act)});
 }
 

@@ -217,7 +217,7 @@ void draw_list() {
         g_rows.area(x - 20, y - 20, x + 20, y + 20, [i, in, later] {
             g_chosen = i;
             set_unit(UNITS[i], !(in || later >= 0), 0, {"OpFactoryList", "factory build list"});
-        });
+        }, ("unit " + std::to_string(nvid)).c_str());
     }
     const int nvid = UNITS[g_chosen];
     const bool in = std::find(items.begin(), items.end(), nvid) != items.end(), later = later_of(nvid) >= 0;
@@ -527,7 +527,7 @@ float draw_cars(const FactoryTrain& t, float y) {
                              change({"OpQueueCars", "factory queue train"}, [i, v](FactoryTrain& r) {
                                  if (i < static_cast<int>(r.cars.size())) r.cars[i] = v;
                              });
-                         });
+                         }, ("car " + std::to_string(i + 1)).c_str());
         x += ICON;
     }
     if (n > SHOWN_CARS) {
@@ -815,6 +815,9 @@ void factory_draw(POINT m) {
     });
     g_hold_tip = under ? ui_printf(ui_format("TipHoldUnit", "%s (VID %d): let go to put it here"), unit_name(under), under) : std::string();
 }
+
+// Test mode (editor.cpp's panel commands): what the panel's last frame drew.
+const PanelRows& factory_rows() { return g_rows; }
 
 bool factory_click(POINT m) { return g_rows.press(m) || g_rows.click(m); }
 bool factory_release(POINT m) { return g_rows.release(m); }   // as arrivals_release

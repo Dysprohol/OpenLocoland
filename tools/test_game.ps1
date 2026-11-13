@@ -31,6 +31,8 @@
 #           P<nvid>[:<army>] picks that object of the palette to place (editor test mode);
 #           D<x>:<y> writes the rail points near that map point to LocoFix.log (editor test mode);
 #           F<x>:<y> opens the panel of the factory at that map point (editor test mode);
+#           H writes the open factory panel's texts and choices with their boxes to LocoFix.log, and
+#           G<n>[:<ms>] clicks the middle of its n-th one (the numbers of H) as k does (editor test mode);
 #           M<file> sets the mission settings from a file (editor test mode, src/LocoFix/editor_mission.cpp);
 #           Z<w>:<h> resizes the map (editor test mode: File > Map size);
 #           E<zip> exports the map, I<zip>|overwrite|rename|ask imports one (File > Export / Import map);
@@ -486,6 +488,22 @@ if ($Steps) {
     } elseif ($vk -cmatch '^F(-?\d+):(-?\d+)$') {
       # editor test mode: the panel of the factory at a map point (its plan, its build list)
       "Factory panel $($Matches[1]),$($Matches[2]): " + [W]::Command($game, 40047, "$($Matches[1]) $($Matches[2])")
+    } elseif ($vk -ceq 'H') {
+      # editor test mode: the factory panel's texts and choices of its last frame into LocoFix.log
+      "Panel rows: " + [W]::Command($game, 40052, "")
+    } elseif ($vk -cmatch '^G(\d+)(?::(\d+))?$') {
+      # editor test mode: the middle of the factory panel's n-th text or choice, clicked as k<x>:<y>
+      $r = [W]::Command($game, 40051, $Matches[1])
+      $hold = if ($Matches[2]) { [int]$Matches[2] } else { 100 }
+      if ($r -le 0) { "Panel row $($Matches[1]): none" } else {
+        $l = [IntPtr]$r
+        "Panel row $($Matches[1]) at $($r -band 0xffff),$($r -shr 16)"
+        [void][W]::PostMessage($game, 0x8001, [IntPtr]0x0200, $l)
+        Start-Sleep -Milliseconds 150
+        [void][W]::PostMessage($game, 0x8001, [IntPtr]0x0201, $l)
+        Start-Sleep -Milliseconds $hold
+        [void][W]::PostMessage($game, 0x8001, [IntPtr]0x0202, $l)
+      }
     } elseif ($vk -cmatch '^P(\d+)(?::(-?\d+))?$') {
       # editor test mode: the palette's object of that VID picked to place (army -1 or none: as in the missions)
       $army = if ($Matches[2]) { $Matches[2] } else { "-1" }

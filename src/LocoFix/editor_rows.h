@@ -19,7 +19,7 @@ public:
     // - n + : `by` gets -1 or 1.
     float number(float x, float y, const std::string& shown, std::function<void(int)> by);
     // A choice of any shape (an icon).
-    void area(float l, float t, float r, float b, std::function<void()> act);
+    void area(float l, float t, float r, float b, std::function<void()> act, const char* name = "");
     bool hover(float l, float t, float r, float b) const;
     // A click: runs the choice under it; true when there was one.
     bool click(POINT m);
@@ -34,7 +34,7 @@ public:
     // `pick` with it (elsewhere: nothing). hold_text draws a text choice as put does.
     static constexpr unsigned HOLD_MS = 350;
     void hold_area(float l, float t, float r, float b, std::function<void()> click, std::vector<int> choices,
-                   std::function<void(int)> pick);
+                   std::function<void(int)> pick, const char* name = "");
     float hold_text(float x, float y, const std::string& text, std::function<void()> click, std::vector<int> choices,
                     std::function<void(int)> pick);
     bool press(POINT m);     // WM_LBUTTONDOWN: true on a hold area (nothing runs yet)
@@ -45,6 +45,16 @@ public:
     int draw_hold(float size, float left, float right, const std::function<void(int, float, float, bool)>& icon);
 
     float cw = 8, ch = 13;   // the font's character
+
+    // Test mode (editor.cpp's panel commands): with `record` on, each frame keeps every text and
+    // choice it drew - its box, its text, whether it is a choice - for the log and for a test's click.
+    struct Drawn {
+        float l, t, r, b;
+        std::string text;
+        bool choice;
+    };
+    static bool record;
+    const std::vector<Drawn>& drawn() const { return shown_; }
 
 private:
     struct Item {
@@ -69,6 +79,7 @@ private:
     std::vector<Tip> tips_;
     std::vector<Hold> holds_;
     std::vector<Cell> cells_;
+    std::vector<Drawn> shown_;
     Hold hold_;
     bool pressed_ = false;
     unsigned since_ = 0, drawn_ = 0;
