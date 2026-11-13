@@ -91,7 +91,9 @@ foreach ($sc in ($Scenarios -split ",")) {
     }
     "missions" {
       Wait-Report @(Launch "missions-alone" "-Job missions -Game '$b\game' -Timeout 20")
-      $runs = @((Launch "missions-loaded" "-Job missions -Game '$b\game' -Timeout 20"),
+      $first = Launch "missions-loaded" "-Job missions -Game '$b\game' -Timeout 20"
+      Start-Sleep 6   # queued first: it starts before the two jobs that load the box beside it
+      $runs = @($first,
                 (Launch "missions-load1" "-Job game -Game '$b\game2' -Timeout 10 -TestArgs @{ Map = 'maps\l08\l08.map'; WaitFor = 'test map: loaded'; ClickOk = 1; SetFull = 0; LastShotOnly = `$true; Steps = 'w@40,w@40' }"),
                 (Launch "missions-load2" "-Job game -Game '$b\game3' -Timeout 10 -TestArgs @{ Map = 'maps\l15\l15.map'; WaitFor = 'test map: loaded'; ClickOk = 1; SetFull = 0; LastShotOnly = `$true; Steps = 'w@40,w@40' }"))
       Wait-Report $runs

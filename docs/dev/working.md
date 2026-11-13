@@ -134,7 +134,8 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
   (`build.py --target <folder>`), so tests of different changes don't share one
   game folder; `test_game.ps1` takes `-Exe`.
 - `tools\rig\rig.ps1` - the test rig: runs `test_game.ps1`, `test_missions.ps1` or the installer
-  inside Windows Sandbox, off the user's screen, at a chosen guest resolution; see "The test rig".
+  inside Windows Sandbox, off the user's screen, at a chosen guest resolution, several sessions' jobs
+  side by side; see "The test rig".
 - `tools\test_rail_rules.py` - differential test of the track rules: builds
   `tools\test_rail_rules.cpp` (which includes `src/LocoFix/rail_rules.h`, the rules of the editor's
   Track tool) and compares it with `map_tool.py` (`rail_candidates`, `plan_track`, `track_cells`,
@@ -278,6 +279,56 @@ registry key, and so the guest - a throw-away Windows of its own - can be set up
   another as on the host): the missions dealt out round-robin, each lane with its own copy of the
   game folder and results folder, every run on its own desktop inside the guest (as `test_game.ps1`
   runs quietly), the lanes' reports merged into one `report.txt`.
+- *Side by side.* Only one Windows Sandbox can run on the machine (a second `wsb start` gives
+  `CO_E_APPSINGLEUSE`, a second `WindowsSandbox.exe` "only one instance is allowed"; more boxes would
+  need Hyper-V virtual machines set up by the maintainer), so the agent runs several jobs at once
+  inside the one box. *Together:* quiet `-Job game` runs, `-Job missions` and `-Job probe` - each as a
+  guest user of its own (`rigslot1`, `rigslot2`, ... made by the agent), so each has its own
+  `HKCU` and with it its own test key `HKCU\SOFTWARE\Gromada\Locoland-test` (two jobs with different
+  languages, resolutions or editor settings do not overwrite each other; the game is unchanged), its
+  own `%TEMP%`, its own copy of the game folder (`C:\work\games\<build>-s<slot>`, mission lanes
+  `...-lane<n>`), its game on a desktop of its own; a hung job's timeout ends only that user's
+  processes. *Alone* (the job waits until no job runs and nothing starts beside it): `-Job setup`
+  (in a fresh box), `-Job script` (it may move the real cursor or change the guest), a visible game
+  run (`Visible`, `Screen`, `SetFull = 1`, steps `A` or `Q`), `-Sound` (one sound device),
+  `KeepRegistry`, and `-Exclusive`. *The display* belongs to the whole guest: every job runs under
+  the display it asked for (`-Resolution`, `-Scale`) - a job that names none under the default, the
+  box's starting size at 100 % (`-DefaultResolution`), never what an earlier job left - so the agent
+  changes it only while no job runs (it asks the host in `agent\display-want.json`; whichever
+  `rig.ps1` is waiting for a job sizes the window - first onto the monitor, since Windows resizes a
+  window that lands on a monitor of another scale, then to the size - and answers once the guest has
+  kept it for 3 s) and a job that needs another display than the running ones waits for them to
+  end; meanwhile jobs queued before it that fit the current display may still start, so jobs of one
+  display go together. If the display changes under a running job anyway (a peek
+  window, an older `rig.ps1`), its `done.json` and the caller's last lines say so. *Turns:*
+  round-robin between callers (the worktree a job comes from): the oldest job of the caller served
+  longest ago goes next, and while it waits (for the box to empty, its display, room) no later job
+  overtakes it. *Limits* (set when the box starts): at most `-MaxJobs` 4 jobs and `-MaxGames` 6 games
+  at once (a missions job counts its lanes; a single larger job still runs, then alone), box memory
+  `-MemoryMB` 8192. *Checked* (2026-11-13): three builds at once, each its own language and frame
+  limit; a hung job killed at its timeout while the job beside it closed normally; an exclusive job
+  waiting for the running one and then holding the box; the turns of two callers; the 20 missions
+  alone and beside two other game jobs (6 games at once): the same report rows, 89 and 90 s.
+- *Reading `-Status`.* `agent protocol 2: several jobs at once`, then the display (and the default),
+  how many games and jobs run of the limits, one line per running job (slot, or `ALONE` and why;
+  seconds of its timeout) and one per waiting job with why it waits: `waits its turn: <job> goes
+  first`, `runs alone - ...: waits for N running job(s) to end`, `needs the display ... : waits for N
+  running job(s) to end`, `waits for the host to set the display`, `all N job slots are busy`, `N of
+  6 games running, it needs M`, `the box is held by <job>`, `needs a fresh box`. A waiting `rig.ps1`
+  prints its own job's line whenever it changes. `agent protocol 1` is a box an older `rig.ps1`
+  started: one job at a time; this `rig.ps1` then queues the old way and says so in one line. An
+  older `rig.ps1` queuing into a protocol 2 box works too (its job runs with the agent's own runner;
+  a job of it that names no display runs under the current one if no newer `rig.ps1` is waiting to
+  set the default, with a note in `run.json`). `-Restart` puts a new box with this `rig.ps1`'s agent
+  in once nothing runs or waits.
+- *For sessions.* Just queue: quiet game runs and mission runs share the box, and a job's results
+  are the same as alone (checked above). Ask for `-Exclusive` only when the job's result depends on
+  having the guest to itself - a frame-rate or timing measurement, anything that touches the whole
+  guest (its display settings, its sound, the real cursor) - not to make a job "safer": it makes every
+  other session wait until it is done. Give a job the `-Resolution` / `-Scale` it needs rather than
+  relying on what the guest has; jobs that ask different displays run one after another. Keep
+  `-Timeout` near what the job needs: a hung job holds a slot until then. A peek window
+  (`peek.cmd`) changes the guest's display while it is open: jobs that start then wait for it to close.
 - *The same results as the host* (2026-11-12, `tools\rig\compare_runs.py <host results> <rig
   results>`): the fullscreen-cursor branch's build, whose 20 missions had run on the host with its own
   scripts, run in the box with the same build and scripts (`-Tools`), one after another and in 4
@@ -296,7 +347,10 @@ registry key, and so the guest - a throw-away Windows of its own - can be set up
   2.8 GB of memory; the 20 missions in 4 lanes 11 % of the CPU on average (at most 23 %, about five
   cores), memory up to the box's 6 GB (the guest itself used at most 2.9 GB, the rest its file cache),
   the host's whole 3D engine at 3 % on average (the VM's own share cannot be told apart in the
-  counters); the installer 5 % (at most 31 %) and 4.2 GB. The box shuts itself down after 10 idle
+  counters); the installer 5 % (at most 31 %) and 4.2 GB. Side by side (2026-11-13): each game
+  running adds about 4 % of the machine on average (1 game 4-5 %, 2 games 8 %, 3 games 13-14 %,
+  peaks 7 / 16 / 32 %) and about 0.35 GB of guest memory (the game's working set 185 MB plus its
+  test script; 2.0 GB idle, 4.1 GB with 6 games); an idle box 0.5 %. The box shuts itself down after 10 idle
   minutes. Not chosen: a faster game clock - the missions test waits for a load, not for game time,
   and a different clock would be a different test.
 - *Not covered* - these still need the real machine: frame-rate measurements that matter (the

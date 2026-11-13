@@ -34,7 +34,7 @@ $ErrorActionPreference = "Continue"
 $Proto = 2
 $agentDir = Join-Path $Io "agent"; $queue = Join-Path $Io "queue"; $jobs = Join-Path $Io "jobs"
 New-Item -ItemType Directory -Force $agentDir, $queue, $jobs | Out-Null
-$config = @{ IdleMinutes = 10; ScreenSeconds = 5; MaxGames = 6; MaxJobs = 4; DefaultResolution = ""; MinFreeGB = 6 }
+$config = @{ IdleMinutes = 10; ScreenSeconds = 5; MaxGames = 6; MaxJobs = 4; DefaultResolution = ""; MinFreeGB = 6; GamesGB = 16 }
 $cfgFile = Join-Path $agentDir "config.json"
 if (Test-Path $cfgFile) { (Get-Content $cfgFile -Raw | ConvertFrom-Json).PSObject.Properties | ForEach-Object { $config[$_.Name] = $_.Value } }
 $logFile = Join-Path $agentDir "agent.log"
@@ -140,7 +140,7 @@ function Read-Queue {
   foreach ($f in @(Get-ChildItem $queue -Filter *.json -ErrorAction SilentlyContinue | Sort-Object Name)) {
     if (-not $parsed.ContainsKey($f.Name)) {
       try { $spec = Get-Content $f.FullName -Raw | ConvertFrom-Json } catch { continue }
-      $parsed[$f.Name] = @{ Id = $f.BaseName; File = $f.FullName; Spec = $spec; Cls = (Classify $spec); Since = Get-Date }
+      $parsed[$f.Name] = @{ Id = $f.BaseName; File = $f.FullName; Spec = $spec; Cls = (Classify $spec); Since = $f.LastWriteTime }   # queued then (also in an earlier box)
     }
     $list += $parsed[$f.Name]
   }
@@ -233,28 +233,43 @@ function Fail-Queued($c, [string]$why) {
   Log "job $($c.Id) not run: $why"
   $script:done++; $script:lastWork = Get-Date
 }
-# Keeps at least MinFreeGB free on the guest's disk: the copies of game folders no running job uses
-# are removed, least recently used first (a later job with the same build copies it again).
-function Free-Disk {
-  $free = (Get-PSDrive C).Free / 1GB
-  if ($free -ge $config.MinFreeGB) { return }
-  $busy = @($slots.Keys | Where-Object { $slots[$_].Job } | ForEach-Object { "-s$_" })
-  $old = Get-ChildItem "C:\work\games" -Directory -ErrorAction SilentlyContinue | Sort-Object LastWriteTime
+# The copies of game folders (C:\work\games\<build>-s<slot>[-lane<n>], about 0.55 GB each) stay for
+# the next job of the same build in that slot (it then copies only what changed), up to GamesGB in
+# all and as long as MinFreeGB stays free: beyond that the copies no running job uses go, least
+# recently used first. (The guest's disk lives on the host's disk while the box runs.)
+$lastUse = @{}   # copy folder -> when a job last used it
+$sizes = @{}     # copy folder -> its size in bytes (measured once)
+function Copy-Name($spec, [int]$slot) {
+  if (-not $spec.Game) { return $null }
+  $h = [BitConverter]::ToString((New-Object Security.Cryptography.SHA1Managed).ComputeHash([Text.Encoding]::UTF8.GetBytes(([string]$spec.Game).ToLower()))).Replace("-", "").Substring(0, 10)
+  return $h + $(if ($slot) { "-s$slot" } else { "" })   # as runjob.ps1 names it
+}
+function Free-Disk([string]$keep = "") {
+  $all = @(Get-ChildItem "C:\work\games" -Directory -ErrorAction SilentlyContinue)
+  foreach ($d in $all) { if (-not $sizes.ContainsKey($d.Name)) { $t = 0L; try { foreach ($f in $d.EnumerateFiles("*", [IO.SearchOption]::AllDirectories)) { $t += $f.Length } } catch { }; $sizes[$d.Name] = $t } }
+  $total = 0; foreach ($d in $all) { $total += $sizes[$d.Name] }
+  $budget = [double]$config.GamesGB * 1GB
+  if ($total -le $budget -and (Get-PSDrive C).Free / 1GB -ge $config.MinFreeGB) { return }
+  $busy = @(@($running.Values | ForEach-Object { Copy-Name $_.Spec $_.Slot }) + $keep | Where-Object { $_ })
+  $old = $all | Sort-Object { $base = $_.Name -replace '-lane\d+$', ''; if ($lastUse.ContainsKey($base)) { $lastUse[$base] } else { $_.LastWriteTime } }
   foreach ($d in $old) {
-    if ((Get-PSDrive C).Free / 1GB -ge $config.MinFreeGB) { break }
-    if ($busy | Where-Object { $d.Name -like "*$_" -or $d.Name -like "*$_-lane*" }) { continue }
-    if (-not $busy.Count -or $d.Name -match '-s\d+') { Remove-Item $d.FullName -Recurse -Force -ErrorAction SilentlyContinue; Log "disk: removed the unused game copy $($d.Name)" }
+    if ($total -le $budget -and (Get-PSDrive C).Free / 1GB -ge $config.MinFreeGB) { break }
+    if ($busy -contains ($d.Name -replace '-lane\d+$', '')) { continue }
+    Remove-Item $d.FullName -Recurse -Force -ErrorAction SilentlyContinue
+    $total -= $sizes[$d.Name]; $sizes.Remove($d.Name)
+    Log "disk: removed the game copy $($d.Name) (copies over $($config.GamesGB) GB or under $($config.MinFreeGB) GB free)"
   }
 }
 function Start-Run($c) {
   $cls = $c.Cls; $id = $c.Id
   $muteLine = Set-GuestMute $true   # every job starts muted (also after someone unmuted by hand while looking in)
-  Free-Disk
   $slot = 0; $user = $env:USERNAME
   if (-not $cls.Excl) {
     $slot = 1; while ($slots[$slot] -and $slots[$slot].Job) { $slot++ }
     $s = Slot-User $slot; $s.Job = $id; $user = $s.User
   }
+  $cn = Copy-Name $c.Spec $slot; if ($cn) { $lastUse[$cn] = Get-Date }
+  Free-Disk $cn
   $dir = Join-Path $jobs $id; New-Item -ItemType Directory -Force $dir | Out-Null
   # The heartbeat says "running" BEFORE the job leaves the queue: an older rig.ps1 changes the display
   # when it sees the agent idle and the queue empty, and must never see both while a job starts.

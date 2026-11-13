@@ -54,6 +54,8 @@
 # -MaxGames    at most this many games at once (default 6; a missions job counts its lanes; set when
 #              it starts; a single job larger than that still runs, alone)
 # -DefaultResolution  the display a job that names none runs under (default: the box's starting size)
+# -GamesGB     the guest keeps copies of game folders for the next job of the same build up to this
+#              many GB (default 16; set when it starts) - the guest's disk lives on the host's disk
 # -MaxWait     minutes a job may wait in the queue before this script withdraws it (default 120)
 # -IdleMinutes the box shuts itself down after this long without a job (default 10; set when it starts)
 # -DgVoodoo    values set in the guest's copy of dgVoodoo.conf, e.g. @{ OutputAPI = "d3d11warp" }
@@ -78,7 +80,7 @@ param(
   [string]$Script = "", [hashtable]$ScriptArgs = @{},
   [hashtable]$DgVoodoo = @{}, [switch]$Warp, [switch]$Sound, [int]$Parallel = 0, [int]$MemoryMB = 8192,
   [string]$Out = "", [double]$Timeout = 30, [switch]$Fresh, [int]$IdleMinutes = 10,
-  [switch]$Exclusive, [int]$MaxJobs = 4, [int]$MaxGames = 6, [string]$DefaultResolution = "", [double]$MaxWait = 120,
+  [switch]$Exclusive, [int]$MaxJobs = 4, [int]$MaxGames = 6, [double]$GamesGB = 16, [string]$DefaultResolution = "", [double]$MaxWait = 120,
   [switch]$Status, [switch]$Monitors, [switch]$Look, [Alias("Show")][switch]$Peek, [switch]$Front, [switch]$Hide, [switch]$Stop, [switch]$Kill, [switch]$Restart
 )
 $ErrorActionPreference = "Stop"
@@ -219,7 +221,7 @@ function Start-Box {
       (@{ exit = 125; seconds = 0; killed = "the box stopped while the job ran" } | ConvertTo-Json -Compress) | Set-Content (Join-Path $d.FullName "done.json") -Encoding utf8 }
   }
   $q = @(Queued).Count; if ($q) { Say "$q job(s) of earlier calls wait in the queue for this box" }
-  [ordered]@{ IdleMinutes = $IdleMinutes; ScreenSeconds = 5; MaxJobs = $MaxJobs; MaxGames = $MaxGames; DefaultResolution = $DefaultResolution } |
+  [ordered]@{ IdleMinutes = $IdleMinutes; ScreenSeconds = 5; MaxJobs = $MaxJobs; MaxGames = $MaxGames; GamesGB = $GamesGB; DefaultResolution = $DefaultResolution } |
     ConvertTo-Json | Set-Content (Join-Path $io "agent\config.json") -Encoding utf8
   $agent = GuestPath (Join-Path $rigDir "guest\agent.ps1")
   if (-not $agent) { throw "the rig must live under $hostRoot (it is mapped into the box from there)" }
