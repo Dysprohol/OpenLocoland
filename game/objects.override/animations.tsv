@@ -20,6 +20,8 @@ nvid	anim	frames	sfx	childForward	childSide	childZ	childNvid	childCount
 # VIDs 950-951, the minimap's bigger frames: one frame, as VID 464
 950	STAND	1	0	0	0	0	0	1
 951	STAND	1	0	0	0	0	0	1
-# VIDs 952-953, the settings page's arrows of LocoFix's rows: one frame, as their models 495/496
+# VIDs 952-955, the settings page's arrows of LocoFix's rows: one frame, as their models 495/496
 952	STAND	1	0	0	0	0	0	1
 953	STAND	1	0	0	0	0	0	1
+954	STAND	1	0	0	0	0	0	1
+955	STAND	1	0	0	0	0	0	1

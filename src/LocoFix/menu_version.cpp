@@ -25,7 +25,7 @@
 // instead, as the state bar will put it there: the size the game would use on this window
 // (minimap.cpp: the player's choice as far as it fits), in the bottom right corner, in real pixels,
 // from vid\464preview1-3.bmp (patch_data.make_minimap_previews, the same frame as VIDs 464/950/951);
-// for a bigger one a line above it says that a strip shows under the map (the pack's strings.ini
+// for one bigger than the interface (interface_scale.cpp) a line above it says that a strip shows under the map (the pack's strings.ini
 // [strings] MenuOptionsMinimapStrip, in the pack's own font). It follows a click on the row at once
 // and goes with the page. The version gives way meanwhile: the corner is the preview's. (A mission on a
 // small map - mission 1, whose logical screen is stretched - has its minimap in the stretched
@@ -43,6 +43,7 @@
 
 std::string language_code();                  // language.cpp
 int minimap_size_for_screen(int screen_w);    // minimap.cpp
+int interface_scale_for_window();             // interface_scale.cpp
 
 namespace {
 
@@ -294,7 +295,7 @@ void draw_menu_version(IDirectDrawSurface7* target, const RECT& window, const RE
         if (frame.picture.pixels.empty()) return;
         const int top = window.bottom - frame.picture.h;
         frame.draw(target, window.right - frame.picture.w, top, 1);
-        if (k >= 2 && !g_strip.picture.pixels.empty())
+        if (k > interface_scale_for_window() && !g_strip.picture.pixels.empty())   // bigger than the interface
             g_strip.draw(target, window.right - margin - g_strip.picture.w * size,
                          top - margin / 2 - g_strip.picture.h * size, size);
         return;

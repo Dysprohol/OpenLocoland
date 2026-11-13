@@ -40,3 +40,7 @@ nvid	name	spriteType	spriteClass	flags	moveMask	sizeX	sizeY	sizeZ	maxHp	speed	sp
 # music rows' and their mouse tips ([MouseTips] MenuVid952AllDir/953) say what they do
 952	Settings left	0x400	FRAME	0x2800	0xf	17	17	0	0	0	0	999999	999999	2500	1	1	1	1	vid\495menu.vid
 953	Settings right	0x400	FRAME	0x2800	0xf	17	17	0	0	0	0	999999	999999	2500	1	1	1	1	vid\496menu.vid
+# VID 954 and 955: the arrows of LocoFix's interface size row on the settings page (optfields.lgc), the
+# same way - the page's arrows as types of their own, their mouse tips MenuVid954AllDir/955
+954	Settings interface left	0x400	FRAME	0x2800	0xf	17	17	0	0	0	0	999999	999999	2500	1	1	1	1	vid\495menu.vid
+955	Settings interface right	0x400	FRAME	0x2800	0xf	17	17	0	0	0	0	999999	999999	2500	1	1	1	1	vid\496menu.vid
