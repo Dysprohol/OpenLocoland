@@ -342,6 +342,192 @@ def make_minimap_previews(frame_vid, *outputs):
         shutil.rmtree(work, ignore_errors=True)
 
 
+# The interface at two and three times its size (LocoFix interface_scale.cpp): the state bar's pictures,
+# its fonts and (for the messages, the tooltip) their fonts, enlarged pixel by pixel - as the minimap's
+# frame - into VIDs of their own, 1100 + i for twice and 1150 + i for three times, i the place in
+# INTERFACE_VIDS (LocoFix has the same table). Their objects.res rows are the edition's own rows of the
+# originals with the box (sizeX/Y/Z) times the scale and the picture's name changed, so the engine places
+# and hit-tests them by the bigger size; their animations are the originals'. The minimap's own bigger
+# frames stay VIDs 950/951 (make_minimap_frames).
+INTERFACE_SCALES = (2, 3)
+INTERFACE_FIRST_VID = {2: 1100, 3: 1150}
+INTERFACE_VIDS = (450, 938, 455, 456, 457, 458, 459, 463, 469, 497, 498, 499, 502, 503, 4, 2, 8, 6, 14, 16, 17,
+                  18, 449)
+INTERFACE_BOX_ONLY = (502, 503)   # vid\empty.vid: nothing drawn, only their box (the money and speed tips) grows
+TEXTURE_MAX = 256   # the biggest texture the engine loads at 16 bits a pixel (GroundVid_LoadImage)
+
+
+def interface_picture(image_file, k):
+    """The enlarged picture's name for an objects.res image name: vid\\450sbar.vid -> vid\\450sbarx2.vid,
+    fonts\\font8x13.bmp -> fonts\\font8x13x2.bmp."""
+    stem, ext = os.path.splitext(image_file)
+    return "%sx%d%s" % (stem, k, ext)
+
+
+def add_interface_rows(objects_res):
+    """Adds the rows of the bigger interface VIDs to `objects_res` (in place). Returns the pictures they
+    name: [(original image file, its enlarged name, k)] - each to be made by make_interface_pictures.
+    An original missing from the edition gets no rows."""
+    import res_tool
+    tables = res_tool.read_tables(open(objects_res, "rb").read())
+    objects = {r["nvid"].strip(): r for r in tables["objects"]}
+    animations = [r for r in tables["animations"]]
+    pictures = []
+    for k in INTERFACE_SCALES:
+        for i, nvid in enumerate(INTERFACE_VIDS):
+            source = objects.get(str(nvid))
+            new = str(INTERFACE_FIRST_VID[k] + i)
+            if source is None or new in objects:
+                continue
+            row = dict(source)
+            row["nvid"] = new
+            row["name"] = "Interface x%d of %d" % (k, nvid)
+            for c in ("sizeX", "sizeY", "sizeZ"):
+                row[c] = str(int(float(source[c]) * k))
+            if nvid not in INTERFACE_BOX_ONLY:
+                row["imageFile"] = interface_picture(source["imageFile"], k)
+                pictures.append((source["imageFile"], row["imageFile"], k))
+            tables["objects"].append(row)
+            objects[new] = row
+            for a in animations:
+                if a["nvid"].strip() == str(nvid):
+                    tables["animations"].append(dict(a, nvid=new))
+    open(objects_res, "wb").write(res_tool.write_tables(tables))
+    return sorted(set(pictures))
+
+
+def enlarge_vid(source, output, k):
+    """Writes `output`: the VID `source` k times bigger, pixel by pixel - a sprite's frames (every picture
+    of it: frames, depth, a palette image kept indexed), or a texture's sheets with its tiles' places and
+    sizes (a sheet padded to a power of two). Raises on a VID of another kind, a raw or shadowed frame."""
+    import csv
+    import glob
+    import json
+    import shutil
+    import tempfile
+    from PIL import Image
+    import map_tool
+
+    work = tempfile.mkdtemp(prefix="interface_")
+    try:
+        folder = os.path.join(work, "vid")
+        map_tool.unpack(source, folder)
+        meta = json.load(open(os.path.join(folder, "vid.json"), encoding="utf-8"))
+        kind = meta.get("kind")
+        if kind == "sprite":
+            with open(os.path.join(folder, "frames.tsv"), encoding="utf-8") as f:
+                rows = list(csv.DictReader(f, delimiter="\t"))
+            if any((r.get("raw") or "").strip() or (r.get("shadow") or "").strip() for r in rows):
+                raise ValueError("a raw or shadowed frame")
+            for png in glob.glob(os.path.join(folder, "*.png")):
+                image = Image.open(png)
+                image.load()
+                image.resize((image.width * k, image.height * k), Image.NEAREST).save(png)
+            sheet = meta["sheet"]
+            meta.update(width=meta["width"] * k, height=meta["height"] * k,
+                        sheet=dict(sheet, cellWidth=sheet["cellWidth"] * k, cellHeight=sheet["cellHeight"] * k))
+        elif kind == "texture" and not meta.get("ground") and not int(meta["imageFlags"], 16) & 0x80c:
+            # The engine unpacks a texture into a buffer of 128 KB (GroundVid_LoadImage: 0x20008 bytes), so
+            # a texture is at most 256 x 256 at 16 bits: the enlarged tiles are packed anew into sheets of
+            # that size, in rows, each tile naming its sheet (a tile shown twice is packed once).
+            sheets_in = {}
+            for png in glob.glob(os.path.join(folder, "texture_*.png")):
+                image = Image.open(png)
+                image.load()
+                sheets_in[int(os.path.basename(png)[8:11])] = image
+                os.remove(png)
+            tiles = os.path.join(folder, "tiles.tsv")
+            with open(tiles, encoding="utf-8") as f:
+                reader = csv.DictReader(f, delimiter="\t")
+                columns, rows = reader.fieldnames, list(reader)
+            size = TEXTURE_MAX
+            sheets, placed = [], {}
+            x = y = shelf = 0
+            for r in rows:
+                box = (int(r["texture"]), int(r["offsetX"]), int(r["offsetY"]), int(r["width"]), int(r["height"]))
+                if box not in placed:
+                    source = sheets_in[box[0]]
+                    w, h = box[3] * k, box[4] * k
+                    if w > size or h > size:
+                        raise ValueError("a tile bigger than a texture")
+                    if x + w > size:
+                        x, y, shelf = 0, y + shelf, 0
+                    if not sheets or y + h > size:
+                        sheets.append(Image.new(source.mode, (size, size)))
+                        x = y = shelf = 0
+                    piece = source.crop((box[1], box[2], box[1] + box[3], box[2] + box[4]))
+                    sheets[-1].paste(piece.resize((w, h), Image.NEAREST), (x, y))
+                    placed[box] = (len(sheets) - 1, x, y)
+                    x, shelf = x + w, max(shelf, h)
+                sheet, px, py = placed[box]
+                r.update(texture=str(sheet), offsetX=str(px), offsetY=str(py), width=str(box[3] * k),
+                         height=str(box[4] * k), x=str(int(r["x"]) * k), y=str(int(r["y"]) * k))
+            for i, sheet in enumerate(sheets):
+                sheet.save(os.path.join(folder, "texture_%03d.png" % i))
+            meta["textures"] = len(sheets)
+            with open(tiles, "w", encoding="utf-8", newline="\n") as f:
+                f.write("\t".join(columns) + "\n")
+                for r in rows:
+                    f.write("\t".join(r[c] for c in columns) + "\n")
+            meta.update(width=meta["width"] * k, height=meta["height"] * k)
+        else:
+            raise ValueError("not a sprite or a texture")
+        with open(os.path.join(folder, "vid.json"), "w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2)
+        map_tool.pack(folder, output)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def enlarge_font(source, output, k):
+    """Writes `output`: the font picture `source` (a grid of 16 x 16 cells, each a character and a one-pixel
+    grid line on its right and bottom; the engine's FontVidConverter cuts a cell of a sixteenth less that
+    line) with every character k times bigger and the grid line kept one pixel. Raises on another shape."""
+    from PIL import Image
+    image = Image.open(source)
+    image.load()
+    if image.width % 16 or image.height % 16 or image.width < 32 or image.height < 32:
+        raise ValueError("not a 16 x 16 grid")
+    cw, ch = image.width // 16, image.height // 16
+    nw, nh = (cw - 1) * k + 1, (ch - 1) * k + 1
+    big = Image.new(image.mode, (16 * nw, 16 * nh))
+    if image.mode == "P":
+        big.putpalette(image.getpalette())
+    for row in range(16):
+        for column in range(16):
+            x, y = column * cw, row * ch
+            cell = Image.new(image.mode, (nw, nh), image.getpixel((x + cw - 1, y + ch - 1)))
+            glyph = image.crop((x, y, x + cw - 1, y + ch - 1))
+            cell.paste(glyph.resize((glyph.width * k, glyph.height * k), Image.NEAREST), (0, 0))
+            big.paste(cell, (column * nw, row * nh))
+    big.save(output, "BMP")
+
+
+def make_interface_pictures(game_folder, pictures, outputs):
+    """Makes each enlarged picture of add_interface_rows: pictures[i] = (original, enlarged name, k) into
+    outputs[i], from `game_folder` (the assembled game; a font of a language pack is made for every
+    lang\\<code>\\ that has the original - the game opens the pack's copy of the bigger name too). A picture
+    that cannot be enlarged is copied as it is, so every row has its file; LocoFix uses a scale only when
+    all of its pictures really are that many times bigger. Returns the originals copied (not enlarged)."""
+    import shutil
+    copied = []
+    for (original, _, k), output in zip(pictures, outputs):
+        source = os.path.join(game_folder, original)
+        try:
+            if original.lower().endswith(".bmp"):
+                enlarge_font(source, output, k)
+            else:
+                enlarge_vid(source, output + ".part", k)
+                os.replace(output + ".part", output)
+        except Exception:   # never stop the build: the original, which LocoFix sees as not enlarged
+            if os.path.exists(output + ".part"):
+                os.remove(output + ".part")
+            if os.path.isfile(source):
+                shutil.copyfile(source, output)
+            copied.append(original)
+    return copied
+
+
 # The editor's icons (vid\939edit.vid, VID 939): the tools of LocoFix's editor bar that the
 # state bar's atlas (vid\455icon.vid) has no icon for, made from the game's own sprites in
 # the atlas' style - a 40 x 40 cell with the gold frame and the dark striped ground of the
