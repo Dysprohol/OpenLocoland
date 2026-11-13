@@ -577,8 +577,10 @@ with ":" and a note is in parentheses - neither is ever clicked -; a choice is l
 underlined when it is set; "..." at its end opens another page (TEMPLATE..., AI..., CONVERT IT IN THE
 ARRIVALS PANEL...); - + change a number, < > move a car or turn the pages; a list entry's two rows are one
 choice. A text longer than its row is cut and ends with "." (an abbreviation's dot; trailing spaces and commas
-dropped first) and its whole text is the status line's while the mouse is over it (`fit`); a long note wraps
-at spaces into its rows (`note`). The arrow back at the bottom left says so in the status line ("Back one
+dropped first) and its whole text is the status line's while the mouse is over it (`fit`) - a list entry's
+task and a train's price stay whole, its name is cut (`fit_head`); a long note wraps at spaces into its rows
+(`note`); a value starts at the value column, or a character after a label longer than that column (English
+IN THE LIST:, Hungarian KIVÁLASZTVA:). The arrow back at the bottom left says so in the status line ("Back one
 page", Esc and the right button too). What the old layout got wrong (found with the test steps `H` and `G<n>`,
 below, and `tools\rig\panel_rows_check.py`): the authors' trains' 12th row lay on the page arrows' row - a
 click on > took that train into the entry instead of turning the page; a neutral or pirate factory's note
