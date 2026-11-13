@@ -450,8 +450,10 @@ shows where; away from the track, or with Shift, they stay where the cursor is, 
   `R` or `E` (or **TURN: ROUND** in its panel) turns it round on its leg: the line then
   runs the other way and the semaphores change places.
 
-Dragging one of them moves it, with its line, to the nearest right place (dropped away from the
-track or with Shift: where it is dropped); deleting it deletes the line too. A **blocker** (the buffer stop, in the RAILWAY group of All objects) is placed freely and
+Dragging one of them moves it, with its line and its semaphores, to the nearest right place (dropped away from the
+track or with Shift: where it is dropped); deleting it deletes them too. Its semaphores are those at
+the ends of its line, also one you moved closer or along the line - in a map loaded from a file too;
+a semaphore you moved far away stays where you put it. A **blocker** (the buffer stop, in the RAILWAY group of All objects) is placed freely and
 turned with R / E like any object: set it at the end of a track yourself.
 
 **One-way lines** (**Push line**, key 4): a line on the track no train may enter against its

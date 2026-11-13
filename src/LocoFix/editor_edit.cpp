@@ -7263,48 +7263,181 @@ bool building_line(uint8_t* o, PushLine& line) {
     return false;
 }
 
-// The editable lines of a factory or repair point: those whose way passes its middle (a factory's
-// begins at the dead end behind it).
+// A line's way is a line of the building `o` as the missions have them (MAP_RULES 5): it passes the
+// building's middle (within 30 px) and a factory's begins at the dead end of its spur, a repair point's
+// runs on through it (its middle is not at the line's begin or end). A short line of a post that only
+// crosses the building - a post placed beside a factory's spur gets one - is the post's, not the
+// building's: before, it was taken for the building's, so the post had "no line of its own" and the
+// building's step took the line (and, with the posts found by their places, the post).
+bool building_way(uint8_t* o, const std::vector<uint8_t*>& path) {
+    if (path.size() < 2) return false;
+    size_t at_middle = path.size();
+    float best = 30;
+    for (size_t k = 0; k < path.size(); ++k) {
+        const float d = std::hypot(dot_wx(path[k]) - at<float>(o, O_X), dot_wy(path[k]) - at<float>(o, O_Y));
+        if (d < best) best = d, at_middle = k;
+    }
+    if (at_middle == path.size()) return false;
+    if (nvid_of(o) == VID_DEPOT) return dot_links(path.front()) == 1;
+    return at_middle > 0 && at_middle + 1 < path.size();
+}
+
+// The editable lines of a factory or repair point: those whose way is its line (building_way).
 std::vector<int> lines_of(uint8_t* o) {
     std::vector<int> out;
     if (nvid_of(o) != VID_DEPOT && nvid_of(o) != VID_WORKSHOP) return out;
     const std::vector<PushLine>& lines = mission_push_lines();
-    for (int i = 0; i < static_cast<int>(lines.size()); ++i) {
-        const Trace t = trace(lines[i]);
-        for (uint8_t* d : t.path)
-            if (std::hypot(dot_wx(d) - at<float>(o, O_X), dot_wy(d) - at<float>(o, O_Y)) < 30) {
-                out.push_back(i);
-                break;
-            }
+    for (int i = 0; i < static_cast<int>(lines.size()); ++i)
+        if (building_way(o, trace(lines[i]).path)) out.push_back(i);
+    return out;
+}
+
+// The posts of a factory or repair point (issue #14). The map keeps no tie between a post and a
+// building - nothing in the engine has one (MAP_RULES 7) -, so the editor finds them the way the
+// authors' maps relate them: a post stands at an end of a one-way line, beside that line's track (192 of
+// the missions' 196 posts within 90 px of a line's end). A building's posts are the semaphores within
+// POST_OWN_REACH of a place its lines' rule gives a post (line_posts), standing beside the track of that
+// line - its own rail points or those up to POST_OWN_REACH along the track past its ends -, with no line
+// of their own (a post given one, L, is the player's signal); its lines are the editor's that pass its
+// middle and, on a map whose script has no editor blocks (the missions'), the script's - whose lengths
+// are the authors' (a factory's 100-175 px, the editor's rule 140), so their posts stand elsewhere than
+// the editor's rule would put them. As each post stands at the end of one line, a post is the
+// building's whose line gives the nearest place it stands at; nearest to a place of another line (an
+// entry's pair, any other one-way section's) it is no building's.
+// So a loaded map's posts are known without anything stored with the map: the missions', a map saved by
+// v0.2.11, a post the player moved toward the building or along its line and saved. Before, a post was
+// found only within 30 px of the editor's own rule's place on the editor's own lines, and a loaded map's
+// post farther away (a mission's, one moved and saved) stayed when the building was moved or turned while
+// the building got new ones: its lights twice, the old ones left behind.
+// Within a session the editor also remembers (g_post_owner) the posts a building's line got
+// (give_building_line), a post dragged or turned away from its building (note_building_post) and one
+// put onto a building's place (claim_building_post); what it remembers comes before what the places say,
+// so a post moved farther than the reach still goes with its building, and a post another building
+// remembers is neither taken nor reused. An entry stays when its post is taken away by a step, so an undo
+// that brings it back finds it again; the list is forgotten with the level and carried over a run
+// (edit_keep_history). A post the player moved farther than the reach and saved is no longer the
+// building's after a load: it stays where he put it.
+std::map<uint8_t*, uint8_t*> g_post_owner;        // post -> its factory or repair point
+std::map<uint8_t*, uint8_t*> g_kept_post_owner;
+
+constexpr float POST_OWN_REACH = 90;   // MAP_RULES 7: a post within 90 px of an end of its line
+
+uint8_t* post_dot(uint8_t* o);   // posts, below
+int own_line(uint8_t* o);
+std::vector<int> lines_of(uint8_t* o);
+
+// The building a post is remembered as belonging to, when both still stand.
+uint8_t* remembered_owner(uint8_t* post) {
+    const auto it = g_post_owner.find(post);
+    return it != g_post_owner.end() && it->second && !removed(it->second) && !removed(post) ? it->second : nullptr;
+}
+
+// The ways of a building's lines: the editor's (lines_of) and, while the map's script has no editor
+// blocks, the script's passing its middle.
+std::vector<Trace> building_traces(uint8_t* o) {
+    std::vector<Trace> out;
+    for (int i : lines_of(o)) out.push_back(trace(mission_push_lines()[i]));
+    if (mission_managed() || (nvid_of(o) != VID_DEPOT && nvid_of(o) != VID_WORKSHOP)) return out;
+    for (const PushLine& l : mission_script_push_lines()) {
+        const Trace t = trace(l);
+        if (building_way(o, t.path)) out.push_back(t);
     }
     return out;
 }
 
-// The posts of a factory or repair point (issue #14): those its line got (give_building_line) and those
-// found at its line's places when they were dragged or turned away from them (note_building_post). A
-// building's posts were found only within 30 px of where its line's rule puts them, so one the player
-// had moved farther stayed when the building was turned or dragged along its track, and the building
-// got new ones: its lights twice. A post has one building: as the missions' and MAP_RULES 7's posts, it
-// stands at the end of one line and faces that line's trains - so when a post is found near the places
-// of two buildings' lines it is the nearest one's, a post that is another building's is neither taken
-// nor reused by a building (its line gets a post of its own), and it stays that building's while it lives.
-// An entry stays when its post is taken away by a step, so an undo that brings it back finds it again; the
-// list is forgotten with the level and carried over a run (edit_keep_history); a loaded map's posts are
-// found by their places, as before, until one is moved.
-std::map<uint8_t*, uint8_t*> g_post_owner;        // post -> its factory or repair point
-std::map<uint8_t*, uint8_t*> g_kept_post_owner;
+// The rail points a post of a line may stand beside: the line's own and those up to POST_OWN_REACH
+// along the track past either end.
+std::set<uint8_t*> line_reach(const Trace& t) {
+    std::set<uint8_t*> out(t.path.begin(), t.path.end());
+    if (t.error || t.path.empty()) return out;
+    for (uint8_t* end : {t.path.front(), t.path.back()}) {
+        std::vector<std::pair<uint8_t*, float>> open{{end, 0.0f}};
+        std::map<uint8_t*, float> seen{{end, 0.0f}};
+        while (!open.empty()) {
+            const auto [d, gone] = open.back();
+            open.pop_back();
+            for (int k = 0; k < dot_links(d) && k < 6; ++k) {
+                uint8_t* n = at<uint8_t*>(d, DOT_LINKS + k * DOT_LINK_SIZE);
+                if (!n) continue;
+                const float to = gone + std::hypot(dot_wx(n) - dot_wx(d), dot_wy(n) - dot_wy(d));
+                if (to > POST_OWN_REACH) continue;
+                const auto it = seen.find(n);
+                if (it != seen.end() && it->second <= to) continue;
+                seen[n] = to;
+                out.insert(n);
+                open.push_back({n, to});
+            }
+        }
+    }
+    return out;
+}
+
+// Every post of a factory or repair point (live ones): what the editor remembers, then what the
+// places of the lines say (above) - a post is the building's whose line's place is the nearest one it
+// stands at; nearest to a place of another line (an entry's, any one-way section's) it is no building's.
+std::map<uint8_t*, uint8_t*> post_owners(std::vector<uint8_t*>* of_other_lines = nullptr) {
+    std::vector<std::pair<uint8_t*, uint8_t*>> posts;   // the posts that may be a building's, with their rail point
+    std::vector<uint8_t*> buildings;
+    for_each_object([&](uint8_t* o) {
+        if (removed(o)) return;
+        if (nvid_of(o) == VID_DEPOT || nvid_of(o) == VID_WORKSHOP) buildings.push_back(o);
+        else if (nvid_of(o) == VID_SEMAPHORE)
+            if (uint8_t* d = post_dot(o)) posts.push_back({o, d});
+    });
+    std::map<uint8_t*, uint8_t*> out;
+    if (!posts.empty()) {
+        std::vector<std::pair<uint8_t*, Trace>> lines;   // every line with its building (nullptr: none)
+        std::set<int> theirs;                            // the editor's lines of a building
+        std::vector<Trace> script_theirs;
+        for (uint8_t* b : buildings) {
+            for (int i : lines_of(b)) theirs.insert(i);
+            for (const Trace& t : building_traces(b)) lines.push_back({b, t});
+        }
+        for (const auto& [b, t] : lines) script_theirs.push_back(t);
+        for (int i = 0; i < static_cast<int>(mission_push_lines().size()); ++i)
+            if (!theirs.count(i)) lines.push_back({nullptr, trace(mission_push_lines()[i])});
+        for (const PushLine& l : mission_script_push_lines()) {
+            const Trace t = trace(l);
+            const bool building = std::any_of(script_theirs.begin(), script_theirs.end(), [&](const Trace& s) { return s.path == t.path; });
+            if (!building) lines.push_back({nullptr, t});
+        }
+        std::map<uint8_t*, std::pair<uint8_t*, float>> best;   // post -> the building (or none) of the nearest place
+        for (const auto& [b, t] : lines) {
+            const std::vector<Post> places = line_posts(t);
+            if (places.empty()) continue;
+            const std::set<uint8_t*> reach = line_reach(t);
+            for (const auto& [p, d] : posts) {
+                if (!reach.count(d)) continue;
+                for (const Post& place : places) {
+                    const float dist = std::hypot(at<float>(p, O_X) - place.x, at<float>(p, O_Y) - place.y);
+                    const auto it = best.find(p);
+                    if (dist < POST_OWN_REACH && (it == best.end() || dist < it->second.second)) best[p] = {b, dist};
+                }
+            }
+        }
+        for (const auto& [p, b] : best)
+            if (b.first && own_line(p) < 0) out[p] = b.first;   // a post with a line of its own is the player's signal
+            else if (!b.first && of_other_lines) of_other_lines->push_back(p);
+    }
+    for (const auto& [p, b] : g_post_owner)
+        if (uint8_t* owner = remembered_owner(p)) out[p] = owner;
+    return out;
+}
 
 // The building of a post, when it still stands.
 uint8_t* post_owner(uint8_t* post) {
-    const auto it = g_post_owner.find(post);
-    return it != g_post_owner.end() && it->second && !removed(it->second) ? it->second : nullptr;
+    if (!post || removed(post) || nvid_of(post) != VID_SEMAPHORE) return nullptr;
+    if (uint8_t* b = remembered_owner(post)) return b;
+    const std::map<uint8_t*, uint8_t*> owners = post_owners();
+    const auto it = owners.find(post);
+    return it != owners.end() ? it->second : nullptr;
 }
 
 // The posts that are another building's than `o` (live ones).
 std::vector<uint8_t*> posts_of_others(uint8_t* o) {
     std::vector<uint8_t*> out;
-    for (const auto& [post, b] : g_post_owner)
-        if (b != o && !removed(post) && post_owner(post)) out.push_back(post);
+    for (const auto& [post, b] : post_owners())
+        if (b != o) out.push_back(post);
     return out;
 }
 
@@ -7312,58 +7445,58 @@ std::vector<uint8_t*> posts_of_others(uint8_t* o) {
 // dragged or turned onto another building's place it serves that line now; elsewhere it keeps its building.
 void claim_building_post(uint8_t* post) {
     if (!post || removed(post) || nvid_of(post) != VID_SEMAPHORE) return;
-    const std::vector<PushLine>& lines = mission_push_lines();
     uint8_t* best = nullptr;
     float best_d = 30;
     for_each_object([&](uint8_t* b) {
         if (removed(b) || (nvid_of(b) != VID_DEPOT && nvid_of(b) != VID_WORKSHOP)) return;
-        for (int i : lines_of(b))
-            for (const Post& p : line_posts(trace(lines[i]))) {
+        for (const Trace& t : building_traces(b))
+            for (const Post& p : line_posts(t)) {
                 const float d = std::hypot(at<float>(post, O_X) - p.x, at<float>(post, O_Y) - p.y);
                 if (d < best_d) best_d = d, best = b;
             }
     });
-    if (!best || post_owner(post) == best) return;
+    if (!best || remembered_owner(post) == best) return;
     g_post_owner[post] = best;
     patch::log("edit: VID 152 at %.0f,%.0f now stands at a post place of VID %d at %.0f,%.0f - it is that one's", at<float>(post, O_X),
                at<float>(post, O_Y), nvid_of(best), at<float>(best, O_X), at<float>(best, O_Y));
 }
 
+// A post about to be moved away: the building its place makes it the post of (post_owners) is
+// remembered, so it goes with that building wherever the player puts it.
 void note_building_post(uint8_t* post) {
-    if (!post || removed(post) || nvid_of(post) != VID_SEMAPHORE || post_owner(post)) return;
-    const std::vector<PushLine>& lines = mission_push_lines();
-    uint8_t* best = nullptr;
-    float best_d = 30;
-    for_each_object([&](uint8_t* b) {
-        if (removed(b) || (nvid_of(b) != VID_DEPOT && nvid_of(b) != VID_WORKSHOP)) return;
-        for (int i : lines_of(b))
-            for (const Post& p : line_posts(trace(lines[i]))) {
-                const float d = std::hypot(at<float>(post, O_X) - p.x, at<float>(post, O_Y) - p.y);
-                if (d < best_d) best_d = d, best = b;
-            }
-    });
+    if (!post || removed(post) || nvid_of(post) != VID_SEMAPHORE || remembered_owner(post)) return;
+    uint8_t* best = post_owner(post);
     if (!best) return;
     g_post_owner[post] = best;
     patch::log("edit: VID 152 at %.0f,%.0f is a post of VID %d at %.0f,%.0f - it goes with it", at<float>(post, O_X),
                at<float>(post, O_Y), nvid_of(best), at<float>(best, O_X), at<float>(best, O_Y));
 }
 
-// Takes a building's lines away and their posts into `posts` (to delete); true when lines went.
+// Takes a building's posts into `posts` (to delete) and its lines of the editor away; true when lines
+// went. A post within 30 px of a place of its lines (the rule's, as before) and every post that is its
+// own (post_owners: remembered, or by its place) - not another building's, not a post with a line of
+// its own. A line of the script (a map without editor blocks) is not the editor's to take: it stays.
 bool take_building_lines(uint8_t* o, std::vector<uint8_t*>& posts) {
+    if (!o || (nvid_of(o) != VID_DEPOT && nvid_of(o) != VID_WORKSHOP)) return false;
     std::vector<int> own = lines_of(o);
-    if (own.empty()) return false;
-    std::vector<PushLine>& lines = mission_push_lines();
-    std::vector<uint8_t*> skip = posts_of_others(o);   // another building's post near a place of these lines is not taken
-    for (int i : own)
-        for (const Post& p : line_posts(trace(lines[i]))) {
+    std::vector<uint8_t*> skip;   // another building's post near a place of these lines is not taken, nor another line's
+    const std::map<uint8_t*, uint8_t*> owners = post_owners(&skip);
+    for (const auto& [post, b] : owners)
+        if (b != o) skip.push_back(post);
+    const size_t first = posts.size();
+    for (const Trace& t : building_traces(o))
+        for (const Post& p : line_posts(t)) {
             std::vector<uint8_t*> taken = posts;
             taken.insert(taken.end(), skip.begin(), skip.end());
             if (uint8_t* post = post_near(p.x, p.y, taken)) posts.push_back(post);
         }
-    for (const auto& [post, b] : g_post_owner)   // and its own moved away from their places (not one given a line of its own)
-        if (b == o && !removed(post) && nvid_of(post) == VID_SEMAPHORE && std::find(posts.begin(), posts.end(), post) == posts.end() &&
-            own_line(post) < 0)
-            posts.push_back(post);
+    for (const auto& [post, b] : owners)   // and its own away from the places (not one given a line of its own)
+        if (b == o && std::find(posts.begin(), posts.end(), post) == posts.end() && own_line(post) < 0) posts.push_back(post);
+    if (posts.size() > first)
+        patch::log("edit: VID %d at %.0f,%.0f takes %u semaphores with it", nvid_of(o), at<float>(o, O_X), at<float>(o, O_Y),
+                   static_cast<unsigned>(posts.size() - first));
+    if (own.empty()) return false;
+    std::vector<PushLine>& lines = mission_push_lines();
     for (auto it = own.rbegin(); it != own.rend(); ++it) lines.erase(lines.begin() + *it);
     g_push_selected = -1;
     return true;

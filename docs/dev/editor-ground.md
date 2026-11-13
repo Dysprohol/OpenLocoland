@@ -400,7 +400,7 @@ point turns round on its leg - R / E, or TURN: ROUND in its panel, also while it
 and its line is made anew the other way with its posts (a green one at the new way in, a red one at
 the far end), one step of the history. A building's posts are those its line got and those standing within 30
 px of where its line's rule puts them when one is dragged or turned round (`note_building_post`,
-`g_building_posts`; issue #14): before, only the second kind was found, so a post the player had moved away
+`g_post_owner`; issue #14): before, only the second kind was found, so a post the player had moved away
 stayed when the repair point was turned or the factory dragged along its spur, and the building got new
 ones - its lights twice (reproduced on POLIGON: the enemy repair point's lower post dragged 70 px down the
 track, the repair point turned - three posts at it in the saved map; now two, and undo brings the moved post
@@ -412,9 +412,34 @@ building's post place becomes that building's (`claim_building_post`, the neares
 keeps its building, and a building takes and reuses no post that is another's (`posts_of_others` in
 `take_building_lines` and `put_posts`) - checked: the repair point's lower post deleted, the factory's post
 dragged to its place, the factory dragged along its spur - before, the factory's step took the post and the
-repair point stood without its light; now the post stays, the repair point's. A post given a line of its own (L) is no longer the building's. On a map loaded from disk a
-building's posts are found by their places again until one is moved: a post moved away and saved is a post
-of its own after the load (the map keeps no mark of whose a post is). Checked in the game: a mission made on the template with the main line, a spur
+repair point stood without its light; now the post stays, the repair point's. A post given a line of its own (L) is no longer the building's.
+A loaded map's posts (issue #14 again, 2026-11-12: the maintainer's maps are loaded from files, and the
+fix above held only within a session). The map keeps no mark of whose a post is - nor does the engine
+(MAP_RULES 7) -, so after a load the editor found a building's posts only within 30 px of the places the
+editor's own rule gives on the editor's own lines. A post the player had moved toward the building and saved
+(The Factory: four posts 35-64 px from their places, one factory with two red posts on its spur) and every
+post of a mission (its lines are the script's, of the authors' lengths, so its posts stand 60-70 px from the
+editor's rule's places) was left where it stood when the building was dragged or turned, and the building got
+new ones: measured over a scripted run, The Factory 23 -> 26 semaphores, mission 5 10 -> 12. Now the posts are
+derived from the map as the authors' maps relate them (`post_owners`): a post belongs to the line whose place
+(`line_posts`) is the nearest one it stands at, within 90 px (192 of the missions' 196 posts are within 90 px of
+a line's end), beside that line's track - its rail point (`post_dot`) one of the line's or within 90 px along
+the track past its ends (`line_reach`) -, and is the building's when that line is a building's: the editor's
+lines through it and, on a map without editor blocks, the script's (`building_traces`); a post nearest to
+another line's place (an entry's pair, any one-way section) or with a line of its own is no building's.
+A building's line is one whose way is its line as the missions have them (`building_way`, MAP_RULES 5): it
+passes the building's middle, and a factory's begins at its spur's dead end, a repair point's runs on through
+it. Before, any line passing the middle was the building's - so the 70 px line a post placed beside a
+factory's spur gets, which only crosses the factory, was taken for the factory's: the post said "no line of
+its own" and the factory's next move took the line (and, with the posts found by their places, the post). What
+the editor remembers in the session (`g_post_owner`) comes first. Nothing new is stored: the missions, maps
+saved by v0.2.11 and posts moved and saved are known as they are, and a map is not changed by being opened.
+Measured after: The Factory 23 -> 22 (the factory's double goes with its next move, every other building keeps
+two or one), mission 5 10 -> 10; undo and redo, save and load and a quick test round in between keep the
+count. A post moved farther than 90 px from its place (or onto another track) and saved is a post of its own
+after a load: it stays where the player put it. On a map without editor blocks the script's own line stays
+where it was when its building moves (the editor cannot change that script; saved under a new name it becomes
+an editor line). Checked in the game: a mission made on the template with the main line, a spur
 with a factory at its dead end (line and red post made), a repair point on the main line (line,
 green and red posts), a crate on the line and the reinforcement point; played with a test script in
 the game folder's copy: the reinforcement, damaged to 60 hp, was pushed through the repair point and

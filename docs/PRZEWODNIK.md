@@ -450,8 +450,10 @@ podgląd pokazuje gdzie; z dala od toru albo z Shiftem zostają tam, gdzie kurso
   swoje semafory. `R` albo `E` (albo **OBROT: ZAWROC** w jego panelu) obraca go na torze:
   linia biegnie wtedy w drugą stronę, a semafory zamieniają się miejscami.
 
-Przeciągnięcie przenosi je razem z linią na najbliższe właściwe miejsce (upuszczone z dala od toru
-albo z Shiftem: tam, gdzie upuszczone); usunięcie usuwa też linię.
+Przeciągnięcie przenosi je razem z linią i semaforami na najbliższe właściwe miejsce (upuszczone z dala od toru
+albo z Shiftem: tam, gdzie upuszczone); usunięcie usuwa też linię i semafory. Jego semafory to te
+na końcach jego linii, także przesunięty bliżej albo wzdłuż linii - również w mapie wczytanej z
+pliku; semafor odsunięty daleko zostaje tam, gdzie go postawiłeś.
 **Bloker** (kozioł oporowy, w grupie KOLEJ we Wszystkich obiektach) stawia się swobodnie i obraca
 R / E jak każdy obiekt: ustaw go sam na końcu toru.
 
