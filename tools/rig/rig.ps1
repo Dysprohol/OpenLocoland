@@ -133,8 +133,13 @@ function Clients { @(Get-Process WindowsSandboxRemoteSession -ErrorAction Silent
 function BoxRunning { if ($wsbExe) { return [bool](BoxIds).Count } else { return [bool](Clients).Count } }
 function AgentState {
   $f = Join-Path $io "agent\state.json"
-  if (-not (Test-Path $f)) { return $null }
-  try { $s = Get-Content $f -Raw | ConvertFrom-Json } catch { return $null }
+  # read again a moment later when it is being swapped (the agent rewrites it every half second)
+  $s = $null
+  for ($i = 0; $i -lt 4 -and -not $s; $i++) {
+    if ($i) { Start-Sleep -Milliseconds 150 }
+    if (Test-Path $f) { try { $s = Get-Content $f -Raw -ErrorAction Stop | ConvertFrom-Json } catch { $s = $null } }
+  }
+  if (-not $s) { return $null }
   $s | Add-Member age ((Get-Date) - [datetime]$s.time).TotalSeconds -PassThru
 }
 function BoxUp { $s = AgentState; return ($s -and $s.age -lt 15 -and $s.state -ne "stopping" -and (BoxRunning)) }
@@ -208,6 +213,8 @@ function Start-Box {
   if (Test-Path (Join-Path $io "agent\agent.log")) { Move-Item (Join-Path $io "agent\agent.log") (Join-Path $io "agent\agent-previous-box.log") -Force }
   Remove-Item (Join-Path $io "stop") -ErrorAction SilentlyContinue
   foreach ($d in @(Get-ChildItem (Join-Path $io "jobs") -Directory -ErrorAction SilentlyContinue)) {
+    # results nobody fetched for a day (their caller was gone) are dropped
+    if ((Test-Path (Join-Path $d.FullName "done.json")) -and $d.LastWriteTime -lt (Get-Date).AddDays(-1)) { Remove-Item $d.FullName -Recurse -Force -ErrorAction SilentlyContinue; continue }
     if (-not (Test-Path (Join-Path $d.FullName "done.json"))) {
       (@{ exit = 125; seconds = 0; killed = "the box stopped while the job ran" } | ConvertTo-Json -Compress) | Set-Content (Join-Path $d.FullName "done.json") -Encoding utf8 }
   }
@@ -336,7 +343,9 @@ function Serve-Display {
 # is kept, so the job runs first in the new box).
 function Serve-Fresh {
   $s = AgentState; if (-not $s -or -not $s.needFresh -or @($s.running).Count) { return }
-  $l = Try-Lock "start.lock"; if (-not $l) { return }
+  # a lock of its own: an older rig.ps1 holds the start lock while it waits for an empty queue, which
+  # here would never come
+  $l = Try-Lock "fresh.lock"; if (-not $l) { return }
   try {
     $s = AgentState; if (-not $s -or -not $s.needFresh -or @($s.running).Count) { return }
     Say "job $($s.needFresh) needs a fresh Windows and the box is empty - restarting the box (queued jobs wait for the new one): $(Stop-Box)"
@@ -424,7 +433,13 @@ function Ensure-Box {
   $lock = $null
   try {
     $deadline = (Get-Date).AddMinutes(40)
-    while (-not $lock) { $lock = Try-Lock "start.lock"; if (-not $lock) { if ((Get-Date) -gt $deadline) { throw "the rig's start lock was held for 40 min" }; Start-Sleep 1 } }
+    while (-not $lock) {
+      $lock = Try-Lock "start.lock"
+      if (-not $lock) {
+        # someone else may be starting it meanwhile
+        if ((BoxUp) -and ((UserClient) -ne [IntPtr]::Zero -or (ClientWidth (HiddenClient)) -gt 700)) { return }
+        if ((Get-Date) -gt $deadline) { throw "the rig's start lock was held for 40 min" }; Start-Sleep 1 }
+    }
     Start-Box
   } finally { if ($lock) { $lock.Dispose() } }
 }
@@ -490,13 +505,16 @@ if ($Job -eq "setup") {
 if ($Job -eq "script") { $spec.Script = GuestPath $Script; if (-not $spec.Script) { throw "-Script must be under $hostRoot" }; if ($ScriptArgs.Count) { $spec.ScriptArgs = $ScriptArgs } }
 $specText = $spec | ConvertTo-Json -Depth 5
 $q = Join-Path $io "queue\$id"
-function Queue-Job { $specText | Set-Content "$q.tmp" -Encoding utf8; Move-Item "$q.tmp" "$q.json" -Force }
+# <id>.alive beside the job: touched while this script waits, so the agent can withdraw a job whose
+# caller is gone (it would hold up the queue for nobody)
+function Queue-Job { $specText | Set-Content "$q.tmp" -Encoding utf8; New-Item -ItemType File -Force "$q.alive" | Out-Null; Move-Item "$q.tmp" "$q.json" -Force }
 Queue-Job
 Say "job $id queued$(if ((Queued).Count -gt 1) { " ($((Queued).Count - 1) other(s) in the queue)" })"
 $jobDir = Join-Path $io "jobs\$id"; $doneFile = Join-Path $jobDir "done.json"
 $queuedAt = Get-Date; $deadline = $null; $n = 0; $said = ""; $requeued = 0
 while (-not (Test-Path $doneFile)) {
   Start-Sleep -Seconds 1; $n++
+  if ($n % 5 -eq 0 -and (Test-Path "$q.json")) { try { (Get-Item "$q.alive" -ErrorAction Stop).LastWriteTime = Get-Date } catch { New-Item -ItemType File -Force "$q.alive" | Out-Null } }
   if ($n % 10 -eq 0 -and -not (BoxRunning)) {
     # the box went: while the job only waited, a new box takes it (the queue is kept); a job that ran is lost
     if ((Test-Path "$q.json") -and -not (Test-Path $jobDir)) { Say "the box went away while job $id waited - starting a new one"; Ensure-Box; continue }
@@ -525,12 +543,13 @@ while (-not (Test-Path $doneFile)) {
   }
   if ($line -and $line -ne $said) { Say $line; $said = $line }
   if (-not (Test-Path $jobDir) -and ((Get-Date) - $queuedAt).TotalMinutes -gt $MaxWait) {
-    Remove-Item "$q.json" -ErrorAction SilentlyContinue
+    Remove-Item "$q.json", "$q.alive" -ErrorAction SilentlyContinue
     if (-not (Test-Path $jobDir)) { throw "job $id waited $MaxWait min without starting - withdrawn from the queue ($said)" }
   }
   if ($deadline -and (Get-Date) -gt $deadline) { New-Item -ItemType File -Force (Join-Path $jobDir "cancel") | Out-Null; Say "job ${id} over its time - cancel asked"; $deadline = (Get-Date).AddMinutes(2) }
 }
 Start-Sleep -Milliseconds 500
+Remove-Item "$q.alive" -ErrorAction SilentlyContinue
 $done = Get-Content $doneFile -Raw | ConvertFrom-Json
 if (-not $Out) { $Out = Join-Path $repo "build\rig\$id" }
 New-Item -ItemType Directory -Force $Out | Out-Null

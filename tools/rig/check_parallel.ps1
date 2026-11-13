@@ -67,6 +67,11 @@ foreach ($sc in ($Scenarios -split ",")) {
       Start-Sleep 25; & $rig -Status
       Wait-Report @($a, $x, $c)
     }
+    "hang" {
+      $runs = @((Launch "hang-hung" "-Job game -Game '$b\game' -Timeout 0.5 -TestArgs @{ Map = 'maps\l01\l01.map'; WaitFor = 'this never appears in a log'; LogWait = 600; ClickOk = 1; SetFull = 0 }"),
+                (Launch "hang-normal" "-Job game -Game '$b\game2' -TestArgs $l01; Language = 'en'; Steps = 'w@25' }"))
+      Wait-Report $runs
+    }
     "fresh" {
       $a = Launch "fresh-first" "-Job game -Game '$b\game' -TestArgs $l01; Steps = 'w@15' }"
       Start-Sleep 8

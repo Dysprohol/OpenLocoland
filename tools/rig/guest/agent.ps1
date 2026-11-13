@@ -52,7 +52,15 @@ function Save-Screen {
     Move-Item $tmp (Join-Path $agentDir "screen.png") -Force
   } catch { }
 }
-function WriteJson($file, $obj) { $tmp = "$file.tmp"; ($obj | ConvertTo-Json -Depth 6 -Compress) | Set-Content $tmp -Encoding utf8; Move-Item $tmp $file -Force }
+# Written whole and swapped in (ReplaceFile): a reader on the host never finds the file missing or half
+# written (Move-Item -Force deletes first - an older rig.ps1 then read "no agent heartbeat").
+function WriteJson($file, $obj) {
+  $tmp = "$file.tmp"; ($obj | ConvertTo-Json -Depth 6 -Compress) | Set-Content $tmp -Encoding utf8
+  for ($i = 0; $i -lt 5; $i++) {
+    try { if (Test-Path $file) { [IO.File]::Replace($tmp, $file, [NullString]::Value) } else { Move-Item $tmp $file -Force }; return } catch { Start-Sleep -Milliseconds 50 }
+  }
+  Move-Item $tmp $file -Force -ErrorAction SilentlyContinue
+}
 # The display as "WxH@<scale %>" (the heartbeat's "screen" stays "WxH@<dpi>" for older rig.ps1)
 function ScreenKey { $s = [GuestDisplay]::Screen(); $r, $d = $s.Split("@"); "$r@$([int]([int]$d * 100 / 96))" }
 $boot = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
@@ -159,6 +167,10 @@ function Blocked($c) {
   $script:needFresh = $null
   if ($cls.Fresh -and -not (Box-Fresh)) {
     if ($n) { return "needs a fresh box: waits for $n running job(s) to end, then the box is restarted" }
+    # an older rig.ps1 whose job waits takes a restart for "the box went away": those jobs go first
+    # (they may start meanwhile, see the queue loop), for at most 10 minutes
+    $legacy = @($script:waitingNow | Where-Object { $_.Cls.Legacy -and $_.Id -ne $c.Id })
+    if ($legacy.Count -and ((Get-Date) - $c.Since).TotalMinutes -lt 10) { return "needs a fresh box: first the $($legacy.Count) job(s) an older rig.ps1 queued (a restart would cut their callers off)" }
     $script:needFresh = $c.Id
     if ($cls.Legacy -and ((Get-Date) - $c.Since).TotalSeconds -gt 90) {
       $notes[$c.Id] = "not a fresh box: an older rig.ps1 queued it and no host script restarted the box"; return "" }
@@ -248,6 +260,7 @@ function Start-Run($c) {
   # when it sees the agent idle and the queue empty, and must never see both while a job starts.
   $script:starting = $id; Beat "running"; Start-Sleep -Milliseconds 300
   Move-Item $c.File (Join-Path $dir "job.json") -Force
+  Remove-Item (Join-Path $queue "$id.alive") -ErrorAction SilentlyContinue
   "$(Get-Date -Format 'HH:mm:ss') before the job: $muteLine" | Add-Content (Join-Path $dir "audio.txt") -Encoding utf8
   $with = @($running.Keys)
   $info = [ordered]@{ slot = $slot; user = $user; caller = $cls.Caller; exclusive = $cls.Excl; display = (ScreenKey); asked = $cls.Display
@@ -337,6 +350,16 @@ while ($true) {
   }
   # the queue: start what may start, in turn
   $waiting = Read-Queue
+  # A job whose rig.ps1 stopped waiting (killed, closed) is withdrawn: nobody would fetch its results,
+  # and at the head of the queue it would hold everyone up. A waiting rig.ps1 touches <id>.alive every
+  # few seconds; jobs of an older rig.ps1 have no such file and are kept.
+  foreach ($w in @($waiting)) {
+    $alive = Join-Path $queue "$($w.Id).alive"
+    if ((Test-Path $alive) -and ((Get-Date) - (Get-Item $alive).LastWriteTime).TotalSeconds -gt 120) {
+      Fail-Queued $w "its rig.ps1 stopped waiting for it (no sign of life for 2 min)"; Remove-Item $alive -ErrorAction SilentlyContinue
+      $waiting = @($waiting | Where-Object { $_.Id -ne $w.Id })
+    }
+  }
   $waitWhy.Clear()
   if ($stop) { foreach ($w in $waiting) { $waitWhy[$w.Id] = "the box is stopping" } }
   else {
@@ -350,8 +373,10 @@ while ($true) {
         # While the job whose turn it is waits for the box to empty (another display, to run alone, a
         # fresh box), the jobs queued BEFORE it that fit the display and the room start meanwhile:
         # jobs of one display go together, and the waiting job is held up by no job newer than itself.
-        if ($running.Count -and ($c.Cls.Excl -or $c.Cls.Fresh -or $now -ne $c.Cls.Display)) {
-          foreach ($o in @($waiting | Where-Object { $_.Id -ne $c.Id -and [string]::CompareOrdinal($_.Id, $c.Id) -lt 0 } | Sort-Object Id)) {
+        # (A job that waits for a fresh box also lets the jobs of older rig.ps1 scripts go first, see Blocked.)
+        $freshWait = $c.Cls.Fresh -and -not (Box-Fresh) -and ((Get-Date) - $c.Since).TotalMinutes -lt 10
+        if (($running.Count -and ($c.Cls.Excl -or $c.Cls.Fresh -or $now -ne $c.Cls.Display)) -or $freshWait) {
+          foreach ($o in @($waiting | Where-Object { $_.Id -ne $c.Id -and ([string]::CompareOrdinal($_.Id, $c.Id) -lt 0 -or ($freshWait -and $_.Cls.Legacy)) } | Sort-Object Id)) {
             if (Fits $o) { $notes[$o.Id] = "started while $($c.Id) (its turn first) waited for the box to empty: queued before it, same display"; Start-Run $o
                            $waiting = @($waiting | Where-Object { $_.Id -ne $o.Id }) }
           }
