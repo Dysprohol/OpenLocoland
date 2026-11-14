@@ -352,8 +352,16 @@ def make_minimap_previews(frame_vid, *outputs):
 INTERFACE_SCALES = (2, 3)
 INTERFACE_FIRST_VID = {2: 1100, 3: 1150}
 INTERFACE_VIDS = (450, 938, 455, 456, 457, 458, 459, 463, 469, 497, 498, 499, 502, 503, 4, 2, 8, 6, 14, 16, 17,
-                  18, 449)
+                  18, 449,
+                  # the editor's own (its interface size, LocoFix editor_edit.cpp): its icons, the Help and Menu
+                  # buttons, the palette's icons, the panels' device, pictures, lamp and buttons, the titles' font
+                  # and the lit menu font
+                  939, 942, 943, 944, 466, 484, 486, 472, 475, 476, 477, 3, 7)
 INTERFACE_BOX_ONLY = (502, 503)   # vid\empty.vid: nothing drawn, only their box (the money and speed tips) grows
+# The panels' device (vid\466back.vid, 1024 x 768) is mostly empty round its middle 579 x 479: its bigger copies
+# are only this much of it, centred (so drawn at the same place), 2.8 instead of 7 million pixels at three times.
+INTERFACE_CROP = {466: (584, 532)}
+_crops = {}   # an enlarged picture's name (lower case) -> its crop, from add_interface_rows
 TEXTURE_MAX = 256   # the biggest texture the engine loads at 16 bits a pixel (GroundVid_LoadImage)
 
 
@@ -387,6 +395,8 @@ def add_interface_rows(objects_res):
             if nvid not in INTERFACE_BOX_ONLY:
                 row["imageFile"] = interface_picture(source["imageFile"], k)
                 pictures.append((source["imageFile"], row["imageFile"], k))
+                if nvid in INTERFACE_CROP:
+                    _crops[row["imageFile"].lower()] = INTERFACE_CROP[nvid]
             tables["objects"].append(row)
             objects[new] = row
             for a in animations:
@@ -396,10 +406,11 @@ def add_interface_rows(objects_res):
     return sorted(set(pictures))
 
 
-def enlarge_vid(source, output, k):
+def enlarge_vid(source, output, k, crop=None):
     """Writes `output`: the VID `source` k times bigger, pixel by pixel - a sprite's frames (every picture
     of it: frames, depth, a palette image kept indexed), or a texture's sheets with its tiles' places and
-    sizes (a sheet padded to a power of two). Raises on a VID of another kind, a raw or shadowed frame."""
+    sizes (a sheet padded to a power of two). With `crop` (w, h) a one-frame sprite is first cut to that much
+    of its middle. Raises on a VID of another kind, a raw or shadowed frame."""
     import csv
     import glob
     import json
@@ -419,10 +430,21 @@ def enlarge_vid(source, output, k):
                 rows = list(csv.DictReader(f, delimiter="\t"))
             if any((r.get("raw") or "").strip() or (r.get("shadow") or "").strip() for r in rows):
                 raise ValueError("a raw or shadowed frame")
+            if crop:
+                if meta["frameCount"] != 1 or crop[0] > meta["width"] or crop[1] > meta["height"]:
+                    raise ValueError("a crop of a sprite of several frames or bigger than it")
+                x0, y0 = (meta["width"] - crop[0]) // 2, (meta["height"] - crop[1]) // 2
             for png in glob.glob(os.path.join(folder, "*.png")):
                 image = Image.open(png)
                 image.load()
+                if crop:
+                    if image.size != (meta["width"], meta["height"]):
+                        raise ValueError("a picture of another size than the sprite")
+                    image = image.crop((x0, y0, x0 + crop[0], y0 + crop[1]))
                 image.resize((image.width * k, image.height * k), Image.NEAREST).save(png)
+            if crop:
+                meta.update(width=crop[0], height=crop[1],
+                            sheet=dict(meta["sheet"], columns=1, cellWidth=crop[0], cellHeight=crop[1]))
             sheet = meta["sheet"]
             meta.update(width=meta["width"] * k, height=meta["height"] * k,
                         sheet=dict(sheet, cellWidth=sheet["cellWidth"] * k, cellHeight=sheet["cellHeight"] * k))
@@ -640,7 +662,7 @@ def make_interface_pictures(game_folder, pictures, outputs):
             if original.lower().endswith(".bmp"):
                 enlarge_font(source, output, k)
             else:
-                enlarge_vid(source, output + ".part", k)
+                enlarge_vid(source, output + ".part", k, _crops.get(interface_picture(original, k).lower()))
                 os.replace(output + ".part", output)
         except Exception:   # never stop the build: the original, which LocoFix sees as not enlarged
             if os.path.exists(output + ".part"):

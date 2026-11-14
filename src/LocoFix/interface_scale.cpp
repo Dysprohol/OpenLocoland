@@ -50,8 +50,15 @@ constexpr int MAX_SCALE = 3;
 constexpr int FIRST_VID[MAX_SCALE + 1] = {0, 0, 1100, 1150};
 // tools/patch_data.py INTERFACE_VIDS: the same numbers in the same order
 constexpr int VIDS[] = {450, 938, 455, 456, 457, 458, 459, 463, 469, 497, 498, 499, 502, 503, 4, 2, 8, 6, 14, 16, 17,
-                        18, 449};
+                        18, 449,
+                        // the editor's own (its interface size, below): icons, Help and Menu buttons, palette icons,
+                        // the panels' device, pictures, lamp and buttons, the titles' and the lit menu font
+                        939, 942, 943, 944, 466, 484, 486, 472, 475, 476, 477, 3, 7};
 constexpr int COUNT = sizeof VIDS / sizeof VIDS[0];
+constexpr int PLAY_COUNT = 23;   // the play interface's are the first ones
+// The panels' device (VID 466, 1024 x 768, mostly empty) is enlarged only round its middle: its bigger copies
+// are this much of it, centred (patch_data.INTERFACE_CROP), so they are drawn at the same place.
+constexpr int CROP_NVID = 466, CROP_W = 584, CROP_H = 532;
 constexpr bool box_only(int nvid) { return nvid == 502 || nvid == 503; }   // vid\empty.vid: only the box grows
 // What each scale needs of the screen: the bar at most about a tenth of the height, and the minimap at
 // the same scale clear of the bar's controls (228 px right of the middle + a 104 px frame, times s).
@@ -79,7 +86,7 @@ int g_ready[MAX_SCALE + 1] = {1, 1, -1, -1};   // -1 not looked at yet
 // is taken too); 1 when it is absent or not 1-3. Read from the registry when the bar is built (`fresh`);
 // the settings page's preview asks every frame and gets the value read at most 4 times a second, so a
 // click on the row shows within a quarter of a second.
-int read_chosen();
+int read_chosen(const char* name = "InterfaceScale");
 int chosen(bool fresh = false) {
     static int value = 1;
     static DWORD at = 0;
@@ -91,12 +98,12 @@ int chosen(bool fresh = false) {
     return value;
 }
 
-int read_chosen() {
+int read_chosen(const char* name) {
     HKEY key;
     if (RegOpenKeyExA(HKEY_CURRENT_USER, REG_KEY, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) return 1;
     char text[16] = {};
     DWORD size = sizeof text - 1, type = 0;
-    const LONG r = RegQueryValueExA(key, "InterfaceScale", nullptr, &type, reinterpret_cast<BYTE*>(text), &size);
+    const LONG r = RegQueryValueExA(key, name, nullptr, &type, reinterpret_cast<BYTE*>(text), &size);
     RegCloseKey(key);
     int value = 0;
     if (r == ERROR_SUCCESS && type == REG_SZ) value = std::atoi(text);
@@ -104,27 +111,30 @@ int read_chosen() {
     return value >= 1 && value <= MAX_SCALE ? value : 1;
 }
 
-// Every bigger VID of the scale there and its picture that many times its original's.
-bool ready(int s) {
+// Every bigger VID of the scale there and its picture that many times its original's: the play interface's
+// (`from` 0, `to` PLAY_COUNT) or the editor's (PLAY_COUNT, COUNT).
+bool ready(int s, int* flags = g_ready, int from = 0, int to = PLAY_COUNT) {
     if (s <= 1) return true;
-    if (g_ready[s] >= 0) return g_ready[s] != 0;
+    if (flags[s] >= 0) return flags[s] != 0;
     if (!world()) return false;
-    g_ready[s] = 1;
-    for (int i = 0; i < COUNT; ++i) {
+    flags[s] = 1;
+    for (int i = from; i < to; ++i) {
         uint8_t* original = vid(VIDS[i]);
         uint8_t* big = vid(FIRST_VID[s] + i);
         if (!original) continue;   // the edition has none: the engine uses its empty VID for both
         // a font is s - 1 rows taller than its letters (patch_data.enlarge_font: the line step height + 1 times s)
         const short w = at<short>(original, 0x2a6), h = at<short>(original, 0x2a8);
         const short bw = big ? at<short>(big, 0x2a6) : 0, bh = big ? at<short>(big, 0x2a8) : 0;
-        const bool ok = big && (box_only(VIDS[i]) || (bw == s * w && (bh == s * h || bh == s * (h + 1) - 1)));
+        const bool ok = big && (box_only(VIDS[i]) || (VIDS[i] == CROP_NVID ? bw == s * CROP_W && bh == s * CROP_H
+                                                       : bw == s * w && (bh == s * h || bh == s * (h + 1) - 1)));
         if (!ok) {
-            patch::log("interface: VID %d is not %d times VID %d - no %dx interface", FIRST_VID[s] + i, s, VIDS[i], s);
-            g_ready[s] = 0;
+            patch::log("interface: VID %d is not %d times VID %d - no %dx %s interface", FIRST_VID[s] + i, s, VIDS[i], s,
+                       from ? "editor" : "play");
+            flags[s] = 0;
             break;
         }
     }
-    return g_ready[s] != 0;
+    return flags[s] != 0;
 }
 
 bool fits(int s, int w, int h) { return s <= 1 || (h >= HEIGHT_PER_STEP * s && w >= WIDTH_PER_STEP * s); }
@@ -234,6 +244,66 @@ void interface_set_hidden(int nvid, int hidden) {
     for (int s = 2; s <= MAX_SCALE; ++s)
         if (uint8_t* big = interface_vid(nvid, s); big && big != vid(nvid))
             reinterpret_cast<SetInt_t>(0x44e490)(big, nullptr, hidden);   // Vid_SetHidden
+}
+
+// ---- the editor's interface size (editor_edit.cpp, editor_panel.cpp) ----
+// The editor's own interface - its bar and the rows above it, the status lines, the hints, the music player,
+// an object's panel and the Help, Menu, palette, Arrivals and factory panels - has a size of its own:
+// EditorInterfaceScale "1"-"3" in the Players key (the settings page's EDITOR INTERFACE SIZE), absent = normal.
+// It is used as far as the editor's screen takes it, by the play interface's rule (twice from 960 x 1328, three
+// times from 1440 x 1992; a panel - the menu device's 579 x 479 visible part - fits then too), and only when the
+// bigger copies of the editor's own pictures are there as well as the bar's. Read at most 4 times a second (the
+// editor asks every frame), so a change on the settings page shows when the editor is drawn next.
+
+namespace {
+int g_editor_ready[MAX_SCALE + 1] = {1, 1, -1, -1};
+bool editor_ready(int s) { return ready(s) && ready(s, g_editor_ready, PLAY_COUNT, COUNT); }
+int editor_biggest(int w, int h) {
+    int s = MAX_SCALE;
+    while (s > 1 && (!fits(s, w, h) || !editor_ready(s))) --s;
+    return s;
+}
+int editor_chosen() {
+    static int value = 1;
+    static DWORD at = 0;
+    const DWORD now = GetTickCount();
+    if (at == 0 || now - at >= 250) {
+        value = read_chosen("EditorInterfaceScale");
+        at = now ? now : 1;
+    }
+    return value;
+}
+}  // namespace
+
+// The editor's scale for its screen now (the game's logical screen, stretched to the window for a small map).
+int interface_editor_scale() {
+    static int last = 1, last_want = 1;
+    const float* screen = reinterpret_cast<float*>(graphics() + 0x20c);
+    const int w = static_cast<int>(screen[0]), h = static_cast<int>(screen[1]);
+    if (w <= 0 || h <= 0) return 1;
+    int window_w = w, window_h = h;
+    window_size(window_w, window_h);
+    const int want = editor_chosen();
+    int s = (std::min)(want, editor_biggest(w, h));
+    const double stretch = (std::min)(static_cast<double>(window_w) / w, static_cast<double>(window_h) / h);
+    if (stretch > 1.01) {
+        const int real = static_cast<int>(want / stretch + 0.5);
+        if (real < s) s = real < 1 ? 1 : real;
+    }
+    if (s != last || want != last_want)
+        patch::log("interface: editor scale %d (chosen %d) for a %dx%d screen in a %dx%d window", s, want, w, h, window_w,
+                   window_h);
+    last = s;
+    last_want = want;
+    return s;
+}
+
+// The biggest editor scale that fits the window (the settings page's EDITOR INTERFACE SIZE; script function 208).
+int interface_editor_max_for_window() {
+    int w = 0, h = 0;
+    window_size(w, h);
+    if (w <= 0 || h <= 0) return 1;
+    return editor_biggest(w, h);
 }
 
 namespace {

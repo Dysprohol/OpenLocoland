@@ -840,19 +840,6 @@ def build(steam, target, locofix=None, captured=None, progress=None, version=Non
             os.path.join(a.steam, "vid", "464map.vid"), p1, p2, p3),
             *(os.path.join(vid, "464preview%d.bmp" % k) for k in (1, 2, 3))):
         print("vid\\464map.vid: unknown layout, no minimap preview on the settings page")
-    # the bigger interface's pictures (rows added above), a font also for every language pack that has its own
-    pictures = []
-    for original, enlarged, k in interface:
-        pictures.append((original, enlarged, k))
-        if original.lower().startswith("fonts\\"):
-            for code in sorted(os.listdir(os.path.join(a.target, "lang"))) if os.path.isdir(os.path.join(a.target, "lang")) else []:
-                if os.path.isfile(os.path.join(a.target, "lang", code, original)):
-                    pictures.append((os.path.join("lang", code, original), os.path.join("lang", code, enlarged), k))
-    not_enlarged = generate(copied, lambda *paths: patch_data.make_interface_pictures(a.target, pictures, paths),
-                            *(os.path.join(a.target, enlarged) for _, enlarged, _ in pictures))
-    if not_enlarged:
-        print("interface: not enlarged, copied as they are (LocoFix keeps such a scale at the original size): " +
-              ", ".join(sorted(set(not_enlarged))))
     if frames != "enlarged":   # copied: VIDs 950/951 have the original frame, which LocoFix keeps at its size
         print("vid\\464map.vid: " + ("unknown layout, copied as it is" if frames else "missing") +
               " - the minimap keeps its size on high screens")
@@ -872,6 +859,20 @@ def build(steam, target, locofix=None, captured=None, progress=None, version=Non
     if not generate(copied, lambda path: patch_data.make_custom_edit_icon(os.path.join(a.steam, "vid"), path),
                     os.path.join(vid, "945edit.vid")):
         print("vid: unknown images, no edit icon for the custom maps page")
+    # the bigger interface's pictures (rows added above), a font also for every language pack that has its own;
+    # after the editor's own pictures above (939, 942-944), which the editor's interface size enlarges too
+    pictures = []
+    for original, enlarged, k in interface:
+        pictures.append((original, enlarged, k))
+        if original.lower().startswith("fonts\\"):
+            for code in sorted(os.listdir(os.path.join(a.target, "lang"))) if os.path.isdir(os.path.join(a.target, "lang")) else []:
+                if os.path.isfile(os.path.join(a.target, "lang", code, original)):
+                    pictures.append((os.path.join("lang", code, original), os.path.join("lang", code, enlarged), k))
+    not_enlarged = generate(copied, lambda *paths: patch_data.make_interface_pictures(a.target, pictures, paths),
+                            *(os.path.join(a.target, enlarged) for _, enlarged, _ in pictures))
+    if not_enlarged:
+        print("interface: not enlarged, copied as they are (LocoFix keeps such a scale at the original size): " +
+              ", ".join(sorted(set(not_enlarged))))
     if not generate(copied, lambda path: patch_data.make_logo_board(LOGO_PNG, path), os.path.join(vid, "481logo.vid")):
         sys.exit(f"{LOGO_PNG} is missing - the title board of the intro (vid\\481logo.vid, VID 481) cannot be made")
 
