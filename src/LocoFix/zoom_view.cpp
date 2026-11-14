@@ -39,10 +39,14 @@
 // scale; it is built again when the view starts or ends. The camera's room below the map is the bar's height in
 // map pixels, bar height / z (status_bar.cpp asks zoom_view_room).
 //
-// MENUS. The Esc menu and the end screens are laid out by the scripts in the middle of the screen (ScreenX,
-// ScreenY, MenuLoad) for 1024x768 and stretched by screen_scaling.cpp from that middle. While a zoom view is in
-// effect those give the scripts a screen of at least 1024x768, and while a menu is up the game draws a screen of
-// that size in one pass (the zoom's view comes back when it goes): the menus look as at zoom 1 at every zoom.
+// THE SCRIPTS' SCREEN. Scripts lay out what they show by the screen's size (ScreenX, ScreenY; MenuLoad by the
+// engine's): their texts (a mission's tutorial lines) are interface objects, drawn at the window's size, and the
+// Esc menu and the end screens are laid out for 1024x768 in the middle of the screen. While a zoom view is in
+// effect all three give the window's size, as at zoom 1 on a map as big as the window; a menu up gets a screen of
+// the window's size drawn in one pass (screen_scaling.cpp takes its 1024x768 middle, as ever), and the zoom's view
+// comes back when it goes - the menus look as at zoom 1. On a map smaller than the window (its own screen
+// stretched, mission 1) the interface's objects on the screen move once into the window's layout when a zoom view
+// starts, and back when it ends (move_interface).
 #include "patch.h"
 #include <ddraw.h>
 #include <algorithm>
@@ -91,7 +95,6 @@ constexpr uintptr_t SCREEN_X = 0x43f9b3;            // script function 119 Scree
 constexpr uintptr_t SCREEN_Y = 0x43f9c0;            // script function 120 ScreenY: mov ecx,[g_graphics] / fld [ecx+0x210]
 
 constexpr int MOUSE = 0x230;   // World.mouse: +8/+0xc world, +0x10/+0x14 screen
-constexpr int MENU_W = 1024, MENU_H = 768;
 constexpr int FRAME_CLASS = 10, TEXT_CLASS = 0x13;
 constexpr int EFF_SCROLL = 2;
 constexpr int EFFECT_START = 0xb20;   // Graphics.effectStart[16]
@@ -263,16 +266,13 @@ void __fastcall world_effects(void* g, void* edx, int draw) {
     reinterpret_cast<Effects_t>(DRAW_EFFECTS)(g, edx, split_now() ? 0 : draw);
 }
 
-// Script functions 119 ScreenX and 120 ScreenY, and MenuLoad: while a zoom view is in effect at least 1024x768 -
-// the size the menus are laid out for (the menu's screen while it is up, see "Menus" at the top). Otherwise the
-// engine's screen, as before.
-int menu_screen_w() { return (std::max)(MENU_W, static_cast<int>(at<float>(graphics(), 0x20c))); }
-int menu_screen_h() { return (std::max)(MENU_H, static_cast<int>(at<float>(graphics(), 0x210))); }
+// Script functions 119 ScreenX and 120 ScreenY, and MenuLoad: while a zoom view is in effect the window's size
+// (see "The scripts' screen" at the top). Otherwise the engine's screen, as before.
 float __cdecl script_screen_x() {
-    return g_view ? static_cast<float>(menu_screen_w()) : at<float>(graphics(), 0x20c);
+    return g_view ? static_cast<float>(window_w()) : at<float>(graphics(), 0x20c);
 }
 float __cdecl script_screen_y() {
-    return g_view ? static_cast<float>(menu_screen_h()) : at<float>(graphics(), 0x210);
+    return g_view ? static_cast<float>(window_h()) : at<float>(graphics(), 0x210);
 }
 __declspec(naked) void screen_x_stub() {
     __asm {
@@ -299,7 +299,7 @@ using MenuLoad_t = int(__cdecl*)(void* args);
 MenuLoad_t g_menu_load = nullptr;
 int __cdecl menu_load(void* args) {
     FloatSwap f;
-    if (g_view) f.enter(menu_screen_w(), menu_screen_h());
+    if (g_view) f.enter(window_w(), window_h());
     const int r = g_menu_load(args);
     f.leave();
     return r;
@@ -765,6 +765,46 @@ bool zoom_view_present(uint8_t* g, IDirectDrawSurface7* back_buffer, IDirectDraw
     return true;
 }
 
+// ---- the interface's objects into the window's layout and back (a map smaller than the window) ----
+
+constexpr uintptr_t OBJECT_MOVE_TO = 0x446640;   // Object_MoveTo
+using MoveTo_t = void(__fastcall*)(void* object, void* edx, float x, float y, float z);
+
+// The level's own stretch: its screen (screen_base_size) into the window, keeping its proportions, centred.
+void own_stretch(double& s, double& left, double& top) {
+    int bw = 0, bh = 0;
+    screen_base_size(bw, bh);
+    s = (std::min)(static_cast<double>(window_w()) / bw, static_cast<double>(window_h()) / bh);
+    left = (window_w() - bw * s) / 2;
+    top = (window_h() - bh * s) / 2;
+}
+
+// Every interface object keeps its place on the screen while the layout changes between the level's own stretched
+// screen and the window's: a screen point p of the own screen is at left/top + p * s in the window.
+void move_interface(bool to_window) {
+    double s, left, top;
+    own_stretch(s, left, top);
+    if (std::fabs(s - 1.0) < 1e-6 && std::fabs(left) < 0.5 && std::fabs(top) < 0.5) return;   // the window's already
+    uint8_t* w = world();
+    const float cx = at<float>(w, 0x44), cy = at<float>(w, 0x48);
+    const int count = at<int>(w, 0x24c + 4);
+    uint8_t** items = at<uint8_t**>(w, 0x24c + 0xc);
+    for (int i = 0; i < count; ++i) {
+        uint8_t* o = items[i];
+        if (!o) continue;
+        const float z = at<float>(o, 0x38);
+        double px = at<float>(o, 0x30) - cx, py = at<float>(o, 0x34) - z - cy;
+        if (to_window) {
+            px = left + px * s;
+            py = top + py * s;
+        } else {
+            px = (px - left) / s;
+            py = (py - top) / s;
+        }
+        reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(o, nullptr, static_cast<float>(cx + px), static_cast<float>(cy + py + z), z);
+    }
+}
+
 // ---- zoom.cpp's view functions ----
 
 // The level's own factor: 1, or the stretch of a small map's screen (mission 1 at 1920x1080: 1.40625).
@@ -828,6 +868,7 @@ bool zoom_view_apply(double z, double surface_z) {
         g_filtered = g_filter_setting == 1 || (g_filter_setting == 2 && !whole);
     }
     if (g_view != was_view) {   // the interface's layout space changed: the window's, or the level's screen
+        move_interface(g_view);
         status_bar_rebuild(player);
         interface_messages_rescale();
     } else if (player) {
@@ -842,20 +883,10 @@ void zoom_view_between_frames() {
     if (!g_installed || !g_view || !graphics()) return;
     const bool menu = menu_background_shown();
     if (menu && !g_menu) {
-        const int mw = (std::max)(MENU_W, g_view_w), mh = (std::max)(MENU_H, g_view_h);
-        // stretched keeping its proportions, centred (screen_scaling.cpp's own rule; a bigger screen's 1024x768
-        // middle is taken by its menu rule first)
-        int tw = window_w(), th = static_cast<int>(static_cast<double>(window_w()) * mh / mw);
-        if (th > window_h()) {
-            th = window_h();
-            tw = static_cast<int>(static_cast<double>(window_h()) * mw / mh);
-        }
-        RECT fit;
-        fit.left = (window_w() - tw) / 2;
-        fit.top = (window_h() - th) / 2;
-        fit.right = fit.left + tw;
-        fit.bottom = fit.top + th;
-        if (screen_set_view(mw, mh, (std::max)(mw, g_surface_w), (std::max)(mh, g_surface_h), &fit)) g_menu = true;
+        // the window's size, as at zoom 1 (screen_scaling.cpp's menu rule takes its 1024x768 middle)
+        const int mw = window_w(), mh = window_h();
+        const RECT whole = {0, 0, mw, mh};
+        if (screen_set_view(mw, mh, (std::max)(mw, g_surface_w), (std::max)(mh, g_surface_h), &whole)) g_menu = true;
     } else if (!menu && g_menu) {
         if (screen_set_view(g_view_w, g_view_h, g_surface_w, g_surface_h, &g_target)) g_menu = false;
     }
