@@ -554,7 +554,7 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       the camera's room below the map follows the bar's height by itself. The choice is a row of ours
       on the game's settings page (**INTERFACE SIZE**, arrows VIDs 954/955, `InterfaceScale` "1"-"3"
       of the Players key; absent = normal), offering only what the window takes (twice from 960 px of
-      height, three times from 1440); applied when the bar is built (a mission's start, the way back
+      height and 1328 of width, three times from 1440 and 1992); applied when the bar is built (a mission's start, the way back
       from the Esc menu); a small map's logical screen (mission 1) keeps the normal size. The
       minimap's row got a first value, as the interface (`MinimapSize` "0" or absent, the default);
       only a minimap bigger than the interface leaves a strip below the map,

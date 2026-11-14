@@ -112,7 +112,8 @@ The missions play as they always did. What changed:
   minimap, the messages, the mouse tips and the cursor twice or three times as big; the map itself
   stays as sharp as before. While the page is open, the bottom of the screen shows the bar and the
   minimap as big and where they will stand. Only the sizes your
-  screen has room for are offered: twice from a screen 1080 pixels high, three times from 1440. It
+  screen has room for are offered: twice on a screen at least 960 pixels high and 1328 wide (1920 x 1080,
+  for example), three times from 1440 high and 1992 wide (2560 x 1440). It
   changes when you go back to the game or start a mission. Mission 1 is a small map that is already
   shown enlarged to fill the screen, so its bar stays as it is there.
 - **The minimap's size.** **MINIMAP SIZE** on the same page: **AS THE INTERFACE** (the default) or

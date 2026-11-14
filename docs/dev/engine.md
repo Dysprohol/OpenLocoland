@@ -562,7 +562,8 @@ map's bottom (`boundsBottom` = map height + 50 - 2, so the map's last rows can c
 bar) - fixed in LocoFix. In LocoFix the minimap follows the interface's size ("The interface's
 size" below) or the player's own choice: a row of ours on the game's settings page
 (`game/maps/script/optfields.lgc`) keeps `MinimapSize` in the Players key like the sound settings -
-"0" or absent = as the interface, "1"-"3" = that size; read each time the bar is built, so it
+"0" or absent = as the interface, "1"-"3" = that size ("1" is a fixed normal minimap under a bigger
+interface - a script never released wrote "1" for NORMAL, so no player has it from before); read each time the bar is built, so it
 applies from the next mission or when the Esc menu closes; a size is used only where it keeps the
 frame clear of the bar's slots (228 px right of the screen's middle, times the interface's scale),
 else the biggest that does. The bigger frames are VIDs 950 and 951
@@ -624,8 +625,13 @@ tip (`MouseTip_Update`, font VID 6, 5 px right of and 10 px above the cursor) is
 font with those offsets times the scale while the bar is up in play; the menus and the held editor keep
 the normal one. The cursors (`Cursor_Show`, Windows `.ani` files through `LoadCursorFromFileA` at the
 system's size) are loaded with `LoadImage` s times the system's cursor size - Windows scales the
-picture and its hot spot together (the arrow's 6,5 of 32 x 32 is 18,15 of 96 x 96) - and loaded again
-when the bar is built at another scale. Messages are one line each, with no wrapping: the longest
+picture and its hot spot together (the arrow's 6,5 of 32 x 32 is 18,15 of 96 x 96) - while the play
+bar is up at that scale, and at the normal size again when the bar is hidden or given up (the menus,
+the end screens, the held editor, TAB), as the mouse tip. A size changed in the Esc menu clears the
+message lines still on the screen at the next message (moved by the new step they would overlap, and a
+click would find a line never written). With the bar hidden, a click on a factory makes
+`Player_SetPanel(2)` build the bar itself and then the list in the same call; the list takes the scale
+that bar gets. Messages are one line each, with no wrapping: the longest
 objective is 48 letters (German), the longest event message 44 - 1728 px at three times, inside
 2560. While the settings page is open its preview (`menu_version.cpp`) shows the bottom of the window as
 the game will lay it out there: the bar at the interface's size across the window (`vidarpreview.bmp`,
