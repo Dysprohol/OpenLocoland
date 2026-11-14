@@ -272,15 +272,34 @@ two ways: a fort or a mining plant by its event handler `F162_0` / `F165_0` (`ai
 every map has it: a train of another army within 75 px and no gun left within 150 px - none needed
 for a neutral one), and a neutral factory or repair point only by the calls `LDepoCapture` and
 `LMasterCapture` (`Captures.lgc`) that each mission makes in its own `main()` for its one such building
-at a point of its own - so a map made in the editor, with none of them, never captured those two, and
-`LDepoCapture` even takes once "the" factory of army 2 or 0, which on a map with the player's factory
-can be that one. `CaptureTact` turns every neutral factory and repair point to the player when a train
-of the player's comes within 100 px (`PlaySFX(25)`, the flash, `BuildingCapture` with its message, a
-`CAPTURE` line in `error.log`). A repair point taking over the enemy's wagons brought by the player's
-locomotive is the engine's own (`Building_UpdateWorkshop`), on any map. Checked in play: a neutral repair
-point and a neutral factory beside the main line captured as trains passed them, and an enemy wagon in a
-player's train taken over going through the player's repair point. Older editor maps get it with
-CONVERT in the Arrivals panel.
+at a point of its own (MAP_RULES.md 7, "Capturing a neutral factory or repair point", has the table): the
+factory's point lies at the outer end of its exit line, where a train coming in stops at the light (the
+line pushes out), the repair point's where trains enter its one-way leg; radius 50-150, the player's
+trains only, and a building taken stays the player's. So a map made in the editor, with none of those
+calls, never captured those two (and `LDepoCapture` takes once "the" factory of army 2 or 0, which on a map
+with the player's factory can be that one). `CaptureTact` (v0.2.0 to v0.2.11) took every neutral factory
+and repair point when a train of the player's came within 100 px of the building's middle - but the editor
+puts a factory 22 px inside its dead end with a 140 px exit line and a red light at its end, so a train
+driven to the factory stops at the light about 120-170 px from its middle and nothing happened (issue of a
+player on Discord, 2026-11-13; reproduced on main: the engine stopped 15 px from the line's end, 167 px from
+the factory, which stayed neutral). Now `CaptureTact` takes a neutral factory when a train of the player's
+comes within 90 px (`CAPTURE_DEPOT`, the missions' median) of the outer end of its line, a neutral repair
+point within 50 px (`CAPTURE_REPAIR`, the missions' most common) of the begin of its line, and either within
+100 px of the building as before. The building's line is the push line passing nearest to it (within 50
+px); the runner reads the lines from `PUSH_LINES`, `push_bx/by/ex/ey[]`, which the editor writes into the
+settings' block with the arrivals' arrays - the same lines as main()'s `SetPushLine` calls, in the screen's
+points (y less the height), so the building is matched at its own y - z and the point taken back at its
+height (on a map whose ground is high the two differ by 70 px and more). Without those arrays (a script
+written before) the runner keeps the 100 px alone (`#ifdef PUSH_LINES`). The moment is the missions':
+`PlaySFX(25)`, the green flash and `act_setarmy 0`, whose ACT_SET_ARMY fires the engine's `BuildingCapture`
+event (`Depo_Action` 0x404984; `Unit_Action` 0x44d61f for VID 104), so `dBuildingCapture` shows
+`DepoCaptured` / `MasterCaptured` - the runner called `BuildingCapture` itself too, a second message, and
+no longer does; a `CAPTURE` line in `error.log` names the train and its distance. A repair point taking
+over the enemy's wagons brought by the player's locomotive is the engine's own (`Building_UpdateWorkshop`),
+on any map. A map gets the new runner when it is saved (a map with the arrivals' blocks: every map made
+since v0.2.0) or by CONVERT in the Arrivals panel (an older one); a map saved now still runs in v0.2.11's
+game (the runner is script; v0.2.11's editor, saving it again, writes its own runner and keeps
+`PUSH_LINES` as an unknown define, harmless). Checked in play: see the capture-factory note.
 
 **The AI and the trains of an editor map - the review of 2026-11-05.** What the editor gives the trains,
 read in the code and the scripts and tried on POLIGON copies: the Train arrivals panel (an army's train made

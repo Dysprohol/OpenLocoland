@@ -616,8 +616,11 @@ działo, fortyfikację albo pociąg, ono i neutralni, którzy to widzą, odpowia
 końca misji, a ona może wtedy strzelać do nich. Piraci (armia 3) walczą ze wszystkimi stronami, a
 wszyscy z nimi. Panel jednostki neutralnych albo piratów zmienia to dla całej jej armii: **W WALCE:
 ODPOWIADA NAPASTNIKOM** (zwyczaj neutralnych) albo **WSZYSCY** (zwyczaj piratów). Misje kampanii mają
-dawne zasady gry. Neutralna fabryka albo punkt naprawczy staje się twój, gdy podjedzie do niego twój
-pociąg (fortyfikacja albo kopalnia - gdy nie ma już ich dział).
+dawne zasady gry. Neutralną fabrykę przejmujesz tam, gdzie przejmują ją misje kampanii: gdy twój pociąg
+stanie przy jej światłach, na końcu jej linii wyjazdowej, gdzie zatrzymują się wjeżdżające pociągi (albo
+podjedzie na mniej więcej 100 px do budynku); neutralny punkt naprawczy - gdy twój pociąg wjedzie na
+jego linię albo podjedzie do niego. Przejmują je tylko twoje pociągi i zostają twoje. Fortyfikację albo
+kopalnię - gdy nie ma już ich dział.
 
 Pamiętaj o zasadzie gry: fabryka, punkt naprawczy i fortyfikacja stoją **na torze albo tuż przy
 nim**.

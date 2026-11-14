@@ -617,8 +617,11 @@ neutral gun, fort or train, it and the neutrals that see it answer that side onl
 mission, and that side may fire at them then. The pirates (army 3) fight every side, and every side
 fights them. A neutral's or a pirate's panel changes that for its whole army: **IN A FIGHT: ANSWERS
 ATTACKERS** (the neutrals' way) or **ALL SIDES** (the pirates' way). The campaign's missions keep the
-game's old rules. A neutral factory or repair point becomes yours when one of your trains comes close
-to it (a fort or a mining plant once its guns are gone).
+game's old rules. A neutral factory becomes yours where the campaign's missions take theirs: when one of
+your trains stops at its light, at the end of its exit line where trains coming in stop (or comes
+within about 100 px of the building); a neutral repair point when your train enters its line or comes
+near it. Only your trains take them, and they stay yours. A fort or a mining plant is taken once its
+guns are gone.
 
 Remember the rule of the game: the factory, the repair point and the fort stand **on the track or
 right next to it**.

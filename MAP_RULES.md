@@ -226,7 +226,7 @@ not forced to 0.
 
 | VID | Rule | Source |
 |---|---|---|
-| 102 factory | At the dead end of a straight spur (6+ rails in the missions) that meets the line through a Y - a curve pair each way - standing on the track; direction = the way out (0 north, 64 east, 128 south, 192 west); a factory push line (5). The player's factory needs a build list (`items`): the game's 14 factory units, in the order of their hotkeys, are `5 10 20 25 80 85 45 30 35 82 97 90 75 62` (F1-F12, `[`, `]`); the panel shows ten in a row, LocoFix adds a second row for the 11th-20th. **[tool]** rail point within 100 px, build list. **[editor]** a new factory takes the build list of one of the same army on the map (an empty one stays empty), or, when none of its army is there, these 14 if it is the player's or a neutral one (every mission's neutral factory has a list, so that it builds once captured); changing a factory's army later leaves its list as it is; a warning without track within 100 px; its panel ticks the list (the game's order), the units it gets later and the player's limits (8). The enemy's AI (army 1 only) ignores the list and builds `level_queue_*` (the editor's plan, 8); a neutral or pirate factory builds nothing by itself (a map's plan orders it, 8), and only a neutral one is captured - on an editor map a train of the player's within 100 px of a neutral factory or repair point captures it (the runner's `CaptureTact`; the missions call `LDepoCapture`/`LMasterCapture` themselves) | l02, l05 (spur, Y, 128/0); sandbox test: a built train leaves through the Y |
+| 102 factory | At the dead end of a straight spur (6+ rails in the missions) that meets the line through a Y - a curve pair each way - standing on the track; direction = the way out (0 north, 64 east, 128 south, 192 west); a factory push line (5). The player's factory needs a build list (`items`): the game's 14 factory units, in the order of their hotkeys, are `5 10 20 25 80 85 45 30 35 82 97 90 75 62` (F1-F12, `[`, `]`); the panel shows ten in a row, LocoFix adds a second row for the 11th-20th. **[tool]** rail point within 100 px, build list. **[editor]** a new factory takes the build list of one of the same army on the map (an empty one stays empty), or, when none of its army is there, these 14 if it is the player's or a neutral one (every mission's neutral factory has a list, so that it builds once captured); changing a factory's army later leaves its list as it is; a warning without track within 100 px; its panel ticks the list (the game's order), the units it gets later and the player's limits (8). The enemy's AI (army 1 only) ignores the list and builds `level_queue_*` (the editor's plan, 8); a neutral or pirate factory builds nothing by itself (a map's plan orders it, 8), and only a neutral one is captured, by the player's train at the outer end of its exit line (below, "Capturing a neutral factory or repair point") | l02, l05 (spur, Y, 128/0); sandbox test: a built train leaves through the Y |
 | 104 repair point | On a track trains drive through (a loop leg), the gate over the rails, turned along the track (0/128 on vertical track); every end of the loop meets the line through a Y each way; the leg is one way (5). It repairs only the car nearest to it (50 px), so the one-way push line through it matters: the train is pushed through and every car is repaired fully as it passes; a train standing in a repair point without one gets only its nearest car repaired. **[tool]** within 20 px of track | l05; sandbox tests: without a push line the loco 45 -> 150 hp, the wagon behind stayed at 22; with it the loco 45 -> 150 and the wagon 22 -> 75 (full: the player's army has 1.5x hp) |
 | 162 fort | A gate standing on the track (0-6 px in all 20 forts), turned along it (0/128 vertical, 64/192 horizontal, 32/96/160/224 diagonal). Guns (VID 115) on its wall: x +-47, z +92/+93 for 0/128; (-32, -24) and (+33, +23), z +93 for 32/160. It cannot be destroyed (U_OBJECT, maxHp 0); its guns can. **[tool]** within 8 px of track. **[editor]** a new fort comes with its guns at these places (64/192: (0, -33) and (0, +34); 96/224: (-33, +23) and (+33, -24), measured in l16 and l20), they move, turn and go with it; it snaps onto the line of the nearest straight track within 60 px, turned along it (R / E turn it round there), and is refused elsewhere. Its sockets: below | l10-l20; sandbox test: trains drive through it |
 | 165 mining plant | Not on the track. One gun on its wall, on the side its direction picks (sockets below) | l09, l11, l14, l15, l18 (30) |
@@ -295,6 +295,39 @@ facing the same trains, beside that line's track and with no line of its own - a
 post (another colour, the other way, a second one at the same end) is not the building's - on a map loaded
 from a file too. On a map whose lines the editor does not save (a mission opened as it is) placing, moving,
 turning or deleting a building makes, takes and erases no line and no post.
+
+**Capturing a neutral factory or repair point.** The missions that have one (army 2 at the start) call
+`LDepoCapture` / `LMasterCapture` (`Captures.lgc`) once a second in `main()` with a point of their own and a
+radius, always for army 0: a rail unit of the player's (any car, B_ENGINE behave) within the radius makes
+`PlaySFX(25)`, a green flash and `act_setarmy 0`; the engine's ACT_SET_ARMY of a factory or repair point fires
+the script event `BuildingCapture` (`Depo_Action` 0x404984, `Unit_Action` 0x44d61f for VID 104), whose
+`dBuildingCapture` shows `DepoCaptured` / `MasterCaptured`. Only the player captures, and the building stays
+the player's (the enemy can only destroy it). Measured (the point against the building and its own push line):
+
+| mission | building (x, y) | call: point, radius | to the building | on its line |
+|---|---|---|---|---|
+| l02 | factory 107,1122 | 107,1191, 50 | 69 | 10 px from the outer end |
+| l03 | factory 388,178 | 323,216, 90 | 75 | 23 from the outer end |
+| l06 | factory 1669,1262 | 1668,1340, 90 | 78 | 15 from the outer end |
+| l07 | factory 190,242 | 252,218, 150 | 66 | 22 from the outer end |
+| l08 | factory 119,380 | 205,413, 60 | 92 | 13 from the outer end |
+| l16 | factory 2923,1897 | 2854,1866, 150 | 76 | 4 from the outer end |
+| l02 | repair point 389,1287 | 392,1340, 50 | 53 | 12 from the begin |
+| l03 | repair point 334,364 | 282,397, 70 | 62 | 21 from the begin |
+| l06 | repair point 176,277 | 112,295, 50 | 66 | 7 from the begin |
+| l08 | repair point 127,2092 | 131,2042, 150 | 50 | 101 from the begin, 58 from the end |
+| l16 | repair point 2663,1449 | 2662,1313, 50 | 136 | 52 from the begin |
+
+So a factory is taken at the outer end of its exit line - where a train coming in stops, since the line
+pushes out - and a repair point where trains enter its one-way leg (4 of 5). The other calls are leftovers
+(l11, l13, l14, l19: the building is the player's already or not there; l01, l04, l09, l12, l17 commented out;
+l10 with 0,0,0). A fort or a mining plant is different: `F162_0` / `F165_0` (`ai_default_event.lgc`) - a rail
+unit of any army but the neutrals within 75 px and no gun of the building's army within 150 px (none needed
+for a neutral one) - any army takes it and may take it back (`FortCaptured<army>`, `FactoryCaptured<army>`).
+**[editor]** The runner's `CaptureTact` does the same on an editor map for every neutral factory and repair
+point: within 90 px of the outer end of the factory's line, 50 px of the begin of the repair point's line (the
+push line passing nearest the building, within 50 px; the editor writes the lines as `PUSH_LINES`,
+`push_bx/by/ex/ey[]` too), or 100 px of the building; the player's trains only (editor-mission.md "Capturing").
 
 ## 6a. Trains on the map
 
