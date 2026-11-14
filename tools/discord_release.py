@@ -19,6 +19,11 @@ Two ways to use it:
    build/releases.md (every release with its link), which is handy on its own: the channel and
    the file say the same thing.
 
+A release's message is its name, the lead of its notes (what stands before the first section),
+a "Full changelog info" link to the release on GitHub in place of the sections, the tag, the
+date and the files. Discord has no collapsible text, so the sections are not in the message;
+`--spoiler` puts them there under a spoiler, `--full` as they are.
+
 The webhook URL is a secret: it comes from DISCORD_WEBHOOK_URL (the repository secret in GitHub
 Actions, an environment variable locally) and is never printed. Create it in Discord: the
 channel's settings -> Integrations -> Webhooks -> New Webhook -> Copy Webhook URL.
@@ -144,14 +149,17 @@ def split_notes(body):
     return lead, rest
 
 
+LINK = "Full changelog info"
+
+
 def notes_text(body, url, mode):
-    """The notes as Discord shows them: the lead and the rest under a spoiler (Discord's only
-    thing that opens inside the message), the lead and a Changelog link, or all of it."""
+    """The notes as Discord shows them: the lead and a link to the whole notes in place of
+    their sections, the lead and the sections under a spoiler, or all of it."""
     lead, rest = split_notes(body)
     if mode == "full":
         return body
-    if mode == "brief" or not rest:
-        return f"{lead}\n\n[Changelog →]({url})" if lead else f"[Changelog →]({url})"
+    if mode == "link" or not rest:
+        return f"{lead}\n\n[{LINK}]({url})" if lead else f"[{LINK}]({url})"
     room = DESCRIPTION - len(lead) - 8                  # "\n\n||" and "||"
     if len(rest) > room:
         part = rest[:room]
@@ -161,7 +169,7 @@ def notes_text(body, url, mode):
     return f"{lead}\n\n||{rest}||" if lead else f"||{rest}||"
 
 
-def embed(release, repo, mode="spoiler"):
+def embed(release, repo, mode="link"):
     """One Discord embed for one release: name, notes, tag, date and the files."""
     tag = release["tag_name"]
     title = (release.get("name") or tag).strip()
@@ -192,16 +200,16 @@ def embed(release, repo, mode="spoiler"):
     return result
 
 
-def payload(release, repo, mode="spoiler"):
+def payload(release, repo, mode="link"):
     return {"username": "OpenLocoland", "embeds": [embed(release, repo, mode)]}
 
 
 def mode_of(args):
     if getattr(args, "full", False):
         return "full"
-    if getattr(args, "brief", False):
-        return "brief"
-    return "spoiler"
+    if getattr(args, "spoiler", False):
+        return "spoiler"
+    return "link"
 
 
 def request(url, data=None, headers=None, method=None):
@@ -350,9 +358,9 @@ def shared(parser, suppress=False):
     parser.add_argument("--webhook", default=default, help="Discord webhook URL (default DISCORD_WEBHOOK_URL)")
     parser.add_argument("--token", default=default, help="GitHub token for the API (default GH_TOKEN/GITHUB_TOKEN)")
     parser.add_argument("--full", action="store_true", default=default,
-                        help="the whole release notes, not hidden under a spoiler")
-    parser.add_argument("--brief", action="store_true", default=default,
-                        help="the lead and a Changelog link instead of the notes under a spoiler")
+                        help="the whole release notes in the message instead of the link")
+    parser.add_argument("--spoiler", action="store_true", default=default,
+                        help="the notes' sections under a spoiler in the message instead of the link")
 
 
 def main():

@@ -402,9 +402,10 @@ downloaded, and the launcher lists only the packs that were built.
 Discord by `.github/workflows/discord-release.yml`, which runs on `release: published` (a draft is
 announced when it is published, never when it is saved; editing a published release does not
 announce it again, the manual run with a tag does) and calls `tools/discord_release.py notify`. The
-message carries the name, the lead of the notes and the rest of them under a spoiler (Discord's only
-thing that opens inside the message; `--brief` sends the lead and a **Changelog →** link instead,
-`--full` all of the notes), the tag, the date and the release's files with their sizes and links. The
+message carries the name, the lead of the notes (what stands before their first section), a **Full
+changelog info** link to the release on GitHub in place of the sections, the tag, the date and the
+release's files with their sizes and links. Discord has no collapsible text, so the sections stay
+out of the message; `--spoiler` puts them into it under a spoiler, `--full` as they are. The
 webhook is the repository secret
 `DISCORD_WEBHOOK_URL` (`gh secret set DISCORD_WEBHOOK_URL -R Dysprohol/OpenLocoland`, the URL of
 the channel's own webhook: Edit Channel -> Integrations -> Webhooks); without it the workflow only
