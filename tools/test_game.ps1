@@ -450,8 +450,9 @@ if ($Steps) {
       $queue = if ($flagman -ne 0) { $qn = [W]::Rd($p.Id, $flagman + 0x494); $q = @(); for ($i = 0; $i -lt [Math]::Min($qn, 10); $i++) { $q += [W]::Rd($p.Id, $flagman + 0xa4 + 2 * $i) -band 0xffff }; "$qn [" + ($q -join " ") + "]" } else { "-" }
       $baseAt = "-"; for ($i = 0; $i -lt $count; $i++) { $o = [long][W]::Rd($p.Id, $items + 4 * $i); if ($o -ne 0 -and ([W]::Rd($p.Id, [long][W]::Rd($p.Id, $o + 0x1c) + 4)) -in 450, 1100, 1150) { $baseAt = "{0},{1},{2}" -f [int](& $g $o 0x30), [int](& $g $o 0x34), [int](& $g $o 0x38) } }
       "Bar base (VID 450, or 1100/1150 at twice/three times its size) x,y,z: $baseAt"
-      # every bar object as index:VID@x,y (its position minus z: the screen position plus the camera)
-      $some = foreach ($i in 0..($count - 1)) { if ($i -ge 0 -and $i -lt $count) { $o = [long][W]::Rd($p.Id, $items + 4 * $i); "${i}:" + [W]::Rd($p.Id, [long][W]::Rd($p.Id, $o + 0x1c) + 4) + "@" + (& $pos $i) } }
+      # every bar object as index:VID@x,y (its position minus z: the screen position plus the camera), h when hidden
+      # (the object's invisible flag 0x8000 or its VID's hidden flag 0x400)
+      $some = foreach ($i in 0..($count - 1)) { if ($i -ge 0 -and $i -lt $count) { $o = [long][W]::Rd($p.Id, $items + 4 * $i); $v = [long][W]::Rd($p.Id, $o + 0x1c); $hid = if ((([W]::Rd($p.Id, $o + 0x28)) -band 0x8000) -or (([W]::Rd($p.Id, $v + 0x14)) -band 0x400)) { "h" } else { "" }; "${i}:" + [W]::Rd($p.Id, $v + 4) + "@" + (& $pos $i) + $hid } }
       "Bar objects: " + ($some -join " ")
       $fm = if ($flagman -ne 0) { "{0}@{1},{2}" -f [W]::Rd($p.Id, [long][W]::Rd($p.Id, $flagman + 0x1c) + 4), [int](& $g $flagman 0x30), [int](& $g $flagman 0x34) } else { "-" }
       "Bar: panel={0} objects={1} icon80={2} icon102={3} queue={4} flagman={5}" -f (([W]::Rd($p.Id, $player + 0x2c)) -band 0xffef), $count, (& $pos 80), (& $pos 102), $queue, $fm

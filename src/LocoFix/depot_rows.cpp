@@ -56,6 +56,7 @@ constexpr int ACT_SET_TEXT = 120;
 constexpr int B_DEPO = 0x18;
 constexpr int PANEL_DEPOT_LIST = 2;
 constexpr int PANEL_DEPOT_QUEUE = 5;
+constexpr int MARKER = 20;           // the marker under the flagman's slot (VID 456)
 constexpr int FIRST_TYPE_ICON = 23;  // the bar's first slot's type icon: where the panel's rows start
 constexpr int ROW = 10;              // slots in a row
 constexpr float ROW_HEIGHT = 41.0f;  // the icon pitch of the panel
@@ -215,6 +216,24 @@ void scale_panel(void* player, int s) {
     }
 }
 
+// The marker under the flagman's slot (bar object 20, VID 456): Player_SetPanel hides it by moving it 1000 px
+// left of where it stands, and Player_UpdateStateBar puts it under the flagman's slot (an absolute place) when
+// there is one. A bar built afresh has it in the middle of the screen, so after one SetPanel it stands at
+// width / 2 - 1000 - on a screen wider than about 1960 px that is on the screen: a white frame on the bar's left
+// part (2560: x 280), shown or not by how many SetPanel calls came since the bar was built (BUGS.md F31). After
+// every SetPanel a marker that is under no slot's type icon goes far off the screen.
+void hide_marker(void* player) {
+    if (bar_count(player) <= FIRST_TYPE_ICON + ROW - 1) return;
+    uint8_t** items = bar_items(player);
+    uint8_t* marker = items[MARKER];
+    if (!marker) return;
+    const float x = at<float>(marker, 0x30);
+    for (int i = 0; i < ROW; ++i)
+        if (items[FIRST_TYPE_ICON + i] && at<float>(items[FIRST_TYPE_ICON + i], 0x30) == x) return;
+    const float off = at<float>(world(), WORLD_CAMERA_X) - 100000.0f;   // far left of the view, whatever the screen
+    if (x > off) reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(marker, nullptr, off, at<float>(marker, 0x34), at<float>(marker, 0x38));
+}
+
 void __fastcall set_panel(void* player, void* edx, int panel) {
     const int wanted = panel & ~0x10;
     const bool list = wanted == PANEL_DEPOT_LIST || wanted == PANEL_DEPOT_QUEUE;
@@ -225,6 +244,7 @@ void __fastcall set_panel(void* player, void* edx, int panel) {
         g_set_panel(player, edx, panel);
         if (s > 1) scale_panel(player, s);   // a panel that falls back to the unit bar adds nothing
         add_second_row(player);
+        hide_marker(player);
         return;
     }
     // the engine makes the list's objects from World.vids: the scale's bigger copies meanwhile
@@ -239,6 +259,7 @@ void __fastcall set_panel(void* player, void* edx, int panel) {
     for (int i = 0; i < 3; ++i) vids[SWAPPED[i]] = kept[i];
     scale_panel(player, s);
     add_second_row(player);
+    hide_marker(player);
 }
 
 void __fastcall handle_panel_action(void* player, void* edx, int object, int* index) {

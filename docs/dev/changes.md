@@ -568,6 +568,10 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       minimap's frame at its size on it in the corner - one picture where they will stand, following a
       click on either row; it replaces the corner's minimap-only preview (`vidarpreview.bmp`, made by
       `build.py` from the bar's own pictures),
+  50. the selected-slot marker off the screen (`depot_rows.cpp`, `BUGS.md` F31): the engine hides it by moving
+      it 1000 px left, which leaves it on a screen wider than about 1960 px (a white frame at x 280 on a 2560
+      one) when the bar was just built; after every `Player_SetPanel` a marker under no slot goes far off
+      the screen,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
