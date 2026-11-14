@@ -6791,12 +6791,20 @@ void put_posts(const std::vector<Post>& posts, std::vector<uint8_t*>& objects, s
     for (const Post& p : posts) {
         std::vector<uint8_t*> taken = objects;   // a post near the place is reused - not one of `not_these`
         taken.insert(taken.end(), not_these.begin(), not_these.end());
-        uint8_t* found = post_near(p.x, p.y, taken);
-        if (as_light)   // the nearest post within 30 px that stands as this light, if any
-            while (found && (red(found) != p.red || direction_gap(at<int>(found, O_DIRECTION), p.direction) > 32 || own_line(found) >= 0)) {
-                taken.push_back(found);
-                found = post_near(p.x, p.y, taken);
-            }
+        uint8_t* found = nullptr;
+        if (as_light) {   // the nearest post within 30 px that stands as this light, if any (ties: the coordinates)
+            float best = 30;
+            for_each_object([&](uint8_t* q) {
+                if (removed(q) || nvid_of(q) != VID_SEMAPHORE || std::find(taken.begin(), taken.end(), q) != taken.end()) return;
+                const float d = std::hypot(at<float>(q, O_X) - p.x, at<float>(q, O_Y) - p.y);
+                const bool tie = found && d == best &&
+                                 (at<float>(q, O_X) != at<float>(found, O_X) ? at<float>(q, O_X) < at<float>(found, O_X) : at<float>(q, O_Y) < at<float>(found, O_Y));
+                if ((d < best || tie) && red(q) == p.red && direction_gap(at<int>(q, O_DIRECTION), p.direction) <= 32 && own_line(q) < 0)
+                    best = d, found = q;
+            });
+        } else {
+            found = post_near(p.x, p.y, taken);
+        }
         const float z = ground_z(v, p.x, p.y);
         if (found) {
             objects.push_back(found);
@@ -7537,6 +7545,10 @@ PostOwners post_owners() {
         const Post& pa = places[a.place].post;
         const Post& pb = places[b.place].post;
         if (pa.x != pb.x || pa.y != pb.y) return by_place(pa.x, pa.y, pb.x, pb.y);
+        uint8_t* ba = lines[places[a.place].line].building;   // one line, two buildings' (a copy set on along the spur)
+        uint8_t* bb = lines[places[b.place].line].building;
+        if (ba && bb && ba != bb && (at<float>(ba, O_X) != at<float>(bb, O_X) || at<float>(ba, O_Y) != at<float>(bb, O_Y)))
+            return by_place(at<float>(ba, O_X), at<float>(ba, O_Y), at<float>(bb, O_X), at<float>(bb, O_Y));
         return by_place(posts[a.post].x, posts[a.post].y, posts[b.post].x, posts[b.post].y);
     });
     for (const Pair& pair : pairs) {
