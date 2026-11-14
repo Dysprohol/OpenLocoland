@@ -683,7 +683,7 @@ ends; the camera's room below the map is its height / z in map pixels. Script fu
 `ScreenY` and `MenuLoad` give the window's size under a zoom view, as on a map as big as the window, so the
 scripts' texts and the menus are laid out as at zoom 1; a menu up gets a window-sized screen drawn in one
 pass. Edge and arrow scrolling move the camera in map pixels a frame; `World_UpdateScroll`'s move
-(`SetPosition` at 0x41ccbf) is taken 1 / z times as far, so it is as fast on the screen at every zoom (not
+(`SetPosition` at 0x41cb3f) is taken 1 / z times as far, so it is as fast on the screen at every zoom (not
 while the camera follows the flagman). The wheel is the engine's own `Mouse+0x04` (`World+0x234`), stored by
 `Mouse_HandleMessage` and cleared by `Mouse_BeginFrame`; nothing in a mission read it before. At the level's
 own zoom none of this runs: every hook passes the engine's call through.

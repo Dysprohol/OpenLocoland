@@ -55,7 +55,7 @@ namespace {
 constexpr uintptr_t G_WORLD = 0x4a9d38;
 constexpr uintptr_t G_GRAPHICS = 0x4a9a14;
 constexpr uintptr_t SET_POSITION = 0x41c680;
-constexpr uintptr_t CALL_SCROLL_MOVE = 0x41ccbf;   // World_UpdateScroll: the camera's move, SetPosition(centre)
+constexpr uintptr_t CALL_SCROLL_MOVE = 0x41cb3f;   // World_UpdateScroll: the camera's move, SetPosition(centre)
 constexpr char REG_KEY[] = "SOFTWARE\\Gromada\\Locoland";
 constexpr int WORLD_FLAGS = 0x04, WORLD_SCROLL_TYPE = 0x30, WORLD_CAMERA_X = 0x44, WORLD_CAMERA_Y = 0x48;
 constexpr int WORLD_HWND = 0x214;
@@ -296,7 +296,7 @@ void measure_frame() {
     g_measure_last = t.QuadPart;
 }
 
-// World_UpdateScroll's move of the camera (SetPosition by the view's centre, 0x41ccbf): border and arrow
+// World_UpdateScroll's move of the camera (SetPosition by the view's centre, 0x41cb3f): border and arrow
 // scrolling - and the slide towards the flagman (scroll types 4 and 8, from his distance in map pixels) - go in
 // map pixels a frame, so on the screen they would be z times faster zoomed in and slower zoomed out: the move
 // is taken 1 / z times as far (the level's own zoom: as it was). Following the flagman (type 0x10) is another
