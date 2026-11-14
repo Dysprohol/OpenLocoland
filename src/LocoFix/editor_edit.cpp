@@ -3341,7 +3341,9 @@ void copy_unit_state(uint8_t* o) {
             for (short n : items) act(o, ACT_ADD_ITEM, n);
         }
     }
-    if (nvid_of(o) == VID_DEPOT && at<int>(o, O_ITEMS_COUNT) == 0 && army_of(o) == 0) {   // the player's
+    // the player's, and a neutral one (army 2): every mission's neutral factory has the list, so that once
+    // the player captures it it builds; the enemy's AI ignores the list (MAP_RULES 6)
+    if (nvid_of(o) == VID_DEPOT && at<int>(o, O_ITEMS_COUNT) == 0 && (army_of(o) == 0 || army_of(o) == 2)) {
         act(o, ACT_DELETE_ALL_ITEM);
         for (short n : DEPOT_UNITS) act(o, ACT_ADD_ITEM, n);
     }
@@ -13619,9 +13621,9 @@ void edit_log_building_posts(const char* tag) {
             posts += ui_printf(" (%.0f,%.0f d%d %s%s)", px, py, at<int>(p, O_DIRECTION), red(p) ? "red" : "green",
                                owner == b ? " own" : owner ? " other's" : "");
         });
-        patch::log("edit test posts [%s]: VID %d at %.0f,%.0f d%d - lines:%s; places:%s; %u semaphores within 160:%s", tag, nvid_of(b), bx, by,
-                   at<int>(b, O_DIRECTION), lines.empty() ? " none" : lines.c_str(), places.empty() ? " none" : places.c_str(), nearby,
-                   posts.c_str());
+        patch::log("edit test posts [%s]: VID %d at %.0f,%.0f d%d - lines:%s; places:%s; %u semaphores within 160:%s; army %d, %d units on its list", tag,
+                   nvid_of(b), bx, by, at<int>(b, O_DIRECTION), lines.empty() ? " none" : lines.c_str(), places.empty() ? " none" : places.c_str(),
+                   nearby, posts.c_str(), army_of(b), at<int>(b, O_ITEMS_COUNT));
     });
 }
 
