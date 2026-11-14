@@ -130,6 +130,22 @@ void __fastcall show_line(uint8_t* list, void* edx, void* item, float x, float y
         move_to(strips[last], at<float>(strips[last], 0x30) - STRIP_LEFT * (s - 1), at<float>(strips[last], 0x34));
 }
 
+// ---- the lines again at another size (a zoom) ----
+
+constexpr int ML_TEXTS = 0xd8, ML_MESSAGE_X = 0x18c, ML_MESSAGE_Y = 0x240;
+constexpr int TEXT_STRING = 0x70;   // Text: the shown text (a String: char*)
+constexpr int ACT_SET_TEXT = 0x78;
+constexpr int MAX_LINES = 45;       // MessageList's arrays: 0xb4 bytes apart
+
+using CreateObject_t = uint8_t*(__fastcall*)(void* world, void* edx, void* vid, float x, float y, float z,
+                                             unsigned direction, void* parent);
+using Action_t = int(__fastcall*)(void* object, void* edx, int action, int a, int b, int c);
+
+uint8_t* vid_or_empty(int nvid) {
+    uint8_t* v = interface_vid(nvid, 1);
+    return v ? v : *reinterpret_cast<uint8_t**>(0x5d3a60);   // g_emptyVid
+}
+
 // ---- the mouse tip ----
 
 using MouseTip_t = void(__fastcall*)(void* tip, void* edx, void* mouse);
@@ -190,6 +206,65 @@ HCURSOR WINAPI load_cursor(LPCSTR path) {
 bool g_installed = false;
 
 }  // namespace
+
+// zoom.cpp, after the bar was built again at another scale: the message lines on the screen made again in the
+// scale's font, at the scale's places - the text, the click strip and the map point of each line kept, as
+// MessageList_ShowLine makes a line (without its sound and its scrolling). Without it the lines would stay
+// at the size they were made at until the next message clears them (a quarter of their size after a zoom to
+// a half and back).
+void interface_messages_rescale() {
+    if (!world()) return;
+    uint8_t* player = at<uint8_t*>(world(), 0x220);   // World.players[0], the human
+    if (!player) return;
+    uint8_t* list = player + 0x44;                      // Player.messages
+    const int s = interface_scale();
+    if (at<int>(list, ML_VID_TEXT) == interface_nvid(MESSAGE_FONT, s)) return;
+    const int lines = at<int>(list, ML_LINES);
+    if (lines <= 0 || lines > MAX_LINES) return;
+    struct Line {
+        char* text;
+        bool strip;
+    } kept[MAX_LINES] = {};
+    int count = 0;
+    for (int i = 0; i < lines; ++i) {
+        uint8_t* text = at<uint8_t*>(list, ML_TEXTS + 4 * i);
+        const char* shown = text ? at<const char*>(text, TEXT_STRING) : nullptr;
+        if (shown) {
+            const size_t n = lstrlenA(shown) + 1;
+            kept[i].text = static_cast<char*>(HeapAlloc(GetProcessHeap(), 0, n));
+            if (kept[i].text) lstrcpynA(kept[i].text, shown, static_cast<int>(n));
+            kept[i].strip = at<uint8_t*>(list, ML_CLICK_BARS + 4 * i) != nullptr;
+            ++count;
+        }
+    }
+    reinterpret_cast<void(__fastcall*)(void*, void*)>(MESSAGE_LIST_CLEAR)(list, nullptr);
+    at<float>(list, ML_TEXT_X) = MESSAGE_X * s;
+    at<float>(list, ML_TEXT_Y) = MESSAGE_Y * s;
+    at<int>(list, ML_VID_TEXT) = interface_nvid(MESSAGE_FONT, s);
+    uint8_t* font = interface_vid(MESSAGE_FONT, s) ? interface_vid(MESSAGE_FONT, s) : vid_or_empty(MESSAGE_FONT);
+    uint8_t* strip = interface_vid(MESSAGE_STRIP, s) ? interface_vid(MESSAGE_STRIP, s) : vid_or_empty(MESSAGE_STRIP);
+    const int step = at<short>(font, 0x2a8) + 1;   // the line's step: the font's picture height + 1
+    const float top = at<float>(graphics(), 0x228);
+    const float x = MESSAGE_X * s, y = MESSAGE_Y * s;
+    auto create = reinterpret_cast<CreateObject_t>(at<void**>(world(), 0)[0x20 / 4]);
+    for (int i = 0; i < lines; ++i) {
+        if (!kept[i].text) continue;
+        uint8_t* text = create(world(), nullptr, font, x, static_cast<float>(i * step) + y + top + 2000.0f, 2000.0f, 0,
+                               nullptr);
+        at<uint8_t*>(list, ML_TEXTS + 4 * i) = text;
+        if (text) {
+            char* string = kept[i].text;   // ACT_SET_TEXT takes a String (a pointer to the char*)
+            reinterpret_cast<Action_t>(at<void**>(text, 0)[1])(text, nullptr, ACT_SET_TEXT,
+                                                               reinterpret_cast<int>(&string), 0, 0);
+        }
+        if (kept[i].strip)
+            at<uint8_t*>(list, ML_CLICK_BARS + 4 * i) =
+                create(world(), nullptr, strip, x - STRIP_LEFT * s,
+                       static_cast<float>(i * step + step / 2) + y + top + 2000.0f, 2000.0f, 0, nullptr);
+        HeapFree(GetProcessHeap(), 0, kept[i].text);
+    }
+    if (count) patch::log("interface: %d message line(s) made again at scale %d", count, s);
+}
 
 // status_bar.cpp: the cursors at the play bar's scale while the bar is up (`s`), at the normal size when it
 // is hidden or given up (the menus, the end screens, the held editor, TAB) - loaded again when that changes.
