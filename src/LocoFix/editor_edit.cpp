@@ -89,6 +89,10 @@ extern "C" void reset_palette_cache();                                  // edito
 bool editor_level_held();           // editor.cpp
 std::string map_ground_image(const std::string& map);   // editor_newmap.cpp: the image file of a map's ground
 void editor_mission_settings();     // editor.cpp: File > Mission settings...
+int interface_editor_scale();         // interface_scale.cpp: the editor's interface size (below: "the editor's interface size")
+uint8_t* interface_vid(int nvid, int s);
+void interface_copy_colours(int s);
+void interface_cursor_scale(int s);   // interface_texts.cpp
 // editor_panel.cpp: the Help and Menu buttons of the bar and their panels
 void panel_draw(POINT mouse);
 void panel_draw_saved();
@@ -1542,9 +1546,44 @@ Box view() {
     return {at<float>(g, G_VIEW_LEFT), at<float>(g, G_VIEW_TOP), at<float>(g, G_VIEW_RIGHT), at<float>(g, G_VIEW_BOTTOM)};
 }
 
+// ---- the editor's interface size ----
+//
+// The editor's own interface - the bar and the rows above it, the status lines, the music player, the
+// hints, an object's panel and the panels of editor_panel.cpp - at the size the player chose for it
+// (EditorInterfaceScale, interface_scale.cpp: 1, 2 or 3 as far as the screen takes it). It is laid out
+// in a screen of the view's size divided by the scale (ui_view), by the same numbers at every size, and
+// its drawing multiplies every place by the scale and draws the bigger copy of each picture and font
+// (interface_vid: the play interface's enlarged pictures and the editor's own, made at build time); a
+// picture with no bigger copy (a rail's, an object's own) is drawn at its size in its place. The mouse
+// is divided by the scale for the interface's hit tests (ui_mouse). What is drawn on the map - marks,
+// labels, the tools' previews - stays one map pixel to a screen pixel. At 1 nothing changes: the same
+// numbers, the same pictures.
+int g_ui = 1;           // the interface's scale this frame (draw_overlay)
+int g_ui_drawing = 0;   // > 0 while the interface is being drawn (UiDrawing): the drawing scales by g_ui
+struct UiDrawing {
+    UiDrawing() { ++g_ui_drawing; }
+    ~UiDrawing() { --g_ui_drawing; }
+    UiDrawing(const UiDrawing&) = delete;
+    UiDrawing& operator=(const UiDrawing&) = delete;
+};
+int drawn_scale() { return g_ui_drawing ? g_ui : 1; }
+// The screen the interface is laid out in: the view at 1 / the scale.
+Box ui_view() {
+    const Box v = view();
+    const float s = static_cast<float>(g_ui);
+    return {v.l / s, v.t / s, v.r / s, v.b / s};
+}
+// A point of the view (the mouse) in the interface's screen; -1 (no mouse) stays.
+POINT ui_point(POINT m) { return {m.x < 0 ? m.x : m.x / g_ui, m.y < 0 ? m.y : m.y / g_ui}; }
+// A rectangle of the interface, with Graphics_FillRect's arguments: at the scale while it is drawn.
+void __fastcall ui_fill(void* g, void*, float l, float t, float r, float b, uint32_t argb) {
+    const float s = static_cast<float>(drawn_scale());
+    reinterpret_cast<FillRect_t>(FILL_RECT)(g, nullptr, l * s, t * s, r * s, b * s, argb);
+}
+
 // The base of the bar: in the middle of the bottom edge of the view, as Player_ShowStateBar puts it.
 Box bar() {
-    const Box v = view();
+    const Box v = ui_view();
     const float left = std::floor((v.l + v.r - BASE_WIDTH) / 2);
     return {left, v.b - BASE_HEIGHT, left + BASE_WIDTH, v.b};
 }
@@ -1642,6 +1681,13 @@ bool scatter_place() { return tool() == Tool::Place && !nothing_picked() && plac
 // ---- the mouse ----
 
 POINT g_mouse = {-1, -1};   // logical pixels
+POINT ui_mouse() { return ui_point(g_mouse); }   // in the interface's screen (above)
+bool on_bar(float x, float y);       // below
+bool on_options(float x, float y);
+int bar_entry_at(float x, float y);
+bool mouse_on_bar() { return on_bar(static_cast<float>(ui_mouse().x), static_cast<float>(ui_mouse().y)); }
+bool mouse_on_options() { return on_options(static_cast<float>(ui_mouse().x), static_cast<float>(ui_mouse().y)); }
+int mouse_entry() { return bar_entry_at(static_cast<float>(ui_mouse().x), static_cast<float>(ui_mouse().y)); }
 POINT g_middle_down = {-1, -1};   // where the middle button went down (a click of it, not a drag)
 bool g_ctrl = false, g_shift = false;
 
@@ -9356,8 +9402,11 @@ struct SoftwareLock {
 // The VID may be hidden (VID flag 0x400: Player_HideStateBar hides the side tiles with the bar,
 // status_bar.cpp), which the drawing skips, so it is shown for the call.
 void draw_screen(int nvid, int frame, float x, float y, int step) {
-    uint8_t* v = vid_by_number(nvid);
+    const int s = drawn_scale();   // the interface at its scale: the bigger copy, the place times the scale
+    uint8_t* v = s > 1 ? interface_vid(nvid, s) : vid_by_number(nvid);
     if (!v) return;
+    x *= static_cast<float>(s);
+    y *= static_cast<float>(s);
     const float z = FRONT + static_cast<float>(step);
     const uint32_t flags = at<uint32_t>(v, V_FLAGS);
     at<uint32_t>(v, V_FLAGS) = flags & ~VID_HIDDEN;
@@ -9386,11 +9435,12 @@ constexpr float LINE_HEIGHT = 14;
 std::vector<std::pair<float, float>> g_status_ends;   // this frame's status lines: their top, how far right they reach
 
 void status_line(float x, float y, const char* text) {
+    UiDrawing ui;
     float cw = 6;
     if (uint8_t* v = vid_by_number(FONT_TIPS)) cw = at<float>(v, V_SIZE_X);
     g_status_ends.push_back({y, x + 2 + cw * (std::strlen(text) + 2)});
     if (vid_by_number(FONT_TIPS)) draw_text(FONT_TIPS, x + 2, y + 1, (std::string(" ") + text + " ").c_str());
-    else reinterpret_cast<Printf_t>(PRINTF)(graphics(), x + 6, y + 2, "%s", text);
+    else reinterpret_cast<Printf_t>(PRINTF)(graphics(), (x + 6) * drawn_scale(), (y + 2) * drawn_scale(), "%s", text);
 }
 
 
@@ -9406,7 +9456,8 @@ void specular_off() {
 }
 
 void draw_bar() {
-    const Box v = view(), b = bar();
+    UiDrawing ui;
+    const Box v = ui_view(), b = bar();
     const float y = (b.t + b.b) / 2;
     SoftwareLock locked;   // one lock for every picture of the bar (see above)
     // the base, and its side tiles out to the edges of the view (status_bar.cpp lines them up
@@ -9457,7 +9508,7 @@ void draw_bar() {
     const auto frame = [](int i, float t, uint32_t color) {
         float hx, hy;
         entry_cell(i, hx, hy);
-        const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
+        const auto fill = ui_fill;
         const float h = 20;   // on the icon's edge (40 px)
         fill(graphics(), nullptr, hx - h, hy - h, hx + h, hy - h + t, color);
         fill(graphics(), nullptr, hx - h, hy + h - t, hx + h, hy + h, color);
@@ -9465,7 +9516,7 @@ void draw_bar() {
         fill(graphics(), nullptr, hx + h - t, hy - h, hx + h, hy + h, color);
     };
     frame(g_entry, 3, 0xffffd040);
-    const int hover = panel_open() ? -1 : bar_entry_at(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y));
+    const int hover = panel_open() ? -1 : mouse_entry();
     if (hover >= 0 && hover != g_entry) frame(hover, 2, 0xd0f0f0e0);
 }
 
@@ -9572,6 +9623,7 @@ void music_toggle() {
 
 // The player, right-aligned at the top, on the first line its status text leaves free.
 void music_draw() {
+    UiDrawing ui;
     g_music_hits.clear();
     g_music_box = {0, 0, 0, 0};
     music_load();
@@ -9586,7 +9638,7 @@ void music_draw() {
     } parts[] = {{" " + name + " ", 0}, {" |< ", -1}, {g_music.on ? " || " : " > ", 2}, {" >| ", 1}};
     float width = 0;
     for (const auto& p : parts) width += cw * p.text.size();
-    const Box v = view();
+    const Box v = ui_view();
     const float right = v.r - 4, left = right - width;
     float top = v.t;
     for (int row = 0; row < 8; ++row, top += LINE_HEIGHT) {
@@ -9596,11 +9648,12 @@ void music_draw() {
         if (free) break;
     }
     g_music_box = {left - 2, top, right + 2, top + LINE_HEIGHT};
-    const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
+    const auto fill = ui_fill;
+    const POINT m = ui_mouse();
     float x = left;
     for (const auto& p : parts) {
         const float w = cw * p.text.size();
-        const bool hover = p.what && g_mouse.x >= x && g_mouse.x < x + w && g_mouse.y >= top && g_mouse.y < top + LINE_HEIGHT;
+        const bool hover = p.what && m.x >= x && m.x < x + w && m.y >= top && m.y < top + LINE_HEIGHT;
         draw_text(FONT_TIPS, x, top + 1, p.text.c_str());
         if (hover) fill(graphics(), nullptr, x + cw, top + ch + 1, x + w - cw, top + ch + 3, 0xfff0e080);
         if (p.what) g_music_hits.push_back({x, top, x + w, top + LINE_HEIGHT, p.what});
@@ -9729,10 +9782,12 @@ void draw_hint() {
     if (!hints_on() || now - g_hint_rest < HINT_DELAY || g_mouse.x < 0 || panel_open() || g_drag.active || g_stroke.active ||
         g_gstroke.active || g_sweep.active || GetKeyState(VK_LBUTTON) < 0 || GetKeyState(VK_RBUTTON) < 0)
         return;
-    const float mx = static_cast<float>(g_mouse.x), my = static_cast<float>(g_mouse.y);
+    UiDrawing ui;
+    const POINT m = ui_mouse();   // in the interface's screen: the hint stands 14 / 22 of it from the cursor, which has the scale too
+    const float mx = static_cast<float>(m.x), my = static_cast<float>(m.y);
     const int entry_under = bar_entry_at(mx, my);
     // the buttons that are not tools: the music player at the top right, the bar's Help and Menu
-    const char* button = music_hint(g_mouse);
+    const char* button = music_hint(m);
     if (!button && panel_on_help(g_mouse)) button = ui_text("HintHelpButton", "the editor's help pages (F1)");
     if (!button && panel_on_menu(g_mouse)) button = ui_text("HintMenuButton", "new, load, save, export, quick test, exit");
     if (!button && entry_under < 0 && (on_bar(mx, my) || on_options(mx, my))) return;   // the plates, the rows
@@ -9752,7 +9807,7 @@ void draw_hint() {
     if (has_panel && panel.contains(mx, my)) return;
     const std::string shown = std::string(" ") + text + " ";
     const float cw = at<float>(font, V_SIZE_X), w = cw * shown.size();
-    const Box v = view();
+    const Box v = ui_view();
     auto place = [&](bool left, bool above, float& x, float& y) {
         x = left ? mx - 14 - w : mx + 14;
         y = above ? my - 22 - LINE_HEIGHT : my + 22;   // below right of the arrow, as the game's tips
@@ -9939,7 +9994,7 @@ OptionGroup strip_group() {
     const int chosen = strip_index(s);
     float cw = 8;
     if (uint8_t* font = vid_by_number(CONTEXT_FONT_VID)) cw = at<float>(font, V_SIZE_X);
-    const Box v = view();
+    const Box v = ui_view();
     OptionItem label;
     const char* format = ui_format("OptStrip", "%s %d / %d:");
     label.value = chosen >= 0 ? ui_printf(format, s.groups[chosen].c_str(), chosen + 1, n) : s.name + ":";
@@ -10238,7 +10293,7 @@ template <typename F> void layout_options(F f) {
         cw = at<float>(font, V_SIZE_X);
         ch = at<float>(font, V_SIZE_Y);
     }
-    const Box v = view();
+    const Box v = ui_view();
     const std::vector<OptionGroup> groups = option_groups();
     const float gap = 2 * cw, room = (v.r - v.l) - 40;
     std::vector<std::vector<size_t>> rows(1);
@@ -10274,7 +10329,7 @@ template <typename F> void layout_options(F f) {
 }
 
 float rows_top() {
-    float top = view().b;
+    float top = ui_view().b;
     for (const Box& b : g_option_rows) top = (std::min)(top, b.t);
     return top;
 }
@@ -10302,8 +10357,10 @@ bool software_vid(int nvid) {
 // Nothing of one pass covers anything of an earlier one that it did not cover before: in a cell the
 // frame is under its icon, the underline beside its text, and the strips under everything.
 void draw_options() {
+    UiDrawing ui;
     g_option_hits.clear();
-    const auto fill = reinterpret_cast<FillRect_t>(FILL_RECT);
+    const auto fill = ui_fill;
+    const POINT m = ui_mouse();
     int items = 0;   // none (a tool without rows, a panel open): no pass, no lock - a lock is a GPU sync
     layout_options([&](const OptionItem&, float, float, float, float, const Box&) { ++items; });
     if (!items) return;
@@ -10322,7 +10379,7 @@ void draw_options() {
             auto picture = [&](int nvid, int frame, float px, float py) {
                 if ((pass == 2) == software_vid(nvid)) draw_screen(nvid, frame, px, py, OPTION_STEP + 1);
             };
-            const bool hover = i.button && g_mouse.x >= x && g_mouse.x < x + iw && g_mouse.y >= cy - SLOT / 2 && g_mouse.y < cy + SLOT / 2;
+            const bool hover = i.button && m.x >= x && m.x < x + iw && m.y >= cy - SLOT / 2 && m.y < cy + SLOT / 2;
             if (i.rail) {   // the rail's own straight across; the chosen one framed
                 const float l = x + 2, r = x + iw - 4, t0 = cy - SLOT / 2 + 4, b0 = cy + SLOT / 2 - 4;
                 if (pass == 1 && (i.lit || hover)) {
@@ -10368,8 +10425,9 @@ void draw_options() {
 
 // The object of the strip under the mouse, 0 when none.
 int strip_under_mouse() {
+    const POINT m = ui_mouse();
     for (const OptionHit& h : g_option_hits)
-        if (h.object > 0 && g_mouse.x >= h.l && g_mouse.x < h.r && g_mouse.y >= h.t && g_mouse.y < h.b) return h.object;
+        if (h.object > 0 && m.x >= h.l && m.x < h.r && m.y >= h.t && m.y < h.b) return h.object;
     return 0;
 }
 
@@ -10389,8 +10447,10 @@ const char* rail_kind_tip(int nvid) {
 
 void draw_row_tip() {
     if (panel_open()) return;
+    UiDrawing ui;
+    const POINT m = ui_mouse();
     for (const OptionHit& h : g_option_hits) {
-        if ((h.object <= 0 && h.rail <= 0 && !h.tip) || g_mouse.x < h.l || g_mouse.x >= h.r || g_mouse.y < h.t || g_mouse.y >= h.b) continue;
+        if ((h.object <= 0 && h.rail <= 0 && !h.tip) || m.x < h.l || m.x >= h.r || m.y < h.t || m.y >= h.b) continue;
         const char* name = h.tip ? h.tip : h.rail > 0 ? rail_kind_tip(h.rail) : object_name(h.object);
         uint8_t* font = vid_by_number(FONT_TIPS);
         if (!name || !*name || !font) return;
@@ -10400,7 +10460,7 @@ void draw_row_tip() {
                                   (bed >= 0 ? ui_printf(ui_format("TipBedBrush", "gravel bed: %s - click / drag on the track"), bed_kind_label(bed))
                                             : std::string(name)) + " ";
         const float cw = at<float>(font, V_SIZE_X), w = cw * shown.size();
-        const Box v = view();
+        const Box v = ui_view();
         float x = (h.l + h.r) / 2 - w / 2;
         x = (std::max)(v.l + 2, (std::min)(x, v.r - 2 - w));
         draw_text(FONT_TIPS, x, h.t - LINE_HEIGHT - 2, shown.c_str());
@@ -11474,7 +11534,7 @@ bool context_rect(Box& b) {
 
 void context_box(uint8_t* o, int rows, float& x, float& y) {
     uint8_t* w = world();
-    const Box v = view();
+    const Box v = ui_view();
     float sx, sy;
     if (!o && g_context_line >= 0 && g_context_line < static_cast<int>(mission_push_lines().size())) {   // a line: by its end
         sx = mission_push_lines()[g_context_line].ex - at<float>(w, W_CAMERA_X);
@@ -11491,6 +11551,9 @@ void context_box(uint8_t* o, int rows, float& x, float& y) {
                 left = (std::min)(left, b.l - at<float>(w, W_CAMERA_X) - 12);
                 right = (std::max)(right, b.r - at<float>(w, W_CAMERA_X) + 12);
             }
+    left /= g_ui;   // the map's screen pixels in the interface's
+    right /= g_ui;
+    sy /= g_ui;
     const float height = (rows + 1) * CONTEXT_ROW;
     x = right;
     if (x + CONTEXT_WIDTH > v.r) x = left - CONTEXT_WIDTH;
@@ -11555,6 +11618,7 @@ std::vector<ContextRow> open_rows() {
 }
 
 void draw_context() {
+    UiDrawing ui;
     g_context_hits.clear();
     g_context_tips.clear();
     if (g_context && removed(g_context)) g_context = nullptr;
@@ -11595,10 +11659,11 @@ void draw_context() {
         for (size_t c = 0; c < row.choices.size(); ++c) {
             const char* text = row.choices[c].text.get();
             const float width = std::strlen(text) * cw;
-            const bool hover = g_mouse.x >= cx - 3 && g_mouse.x < cx + width + 3 && g_mouse.y >= ry && g_mouse.y < ry + CONTEXT_ROW;
+            const POINT m = ui_mouse();
+            const bool hover = m.x >= cx - 3 && m.x < cx + width + 3 && m.y >= ry && m.y < ry + CONTEXT_ROW;
             draw_text(row.choices[c].current || hover ? CONTEXT_LIT : CONTEXT_FONT, cx, ty, text, false, CONTEXT_STEP + 1);
             if (row.choices[c].current) {   // what is set: underlined
-                reinterpret_cast<FillRect_t>(FILL_RECT)(graphics(), nullptr, cx, ty + ch + 1, cx + width, ty + ch + 3, 0xe0f0e080);
+                ui_fill(graphics(), nullptr, cx, ty + ch + 1, cx + width, ty + ch + 3, 0xe0f0e080);
             }
             g_context_hits.push_back({cx - 3, ry, cx + width + 3, ry + CONTEXT_ROW, static_cast<int>(r - 1), static_cast<int>(c)});
             cx += width + 2 * cw;
@@ -11647,7 +11712,7 @@ void draw_mine_labels() {
         // itself - given sy, which is lifted already, the flag stood its height above the mine)
         // drawn after the bar and the rows now (in their lock), so what of it falls on them is left out - the
         // bar covered it when the labels came before it
-        auto covered = [](float x, float y) { return on_bar(x, y) || on_options(x, y); };
+        auto covered = [](float x, float y) { return on_bar(x / g_ui, y / g_ui) || on_options(x / g_ui, y / g_ui); };
         if ((at<uint32_t>(o, O_FLAGS) & 0x8000) && !covered(sx, sy) && !covered(sx, sy - 12) && !covered(sx, sy + 12))
             draw_vid(vid_of(o), 0, sx, at<float>(o, O_Y) - cam_y, at<float>(o, O_Z));
         const bool marker = nvid_of(o) == VID_MINE_MARKER;
@@ -11737,8 +11802,9 @@ void draw_overlay() {
         ~Drawing() { g_overlay_drawing = false; }
     } drawing;
     const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
-    const bool over_bar = on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)) ||
-                          on_options(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y));
+    g_ui = interface_editor_scale();   // the editor's interface this frame, the cursor with it
+    interface_cursor_scale(g_ui);
+    const bool over_bar = mouse_on_bar() || mouse_on_options();
     const float mx = cam_x + g_mouse.x, my = cam_y + g_mouse.y;
 
     prof::Lap lap;
@@ -11920,12 +11986,13 @@ void draw_overlay() {
 
     // the status line, in the mouse tips' font on a dark band: the tool_text (or the entry under
     // the cursor), the undo and redo counts, "not saved" and the last message
-    const Box v = view();
+    const Box v = ui_view();
+    const POINT um = ui_mouse();
     g_status_ends.clear();
     music_tick();
     char status[400];
     char tool_text[160];
-    const int hover = bar_entry_at(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y));
+    const int hover = mouse_entry();
     const Entry& shown = hover >= 0 ? ENTRIES[hover] : entry();
     const bool palette = is_palette(shown);
     const int shown_nvid = palette ? g_picked_nvid[palette_of(shown)] : shown.nvid != 0 ? shown.nvid : decal_nvid();
@@ -11944,8 +12011,8 @@ void draw_overlay() {
     }
     if (hover >= 0 && *shown.key) std::snprintf(tool_text + std::strlen(tool_text), sizeof tool_text - std::strlen(tool_text), " (%s)", shown.key);
     if (const char* tip = panel_tip(g_mouse)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // the Help or Menu button
-    if (const char* tip = music_tip(g_mouse)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // the music player
-    if (const char* tip = context_tip(g_mouse)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // a row of an object's panel
+    if (const char* tip = music_tip(um)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // the music player
+    if (const char* tip = context_tip(um)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // a row of an object's panel
     if (const char* tip = arrivals_tip(g_mouse)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // a row of the Arrivals panel
     if (const char* tip = factory_tip(g_mouse)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);    // a row of a factory's panel
     std::snprintf(status, sizeof status, ui_format("StatusLine", "EDITOR - %s - undo %u, redo %u%s   %s"), tool_text,
@@ -12083,7 +12150,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
     // Ground height's repeat timer went on raising the ground unseen under it, and a Paint stroke
     // painted after it with no button held until the next click
     if (panel_open() && stroke_under_way()) end_strokes("a panel opened");
-    if (m == WM_LBUTTONDOWN && music_click(logical(l))) return true;   // the music player, also over an open panel
+    if (m == WM_LBUTTONDOWN && music_click(ui_point(logical(l)))) return true;   // the music player, also over an open panel
     if ((m == WM_KEYDOWN || m == WM_KEYUP) && w == VK_SHIFT) g_shift = m == WM_KEYDOWN;   // also while a panel takes the keys (Shift+- +)
     if (panel_message(window, m, w, g_mouse)) {   // the Help and Menu buttons, an open panel
         if (panel_open() && stroke_under_way()) end_strokes("a panel opened");
@@ -12112,8 +12179,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         }
         if (g_drag.active) continue_drag(g_mouse);
         continue_entry_drag(g_mouse);
-        if (panel_open() || on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)) ||
-            on_options(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)) ||
+        if (panel_open() || mouse_on_bar() || mouse_on_options() ||
             !view().contains(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
             // nothing is painted or raised unseen under a panel, the bar or the rows, nor out of the
             // window (the mouse captured: a drag out of it painted and raised the map beyond the view
@@ -12128,15 +12194,15 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         return false;   // the game scrolls by it
     case WM_LBUTTONDOWN: {
         g_mouse = logical(l);
-        if (context_click(g_mouse)) return true;   // the open context panel
-        const int i = bar_entry_at(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y));
+        if (context_click(ui_mouse())) return true;   // the open context panel
+        const int i = mouse_entry();
         if (i >= 0) {
             if (ENTRIES[i].tool == Tool::Settings) editor_mission_settings();
             else choose_entry(i);
             return true;
         }
-        if (options_click(g_mouse)) return true;   // the rows of the ground's tools
-        if (on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)))
+        if (options_click(ui_mouse())) return true;   // the rows of the ground's tools
+        if (mouse_on_bar())
             return true;   // the plates of the bar: nothing under them is picked or placed
         if (g_arrival_pick != ArrivalPick::None) {   // a point for the Arrivals panel
             pick_arrival_at(cursor_dot());
@@ -12291,8 +12357,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             return true;
         }
         if ((tool() == Tool::Height || tool() == Tool::Paint || tool() == Tool::Water) &&
-            !on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)) &&
-            !on_options(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
+            !mouse_on_bar() && !mouse_on_options()) {
             // the right button stays with these tools (Esc leaves them): Raise lowers, the brushes of
             // the picture put the original back
             if (tool() == Tool::Height && g_brush == Brush::Raise) {
@@ -12313,8 +12378,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             if (stroke_under_way()) g_held_button = VK_RBUTTON;
             return true;
         }
-        if (tool() == Tool::Region && !on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)) &&
-            !on_options(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {   // a region's panel: the right button on it
+        if (tool() == Tool::Region && !mouse_on_bar() && !mouse_on_options()) {   // a region's panel: the right button on it
             uint8_t* w0 = world();
             uint8_t* o = pick(at<float>(w0, W_CAMERA_X) + g_mouse.x, at<float>(w0, W_CAMERA_Y) + g_mouse.y);
             if (o && is_region(o)) {
@@ -12323,7 +12387,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
                 return true;
             }
         }
-        if (tool() == Tool::Select && !on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
+        if (tool() == Tool::Select && !mouse_on_bar()) {
             if (arrival_marker_click(g_mouse) || start_mark_click()) {
                 g_context = nullptr;
                 return true;
@@ -12356,7 +12420,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         return false;
     case WM_MBUTTONUP:
         if (tool() == Tool::Track && std::abs(g_mouse.x - g_middle_down.x) + std::abs(g_mouse.y - g_middle_down.y) < 4 &&
-            !on_bar(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y)))
+            !mouse_on_bar())
             delete_rail_at_cursor();
         return false;
     case WM_MOUSEWHEEL:
@@ -13131,6 +13195,8 @@ void edit_level_held() {
     for (FactoryTrain& t : mission_factories().queue)
         if (!t.factory && (t.fx || t.fy)) find_plan_factory(t);
     set_army_gammas();
+    interface_copy_colours(2);   // the icons' bigger copies lit the same (the editor's interface size)
+    interface_copy_colours(3);
     // Reset palette cache so editor icons use correct frames after run mode
     reset_palette_cache();
     find_decals();
