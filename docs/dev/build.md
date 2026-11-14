@@ -166,9 +166,12 @@ the Polish one leaves 80 keys empty that the English one fills with references
 Russian a few too, so `strings.override.ini` sets all of these to the English values (84 keys)
 and the pack reads the same on any base; `check_lang.py` reports such keys a fan pack leaves to
 its base. `lang/cs/game/` holds the fan translation's texts converted
-to what the game reads: the briefings, menu pages and the editor's help pages in ASCII with CRLF
-(it was UTF-8 with two files in CP1250, and its few Czech letters, dashes and a Cyrillic O were
-written without marks while the fonts had no Czech letters; their diacritics are to come), and
+to what the game reads: the briefings, menu pages and the editor's help pages in CP1250 with CRLF
+and their diacritics - Danetry's revision of 2026-11, made with the translator's kit
+(`tools/translate_kit.py`; before it they were ASCII: the translation was UTF-8 with two files in
+CP1250, and its few Czech letters, dashes and a Cyrillic O were written without marks while the
+fonts had no Czech letters; help pages added after his kit are ASCII or still English until he
+translates them), and
 `strings.override.ini` its `strings.ini` on the English keys - its two renamed keys (`Penize`,
 `Rychlost casu`) and the empty or English values completed in Czech -, our keys and the editor's,
 in CP1250 with every diacritic: the revision by the translator Danetry (merged from his fork with
@@ -178,7 +181,10 @@ does not wrap a text, so the fan translation's long lines - it wrote paragraphs 
 broken at the English files' widths (briefings, menu pages, win and loss 44 characters, objectives
 40, the tutorial's scripts 54), the key columns of the controls pages (`menu41.txt`, which had lost
 its ESC 7 / ESC 2, and `menu42.txt`) are aligned again, and mission 1's briefing, too long for one
-page then, has a third page (`l01\brief3.txt`, listed by the pack's own `l01\brief.lst`); the
+page then, had a third page; his revision puts it on two pages again and lists the pages in the
+pack's own `brief.lst` where they differ from the game's - mission 1 (two pages), mission 8 (a page
+of hints, `l08\brief2.txt`) and mission 11 (its mine hint moved onto page 2, so `brief3.txt` is not
+listed) - which only the fan translation reads: on the Czech edition its own mission texts stay; the
 menu's and the missions' headers (`MenuHeader*`, `MapHeader*`, drawn with the capitals-only VID 3)
 and the objectives (the messages' font VID 14, capitals only too) are in capitals.
 
