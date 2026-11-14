@@ -6776,7 +6776,8 @@ std::vector<Post> line_posts(const Trace& t) {
 // Puts the posts: one standing near a place is moved, turned and coloured, the others are made;
 // what they were goes into `objects` / `before` (a made one was not there).
 int direction_gap(int a, int b);   // below
-std::set<uint8_t*> buildings_lights();   // the posts that are a factory's or repair point's lights (post_owners, below)
+std::set<uint8_t*> not_reusable(const PushLine* for_line);   // the posts S may not move (post_owners, below)
+int find_line(const PushLine& l);   // below
 
 // `as_light` (a building's line): only a post that stands as that light already - its colour, facing
 // its trains within a step - is reused; another one near the place is the player's and stays. Without it
@@ -6784,7 +6785,7 @@ std::set<uint8_t*> buildings_lights();   // the posts that are a factory's or re
 // light is moved, turned and coloured (ties: its coordinates); before 2026-11-14 the first within 30 px
 // in the objects' order, of any owner, was - a building's light or a post with its own line could go.
 void put_posts(const std::vector<Post>& posts, std::vector<uint8_t*>& objects, std::vector<State>& before,
-               const std::vector<uint8_t*>& not_these = {}, bool as_light = false) {
+               const std::vector<uint8_t*>& not_these = {}, bool as_light = false, const PushLine* for_line = nullptr) {
     uint8_t* v = vid_by_number(VID_SEMAPHORE);
     if (!v) return;
     std::set<uint8_t*> lights;   // the buildings' lights, asked once when needed
@@ -6804,7 +6805,7 @@ void put_posts(const std::vector<Post>& posts, std::vector<uint8_t*>& objects, s
                     best = d, found = q;
             });
         } else {
-            if (!lights_known) lights = buildings_lights(), lights_known = true;
+            if (!lights_known) lights = not_reusable(for_line), lights_known = true;
             float best = 30;
             for_each_object([&](uint8_t* q) {
                 if (removed(q) || nvid_of(q) != VID_SEMAPHORE || std::find(taken.begin(), taken.end(), q) != taken.end() || lights.count(q))
@@ -6812,7 +6813,7 @@ void put_posts(const std::vector<Post>& posts, std::vector<uint8_t*>& objects, s
                 const float d = std::hypot(at<float>(q, O_X) - p.x, at<float>(q, O_Y) - p.y);
                 const bool tie = found && d == best &&
                                  (at<float>(q, O_X) != at<float>(found, O_X) ? at<float>(q, O_X) < at<float>(found, O_X) : at<float>(q, O_Y) < at<float>(found, O_Y));
-                if ((d < best || tie) && own_line(q) < 0) best = d, found = q;
+                if ((d < best || tie) && (own_line(q) < 0 || (for_line && own_line(q) == find_line(*for_line)))) best = d, found = q;
             });
         }
         const float z = ground_z(v, p.x, p.y);
@@ -6848,7 +6849,7 @@ void push_semaphores() {
     const std::vector<Post> posts = line_posts(t);
     std::vector<uint8_t*> objects;
     std::vector<State> before;
-    put_posts(posts, objects, before);
+    put_posts(posts, objects, before, {}, false, &lines[g_push_selected]);
     if (objects.empty()) return;
     commit({"OpSemaphores", "semaphores"}, objects, before);
     MESSAGE("MsgSemaphores", "%u semaphores at the push line: %s", static_cast<unsigned>(objects.size()),
@@ -7407,6 +7408,7 @@ std::set<uint8_t*> line_reach(const Trace& t) {
 struct PostOwners {
     std::map<uint8_t*, uint8_t*> building;
     std::set<uint8_t*> line;
+    std::map<uint8_t*, PushLine> line_of;   // the line of each post of `line`
     uint8_t* of(uint8_t* post) const {
         const auto it = building.find(post);
         return it != building.end() ? it->second : nullptr;
@@ -7441,35 +7443,52 @@ PostOwners post_owners() {
         uint8_t* building;
         std::vector<Post> places;
         std::set<uint8_t*> reach;
+        PushLine line;
     };
     std::vector<Line> lines;
     std::set<int> theirs;
     for (uint8_t* b : buildings) {
         for (int i : lines_of(b)) theirs.insert(i);
-        for (const Trace& t : building_traces(b)) lines.push_back({b, line_posts(t), line_reach(t)});
+        for (int i : lines_of(b)) {
+            const Trace t = trace(mission_push_lines()[i]);
+            lines.push_back({b, line_posts(t), line_reach(t), mission_push_lines()[i]});
+        }
     }
     // the other lines; a line a post owns (its own, a pair's) has its lights already - those posts - and
     // no places for others: a post's line has a green place at its begin by the rule, which could
     // otherwise take a building's post moved near it away from the building
     std::set<uint8_t*> owners_of_lines;
+    // Both lights of such a line are its: the post that owns it and any post standing at one of its places
+    // (within 30 px, its colour, facing its trains) - the green at the begin of a red post's line (S's, the
+    // authors' on a mission saved under a new name, a building's old line that is not its rule line) owns
+    // nothing itself and was otherwise free for a building to claim or reuse, or for S to move.
     auto owned = [&](const PushLine& l, const Trace& t) {
         if (t.error || t.path.size() < 2) return false;
         bool any = false;
         for (const Live& p : posts)
             if (std::hypot(p.x - dot_wx(t.path.back()), p.y - dot_wy(t.path.back())) < POST_REACH + 10 && owns(p.post, l)) {
                 owners_of_lines.insert(p.post);
+                out.line_of[p.post] = l;
                 any = true;
             }
-        return any;
+        if (!any) return false;
+        for (const Post& place : line_posts(t))
+            for (const Live& p : posts)
+                if (std::hypot(p.x - place.x, p.y - place.y) < 30 && red(p.post) == place.red &&
+                    direction_gap(at<int>(p.post, O_DIRECTION), place.direction) <= 32 && !owners_of_lines.count(p.post)) {
+                    owners_of_lines.insert(p.post);
+                    out.line_of[p.post] = l;
+                }
+        return true;
     };
     for (int i = 0; i < static_cast<int>(mission_push_lines().size()); ++i)
         if (!theirs.count(i)) {
             const Trace t = trace(mission_push_lines()[i]);
-            if (!owned(mission_push_lines()[i], t)) lines.push_back({nullptr, line_posts(t), line_reach(t)});
+            if (!owned(mission_push_lines()[i], t)) lines.push_back({nullptr, line_posts(t), line_reach(t), mission_push_lines()[i]});
         }
     for (const PushLine& l : mission_script_push_lines()) {
         const Trace t = trace(l);
-        if (!owned(l, t)) lines.push_back({nullptr, line_posts(t), line_reach(t)});   // the script's: never a building's
+        if (!owned(l, t)) lines.push_back({nullptr, line_posts(t), line_reach(t), l});   // the script's: never a building's
     }
     for (uint8_t* p : owners_of_lines) out.line.insert(p);   // another line's lights: never a building's
     struct Place {
@@ -7526,7 +7545,7 @@ PostOwners post_owners() {
         place.filled = true;
         done.insert(post);
         if (uint8_t* b = lines[place.line].building) out.building[post] = b;
-        else out.line.insert(post);
+        else out.line.insert(post), out.line_of[post] = lines[place.line].line;
     }
     if (g_test) {
         LARGE_INTEGER t1, f;
@@ -7539,9 +7558,14 @@ PostOwners post_owners() {
     return out;
 }
 
-std::set<uint8_t*> buildings_lights() {
+// The posts S or an entry's line (put_posts without as_light) may not move: a building's light, and a
+// light of another line than `for_line` (the line being given its posts: its own lights are reused).
+std::set<uint8_t*> not_reusable(const PushLine* for_line) {
     std::set<uint8_t*> out;
-    for (const auto& [post, b] : post_owners().building) out.insert(post);
+    const PostOwners owners = post_owners();
+    for (const auto& [post, b] : owners.building) out.insert(post);
+    for (const auto& [post, l] : owners.line_of)
+        if (!for_line || !same_line(l, *for_line)) out.insert(post);
     return out;
 }
 
@@ -7979,7 +8003,7 @@ void give_building_line(uint8_t* o) {
     // the posts another building or another line has, found before the new line is there - the same
     // answer as take_building_lines'; a post near a place is reused only when it stands as that light
     const std::vector<uint8_t*> others = posts_of_others(o, post_owners());
-    mission_push_lines().push_back(line);
+    if (find_line(line) < 0) mission_push_lines().push_back(line);   // an equal line there (drawn by hand, or turned to match) is its line - not a copy beside it
     op.lines_after = mission_push_lines();
     std::vector<uint8_t*> objects;
     std::vector<State> before;
@@ -13692,7 +13716,7 @@ bool edit_place_entry_posts(int x, int y, PushLine& line) {
     if (find_line(line) < 0) mission_push_lines().push_back(line);
     std::vector<uint8_t*> objects;
     std::vector<State> before;
-    put_posts(line_posts(t), objects, before);
+    put_posts(line_posts(t), objects, before, {}, false, &line);
     commit({"OpEntryLine", "entry line"}, objects, before);
     lines_into_step(lines_before);
     return true;

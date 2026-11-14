@@ -438,8 +438,13 @@ nearest post within 90 px (192 of the missions' 196 posts are within 90 px of a 
 facing the same trains (direction within one step), beside that line's track (its rail point, `post_dot`, on
 the line or within 90 px along the track past its ends, `line_reach`) and with no line of its own - at most one
 a place; ties go to the line that is no building's, then by coordinates, never by the objects' order. The places
-of every other line compete for posts the same way, except a line a post owns (its own, a pair's): its lights
-are those posts. A post that stands as no light the building's line needs - another colour, the other way, a
+of every other line compete for posts the same way, except a line a post owns (its own, a pair's, S's on a
+hand line): both its lights are its - the owner and any post within 30 px of one of its places, of that colour
+and facing - so the green at the begin of such a line (S's, the authors' on a mission saved under a new name, a
+building's old line that is not its rule line) is never claimed or reused by a building nor moved by S for
+another line. A rule line already lying where the building stands (drawn by hand, or turned to match) is its
+line and is reused, not copied. S on a building's own line adds a second pair of lights. A building's light the
+map maker moves to another building's place becomes that building's. A post that stands as no light the building's line needs - another colour, the other way, a
 second one at the same end, one placed or moved elsewhere - is never taken, and a new place reuses a post
 within 30 px only when it already stands as that light and is no other building's or line's (`put_posts` with
 `as_light`); S and an entry's line reuse the nearest post that has no line of its own and is no building's
