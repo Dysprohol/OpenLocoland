@@ -108,6 +108,7 @@ void panel_open_arrivals();   // editor_panel.cpp
 void edit_open_enemy_factory();   // editor_edit.cpp: the panel of the map's first enemy factory
 bool edit_open_factory_at(float x, float y);   // editor_edit.cpp: the panel of the factory at a map point
 int edit_interface_scale();                     // editor_edit.cpp: the editor's interface size now
+void logical_to_window(POINT& p);                // screen_scaling.cpp
 const PanelRows& factory_rows();                // editor_factory.cpp: what the panel's last frame drew (test mode)
 bool edit_test_pick(int nvid, int army);   // editor_edit.cpp: test mode - the palette object to place
 void new_map_dialog(HWND owner);                // editor_newmap.cpp
@@ -1586,9 +1587,12 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
                 }
                 if (n < 0 || n >= static_cast<int>(rows.size())) return 0;
                 const PanelRows::Drawn& d = rows[n];
-                const int x = static_cast<int>((d.l + d.r) / 2 * scale), y = static_cast<int>((d.t + d.b) / 2 * scale);
-                patch::log("panel row %d clicked at %d,%d: %s %s", n, x, y, d.choice ? "choice" : "text", d.text.c_str());
-                return (y << 16) | x;
+                // the middle in the window's pixels: times the interface's size, then out of the logical screen
+                // (a map narrower than the window has it centred: FPTest's 2048 in a 2560 window)
+                POINT at = {static_cast<LONG>((d.l + d.r) / 2 * scale), static_cast<LONG>((d.t + d.b) / 2 * scale)};
+                logical_to_window(at);
+                patch::log("panel row %d clicked at %ld,%ld: %s %s", n, at.x, at.y, d.choice ? "choice" : "text", d.text.c_str());
+                return (at.y << 16) | at.x;
             }
             if (data->dwData == TEST_FACTORY) {   // "x y": the panel of the factory there
                 PanelRows::record = true;

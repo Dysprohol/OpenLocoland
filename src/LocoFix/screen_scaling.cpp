@@ -468,6 +468,15 @@ ATOM WINAPI RegisterClassA_scaling(const WNDCLASSA* cls) {
 // A point in the game area of the window -> the logical screen the game works in.
 void window_to_logical(POINT& p) { to_logical(p); }
 
+// The other way: a point of the logical screen in the window's game area (editor test mode: where to click).
+void logical_to_window(POINT& p) {
+    Scaling s;
+    auto* g = graphics();
+    if (!g || !compute(g, s)) return;
+    p.x = s.target.left + MulDiv(p.x - s.source.left, s.target.right - s.target.left, s.source.right - s.source.left);
+    p.y = s.target.top + MulDiv(p.y - s.source.top, s.target.bottom - s.target.top, s.source.bottom - s.source.top);
+}
+
 // The game area of the window in real pixels - the launcher's resolution (interface_scale.cpp); `w` and `h`
 // are left as they are before the first level has loaded.
 void window_size(int& w, int& h) {
