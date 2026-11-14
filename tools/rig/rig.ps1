@@ -48,10 +48,10 @@
 # -Sound       let this job's sound out (it plays on the host's speakers): the guest's playback is
 #              muted from the box's start and before every job, never the host's mixer
 # -Script      (-Job script) a .ps1 under the host folder run inside the box; -ScriptArgs its parameters
-# -MemoryMB    the box's memory (default 8192, set when it starts): the guest uses 1.9 GB idle and about
+# -MemoryMB    the box's memory (default 12288, set when it starts): the guest uses 1.9 GB idle and about
 #              0.25 GB more per game running (file cache besides); the host gives only what the guest touches
-# -MaxJobs     at most this many jobs at once in the box (default 4; set when it starts)
-# -MaxGames    at most this many games at once (default 6; a missions job counts its lanes; set when
+# -MaxJobs     at most this many jobs at once in the box (default 6; set when it starts)
+# -MaxGames    at most this many games at once (default 9; a missions job counts its lanes; set when
 #              it starts; a single job larger than that still runs, alone)
 # -DefaultResolution  the display a job that names none runs under (default: the box's starting size)
 # -GamesGB     the guest keeps copies of game folders for the next job of the same build up to this
@@ -78,9 +78,9 @@ param(
   [int]$Scale = 0, [string]$Resolution = "",
   [string]$Setup = "", [string]$SetupArgs = "--silent", [switch]$NoMotw, [switch]$NoGame,
   [string]$Script = "", [hashtable]$ScriptArgs = @{},
-  [hashtable]$DgVoodoo = @{}, [switch]$Warp, [switch]$Sound, [int]$Parallel = 0, [int]$MemoryMB = 8192,
+  [hashtable]$DgVoodoo = @{}, [switch]$Warp, [switch]$Sound, [int]$Parallel = 0, [int]$MemoryMB = 12288,
   [string]$Out = "", [double]$Timeout = 30, [switch]$Fresh, [int]$IdleMinutes = 10,
-  [switch]$Exclusive, [int]$MaxJobs = 4, [int]$MaxGames = 6, [double]$GamesGB = 16, [string]$DefaultResolution = "", [double]$MaxWait = 120,
+  [switch]$Exclusive, [int]$MaxJobs = 6, [int]$MaxGames = 9, [double]$GamesGB = 16, [string]$DefaultResolution = "", [double]$MaxWait = 120,
   [switch]$Status, [switch]$Monitors, [switch]$Look, [Alias("Show")][switch]$Peek, [switch]$Front, [switch]$Hide, [switch]$Stop, [switch]$Kill, [switch]$Restart
 )
 $ErrorActionPreference = "Stop"

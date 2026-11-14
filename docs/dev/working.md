@@ -303,9 +303,9 @@ registry key, and so the guest - a throw-away Windows of its own - can be set up
   window, an older `rig.ps1`), its `done.json` and the caller's last lines say so. *Turns:*
   round-robin between callers (the worktree a job comes from): the oldest job of the caller served
   longest ago goes next, and while it waits (for the box to empty, its display, room) no later job
-  overtakes it. *Limits* (set when the box starts): at most `-MaxJobs` 4 jobs and `-MaxGames` 6 games
+  overtakes it. *Limits* (set when the box starts): at most `-MaxJobs` 6 jobs and `-MaxGames` 9 games (4 and 6 until 2026-11-14; raised for seven sessions sharing the box on a 24-thread, 64 GB host)
   at once (a missions job counts its lanes; a single larger job still runs, then alone), box memory
-  `-MemoryMB` 8192. *Checked* (2026-11-13, in the shared box while other sessions used it): three
+  `-MemoryMB` 12288. *Checked* (2026-11-13, in the shared box while other sessions used it): three
   builds at once at one resolution, each its own language and frame limit; two resolutions never at
   once; a job asking 150 % (the TV) and the next naming none getting the default; a hung job killed
   at its timeout while the jobs beside it closed normally; an exclusive job waiting for the running
