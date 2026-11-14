@@ -108,6 +108,9 @@ void panel_open_arrivals();   // editor_panel.cpp
 void edit_open_enemy_factory();   // editor_edit.cpp: the panel of the map's first enemy factory
 bool edit_open_factory_at(float x, float y);   // editor_edit.cpp: the panel of the factory at a map point
 int edit_interface_scale();                     // editor_edit.cpp: the editor's interface size now
+bool zoom_view_split();                         // zoom_view.cpp: a zoom's view in effect (the interface in the window)
+bool zoom_editor_kept(double& z, float& x, float& y);   // zoom.cpp: the editor's zoom over Run the level
+void zoom_editor_restore(double z, float x, float y);
 void logical_to_window(POINT& p);                // screen_scaling.cpp
 const PanelRows& factory_rows();                // editor_factory.cpp: what the panel's last frame drew (test mode)
 bool edit_test_pick(int nvid, int army);   // editor_edit.cpp: test mode - the palette object to place
@@ -321,6 +324,8 @@ bool g_run_dirty = false;   // the copy holds edits not saved
 bool g_run_back = false;   // the next load is the way back: the view and the chosen object as they were
 bool g_save_on_back = false, g_close_on_back = false;   // the edits of the copy to be saved once it is held again
 float g_run_view_x = 0, g_run_view_y = 0;   // the view's top-left before the run
+double g_run_zoom = 0;                       // the editor's zoom before the run (0: its own), the view's middle
+float g_run_zoom_x = 0, g_run_zoom_y = 0;
 
 void load_map(const std::string& path);
 
@@ -989,6 +994,7 @@ bool run_level(HWND window) {
         g_run_view_x = *reinterpret_cast<float*>(w + 0x44);
         g_run_view_y = *reinterpret_cast<float*>(w + 0x48);
     }
+    if (!zoom_editor_kept(g_run_zoom, g_run_zoom_x, g_run_zoom_y)) g_run_zoom = 0;   // the run starts at its own zoom
     edit_remember_selection();
     try {
         memory_test_point("keep");
@@ -1589,8 +1595,9 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
                 const PanelRows::Drawn& d = rows[n];
                 // the middle in the window's pixels: times the interface's size, then out of the logical screen
                 // (a map narrower than the window has it centred: FPTest's 2048 in a 2560 window)
+                // (under a zoom the interface is laid out in the window itself: zoom_view.cpp)
                 POINT at = {static_cast<LONG>((d.l + d.r) / 2 * scale), static_cast<LONG>((d.t + d.b) / 2 * scale)};
-                logical_to_window(at);
+                if (!zoom_view_split()) logical_to_window(at);
                 patch::log("panel row %d clicked at %ld,%ld: %s %s", n, at.x, at.y, d.choice ? "choice" : "text", d.text.c_str());
                 return (at.y << 16) | at.x;
             }
@@ -1729,6 +1736,8 @@ void editor_level_loaded(void* w) {
                 const float* screen = reinterpret_cast<const float*>(static_cast<uint8_t*>(graphics()) + 0x20c);
                 reinterpret_cast<SetPosition_t>(SET_POSITION)(world, nullptr, g_run_view_x + screen[0] / 2, g_run_view_y + screen[1] / 2, 0);
             }
+            if (g_run_zoom > 0) zoom_editor_restore(g_run_zoom, g_run_zoom_x, g_run_zoom_y);   // after the next frame
+            g_run_zoom = 0;
             edit_restore_history();
             edit_restore_selection();
             if (!g_run_origin.empty()) {   // the copy held again: the editor on the original map, its edits not saved

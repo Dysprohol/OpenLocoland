@@ -24,8 +24,14 @@
 // script function 201 GetMouseWheel reads it in the main menu's custom maps page, menu_input.cpp): towards the
 // player out, away in, one step a notch. Not while the cursor is over the interface (the menu's hover - the bar,
 // the minimap, the money plate, a message's strip), a menu is up, the game is paused or loading, the scripts hold
-// the camera (no border or arrow scrolling: an intro), or in the editor (its wheel is its tools'). The zoom stays
-// while a menu is up (zoom_view.cpp gives the menu its screen). A level change gives the level its own zoom.
+// the camera (no border or arrow scrolling: an intro). The zoom stays while a menu is up (zoom_view.cpp gives the
+// menu its screen). A level change gives the level its own zoom.
+//
+// The map editor (a level held, editor.cpp): its plain wheel is its tools', so its zoom is Ctrl+wheel, passed in
+// by editor_edit.cpp (zoom_editor_wheel) - the same steps, caps and anchor; not while one of its panels is open.
+// Ctrl+0 puts the level's own zoom back (zoom_editor_reset). Run the level loads a level (its own zoom); coming
+// back, editor.cpp asks for the editor's zoom again (zoom_editor_restore). The editor's camera margin past the
+// map is in map pixels, so camera.cpp takes it times zoom_ratio().
 //
 // A change is made between two frames, right after one is presented (frame_limit.cpp's wrapper of
 // Graphics_EndScene). A step is reached in a glide of GLIDE_MS (220 ms; the test key's ZoomGlide in test mode, 0 =
@@ -45,6 +51,10 @@ void window_size(int& w, int& h);              // screen_scaling.cpp
 void window_to_logical(POINT& p);
 void logical_to_window(POINT& p);
 bool menu_background_shown();
+bool editor_level_held();                      // editor.cpp
+bool panel_open();                             // editor_panel.cpp: a panel of the editor is open
+bool edit_busy();                              // editor_edit.cpp: a drag or a stroke under way
+void edit_zoom_changed();                      // editor_edit.cpp: its mouse at the new view
 void frame_rate_section(const char* part);     // frame_limit.cpp
 bool zoom_view_installed();                    // zoom_view.cpp
 double zoom_view_base();
@@ -122,6 +132,11 @@ int g_own = 0;        // the index of the level's own zoom
 int g_step = 0;       // the index of the step in effect or being glided to
 bool g_made = false;  // the steps made for this level
 double g_zoom = 1.0;  // the zoom drawn now (a step, or between two in a glide)
+
+int g_editor_notches = 0;   // the editor's Ctrl+wheel, taken after the frame as the wheel is
+bool g_editor_reset = false;   // Ctrl+0
+double g_restore_zoom = 0;     // the editor back from Run the level: its zoom (0 = none), the view's middle
+float g_restore_x = 0, g_restore_y = 0;
 
 // a glide
 bool g_gliding = false;
@@ -209,7 +224,13 @@ void log_memory(double ms, double z) {
 const char* refused(uint8_t* w) {
     const unsigned flags = at<unsigned>(w, WORLD_FLAGS);
     if (!(flags & WORLD_ACTIVE)) return "the window is not active";
-    if (flags & WORLD_EDITOR) return "editor mode";
+    if (flags & WORLD_EDITOR) {   // the map editor (its level held: paused, its own scroll type)
+        if (!editor_level_held()) return "editor mode, the level not held";
+        if (panel_open()) return "a panel of the editor is open";
+        if (edit_busy()) return "a drag or a stroke is under way";
+        if (flags & WORLD_LOADING) return "loading";
+        return nullptr;
+    }
     if (flags & (WORLD_LOADING | WORLD_PAUSED)) return "loading or paused";
     if (!(at<unsigned>(w, WORLD_SCROLL_TYPE) & SCROLL_BY_PLAYER)) return "the scripts hold the camera";
     if (menu_background_shown()) return "a menu is up";
@@ -244,6 +265,7 @@ bool show_zoom(double z, double surface_z) {
         ClientToScreen(window, &screen);
         SendMessageA(window, WM_NCHITTEST, 0, MAKELPARAM(screen.x, screen.y));
     }
+    if (at<unsigned>(w, WORLD_FLAGS) & WORLD_EDITOR) edit_zoom_changed();
     return true;
 }
 
@@ -335,7 +357,66 @@ void __fastcall scroll_move(void* w, void* edx, float x, float y, int mode) {
     reinterpret_cast<SetPosition_t>(SET_POSITION)(w, edx, x, y, mode);
 }
 
+// The editor's Ctrl+0 and its zoom back after Run the level, between two frames.
+void editor_after_frame(uint8_t* w) {
+    if (g_editor_reset) {
+        g_editor_reset = false;
+        if (g_made && g_step != g_own && !refused(w)) go_to(g_own);
+    }
+    if (g_restore_zoom > 0 && editor_level_held() && !(at<unsigned>(w, WORLD_FLAGS) & WORLD_LOADING)) {
+        const double z = g_restore_zoom;
+        g_restore_zoom = 0;
+        if (!g_made) make_steps();
+        int best = g_own;
+        for (int i = 0; i < g_step_count; ++i)
+            if (std::fabs(std::log(g_steps[i] / z)) < std::fabs(std::log(g_steps[best] / z))) best = i;
+        if (best == g_own) return;
+        g_step = best;
+        g_gliding = false;
+        if (!zoom_view_apply(g_steps[best], g_steps[best])) {
+            g_step = g_own;
+            return;
+        }
+        g_zoom = g_steps[best];
+        uint8_t* g = graphics();
+        reinterpret_cast<SetPosition_t>(SET_POSITION)(w, nullptr, g_restore_x, g_restore_y, 0);
+        edit_zoom_changed();
+        patch::log("zoom: the editor's zoom %d/1000 back (view %.0fx%.0f)", static_cast<int>(g_zoom * 1000 + 0.5),
+                   at<float>(g, 0x20c), at<float>(g, 0x210));
+    }
+}
+
 }  // namespace
+
+// editor_edit.cpp: Ctrl+wheel in the editor (notches > 0 away from the player: in), taken after the frame.
+void zoom_editor_wheel(int notches) { g_editor_notches += notches; }
+
+// editor_edit.cpp: Ctrl+0 - the level's own zoom again (after the frame).
+void zoom_editor_reset() { g_editor_reset = true; }
+
+// The zoom against the level's own: 1 at its own zoom, 2 at twice as big, 0.5 at half (the editor's status line).
+double zoom_relative() { return g_made && g_steps[g_own] > 0 ? g_zoom / g_steps[g_own] : 1.0; }
+
+// Map pixels per pixel of the level's own screen: 1 at its own zoom, 2 zoomed out to 1/2 (camera.cpp: the
+// editor's margin past the map is that many times its own).
+double zoom_ratio() { return 1.0 / zoom_relative(); }
+
+// editor.cpp, Run the level: the zoom the editor had and the view's middle (map point), asked for again by
+// zoom_editor_restore when the editor is back.
+bool zoom_editor_kept(double& z, float& x, float& y) {
+    uint8_t* w = world();
+    uint8_t* g = graphics();
+    if (!w || !g || !g_made || g_step == g_own) return false;
+    z = g_steps[g_step];
+    x = at<float>(w, WORLD_CAMERA_X) + at<float>(g, 0x20c) * 0.5f;
+    y = at<float>(w, WORLD_CAMERA_Y) + at<float>(g, 0x210) * 0.5f;
+    return true;
+}
+void zoom_editor_restore(double z, float x, float y) {
+    g_restore_zoom = z;
+    g_restore_x = x;
+    g_restore_y = y;
+}
 
 // screen_scaling.cpp: a level is about to load; it gets its own screen again (its own zoom).
 void zoom_level_loading() {
@@ -347,6 +428,8 @@ void zoom_level_loading() {
     g_step_count = 1;
     g_zoom = 1.0;
     g_measure_from = 0;
+    g_editor_notches = 0;
+    g_editor_reset = false;
     zoom_view_level_loading();
 }
 
@@ -366,14 +449,17 @@ void zoom_after_frame() {
     zoom_view_between_frames();
     glide();
     measure_frame();
-    const int notches = at<int>(w, MOUSE_WHEEL);
+    const bool editor = (at<unsigned>(w, WORLD_FLAGS) & WORLD_EDITOR) != 0;
+    if (editor) editor_after_frame(w);
+    const int notches = editor ? g_editor_notches : at<int>(w, MOUSE_WHEEL);
+    g_editor_notches = 0;
     if (!notches) return;
     if (const char* why = refused(w)) {
         static const bool test = test_mode();   // the tests see why a turn did nothing; a player's log stays quiet
         if (test) patch::log("zoom: %d notch(es) not taken - %s", notches, why);
         return;
     }
-    at<int>(w, MOUSE_WHEEL) = 0;   // taken: nothing after the frame reads it again
+    if (!editor) at<int>(w, MOUSE_WHEEL) = 0;   // taken: nothing after the frame reads it again
     if (!g_made) make_steps();
     int step = g_step - notches;   // one step a notch; away from the player (positive) goes in
     if (step < 0) step = 0;

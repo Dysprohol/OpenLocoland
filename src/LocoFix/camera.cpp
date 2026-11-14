@@ -13,11 +13,14 @@
 // bottom of the view, so the editor's camera goes that far out - times the editor's interface size
 // (editor_edit.cpp): its bar and the rows of a tool above it, up to three (212 px at the normal size), stand that
 // many times higher, and the rows take the clicks, so the map's bottom must come out from under them (600 px at
-// twice, 900 at three times; 300 at the normal size as before).
+// twice, 900 at three times; 300 at the normal size as before). Under the editor's zoom (zoom.cpp) the bar and the
+// rows keep their size on the screen while a map pixel does not, so the margin in map pixels is that times the map
+// pixels per pixel of the level's own screen (zoom_ratio: 2 zoomed out to 1/2, 1/2 zoomed in twice).
 #include "patch.h"
 
 bool editor_level_held();     // editor.cpp
 int edit_interface_scale();   // editor_edit.cpp: the editor's interface size now
+double zoom_ratio();          // zoom.cpp: map pixels per pixel of the level's own screen (1 unzoomed)
 
 namespace {
 
@@ -44,7 +47,7 @@ void __fastcall SetPosition_centered(void* world, void* edx, float x, float y, i
             hi += missing / 2;
         }
         if (editor_level_held()) {
-            const float margin = EDITOR_MARGIN * static_cast<float>(edit_interface_scale());
+            const float margin = EDITOR_MARGIN * static_cast<float>(edit_interface_scale()) * static_cast<float>(zoom_ratio());
             lo -= margin;
             hi += margin;
         }

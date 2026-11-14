@@ -34,6 +34,14 @@
 // Player_UpdateStateBar (the minimap's hover and click); the minimap's right-click order gets its rectangle in
 // logical pixels (the engine computes the map point from the logical cursor).
 //
+// THE MAP EDITOR (a level held): it has no interface objects (the bar is released); its marks on the map are
+// drawn after Graphics_DrawScene in the world pass (in map pixels, stretched with the world), and its own
+// interface - bar, rows, status lines, hints, panels - in the second pass, at the window's size
+// (edit_interface_pass), drawn as at zoom 1: into the window-sized picture, its software pictures through the
+// engine's locks of it and of the window-sized depth buffer - cleared first to the engine's empty depth, so what
+// is drawn there is in front of everything - and the render states Graphics_DrawScene leaves. It reads the mouse in
+// the window's pixels itself.
+//
 // THE INTERFACE'S LAYOUT. While a zoom view is in effect the bar is built with the screen and the view set to the
 // window's (status_bar.cpp asks zoom_view_layout_begin), so it has the window's layout and the interface's own
 // scale; it is built again when the view starts or ends. The camera's room below the map is the bar's height in
@@ -65,6 +73,8 @@ void fog_buffer_cover(int w, int h);          // fog_buffer.cpp
 bool status_bar_rebuild(uint8_t* player);     // status_bar.cpp
 void status_bar_room(uint8_t* player);
 void interface_messages_rescale();            // interface_texts.cpp
+bool editor_level_held();                     // editor.cpp
+void edit_interface_pass();                   // editor_edit.cpp: the editor's interface, at the window's size
 int __cdecl whole_layer_filter(const uint8_t* object);   // below
 
 namespace {
@@ -630,6 +640,31 @@ void interface_pass(uint8_t* g, IDirectDrawSurface7* picture, int w, int h) {
     unlock_all(g);
 }
 
+// The editor's pass (see "The map editor" at the top); the scene is begun, the game's window-sized surfaces in, the
+// screen at the window's size. The depth buffer is the game's own (the engine locks and unlocks it as it draws, so
+// memory of ours would be swapped for it by the first picture's unlock): cleared to the engine's empty value as
+// Graphics_Clear does - left as it was, every text of the frames before kept the pictures drawn later out of its
+// letters, and the map showed through them.
+void editor_pass(uint8_t* g, int w, int h) {
+    unlock_all(g);
+    DDSURFACEDESC2 d = {};
+    d.dwSize = sizeof d;
+    if (SUCCEEDED(field(g, DEPTH)->Lock(nullptr, &d, DDLOCK_WAIT | DDLOCK_WRITEONLY, nullptr))) {
+        for (int y = 0; y < h; ++y) {
+            auto* row = reinterpret_cast<uint16_t*>(static_cast<uint8_t*>(d.lpSurface) + static_cast<size_t>(y) * d.lPitch);
+            std::fill(row, row + w, static_cast<uint16_t>(0x3ff));
+        }
+        field(g, DEPTH)->Unlock(nullptr);
+    }
+    clear_z(g);
+    rs(g, 0x17, 7);   // as Graphics_DrawScene leaves them after its layers
+    rs(g, 0x1b, 1);
+    rs(g, 0xe, 1);
+    tss(g, 0x10, 1);
+    edit_interface_pass();
+    unlock_all(g);
+}
+
 // ---- the screenshot ----
 
 using Shot_t = void(__fastcall*)(void* g, void* edx, const char* file, int x, int y, int w, int h);
@@ -708,8 +743,15 @@ bool zoom_view_defer_brighten(float l, float t, float r, float b, uint32_t color
     return true;
 }
 
-// screen_scaling.cpp: this frame is drawn in two passes
+// screen_scaling.cpp: this frame is drawn in two passes (the editor: its interface is laid out in the window)
 bool zoom_view_split() { return g_installed && split_now(); }
+
+// The editor: a point of the zoom's view (logical pixels) in the window's pixels (exact, in floats).
+void zoom_view_to_window(float& x, float& y) {
+    if (!g_view || g_view_w <= 0 || g_view_h <= 0) return;
+    x = g_target.left + x * (g_target.right - g_target.left) / g_view_w;
+    y = g_target.top + y * (g_target.bottom - g_target.top) / g_view_h;
+}
 
 // status_bar.cpp, around building the bar: the window's layout while a zoom view is in effect. Returns a token
 // for zoom_view_layout_end (nullptr: nothing changed).
@@ -757,7 +799,8 @@ bool zoom_view_present(uint8_t* g, IDirectDrawSurface7* back_buffer, IDirectDraw
         picture->Blt(const_cast<RECT*>(&target), back_buffer, const_cast<RECT*>(&source), DDBLT_WAIT, nullptr);
         begin_scene(g);
     }
-    interface_pass(g, picture, W, H);
+    if (editor_level_held()) editor_pass(g, W, H);
+    else interface_pass(g, picture, W, H);
     end_scene(g);
     g_world_view_w = g_world_view_h = 0;
     screen_set_render_target(g, ours[0]);

@@ -71,6 +71,12 @@
 #include <vector>
 
 void window_to_logical(POINT& p);   // screen_scaling.cpp
+void window_size(int& w, int& h);
+bool zoom_view_split();             // zoom_view.cpp: a zoom's view in effect - the interface drawn in the window
+void zoom_view_to_window(float& x, float& y);   // a point of the zoom's view in the window's pixels
+void zoom_editor_wheel(int notches);            // zoom.cpp: Ctrl+wheel, Ctrl+0
+void zoom_editor_reset();
+double zoom_relative();
 const char* object_name(int nvid);  // editor_panel.cpp: the palette's names of the objects
 bool palette_state(int nvid, int& behave, std::vector<short>& items);   // editor_panel.cpp
 int palette_icon(int nvid);                                             // editor_panel.cpp
@@ -1567,10 +1573,20 @@ struct UiDrawing {
     UiDrawing& operator=(const UiDrawing&) = delete;
 };
 int drawn_scale() { return g_ui_drawing ? g_ui : 1; }
+// Under a zoom (zoom.cpp, Ctrl+wheel) the map is drawn at the zoom and stretched to the window, and the interface
+// after it at the window's own pixels (zoom_view.cpp's second pass, edit_interface_pass): its screen is then the
+// window's, whatever the logical screen is, and its mouse the window's (g_win_mouse) divided by the scale. At the
+// level's own zoom none of this: the view and the logical mouse as before.
+bool ui_in_window() { return zoom_view_split(); }
 // The screen the interface is laid out in: the view at 1 / the scale.
 Box ui_view() {
-    const Box v = view();
     const float s = static_cast<float>(g_ui);
+    if (ui_in_window()) {
+        int w = 0, h = 0;
+        window_size(w, h);
+        return {0, 0, w / s, h / s};
+    }
+    const Box v = view();
     return {v.l / s, v.t / s, v.r / s, v.b / s};
 }
 // A point of the view (the mouse) in the interface's screen; -1 (no mouse) stays.
@@ -1681,7 +1697,18 @@ bool scatter_place() { return tool() == Tool::Place && !nothing_picked() && plac
 // ---- the mouse ----
 
 POINT g_mouse = {-1, -1};   // logical pixels
-POINT ui_mouse() { return ui_point(g_mouse); }   // in the interface's screen (above)
+POINT g_win_mouse = {-1, -1};   // the same in the window's pixels (the interface's under a zoom)
+POINT ui_mouse() {   // in the interface's screen (above)
+    if (!ui_in_window()) return ui_point(g_mouse);
+    return {g_win_mouse.x < 0 ? g_win_mouse.x : g_win_mouse.x / g_ui, g_win_mouse.y < 0 ? g_win_mouse.y : g_win_mouse.y / g_ui};
+}
+// A point drawn on the map (logical pixels of the view) in the interface's screen.
+void map_to_ui(float& x, float& y) {
+    if (ui_in_window()) zoom_view_to_window(x, y);
+    x /= g_ui;
+    y /= g_ui;
+}
+void no_mouse() { g_mouse = g_win_mouse = {-1, -1}; }
 bool on_bar(float x, float y);       // below
 bool on_options(float x, float y);
 int bar_entry_at(float x, float y);
@@ -1711,6 +1738,16 @@ POINT logical(LPARAM l) {
     POINT p = {GET_X_LPARAM(l), GET_Y_LPARAM(l)};
     window_to_logical(p);
     return p;
+}
+// The mouse of a message: g_mouse (logical) and g_win_mouse (the window's)
+void take_mouse(LPARAM l) {
+    g_mouse = logical(l);
+    g_win_mouse = {GET_X_LPARAM(l), GET_Y_LPARAM(l)};
+}
+// A message's point in the interface's screen
+POINT ui_of(LPARAM l) {
+    if (!ui_in_window()) return ui_point(logical(l));
+    return {GET_X_LPARAM(l) / g_ui, GET_Y_LPARAM(l) / g_ui};
 }
 
 // The map point under a logical point: x and y on the map, z the ground there. The ground drawn at
@@ -8252,7 +8289,7 @@ void end_strokes(const char* why) {
     }
     if (!g_test && GetCapture()) ReleaseCapture();
     // let go outside the window: the brush's outline does not stay where the cursor left it
-    if (g_view_window && !cursor_in_window(g_view_window)) g_mouse = {-1, -1};
+    if (g_view_window && !cursor_in_window(g_view_window)) no_mouse();
     ending = false;
 }
 
@@ -11551,9 +11588,9 @@ void context_box(uint8_t* o, int rows, float& x, float& y) {
                 left = (std::min)(left, b.l - at<float>(w, W_CAMERA_X) - 12);
                 right = (std::max)(right, b.r - at<float>(w, W_CAMERA_X) + 12);
             }
-    left /= g_ui;   // the map's screen pixels in the interface's
-    right /= g_ui;
-    sy /= g_ui;
+    float right_y = sy;   // the map's screen pixels in the interface's
+    map_to_ui(left, sy);
+    map_to_ui(right, right_y);
     const float height = (rows + 1) * CONTEXT_ROW;
     x = right;
     if (x + CONTEXT_WIDTH > v.r) x = left - CONTEXT_WIDTH;
@@ -11712,7 +11749,10 @@ void draw_mine_labels() {
         // itself - given sy, which is lifted already, the flag stood its height above the mine)
         // drawn after the bar and the rows now (in their lock), so what of it falls on them is left out - the
         // bar covered it when the labels came before it
-        auto covered = [](float x, float y) { return on_bar(x / g_ui, y / g_ui) || on_options(x / g_ui, y / g_ui); };
+        auto covered = [](float x, float y) {
+            map_to_ui(x, y);
+            return on_bar(x, y) || on_options(x, y);
+        };
         if ((at<uint32_t>(o, O_FLAGS) & 0x8000) && !covered(sx, sy) && !covered(sx, sy - 12) && !covered(sx, sy + 12))
             draw_vid(vid_of(o), 0, sx, at<float>(o, O_Y) - cam_y, at<float>(o, O_Z));
         const bool marker = nvid_of(o) == VID_MINE_MARKER;
@@ -11792,15 +11832,17 @@ bool context_click(POINT m) {
     return true;
 }
 
+struct OverlayDrawing {   // the overlay of this frame being drawn (track_joints walks the rails once a frame)
+    OverlayDrawing() { g_overlay_drawing = true; }
+    ~OverlayDrawing() { g_overlay_drawing = false; }
+};
+
 void draw_overlay() {
     uint8_t* w = world();
     void* g = graphics();
     if (!w || !g) return;
     ++g_overlay_frame;
-    struct Drawing {
-        Drawing() { g_overlay_drawing = true; }
-        ~Drawing() { g_overlay_drawing = false; }
-    } drawing;
+    const OverlayDrawing drawing;
     const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
     g_ui = interface_editor_scale();   // the editor's interface this frame, the cursor with it
     interface_cursor_scale(g_ui);
@@ -11964,6 +12006,11 @@ void draw_overlay() {
     lap.to(prof::ED_REGIONS);
     draw_track_marks();   // the Track tool's marks of the joints (Direct3D, no lock)
     draw_mines();
+    if (ui_in_window()) {   // under a zoom the labels are the map's (the status lines' lock is the second pass's)
+        SoftwareLock locked(vid_by_number(FONT_TIPS) != nullptr);
+        draw_mine_labels();
+        draw_sockets();   // an object's panel's socket numbers: on the map too
+    }
     lap.to(prof::ED_MARKS);
     {
         const RailMemo memo;   // these three only read the rail network (RailMemo)
@@ -11974,8 +12021,14 @@ void draw_overlay() {
         draw_arrivals();
         lap.to(prof::ED_ARRIVALS);
     }
+}
 
-    began = ground_clock();
+// The editor's interface: the bar, the rows, the status lines, the music player, an object's panel, the tips, the
+// hints and the panels - after the map's overlay at the level's own zoom, in the second pass under a zoom.
+void draw_interface() {
+    const OverlayDrawing drawing;   // the same frame as draw_overlay's
+    prof::Lap lap;
+    double began = ground_clock();
     draw_bar();
     g_frame_times.bar += ground_clock() - began;
     lap.to(prof::ED_BAR);
@@ -12015,12 +12068,16 @@ void draw_overlay() {
     if (const char* tip = context_tip(um)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // a row of an object's panel
     if (const char* tip = arrivals_tip(um)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // a row of the Arrivals panel
     if (const char* tip = factory_tip(um)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);    // a row of a factory's panel
+    // zoomed (Ctrl+wheel): how far and the key back, after "not saved"; at the level's own zoom nothing
+    const int zoom = static_cast<int>(std::lround(zoom_relative() * 100));
+    const std::string saved_zoom = std::string(g_dirty ? ui_text("StatusNotSaved", " - not saved") : "") +
+                                   (zoom != 100 ? ui_printf(ui_format("StatusZoom", " - zoom %d%% (Ctrl+0: 100%%)"), zoom) : "");
     std::snprintf(status, sizeof status, ui_format("StatusLine", "EDITOR - %s - undo %u, redo %u%s   %s"), tool_text,
                   static_cast<unsigned>(g_undo.size()), static_cast<unsigned>(g_redo.size()),
-                  g_dirty ? ui_text("StatusNotSaved", " - not saved") : "",
+                  saved_zoom.c_str(),
                   GetTickCount() - g_message_time < 6000 ? g_message.c_str() : "");
     SoftwareLock locked(vid_by_number(FONT_TIPS) != nullptr);   // the status lines are text only: one lock for all of them (above); not for the GDI text without the font
-    draw_mine_labels();   // the mines' labels in the same lock (draw_mines)
+    if (!ui_in_window()) draw_mine_labels();   // the mines' labels in the same lock (draw_mines)
     status_line(v.l, v.t, status);
     if (tool() == Tool::Track) status_line(v.l, v.t + LINE_HEIGHT, g_track_status.c_str());
     if (tool() == Tool::PushLine) status_line(v.l, v.t + LINE_HEIGHT, g_push_status.c_str());
@@ -12080,7 +12137,7 @@ void draw_overlay() {
     locked.unlock();
     lap.to(prof::ED_STATUS);
     music_draw();
-    draw_sockets();
+    if (!ui_in_window()) draw_sockets();   // under a zoom they are the map's (draw_overlay)
     draw_context();
     draw_row_tip();
     draw_hint();
@@ -12138,9 +12195,10 @@ void __fastcall DrawScene_editor(void* g, void* edx, int draw) {
         draw_map_frame();
         frame.to(prof::ED_FRAME);
         draw_overlay();
+        if (!ui_in_window()) draw_interface();   // under a zoom: after the stretch (edit_interface_pass)
     }
     prof::Lap saved;
-    if (draw) {   // the SAVED notice, also over the level Run the level runs - at the editor's size
+    if (draw && !(held && ui_in_window())) {   // the SAVED notice, also over the level Run the level runs - at the editor's size
         UiDrawing ui;
         panel_draw_saved();
     }
@@ -12154,12 +12212,12 @@ void __fastcall DrawScene_editor(void* g, void* edx, int draw) {
 // A message of the editor window while the level is held; true when it was handled here.
 bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
     g_view_window = window;
-    if (m >= WM_MOUSEFIRST && m <= WM_MOUSELAST && m != WM_MOUSEWHEEL) g_mouse = logical(l);
+    if (m >= WM_MOUSEFIRST && m <= WM_MOUSELAST && m != WM_MOUSEWHEEL) take_mouse(l);
     // a panel open (F1, the Help or Menu button during a right-button stroke) ends a stroke: the
     // Ground height's repeat timer went on raising the ground unseen under it, and a Paint stroke
     // painted after it with no button held until the next click
     if (panel_open() && stroke_under_way()) end_strokes("a panel opened");
-    if (m == WM_LBUTTONDOWN && music_click(ui_point(logical(l)))) return true;   // the music player, also over an open panel
+    if (m == WM_LBUTTONDOWN && music_click(ui_of(l))) return true;   // the music player, also over an open panel
     if ((m == WM_KEYDOWN || m == WM_KEYUP) && w == VK_SHIFT) g_shift = m == WM_KEYDOWN;   // also while a panel takes the keys (Shift+- +)
     if (panel_message(window, m, w, ui_mouse())) {   // the Help and Menu buttons, an open panel
         if (panel_open() && stroke_under_way()) end_strokes("a panel opened");
@@ -12178,10 +12236,10 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
     switch (m) {
     case WM_MOUSELEAVE:   // the cursor out of the window: no brush's outline left at its edge
         g_tracking_leave = false;
-        if (!stroke_under_way()) g_mouse = {-1, -1};
+        if (!stroke_under_way()) no_mouse();
         return false;
     case WM_MOUSEMOVE:
-        g_mouse = logical(l);
+        take_mouse(l);
         if (!g_test && !g_tracking_leave) {
             TRACKMOUSEEVENT t = {sizeof(t), TME_LEAVE, window, 0};
             g_tracking_leave = TrackMouseEvent(&t) != FALSE;
@@ -12202,7 +12260,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         if (g_gstroke.active) ground_step(false);
         return false;   // the game scrolls by it
     case WM_LBUTTONDOWN: {
-        g_mouse = logical(l);
+        take_mouse(l);
         if (context_click(ui_mouse())) return true;   // the open context panel
         const int i = mouse_entry();
         if (i >= 0) {
@@ -12340,7 +12398,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
     case WM_ACTIVATE:
         if (LOWORD(w) == WA_INACTIVE) {
             end_strokes("the game left (Alt+Tab)");
-            g_mouse = {-1, -1};
+            no_mouse();
         }
         // the keys held when the game was left or came back were let go in another window: Alt stayed
         // down for the editor after Alt+Tab, and the next click in Ground height or Paint was the
@@ -12433,6 +12491,10 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             delete_rail_at_cursor();
         return false;
     case WM_MOUSEWHEEL:
+        if (g_ctrl || GetKeyState(VK_CONTROL) < 0 || (GET_KEYSTATE_WPARAM(w) & MK_CONTROL)) {   // Ctrl: the zoom (zoom.cpp)
+            zoom_editor_wheel(GET_WHEEL_DELTA_WPARAM(w) / WHEEL_DELTA);
+            return true;
+        }
         if (brush_tool())   // the brushes: the wheel sizes the brush, as + and - do
             brush_size(GET_WHEEL_DELTA_WPARAM(w) > 0 ? 1 : -1);
         else if (tool() == Tool::Track)   // the next rail climbs / falls a step, as PgUp / PgDn; nothing turns
@@ -12457,7 +12519,8 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         if (m == WM_KEYUP) return w != VK_CONTROL && w != VK_SHIFT && (w < VK_LEFT || w > VK_DOWN);
         const bool ctrl = g_ctrl || GetKeyState(VK_CONTROL) < 0;
         const bool placing = (tool() == Tool::Place && !nothing_picked()) || (tool() == Tool::Decals && !bed_brush());
-        if (ctrl && w == 'Z') undo(false);
+        if (ctrl && w == '0') zoom_editor_reset();   // the level's own zoom again (zoom.cpp)
+        else if (ctrl && w == 'Z') undo(false);
         else if (ctrl && w == 'Y') undo(true);
         else if (ctrl && w == 'C') copy_selection();
         else if (ctrl && w == 'V') paste();
@@ -12748,7 +12811,26 @@ void edit_log_rail_points(float x, float y) {
 }
 
 bool edit_dirty() { return g_dirty; }
-int edit_interface_scale() { return g_ui; }   // the editor's interface size now (the test mode's panel clicks)
+int edit_interface_scale() { return g_ui; }
+
+// zoom.cpp, after a zoom step: the mouse's logical point at the new view (the tools' previews where the cursor is
+// before it moves), and whether a drag or a stroke is under way (no zoom then: they go on in the view's pixels).
+void edit_zoom_changed() {
+    if (g_win_mouse.x < 0) return;
+    POINT p = g_win_mouse;
+    window_to_logical(p);
+    g_mouse = p;
+}
+bool edit_busy() { return stroke_under_way(); }
+
+// zoom_view.cpp's second pass under a zoom: the interface over the stretched map, at the window's size (the
+// screen and the view are the window's now).
+void edit_interface_pass() {
+    if (!world() || !graphics()) return;
+    draw_interface();
+    UiDrawing ui;
+    panel_draw_saved();
+}   // the editor's interface size now (the test mode's panel clicks)
 
 // editor_panel.cpp's drawing: pictures and texts in front of the scene as the bar's, the view and the bar.
 void edit_draw_picture(int nvid, int frame, float x, float y, int step);   // below, with the panels' queue

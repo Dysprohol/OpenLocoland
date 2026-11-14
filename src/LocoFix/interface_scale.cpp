@@ -39,6 +39,7 @@
 #include <cstdlib>
 
 void window_size(int& w, int& h);   // screen_scaling.cpp: the game area of the window, real pixels
+bool zoom_view_split();             // zoom_view.cpp: a zoom's view in effect (the interface in the window)
 
 namespace {
 
@@ -280,11 +281,13 @@ int editor_chosen() {
 }
 }  // namespace
 
-// The editor's scale for its screen now (the game's logical screen, stretched to the window for a small map).
+// The editor's scale for its screen now (the game's logical screen, stretched to the window for a small map; under
+// the editor's zoom the window's, where its interface is drawn then - zoom_view.cpp).
 int interface_editor_scale() {
     static int last = 1, last_want = 1;
     const float* screen = reinterpret_cast<float*>(graphics() + 0x20c);
-    const int w = static_cast<int>(screen[0]), h = static_cast<int>(screen[1]);
+    int w = static_cast<int>(screen[0]), h = static_cast<int>(screen[1]);
+    if (zoom_view_split()) window_size(w, h);
     if (w <= 0 || h <= 0) return 1;
     int window_w = w, window_h = h;
     window_size(window_w, window_h);
