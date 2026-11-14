@@ -213,6 +213,53 @@ hint, an object's panel by the right button, a drag and its undo, a click-and-ho
 Save and Load; the factory panel's 30 pages in Polish, German and Hungarian at both sizes with no fault of
 `panel_rows_check.py`; the settings page's row (its arrows, its tip, back in the editor at the size chosen).
 
+**Zoom in the editor** (`zoom.cpp`, `zoom_view.cpp`, `editor_edit.cpp`; engine.md "Zoom"). The **mouse
+wheel** over the map zooms the held level's map in and out by play's steps and caps (zoom.cpp's ladder, its
+ends and its glide, whatever they are), the map point under the cursor kept, as in a mission; **Ctrl+0** goes
+back to 100 % (help page 3). What the wheel did for the tools until then moved to **Ctrl+wheel**: a brush's
+size, the Track tool's ramp, turning what is placed or selected, the scatter's radius, a post's side (the keys
+stay: R / E, + / -, PgUp / PgDn); Shift+wheel is as before (the selected object's height); an open panel takes
+the wheel first (Help's pages, the palette's pages); over the bar, its rows, an object's panel and the music
+player the plain wheel does nothing (as in play over the bar); the wheel's click is unchanged. The two meanings
+are one pair of constants in `editor_edit.cpp` (`WHEEL_ZOOM_KEYS`, `WHEEL_TOOL_KEYS`), to swap if wanted. The
+status line says " - zoom 50% (Ctrl+0: 100%)" (`StatusZoom`) after "not saved" while zoomed, nothing at 100 %.
+No zoom while a panel is open or a drag or a stroke is under way (`refused`, in the test log). How: the map is
+drawn at the zoom in a logical screen of the window / z and stretched to the window, as in play; the editor's
+drawing is split in two - `draw_overlay` (the marks on the map, the tools' previews, the cursor) right after
+`Graphics_DrawScene` in logical pixels, so it is stretched with the map, and `draw_interface` (the bar, the rows,
+the status lines, the music player, an object's panel, the tips, the hints, the panels, the SAVED notice) after
+it at zoom 1 - the same calls in the same order as before -, under a zoom in zoom_view.cpp's second pass over the
+stretched picture at the window's pixels (`edit_interface_pass`: the game's window-sized surfaces, the
+window's software depth surface cleared to the engine's empty value and locked by the engine as it draws, the
+hardware z-buffer cleared, the render states `Graphics_DrawScene` leaves; play's interface pass is not run, the
+held level has no interface objects). Not memory of ours for the depth, as play's pass has: the engine's
+`Graphics_DrawVid` locks the back buffer itself for a picture drawn outside a lock and unlocks the back and the
+depth buffer after it, so the window's own depth surface came in, never cleared there - the texts of earlier
+frames kept the rows' strip and a panel's device out of their letters (the map showed through as old text), and
+that surface stayed locked, so back at 100 % its locks failed ("surface busy") and the frames lost pictures. Under a zoom the interface's screen is the window's (`ui_view`), its scale is
+chosen for the window (`interface_editor_scale`), and its mouse is the message's own window point
+(`g_win_mouse`, `ui_mouse`, `ui_of`) divided by the scale; everything on the map keeps the logical mouse
+(`g_mouse`): picking, drags, the tools, the regions' handles, the edge scrolling. The two places that put
+the interface by a map point convert it (`map_to_ui`): an object's panel beside the object and the mines'
+labels' test against the bar; the mines' labels and the socket numbers of an object's panel are drawn with
+the map then. The camera's margin past the map (camera.cpp, 300 px times the interface's size) is in map
+pixels, times `zoom_ratio()` (at the normal size 600 at 1/2, 150 at 2). Run the level loads its level at its own zoom; editor.cpp
+keeps the zoom and the view's middle (`zoom_editor_kept`) and asks for it again when the editor holds the map
+again (`zoom_editor_restore`, after the next frame). Load, New map and a level change reset it (the level's
+load, as in play). The test mode's factory panel click (`G` / `T`) takes the interface's point as a window
+point under a zoom. Checked in the rig (2026-11-14, mission 13's map, 1920 x 1080, the interface at the normal
+size and twice): at 2/3, 1/2, the whole map (47 %), 1.5, 2 and 3 a house placed lands on the map point under the
+cursor and dragged lands under the new one, track starts at the clicked point's lattice spot, Shift+wheel lifts
+the selected object, Ctrl+wheel sets the Track tool's ramp, undo, Help and its pages; the wheel over the bar
+zooms nothing; Ctrl+0; Run the level and back at 67 %; Save. Paint strokes at the map's four corners at 2/3, 1/2,
+the whole map, 1.5 and 2, the camera's limits exactly the margin in map pixels past the map. At 100 % the editor is
+pixel for pixel 3cf0f07's (27 steps; only the map's own animations differ) and as fast (alone in the test box:
+47.6 / 49.8 fps). Frame time zoomed out (the test box's virtual adapter, alone, no frame limit, mission 13): 100 %
+50.8 fps, 2/3 23.9, 1/2 17.7, the whole map 17.5 (57 ms); 1.5 / 2 / 3: 63 / 75 / 107; private memory 301 -> 314
+MB, the address space 659 -> 678 MB of 2048. A 4096 x 3072 map: 100 % 78.5 fps, 2/3 33.8 (its last step: 1/2 and
+the whole map are over the pixel cap), 327 MB private. Zoomed out the void's 1-pixel grid past the map's edge
+thins with the shrink.
+
 **The frame and the profiler** (`src/LocoFix/profile.cpp`, `profile.h`). `LOCOFIX_PROFILE=1` in the
 environment (`$env:LOCOFIX_PROFILE = "1"` before `test_game.ps1`) or the DWORD `EditorProfile` = 1 next
 to `FrameLimit` turns on a per-frame profiler for the run, in the editor and in play; off it costs one

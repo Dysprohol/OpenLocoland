@@ -138,7 +138,7 @@ Select tool too, where a line is an object like the others: it turns white, the 
 level's entry or exit) while the mouse is over no other, and the right button opens its panel in the
 game's style (DIRECTION: TURN ROUND (R), ACTION (T): PUSHES TRAINS / ONE WAY ONLY, DELETE (DEL)): T switches its flag
 (a new line has 1: the level entry, factory exits, repair point legs; the level exit has 0), R (or E,
-the wheel) turns it round, Del deletes it - all undoable - and S puts its semaphores
+Ctrl+wheel) turns it round, Del deletes it - all undoable - and S puts its semaphores
 the way the missions have them (MAP_RULES.md 7): a post faces the trains it is for and stands
 24 px to their right, a red one at the line's end for the trains that would enter it against
 its way, a green one at its begin for those it lets in (none at a dead end - a factory's); a line

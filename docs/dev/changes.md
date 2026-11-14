@@ -589,9 +589,16 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       at the zoom and stretched to the window, the interface after it at the window's own pixels, so it keeps
       its size at every zoom and interface size; up to the whole view of a 3072 x 2304 map; border and arrow
       scrolling as fast on the screen at every zoom; nothing over the interface, in a menu, while paused,
-      during an intro or in the editor; a menu keeps the zoom and looks as at zoom 1; a level change goes back
+      during an intro or in the editor (its own: 53); a menu keeps the zoom and looks as at zoom 1; a level change goes back
       to the level's own zoom, at which nothing of it runs. The engine stored the wheel and nothing in a
       mission read it,
+  53. zoom in the map editor (`zoom.cpp`, `zoom_view.cpp`, `editor_edit.cpp`, editor-ui.md "Zoom in the
+      editor"): the mouse wheel over the map through play's steps, the map point under the cursor kept, Ctrl+0
+      back to 100 %, the zoom in the status line; the tools' wheel (turning, a brush's size, the ramp, the
+      scatter's radius, a post's side) is Ctrl+wheel now; the map and its marks drawn at the zoom, the editor's own interface after the
+      stretch at the window's pixels and its own size; picking, drags and the tools on the map as before; the
+      camera's margin past the map in map pixels; Run the level at the level's own zoom and the editor's zoom
+      again after it,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that

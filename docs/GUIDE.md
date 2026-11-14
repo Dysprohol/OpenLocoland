@@ -132,7 +132,7 @@ The missions play as they always did. What changed:
 - **Zoom with the mouse wheel.** In a mission, turning the wheel away from you brings the map closer
   (up to three times), turning it towards you shows more of it (up to the whole map where it fits), a
   little with every notch and smoothly. The point under the cursor stays where it is, and the bar, the minimap,
-  the messages and the cursor keep their size. Not over the interface, in a menu or in the editor. A
+  the messages and the cursor keep their size. Not over the interface or in a menu; in the editor too, over the map. A
   zoomed-out view takes longer to draw, so the game runs slower while it is on; a zoomed-in one is
   quicker.
 - **A steady frame rate** (60 by default) instead of the game using a whole processor core.
@@ -205,7 +205,7 @@ What you see:
 - **The status line** at the top: the tool (or the one under the mouse), the undo and redo counts,
   "not saved" and the last message - why something could not be done is always written there.
 - **Hints**: when the cursor rests a moment, a few words beside it give the keys of the tool (or of the
-  bar's entry under it), e.g. for Track "click: start / end, wheel: ramp, V: kind"; the next move
+  bar's entry under it), e.g. for Track "click: start / end, Ctrl+wheel: ramp, V: kind"; the next move
   takes them away. **HINTS UNDER THE CURSOR** at the top of the Menu panel turns them off and on.
 - **Music** in the top right corner: the file's name, `|<` the one before, `>` plays it while you edit
   (`||` stops it), `>|` the next - to listen through the game's music and pick the map's in Mission
@@ -238,13 +238,22 @@ drawn. **QUICK TEST, NO SAVE** shows the game's bar at the game's size.
 
 **Moving around:** the screen edge, the arrow keys, or drag with the middle mouse button.
 
+**Zoom:** the mouse wheel over the map shows more of it (down to the whole map where it fits) or brings it
+closer (up to three times), the point under the cursor staying where it is, as in a mission; `Ctrl+0` goes
+back to 100 %. What the wheel did for the tools before - turning, a brush's size, the Track tool's ramp, the
+scatter's radius - is now Ctrl+wheel (Shift+wheel and the keys as before); over the bar, its rows and the
+panels the wheel does what it did there. The status line says how far you are zoomed. The bar, the rows, the panels and
+the status line keep their size; everything on the map - picking, dragging, the tools - works as before.
+Zoomed out the editor draws more and runs slower. Run the level starts at the game's own zoom, and coming
+back you get yours again.
+
 **The basic editing** (the Select tool, key 1):
 
 | Action | How |
 |---|---|
 | select | click an object (a car or unit before any other object, those before the rails; the smallest of them under the cursor); the circle marks it |
 | move | drag it |
-| turn | R / E or the mouse wheel |
+| turn | R / E or Ctrl+wheel |
 | raise / lower it | PgUp / PgDn by 4 (with Shift by 16), or Shift+wheel; Home puts it back on the ground - the status line shows its height above the ground |
 | change its army | A: ours, enemy, neutral, pirates - the flags change colour (while placing, A sets the army of the next object) |
 | delete | Del (Shift+Del: a whole train); the Delete tool: a click, or a drag with the button held deletes everything the cursor passes over (one undo step); Shift+click: a whole section of track |
@@ -305,7 +314,7 @@ out of sight.)
 
 The strip's **Paint the ground**: its row of buttons above the bar has the textures (grass, light
 grass, forest floor, sand, desert, snow, ice, rock, dark rock, lava, swamp, lake bed - taken from the
-campaign's maps; `[` and `]` pick them too), **SIZE** (8 - 200 px; the mouse wheel too), **STRENGTH**
+campaign's maps; `[` and `]` pick them too), **SIZE** (8 - 200 px; Ctrl+wheel too), **STRENGTH**
 (how much a pass covers: lower it to blend textures) and **EDGE** soft or hard. Paint by dragging
 with the left button; the right button (or Shift+drag) puts the original picture back; Alt+click
 takes the texture under the cursor (also one of a picture painted and saved before). Paint a sand path where the track will run and some
@@ -336,7 +345,7 @@ raise and lower it during the game as mission 15's flood does; the editor does n
 The **Ground height** tool shapes the ground with its row of buttons above the bar: the mode -
 **RAISE/LOWER** (the left button raises, the right one lowers), **FLATTEN**, **SMOOTH**, **RAMP** (drag
 from one point to another: an even slope between their levels, for a driveway up to a plateau) and
-**ROUGH** (a slight random unevenness); **SIZE** (the mouse wheel too), **STRENGTH** (how fast it works)
+**ROUGH** (a slight random unevenness); **SIZE** (Ctrl+wheel too), **STRENGTH** (how fast it works)
 and **EDGE** soft or hard (hard for cliffs and plateaus). Shift flattens and Ctrl smooths for a stroke
 without changing the mode; `M` steps through the modes. The brush goes on while you hold it still,
 and the level under the cursor is always in the status line. The ground's picture follows: a hill shows as a
@@ -389,7 +398,7 @@ along the map, so the trains come and go out of sight. Then a spur for the facto
 the line through a Y, a straight piece ending in a **dead end**.
 
 The row above the bar picks the kind of the next rails - plain, swamp (on its embankment), destroyed or
-destroyed swamp, each shown as its rail - and whether the rails go up, flat or down; `V` cycles the kinds too. `PgUp` / `PgDn` or the mouse wheel make every rail laid climb or descend a step after the one before, until you change it (ramps onto higher
+destroyed swamp, each shown as its rail - and whether the rails go up, flat or down; `V` cycles the kinds too. `PgUp` / `PgDn` or Ctrl+wheel make every rail laid climb or descend a step after the one before, until you change it (ramps onto higher
 ground: each ramp 11 levels; the status line shows the level). Rails on the ground keep the ground
 just above them (a hill in their way is cut down to them); a ramp or a raised line leaves the ground under
 it as it was and stands on its gravel bed, which looks like an embankment - unless the row's **GROUND
@@ -493,7 +502,7 @@ pushing on or off, `R` turns it round, `S` puts its semaphores, Del deletes it. 
 
 **Semaphores** (keys 8 green, 9 red) are signs only - they show the way of the one-way lines and
 stand beside the track, to the right of the trains they face, as in the missions: one goes on the
-side of the track you point at (`R` / `E` or the wheel: the other side), and on a placed one `R` / `E`
+side of the track you point at (`R` / `E` or Ctrl+wheel: the other side), and on a placed one `R` / `E`
 turn it round - it goes across the track to the trains of the other way; the status line and its
 panel (FOR TRAINS) say whose it is.
 `T` switches the colour. A semaphore you place gets its own one-way line at once, as the missions'
@@ -654,7 +663,7 @@ right next to it**.
 theme of All objects, every decal in one list (`[` `]` from any tool take you there). The row above the
 bar shows the theme (its arrows turn the pages); the name of the one under the pointer shows above it, a
 click there picks one, and so do `[` `]`. A click on the map
-puts one as shown (`R` `E` turn it), a drag scatters them in the radius (wheel, `+` `-`) in their looks
+puts one as shown (`R` `E` turn it), a drag scatters them in the radius (Ctrl+wheel, `+` `-`) in their looks
 at random, never nearer than the spacing (`<` `>`). Shift+drag takes them away. A decal picked in any
 theme of **All objects** is placed the same way. Trees, houses and the rest are in All objects too, and
 while one of them is to be placed the row above the bar shows its theme the same way.
@@ -780,7 +789,7 @@ and must not be a folder of the game (`l01`-`l20`, `sandbox`, `template`, `scrip
 |---|---|---|
 | 1 | Select | select, drag, turn, army, panel |
 | 2 | Delete | a click deletes; a drag with the button held deletes all it passes over (one undo step); Shift+click on a rail: its section |
-| 3 | Track | lays rails (V kind, PgUp/PgDn or the wheel ramp, B bed) |
+| 3 | Track | lays rails (V kind, PgUp/PgDn or Ctrl+wheel ramp, B bed) |
 | 4 | Push line | a one-way line on the track |
 | 5 | Factory | at a dead end, with its exit line |
 | 6 | Repair point | on a straight piece, with its line |
@@ -796,7 +805,8 @@ tools, the rarer things placed, the two panels last.
 
 | Key | |
 |---|---|
-| R / E, wheel | turn: a step of the object's directions (R right, E left); turn round a train (E: only the selected car), a wreck on the track, a semaphore beside the track and, in the Push line tool, the line; a factory and a repair point follow their track (help page 15) |
+| wheel | zoom over the map (Ctrl+0: 100 %) |
+| R / E, Ctrl+wheel | turn: a step of the object's directions (R right, E left); turn round a train (E: only the selected car), a wreck on the track, a semaphore beside the track and, in the Push line tool, the line; a factory and a repair point follow their track (help page 15) |
 | A | next army; while placing: the army of the next object |
 | T | semaphore red / green; on a line: pushing on / off |
 | L / Shift+L | a line at the selected semaphore: lets in / keeps out |
@@ -805,12 +815,12 @@ tools, the rarer things placed, the two panels last.
 | U / Shift+U / C | uncouple in front of / behind the car, couple it (to the train along its track) |
 | `[` `]` | the next object of the row above the bar, the texture |
 | `<` `>` | the decals' spacing |
-| wheel, `+` `-` | the brush's size (Ground height, Decals, Paint, Water) |
+| Ctrl+wheel, `+` `-` | the brush's size (Ground height, Decals, Paint, Water) |
 | M | Ground height: the next mode (raise/lower, flatten, smooth, ramp, rough) |
 | H | the ground's heights (contour lines) with any tool |
 | B | the gravel bed of new track |
 | V | the kind of new rails |
-| PgUp / PgDn | the selected object up / down by 4 (Shift: 16); while placing: the height of the object to place; Track tool: the next rail climbs / descends (the wheel too) |
+| PgUp / PgDn | the selected object up / down by 4 (Shift: 16); while placing: the height of the object to place; Track tool: the next rail climbs / descends (Ctrl+wheel too) |
 | Home | the selected object back on the ground; while placing: the object to place on the ground |
 | Ctrl+C / Ctrl+V / Ctrl+D | copy the selected object / paste it under the pointer / duplicate it beside the original |
 | Ctrl+G | placing on a grid (its size in the row) |

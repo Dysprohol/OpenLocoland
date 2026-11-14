@@ -132,7 +132,7 @@ Misje grają się tak jak zawsze. Co się zmieniło:
 - **Przybliżanie i oddalanie kółkiem myszy.** W misji obrót kółka od siebie przybliża mapę (do trzech
   razy), obrót do siebie pokazuje jej więcej (aż do całej mapy, jeśli się mieści), po trochu z każdym
   ząbkiem i płynnie. Punkt pod kursorem zostaje na miejscu, a pasek, minimapa, komunikaty i kursor zachowują swój
-  rozmiar. Nie nad interfejsem, w menu ani w edytorze. Oddalony widok rysuje się dłużej, więc gra działa
+  rozmiar. Nie nad interfejsem ani w menu; w edytorze też, nad mapą. Oddalony widok rysuje się dłużej, więc gra działa
   wtedy wolniej; przybliżony szybciej.
 - **Stała liczba klatek** (domyślnie 60) zamiast zajmowania przez grę całego rdzenia procesora.
 - **Postępy przechodzą z oryginału.** Profil z oryginału (wygrane misje, wyniki, ustawienia) jest
@@ -204,7 +204,7 @@ Co widać:
 - **Wiersz stanu** u góry: narzędzie (albo to pod myszą), liczba kroków do cofnięcia i ponowienia,
   „nie zapisano” i ostatni komunikat - dlaczego czegoś nie da się zrobić, zawsze jest napisane tutaj.
 - **Podpowiedzi**: gdy kursor chwilę stoi, kilka słów obok niego podaje klawisze narzędzia (albo
-  pozycji paska pod nim), np. dla Torów „klik: początek / koniec, kółko: rampa, V: rodzaj”; następny
+  pozycji paska pod nim), np. dla Torów „klik: początek / koniec, Ctrl+kółko: rampa, V: rodzaj”; następny
   ruch je zabiera. **PODPOWIEDZI POD KURSOREM** na górze panelu Menu je wyłącza i włącza.
 - **Muzyka** w prawym górnym rogu: nazwa pliku, `|<` poprzedni, `>` gra go podczas edycji (`||`
   zatrzymuje), `>|` następny - żeby przesłuchać muzykę gry i wybrać muzykę mapy w Ustawieniach misji. Na
@@ -237,13 +237,22 @@ gry (dwa razy od 1920 x 1080, trzy razy od 2560 x 1440) i działa przy następny
 
 **Poruszanie się:** krawędź ekranu, klawisze strzałek albo przeciąganie środkowym przyciskiem myszy.
 
+**Powiększenie:** kółko myszy nad mapą pokazuje więcej mapy (aż do całej, gdy się mieści) albo ją przybliża
+(do trzech razy), a punkt pod kursorem zostaje na miejscu, jak w misji; `Ctrl+0` wraca do 100 %. To, co kółko
+robiło dotąd dla narzędzi - obrót, rozmiar pędzla, rampa Torów, promień rozrzucania - jest teraz pod
+Ctrl+kółkiem (Shift+kółko i klawisze jak dotąd); nad paskiem, jego wierszami i panelami kółko robi to, co
+robiło. Wiersz stanu mówi, jakie jest powiększenie. Pasek, wiersze, panele i wiersz stanu zachowują swoją
+wielkość; wszystko na mapie - zaznaczanie, przeciąganie, narzędzia - działa jak wcześniej. Oddalony widok
+edytor rysuje dłużej, więc działa wolniej. Test poziomu zaczyna się w powiększeniu samej gry, a po powrocie
+wraca twoje.
+
 **Podstawy edycji** (narzędzie Zaznacz, klawisz 1):
 
 | Czynność | Jak |
 |---|---|
 | zaznaczenie | kliknij obiekt (wagon lub jednostka przed każdym innym obiektem, one przed szynami; najmniejszy z nich pod kursorem); oznacza go kółko |
 | przesunięcie | przeciągnij go |
-| obrót | R / E albo kółko myszy |
+| obrót | R / E albo Ctrl+kółko |
 | wyżej / niżej | PgUp / PgDn o 4 (z Shift o 16) albo Shift+kółko; Home stawia z powrotem na ziemi - wiersz stanu pokazuje wysokość nad ziemią |
 | zmiana armii | A: nasi, wróg, neutralni, piraci - flagi zmieniają kolor (przy stawianiu A ustala armię następnego obiektu) |
 | usunięcie | Del (Shift+Del: cały pociąg); narzędzie Usun: kliknięcie, albo przeciągnięcie z wciśniętym przyciskiem usuwa wszystko, nad czym przejdzie kursor (jeden krok cofania); Shift+klik: cały odcinek toru |
@@ -301,7 +310,7 @@ nową krawędzią - tor może biec jeszcze 300 px dalej, poza zasięgiem wzroku.
 
 **Malowanie terenu** z listwy: jego rząd przycisków nad paskiem ma tekstury (trawa, jasna trawa,
 ściółka, piasek, pustynia, śnieg, lód, skała, ciemna skała, lawa, bagno, dno jeziora - wzięte z map
-kampanii; `[` i `]` też je wybierają), **ROZMIAR** (8 - 200 px; także kółko myszy), **SILA** (ile
+kampanii; `[` i `]` też je wybierają), **ROZMIAR** (8 - 200 px; także Ctrl+kółko), **SILA** (ile
 pokrywa jedno pociągnięcie: mniejsza pozwala mieszać tekstury) i **KRAWEDZ** miękką albo twardą. Maluj
 przeciągając lewym przyciskiem; prawy (albo Shift+przeciąganie) przywraca oryginalny obraz; Alt+klik
 pobiera teksturę spod kursora (także z obrazu pomalowanego i zapisanego wcześniej). Namaluj
@@ -334,7 +343,7 @@ sam tego nie dopisuje.
 Narzędzie **Wysokosc terenu** kształtuje teren swoim rzędem przycisków nad paskiem: tryb -
 **PODNIES/OBNIZ** (lewy przycisk podnosi, prawy obniża), **WYROWNAJ**, **WYGLADZ**, **RAMPA** (przeciągnij
 z jednego punktu do drugiego: równy spadek między ich poziomami, np. podjazd na płaskowyż) i
-**NIEROWNOSCI** (lekkie losowe nierówności); **ROZMIAR** (także kółko myszy), **SILA** (jak szybko działa) i
+**NIEROWNOSCI** (lekkie losowe nierówności); **ROZMIAR** (także Ctrl+kółko), **SILA** (jak szybko działa) i
 **KRAWEDZ** miękka albo twarda (twarda: urwiska i płaskowyże). Shift wyrównuje, a Ctrl wygładza na
 jeden ruch bez zmiany trybu; `M` przełącza tryby. Pędzel działa dalej, gdy trzymasz go w miejscu, a
 poziom pod kursorem zawsze widać w wierszu stanu. Obraz terenu idzie za
@@ -390,7 +399,7 @@ od linii przez Y, prosty odcinek kończący się **ślepym końcem**.
 
 Rząd nad paskiem wybiera rodzaj następnych szyn - zwykłe, bagienne (na nasypie), zniszczone albo
 zniszczone bagienne, każdy pokazany swoją szyną - i czy szyny idą w górę, płasko albo w dół; `V`
-też przełącza rodzaje. `PgUp` / `PgDn` albo kółko myszy sprawiają, że każda kładziona szyna wznosi się albo opada o stopień po poprzedniej, dopóki tego nie zmienisz (rampy na
+też przełącza rodzaje. `PgUp` / `PgDn` albo Ctrl+kółko sprawiają, że każda kładziona szyna wznosi się albo opada o stopień po poprzedniej, dopóki tego nie zmienisz (rampy na
 wyższy teren: każda rampa to 11 poziomów; wiersz stanu pokazuje poziom). Szyny na ziemi mają teren
 tuż nad sobą (wzgórze na ich drodze zostaje ścięte do nich); rampa albo podniesiona linia zostawia teren
 pod sobą taki, jaki był, i stoi na podsypce, która wygląda jak nasyp - chyba że w rzędzie **TEREN POD
@@ -494,7 +503,7 @@ pchanie, `R` ją odwraca, `S` stawia jej semafory, Del ją usuwa. Zrób dwie:
 
 **Semafory** (klawisze 8 zielony, 9 czerwony) są tylko znakami - pokazują kierunek linii
 jednokierunkowych i stoją obok toru, po prawej stronie pociągów, na które patrzą, jak w misjach:
-staje po tej stronie toru, którą wskażesz (`R` / `E` albo kółko: po drugiej), a na postawionym `R` / `E`
+staje po tej stronie toru, którą wskażesz (`R` / `E` albo Ctrl+kółko: po drugiej), a na postawionym `R` / `E`
 obracają go - przechodzi na drugą stronę toru, do pociągów jadących w drugą stronę; wiersz stanu i jego
 panel (DLA POCIAGOW) mówią, dla których jest. `T` zmienia kolor. Postawiony semafor od razu dostaje własną linię
 jednokierunkową, tak jak mają je semafory misji, a podgląd ją pokazuje: wjazd przez **zielony** semafor jest rysowany na zielono, zatrzymanie przy **czerwonym** - krótkim czerwonym znakiem przed nim, kończącym się przy nim:
@@ -653,7 +662,7 @@ Wszystkich obiektach, każda dekoracja na jednej liście (`[` `]` z dowolnego na
 Rząd nad paskiem pokazuje temat (jego strzałki zmieniają strony); nazwa tej pod wskaźnikiem pokazuje
 się nad nią, kliknięcie tam wybiera jedną, tak samo `[` `]`. Kliknięcie
 na mapie stawia jedną tak, jak ją widać (`R` `E` ją obracają), przeciąganie rozrzuca je w promieniu
-(kółko, `+` `-`) w losowych wyglądach, nigdy bliżej niż odstęp (`<` `>`). Shift+przeciąganie je zbiera.
+(Ctrl+kółko, `+` `-`) w losowych wyglądach, nigdy bliżej niż odstęp (`<` `>`). Shift+przeciąganie je zbiera.
 Dekoracja wybrana w dowolnym temacie **Wszystkich obiektów** stawia się tak samo. Drzewa, domy i reszta
 też są we Wszystkich obiektach, a gdy jeden z nich ma być postawiony, rząd nad paskiem pokazuje tak samo
 jego temat.
@@ -778,7 +787,7 @@ gry (`l01`-`l20`, `sandbox`, `template`, `script`, `outro`).
 |---|---|---|
 | 1 | Zaznacz | zaznaczanie, przeciąganie, obrót, armia, panel |
 | 2 | Usun | kliknięcie usuwa; przeciągnięcie z wciśniętym przyciskiem usuwa wszystko po drodze (jeden krok cofania); Shift+klik na szynie: jej odcinek |
-| 3 | Tory | kładzie szyny (V rodzaj, PgUp/PgDn albo kółko rampa, B podsypka) |
+| 3 | Tory | kładzie szyny (V rodzaj, PgUp/PgDn albo Ctrl+kółko rampa, B podsypka) |
 | 4 | Linia jednokierunkowa | linia na torze w jedną stronę |
 | 5 | Fabryka | na ślepym końcu, z linią wyjazdu |
 | 6 | Punkt naprawczy | na prostym odcinku, z linią |
@@ -794,7 +803,8 @@ rzadziej stawiane rzeczy, na końcu dwa panele.
 
 | Klawisz | |
 |---|---|
-| R / E, kółko | obrót: o krok kierunków obiektu (R w prawo, E w lewo); zawrócenie pociągu (E: tylko zaznaczonego wagonu), wraku na torze, semafora przy torze, a w narzędziu Linia jednokierunkowa linii; fabrykę i punkt naprawczy obraca ich tor (strona pomocy 15) |
+| kółko | powiększenie nad mapą (Ctrl+0: 100 %) |
+| R / E, Ctrl+kółko | obrót: o krok kierunków obiektu (R w prawo, E w lewo); zawrócenie pociągu (E: tylko zaznaczonego wagonu), wraku na torze, semafora przy torze, a w narzędziu Linia jednokierunkowa linii; fabrykę i punkt naprawczy obraca ich tor (strona pomocy 15) |
 | A | następna armia; przy stawianiu: armia następnego obiektu |
 | T | semafor czerwony / zielony; na linii: pchanie tak / nie |
 | L / Shift+L | linia przy zaznaczonym semaforze: wpuszcza / zatrzymuje |
@@ -803,12 +813,12 @@ rzadziej stawiane rzeczy, na końcu dwa panele.
 | U / Shift+U / C | odczep przed wagonem / za nim, doczep go (do pociągu na jego torze) |
 | `[` `]` | następny obiekt rzędu nad paskiem, tekstura |
 | `<` `>` | odstęp dekoracji |
-| kółko, `+` `-` | rozmiar pędzla (Wysokosc terenu, Dekoracje, Malowanie, Woda) |
+| Ctrl+kółko, `+` `-` | rozmiar pędzla (Wysokosc terenu, Dekoracje, Malowanie, Woda) |
 | M | Wysokosc terenu: następny tryb (podnieś/obniż, wyrównaj, wygładź, rampa, nierówności) |
 | H | wysokości terenu (poziomice) przy każdym narzędziu |
 | B | podsypka nowych torów |
 | V | rodzaj nowych szyn |
-| PgUp / PgDn | zaznaczony obiekt wyżej / niżej o 4 (Shift: o 16); przy stawianiu: wysokość obiektu do postawienia; narzędzie Tory: następna szyna wznosi się / opada (także kółko) |
+| PgUp / PgDn | zaznaczony obiekt wyżej / niżej o 4 (Shift: o 16); przy stawianiu: wysokość obiektu do postawienia; narzędzie Tory: następna szyna wznosi się / opada (także Ctrl+kółko) |
 | Home | zaznaczony obiekt z powrotem na ziemi; przy stawianiu: obiekt do postawienia na ziemi |
 | Ctrl+C / Ctrl+V / Ctrl+D | kopiuj zaznaczony obiekt / wstaw go pod wskaźnikiem / powiel obok oryginału |
 | Ctrl+G | stawianie na siatce (jej rozmiar w rzędzie) |

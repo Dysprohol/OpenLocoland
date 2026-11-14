@@ -647,7 +647,8 @@ table of bigger VIDs holds its pictures too (1123-1135, 1173-1185) - editor-ui.m
 the editor".
 
 **Zoom** (LocoFix `zoom.cpp`, `zoom_view.cpp`, working.md "Zoom with the wheel"): the mouse wheel in play
-draws the map bigger or smaller, the interface at its own size. A zoom z (window pixels per map pixel) is a
+draws the map bigger or smaller, the interface at its own size (in the map editor too, with the editor's
+interface drawn in the second pass: editor-ui.md "Zoom in the editor"). A zoom z (window pixels per map pixel) is a
 logical screen of the window / z, at most the map on each axis, made between two frames (`screen_set_view`:
 the back, z and depth surfaces of that size, also in full screen, the screen size and `Graphics_SetViewport`;
 the fog texture big enough, `fog_buffer_cover`), and the camera put with `SetPosition` so that the map point
