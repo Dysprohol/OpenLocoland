@@ -1,0 +1,50 @@
+# Announces a published release on the project's Discord channel (tools/discord_release.py).
+# The webhook is the repository secret DISCORD_WEBHOOK_URL - create it in the channel's settings
+# (Integrations -> Webhooks -> New Webhook) and add it with:
+#
+#     gh secret set DISCORD_WEBHOOK_URL -R Dysprohol/OpenLocoland
+#
+# A draft is announced when it is published, never when it is saved. Editing a published
+# release does not announce it again; the manual run can, with a tag.
+name: Discord release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to announce again
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: discord-release
+  cancel-in-progress: false
+
+jobs:
+  announce:
+    name: Announce on Discord
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Post the release
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+          EVENT_PATH: ${{ github.event_path }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "::warning::DISCORD_WEBHOOK_URL is not set - nothing to announce"
+            exit 0
+          fi
+          if [ -n "$TAG" ]; then
+            python3 tools/discord_release.py notify --tag "$TAG"
+          else
+            python3 tools/discord_release.py notify --event "$EVENT_PATH"
+          fi

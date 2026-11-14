@@ -398,6 +398,21 @@ Steam depot (`download_depot`, "Quick start" above; Setup's window lists the lin
 again to get its pack - Setup captures only the language Steam has installed and the depots
 downloaded, and the launcher lists only the packs that were built.
 
+**Discord.** Every published release is announced in `#open-locoland-releases` on the project's
+Discord by `.github/workflows/discord-release.yml`, which runs on `release: published` (a draft is
+announced when it is published, never when it is saved; editing a published release does not
+announce it again, the manual run with a tag does) and calls `tools/discord_release.py notify`. The
+message carries the name, the lead of the notes and the rest of them under a spoiler (Discord's only
+thing that opens inside the message; `--brief` sends the lead and a **Changelog →** link instead,
+`--full` all of the notes), the tag, the date and the release's files with their sizes and links. The
+webhook is the repository secret
+`DISCORD_WEBHOOK_URL` (`gh secret set DISCORD_WEBHOOK_URL -R Dysprohol/OpenLocoland`, the URL of
+the channel's own webhook: Edit Channel -> Integrations -> Webhooks); without it the workflow only
+warns. The same script fills a channel that predates the workflow: `python tools\discord_release.py
+backfill --dry-run` lists the releases, `backfill` sends them oldest first, two seconds apart
+(`--limit N`, `--newest-first`), and both write `build\releases.md` - every release with its link,
+newest first - which is the list to hand out anywhere else.
+
 ## Distribution
 
 The repository is public. What publishing the fixes rests on (checked October 2026; this is
