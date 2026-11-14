@@ -205,11 +205,16 @@ void note(int k, int rows, const std::string& text) {
     for (int i = 0; i < rows; ++i) put(left(), row_y(k + i), fit(lines[i], left(), row_y(k + i)));
 }
 
-// The groove between a list and its actions.
-void line_under(int k) {
-    const float y = row_y(k);
-    edit_fill(left() - 2, y - 1, right_end() + 2, y, LINE_DARK);
-    edit_fill(left() - 2, y, right_end() + 2, y + 1, LINE_LIGHT);
+// The groove between a list and its actions: drawn after the rows' texts are written (factory_draw), as a
+// Direct3D fill among the queued texts would make their one lock wait for the GPU (+1.5-2 ms a frame at
+// 1920 x 1080, docs/dev/editor-ui.md "The frame and the profiler").
+float g_line_y = 0;   // 0: none this frame
+void line_under(int k) { g_line_y = row_y(k); }
+void draw_line_under() {
+    if (!g_line_y) return;
+    edit_fill(left() - 2, g_line_y - 1, right_end() + 2, g_line_y, LINE_DARK);
+    edit_fill(left() - 2, g_line_y, right_end() + 2, g_line_y + 1, LINE_LIGHT);
+    g_line_y = 0;
 }
 
 // A list's pages at the right end of the actions' row: < n/m >.
@@ -892,6 +897,7 @@ void factory_draw(POINT m) {
     }
     // the click-and-hold strip of a car or + CAR held down: over everything of the panel
     edit_texts_flush();   // the strip comes over the rows' texts (they are queued: editor_edit.cpp)
+    draw_line_under();
     const int under = g_rows.draw_hold(ICON, g_px + LEFT - 20, g_px + LEFT + WIDTH * g_cw + 20, [](int vid, float cx, float cy, bool lit) {
         const int frame = palette_icon(vid);
         if (frame >= 0) edit_draw_picture(VID_ICONS, frame, cx, cy, STEP - 1);
