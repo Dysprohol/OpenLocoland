@@ -39,6 +39,7 @@ void minimap_frame_back(void* original);
 void minimap_bounds(void* player);         // the camera may go below the map by a bigger frame's height
 int interface_choose_scale();              // interface_scale.cpp
 int interface_scale();
+int interface_real_scale();
 uint8_t* interface_vid(int nvid, int scale);
 void interface_copy_colours(int scale);
 void interface_set_hidden(int nvid, int hidden);
@@ -62,6 +63,8 @@ constexpr int WORLD_CAMERA_X = 0x44;   // World: top-left of the view on the map
 constexpr int WORLD_ARMY = 0x21c;      // the army of the local player
 constexpr int OBJECT_INVISIBLE = 0x8000;
 constexpr int B_ENGINE = 0x15;         // spriteClass of an engine: the panel of its cars
+constexpr int B_DEPO = 0x18;           // spriteClass of a factory: its build list (panel 2) and queue (5)
+constexpr int WORLD_MENU = 0x24c;      // World.menu: every FRAME object (count +4, items +0xc)
 
 constexpr int BAR_VID = 450;
 constexpr int SIDE_VID = 938;
@@ -120,6 +123,25 @@ uint8_t* bar_base(void* player) {
     for (int i = 0; i < count; ++i)
         if (items[i] && at<uint8_t*>(items[i], 0x1c) == interface_vid(BAR_VID, interface_scale())) return items[i];
     return nullptr;
+}
+
+// The side tiles of a bar built earlier are deleted: they are in no list but the world's menu (the bar's own
+// objects go with the bar's list when it is given up), so a bar built again - TAB, a zoom (zoom.cpp) -
+// would put a new row of them over the old one, at another place and size after a zoom. The engine's own
+// way of letting a menu object go (ObjectList_RemoveAt): its Delete, whose Frame_Destruct takes it off
+// the menu.
+void remove_sides() {
+    uint8_t* menu = world() + WORLD_MENU;
+    for (int i = at<int>(menu, 4) - 1; i >= 0; --i) {
+        if (i >= at<int>(menu, 4)) continue;
+        uint8_t* o = at<uint8_t**>(menu, 0x0c)[i];
+        if (!o || !at<uint8_t*>(o, 0x1c)) continue;
+        const uint8_t* v = at<uint8_t*>(o, 0x1c);
+        bool side = false;
+        for (int s = 1; s <= 3; ++s)
+            if (v == interface_vid(SIDE_VID, s)) side = true;
+        if (side) reinterpret_cast<void(__fastcall*)(void*, void*, int)>(at<void**>(o, 0)[0])(o, nullptr, 1);
+    }
 }
 
 void add_sides(void* player, uint8_t* side, int s) {
@@ -214,7 +236,7 @@ void __fastcall show(uint8_t* player, void*) {
         interface_copy_colours(s);
         create_bar(player, s);
     }
-    interface_cursor_scale(interface_scale());
+    interface_cursor_scale(interface_real_scale());   // in the window's pixels (a zoom shrinks the bar)
     uint8_t* flagman = at<uint8_t*>(player, 0x10);
     const int panel = flagman && at<int>(at<uint8_t*>(flagman, 0x1c), 0x10) == B_ENGINE ? 1 : 0;
     reinterpret_cast<SetInt_t>(SET_PANEL)(player, nullptr, panel);
@@ -227,7 +249,10 @@ void __fastcall show(uint8_t* player, void*) {
     minimap_bounds(player);
     uint8_t* side = interface_vid(SIDE_VID, interface_scale());
     if (!side) return;   // objects.res without VID 938
-    if (created && at<int>(player, 0x18) > 0) add_sides(player, side, interface_scale());
+    if (created && at<int>(player, 0x18) > 0) {
+        remove_sides();
+        add_sides(player, side, interface_scale());
+    }
     set_hidden(side, 0);
 }
 
@@ -239,6 +264,21 @@ void __fastcall hide(void* player, void* edx) {
 }
 
 }  // namespace
+
+// zoom.cpp, between two frames after the game's screen changed: the bar given up and built again for the new
+// screen (as on the way back from the Esc menu), at the scale it takes now (interface_choose_scale), the
+// factory's panel open again if it was. False when the bar is not built (TAB hid it, a menu is up): it is
+// built for the screen when it is shown.
+bool status_bar_rebuild(uint8_t* player) {
+    if (!player || !g_hide || at<int>(player, 0x18) == 0) return false;
+    const int panel = at<int>(player, 0x2c) & ~0x10;
+    g_hide(player, nullptr);   // the engine's: the bar's list released (its objects deleted), the panel 6
+    show(player, nullptr);
+    uint8_t* flagman = at<uint8_t*>(player, 0x10);
+    if ((panel == 2 || panel == 5) && flagman && at<int>(at<uint8_t*>(flagman, 0x1c), 0x10) == B_DEPO)
+        reinterpret_cast<SetInt_t>(SET_PANEL)(player, nullptr, 2);
+    return true;
+}
 
 void install_status_bar() {
     install_interface_scale();
