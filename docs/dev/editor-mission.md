@@ -323,7 +323,17 @@ released v0.2.11 game, a map saved by v0.2.11: not captured at the light (the pl
 a map saved with the change: captured, with one message (`DepoCaptured`). The 20 missions pass. A neutral
 factory placed in the editor starts with an empty build list (`copy_unit_state` gives the 14 units to the
 player's only; every mission's neutral factory has a list), so the map maker must tick its units, or the
-captured factory builds nothing. Not checked in play: CONVERT of a map without the arrivals' blocks.
+captured factory builds nothing. After the review of 2026-11-14 (a building's own line, the screen
+compare): the same map re-saved, the factory taken as the train came into its light (30 px from the line's
+end on the screen); a new map made in the editor wrote both buildings' lines, and its repair point was taken
+by a train 1 px from its line's begin. Several lines, the arrays changed by hand on that map: a line
+beginning 280 px away that passes 6 px from the factory and ends where the player's engine stands, a 5400
+px line through the factory and a light's 70 px line ending at the engine - the runner before took the
+factory in the first second (`by a train at 250,475, 403 px from it`), the new one never did (the engine
+stopped at the light, 167 px away: no line of its own, the 100 px alone); with the factory's own line among
+them it was taken at its light. The 20 missions pass. Not checked in play: CONVERT of a map without the
+arrivals' blocks; a light on a ramp or a bridge (the test map is flat - the point does not use any height
+but the car's own).
 
 **The AI and the trains of an editor map - the review of 2026-11-05.** What the editor gives the trains,
 read in the code and the scripts and tried on POLIGON copies: the Train arrivals panel (an army's train made
