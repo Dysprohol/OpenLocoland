@@ -631,10 +631,11 @@ void interface_pass(uint8_t* g, IDirectDrawSurface7* picture, int w, int h) {
 
 using Shot_t = void(__fastcall*)(void* g, void* edx, const char* file, int x, int y, int w, int h);
 Shot_t g_shot = nullptr;
-// With the split the final picture (the window-sized back buffer the frame was presented from), not the world's.
+// Under a zoom (a menu too) the final picture (the window-sized back buffer the frame was presented from), not the
+// logical one.
 void __fastcall save_screenshot(uint8_t* g, void* edx, const char* file, int x, int y, int w, int h) {
     IDirectDrawSurface7* game[3];
-    if (!split_now() || !screen_game_surfaces(game)) return g_shot(g, edx, file, x, y, w, h);
+    if (!g_view || !screen_game_surfaces(game)) return g_shot(g, edx, file, x, y, w, h);
     unlock_all(g);
     IDirectDrawSurface7* ours = field(g, BACK);
     FloatSwap f;
@@ -842,8 +843,19 @@ void zoom_view_between_frames() {
     const bool menu = menu_background_shown();
     if (menu && !g_menu) {
         const int mw = (std::max)(MENU_W, g_view_w), mh = (std::max)(MENU_H, g_view_h);
-        const RECT whole = {0, 0, window_w(), window_h()};
-        if (screen_set_view(mw, mh, (std::max)(mw, g_surface_w), (std::max)(mh, g_surface_h), &whole)) g_menu = true;
+        // stretched keeping its proportions, centred (screen_scaling.cpp's own rule; a bigger screen's 1024x768
+        // middle is taken by its menu rule first)
+        int tw = window_w(), th = static_cast<int>(static_cast<double>(window_w()) * mh / mw);
+        if (th > window_h()) {
+            th = window_h();
+            tw = static_cast<int>(static_cast<double>(window_h()) * mw / mh);
+        }
+        RECT fit;
+        fit.left = (window_w() - tw) / 2;
+        fit.top = (window_h() - th) / 2;
+        fit.right = fit.left + tw;
+        fit.bottom = fit.top + th;
+        if (screen_set_view(mw, mh, (std::max)(mw, g_surface_w), (std::max)(mh, g_surface_h), &fit)) g_menu = true;
     } else if (!menu && g_menu) {
         if (screen_set_view(g_view_w, g_view_h, g_surface_w, g_surface_h, &g_target)) g_menu = false;
     }
