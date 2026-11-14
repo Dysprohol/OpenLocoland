@@ -325,9 +325,12 @@ l10 with 0,0,0). A fort or a mining plant is different: `F162_0` / `F165_0` (`ai
 unit of any army but the neutrals within 75 px and no gun of the building's army within 150 px (none needed
 for a neutral one) - any army takes it and may take it back (`FortCaptured<army>`, `FactoryCaptured<army>`).
 **[editor]** The runner's `CaptureTact` does the same on an editor map for every neutral factory and repair
-point: within 90 px of the outer end of the factory's line, 50 px of the begin of the repair point's line (the
-push line passing nearest the building, within 50 px; the editor writes the lines as `PUSH_LINES`,
-`push_bx/by/ex/ey[]` too), or 100 px of the building; the player's trains only (editor-mission.md "Capturing").
+point: a car of the player's within 90 px of the outer end of the factory's own line (a train passing that
+near takes it too, as in the missions), 50 px of the begin of the repair point's own line, or 100 px of the
+building; the player's trains only. A building's own line has the shape the editor gives it - a factory's
+begins within 50 px of it and goes away from it, a repair point's passes it and begins within 200 px -; a
+building without one keeps the 100 px alone. The editor writes the lines as `PUSH_LINES`,
+`push_bx/by/ex/ey[]` too, so a map made before gets this when it is saved again (editor-mission.md "Capturing").
 
 ## 6a. Trains on the map
 

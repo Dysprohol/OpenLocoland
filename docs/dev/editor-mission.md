@@ -282,15 +282,27 @@ and repair point when a train of the player's came within 100 px of the building
 puts a factory 22 px inside its dead end with a 140 px exit line and a red light at its end, so a train
 driven to the factory stops at the light about 120-170 px from its middle and nothing happened (issue of a
 player on Discord, 2026-11-13; reproduced on main: the engine stopped 15 px from the line's end, 167 px from
-the factory, which stayed neutral). Now `CaptureTact` takes a neutral factory when a train of the player's
-comes within 90 px (`CAPTURE_DEPOT`, the missions' median) of the outer end of its line, a neutral repair
-point within 50 px (`CAPTURE_REPAIR`, the missions' most common) of the begin of its line, and either within
-100 px of the building as before. The building's line is the push line passing nearest to it (within 50
-px); the runner reads the lines from `PUSH_LINES`, `push_bx/by/ex/ey[]`, which the editor writes into the
-settings' block with the arrivals' arrays - the same lines as main()'s `SetPushLine` calls, in the screen's
-points (y less the height), so the building is matched at its own y - z and the point taken back at its
-height (on a map whose ground is high the two differ by 70 px and more). Without those arrays (a script
-written before) the runner keeps the 100 px alone (`#ifdef PUSH_LINES`). The moment is the missions':
+the factory, which stayed neutral). Now `CaptureTact` takes a neutral factory when a car of the player's
+comes within 90 px (`CAPTURE_FACTORY`, the missions' median) of the outer end of its own line, a neutral
+repair point within 50 px (`CAPTURE_REPAIR`, the missions' most common) of the begin of its own line, and
+either within 100 px of the building as before. It is a radius, not a stop: a train passing within 90 px of
+the light takes the factory too, as the missions' radii (up to 150 at l07, l16) do. The runner reads the
+lines from `PUSH_LINES`, `push_bx/by/ex/ey[]`, which the editor writes into the settings' block with the
+arrivals' arrays - the same lines as main()'s `SetPushLine` calls, in the screen's points (y less the
+height). A building's own line (`CaptureLine`) is one of the shape the editor gives it: a factory's begins
+within 50 px of its middle (at the dead end 22 px behind it) and its end is farther from it than its begin
+- the nearest such begin; a repair point's passes within 30 px of its middle and begins within 200 px of it
+(the editor's runs 120 px each way) - the nearest such line. Any other line - a light's, a level entry's, a
+hand-drawn one, another building's - is not taken, and a building without a line of its own (no dead end
+near, the line deleted with its rails, a map through CONVERT whose lines are elsewhere) keeps the 100 px
+alone. The vector of a long line is halved until it is short before the products, so nothing passes 32
+bits (a 1300 px line did). The trains are compared on the screen too: `CaptureTrain` walks the engine's
+box round the point (`FirstInBox`, map coordinates, reaching 400 px further down since a car stands that
+much lower on the screen than on the map by its height) and takes a car of class B_ENGINE and army 0 whose
+GetX, GetY - GetZ lies within the radius - so the height of the track at the light (a ramp, a bridge, high
+ground) does not move the point. The neutral buildings are listed first and looked at after, so the units'
+walk and the box's are never under way together. Without the arrays (a script written before) the runner
+keeps the 100 px alone (`#ifdef PUSH_LINES`); POLIGON (`maps.new/sandbox`) has its six lines written in. The moment is the missions':
 `PlaySFX(25)`, the green flash and `act_setarmy 0`, whose ACT_SET_ARMY fires the engine's `BuildingCapture`
 event (`Depo_Action` 0x404984; `Unit_Action` 0x44d61f for VID 104), so `dBuildingCapture` shows
 `DepoCaptured` / `MasterCaptured` - the runner called `BuildingCapture` itself too, a second message, and
