@@ -95,12 +95,20 @@ IDirectDrawSurface7*& surface(uint8_t* g, int offset) { return *reinterpret_cast
 IDirectDrawSurface7* g_small[3] = {};   // ours, in SURFACE_FIELDS order
 int g_small_w = 0, g_small_h = 0;
 IDirectDrawSurface7* g_game[3] = {};    // the game's, while ours are in use
+// The snapshot of the fade-in effect (Effect 5, see Effect_hook), made at the window's size by
+// Graphics_InitDirectDraw (Graphics_CreateSurface kind 7): a screen bigger than the window (a zoom)
+// gets one of its own size with the other three.
+constexpr int SNAPSHOT = 0xc08, SNAPSHOT_KIND = 7;
+IDirectDrawSurface7* g_small_snapshot = nullptr;
+IDirectDrawSurface7* g_game_snapshot = nullptr;
 
 void release_small() {
     for (auto*& s : g_small) {
         if (s) s->Release();
         s = nullptr;
     }
+    if (g_small_snapshot) g_small_snapshot->Release();
+    g_small_snapshot = nullptr;
 }
 
 // As Graphics_EndScene does before presenting: software drawing locks again on demand.
@@ -145,6 +153,13 @@ bool create_small(uint8_t* g, int w, int h) {
         release_small();
         return false;
     }
+    if ((w > g_window_w || h > g_window_h) && surface(g, SNAPSHOT)) {
+        DDPIXELFORMAT format = {};
+        format.dwSize = sizeof format;
+        if (FAILED(surface(g, SNAPSHOT)->GetPixelFormat(&format)) ||
+            !(g_small_snapshot = g_create_surface(g, nullptr, w, h, SNAPSHOT_KIND, &format)))
+            patch::log("screen scaling: no %dx%d snapshot, the fade-in shows only the window's part", w, h);
+    }
     g_small_w = w;
     g_small_h = h;
     return true;
@@ -161,6 +176,10 @@ bool use_small_surfaces(uint8_t* g, int w, int h, bool even_full_screen = false)
         g_game[i] = surface(g, SURFACE_FIELDS[i]);
         surface(g, SURFACE_FIELDS[i]) = g_small[i];
     }
+    if (g_small_snapshot) {
+        g_game_snapshot = surface(g, SNAPSHOT);
+        surface(g, SNAPSHOT) = g_small_snapshot;
+    }
     return true;
 }
 
@@ -168,6 +187,10 @@ void use_game_surfaces(uint8_t* g) {
     if (!g_game[0]) return;
     unlock(g);
     set_render_target(g, g_game[0]);
+    if (g_game_snapshot) {
+        surface(g, SNAPSHOT) = g_game_snapshot;
+        g_game_snapshot = nullptr;
+    }
     for (int i = 0; i < 3; ++i) {
         surface(g, SURFACE_FIELDS[i]) = g_game[i];
         g_game[i] = nullptr;
@@ -418,7 +441,20 @@ Effect_t g_effect = nullptr;
 // The fade-in effect snapshots the window; after a stretched frame the snapshot gets the
 // picture at the logical size instead.
 void __fastcall Effect_hook(uint8_t* g, void* edx, int effect, int a, int b, int duration) {
+    // The engine copies the window's picture (the front buffer) by the screen's size: for a screen bigger
+    // than the window it would read past it (in 32-bit colour the copy is a Lock and a loop) - it gets the
+    // window's size for the call, and the logical picture comes below.
+    const float kept_w = screen_size(g)[0], kept_h = screen_size(g)[1];
+    const bool bigger = effect == 5 && g_window_w && (kept_w > g_window_w || kept_h > g_window_h);
+    if (bigger) {
+        screen_size(g)[0] = static_cast<float>(g_window_w);
+        screen_size(g)[1] = static_cast<float>(g_window_h);
+    }
     g_effect(g, edx, effect, a, b, duration);
+    if (bigger) {
+        screen_size(g)[0] = kept_w;
+        screen_size(g)[1] = kept_h;
+    }
     if (effect != 5 || !g_last_frame_scaled) return;
     auto* snapshot = surface(g, 0xc08);
     if (!snapshot || !g_copy) return;
@@ -505,6 +541,7 @@ bool screen_set_logical(int w, int h) {
     const bool bigger = w > g_window_w || h > g_window_h;
     use_game_surfaces(g);
     if (w == g_window_w && h == g_window_h) {
+        release_small();   // a zoom's big surfaces are not kept for the next time (tens of MB)
         g_logical_w = g_logical_h = 0;
         set_screen(g, w, h);
         return true;
