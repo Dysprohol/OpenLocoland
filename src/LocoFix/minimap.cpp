@@ -50,7 +50,9 @@
 int interface_scale();                 // interface_scale.cpp
 int interface_original_nvid(int nvid);
 int interface_scale_for_window();
-double interface_zoom_shrink();
+bool zoom_view_world_view(float& w, float& h);   // zoom_view.cpp: the world's view while drawn in its second pass
+bool zoom_view_defer_brighten(float l, float t, float r, float b, uint32_t color);
+double zoom_view_room();
 
 namespace {
 
@@ -127,14 +129,8 @@ bool fits(int size, int bar_scale, int screen_w) {
     return size <= 1 || screen_w - size * FRAME_W >= screen_w / 2 + BAR_CONTROLS_RIGHT * bar_scale;
 }
 
-// `shrink`: a zoom out's stretch of the screen to the window (below 1, interface_scale.cpp): a size the player
-// chose is then that many times bigger, so it comes out at its own size (as the bar does).
-int size_for(int screen_w, int bar_scale, bool fresh = false, double shrink = 1.0) {
+int size_for(int screen_w, int bar_scale, bool fresh = false) {
     int size = chosen_size(fresh);
-    if (size > 0 && shrink < 0.99) {
-        size = static_cast<int>(size / shrink + 0.5);
-        if (size > MAX_SIZE) size = MAX_SIZE;
-    }
     if (size == 0) size = bar_scale;
     while (size > 1 && !fits(size, bar_scale, screen_w)) --size;
     return size < 1 ? 1 : size;
@@ -239,13 +235,16 @@ void __fastcall brighten_view(void* g, void*, const Minimap* m, float, float, fl
     const float map_w = at<float>(w, 0x28), map_h = at<float>(w, 0x2c);
     const float cam_x = at<float>(w, 0x44), cam_y = at<float>(w, 0x48);
     const float* view = reinterpret_cast<float*>(static_cast<uint8_t*>(g) + 0x220);   // left, right, top, bottom
+    float view_w = view[1] - view[0], view_h = view[3] - view[2];
+    zoom_view_world_view(view_w, view_h);   // drawn in a zoom's interface pass: the world's view, not the window's
     auto clamp = [](float v, float lo, float hi) { return v < lo ? lo : v > hi ? hi : v; };
-    const float x0 = clamp(cam_x, 0, map_w), x1 = clamp(cam_x + view[1] - view[0], 0, map_w);
-    const float y0 = clamp(cam_y, 0, map_h), y1 = clamp(cam_y + view[3] - view[2], 0, map_h);
+    const float x0 = clamp(cam_x, 0, map_w), x1 = clamp(cam_x + view_w, 0, map_w);
+    const float y0 = clamp(cam_y, 0, map_h), y1 = clamp(cam_y + view_h, 0, map_h);
     float l = x0 * m->width / map_w + m->left, r = x1 * m->width / map_w + m->left;
     float t = y0 * m->height / map_h + m->top, b = y1 * m->height / map_h + m->top;
     fit(l, r, m->left, m->width, HIGHLIGHT_MIN_W * g_size);
     fit(t, b, m->top, m->height, HIGHLIGHT_MIN_H * g_size);
+    if (zoom_view_defer_brighten(l, t, r, b, color)) return;   // a zoom's pass: after the dots reach the picture
     reinterpret_cast<Brighten_t>(BRIGHTEN_RECT)(g, nullptr, l, t, r, b, color);
 }
 
@@ -281,7 +280,7 @@ bool g_installed = false;
 void* minimap_frame_for_screen() {
     if (!g_installed || !world() || !graphics()) return nullptr;
     const float* screen = reinterpret_cast<float*>(graphics() + 0x20c);   // width, height
-    const int k = size_for(static_cast<int>(screen[0]), interface_scale(), true, interface_zoom_shrink());
+    const int k = size_for(static_cast<int>(screen[0]), interface_scale(), true);
     if (k < 2) return nullptr;
     const int nvid = VID_MINIMAP_BIG[k - 2];
     if (nvid >= vid_count() || !vid_slot(nvid) || !vid_slot(VID_MINIMAP)) {
@@ -328,7 +327,7 @@ void minimap_bounds(void* player) {
     if (!frame || size_of_frame(frame) <= interface_scale()) return;
     const float height = static_cast<float>(at<short>(at<uint8_t*>(frame, 0x1c), 0x2a8));
     float& bottom = at<float>(world(), WORLD_BOUNDS_BOTTOM);
-    const float wanted = at<float>(world(), 0x2c) + height;
+    const float wanted = at<float>(world(), 0x2c) + static_cast<float>(height * zoom_view_room());
     if (bottom < wanted) bottom = wanted;
 }
 

@@ -27,6 +27,8 @@
 #include "patch.h"
 #include "profile.h"
 
+int zoom_draw_filter(const uint8_t* object);   // zoom_view.cpp: -1 no opinion, 0 leave out, 1 draw
+
 namespace {
 
 constexpr uintptr_t G_GRAPHICS = 0x4a9a14;
@@ -84,6 +86,8 @@ bool in_view_box(const uint8_t* object, const Box& box) {
 }
 
 int __cdecl object_visible(const uint8_t* object) {
+    const int pass = zoom_draw_filter(object);   // a zoom: the world and the interface in two passes
+    if (pass >= 0) return pass;
     const bool visible = in_box(object, OBJECTS);
     if (prof::on() && visible) {
         prof::count(prof::DRAWN_ALL, 1);
@@ -95,7 +99,10 @@ int __cdecl object_visible(const uint8_t* object) {
     }
     return visible;
 }
-int __cdecl shadow_visible(const uint8_t* object) { return in_box(object, SHADOWS); }
+int __cdecl shadow_visible(const uint8_t* object) {
+    if (zoom_draw_filter(object) == 0) return 0;
+    return in_box(object, SHADOWS);
+}
 
 uintptr_t g_layer_draw = LAYER_DRAW, g_layer_skip = LAYER_SKIP;
 uintptr_t g_shadow_draw = SHADOW_DRAW, g_shadow_skip = SHADOW_SKIP;

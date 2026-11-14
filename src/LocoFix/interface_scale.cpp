@@ -80,7 +80,6 @@ uint8_t* vid(int nvid) {
 }
 
 int g_scale = 1;          // the scale of the bar built last
-int g_real = 1;           // what that comes to in the window's pixels (the zoom's stretch), whole
 int g_ready[MAX_SCALE + 1] = {1, 1, -1, -1};   // -1 not looked at yet
 
 // The player's choice: InterfaceScale of the Players key, the text the script's SetReg writes (a DWORD
@@ -167,38 +166,12 @@ int interface_choose_scale() {
         const int real = static_cast<int>(want / stretch + 0.5);
         if (real < s) s = real < 1 ? 1 : real;
     }
-    if (stretch < 0.99) {
-        // a zoom out (zoom.cpp): the screen is shrunk to the window, the bar is built that many times bigger
-        // so it comes out at the size it has without the zoom - the smallest scale that reaches nine tenths
-        // of it, else the biggest there is
-        const int target = (std::min)(want, interface_max_for_window());
-        s = 1;
-        while (s < MAX_SCALE && ready(s + 1) && s * stretch < target * 0.9) ++s;
-    }
-    g_real = static_cast<int>(s * (stretch < 1.0 ? stretch : 1.0) + 0.5);
-    if (g_real < 1) g_real = 1;
-    if (s != g_scale || want > 1 || stretch < 0.99)
+    if (s != g_scale || want > 1)
         patch::log("interface: scale %d (chosen %d) for a %dx%d screen in a %dx%d window", s, want, w, h, window_w,
                    window_h);
     g_scale = s;
     return s;
 }
-
-// A zoom out's stretch of the logical screen down to the window (below 1), else 1: the minimap's chosen size
-// is kept in the window's pixels with it (minimap.cpp).
-double interface_zoom_shrink() {
-    uint8_t* g = graphics();
-    if (!g) return 1.0;
-    const float* screen = reinterpret_cast<float*>(g + 0x20c);
-    int window_w = static_cast<int>(screen[0]), window_h = static_cast<int>(screen[1]);
-    window_size(window_w, window_h);
-    const double stretch = (std::min)(window_w / static_cast<double>(screen[0]), window_h / static_cast<double>(screen[1]));
-    return stretch < 1.0 ? stretch : 1.0;
-}
-
-// The scale of the bar in the window's pixels, whole: the cursor (a Windows cursor, drawn by Windows at the
-// window's pixels) follows it - not the bar's own scale, which a zoom out makes bigger to shrink it back.
-int interface_real_scale() { return g_real; }
 
 // zoom.cpp: whether the bigger pictures of scale s are there (an edition the build could not enlarge has none).
 bool interface_scale_available(int s) { return s >= 1 && s <= MAX_SCALE && ready(s); }

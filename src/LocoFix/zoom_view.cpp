@@ -60,6 +60,7 @@ void fog_buffer_cover(int w, int h);          // fog_buffer.cpp
 bool status_bar_rebuild(uint8_t* player);     // status_bar.cpp
 void status_bar_room(uint8_t* player);
 void interface_messages_rescale();            // interface_texts.cpp
+int __cdecl whole_layer_filter(const uint8_t* object);   // below
 
 namespace {
 
@@ -304,8 +305,7 @@ int __cdecl menu_load(void* args) {
     return r;
 }
 
-// Layers 0 and 7 have no culling test: their draw call asks the filter too.
-int __cdecl whole_layer_filter(const uint8_t* object);
+// Layers 0 and 7 have no culling test: their draw call asks the filter too (whole_layer_filter, below).
 __declspec(naked) void whole_layer_draw() {
     __asm {
         push ecx
@@ -667,8 +667,6 @@ int test_value(const char* name, int fallback) {
 }
 
 }  // namespace
-
-int __cdecl whole_layer_filter(const uint8_t* object);
 
 // view_culling.cpp (and the stub for layers 0 and 7): -1 no opinion (the usual test), 0 leave out, 1 draw.
 int zoom_draw_filter(const uint8_t* object) {

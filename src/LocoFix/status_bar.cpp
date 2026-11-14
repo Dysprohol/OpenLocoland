@@ -39,7 +39,9 @@ void minimap_frame_back(void* original);
 void minimap_bounds(void* player);         // the camera may go below the map by a bigger frame's height
 int interface_choose_scale();              // interface_scale.cpp
 int interface_scale();
-int interface_real_scale();
+void* zoom_view_layout_begin();            // zoom_view.cpp: the bar laid out for the window under a zoom
+void zoom_view_layout_end(void* token);
+double zoom_view_room();                   // map pixels per window pixel of the bar's height
 uint8_t* interface_vid(int nvid, int scale);
 void interface_copy_colours(int scale);
 void interface_set_hidden(int nvid, int hidden);
@@ -223,8 +225,28 @@ void create_bar(uint8_t* player, int s) {
     }
 }
 
-// Player_ShowStateBar
+// The camera's limits: the map, and below it the bar's height in map pixels less 2 - the engine's own room, so the
+// bar hides none of the map (under a zoom the bar keeps its size in the window: its height / z in map pixels).
+void set_bounds(uint8_t* player) {
+    uint8_t* w = world();
+    at<float>(w, 0x34) = 0.0f;                    // boundsLeft
+    at<float>(w, 0x3c) = 0.0f;                    // boundsTop
+    at<float>(w, 0x38) = at<float>(w, 0x28);      // boundsRight = the map's width
+    const float bar = static_cast<float>(height(scaled_or_empty(BAR_VID, interface_scale())));
+    at<float>(w, 0x40) = static_cast<float>(bar * zoom_view_room()) + at<float>(w, 0x2c) - 2.0f;
+    minimap_bounds(player);
+}
+
+void show_bar(uint8_t* player);
+
+// Player_ShowStateBar; under a zoom the bar has the window's layout (zoom_view.cpp)
 void __fastcall show(uint8_t* player, void*) {
+    void* token = zoom_view_layout_begin();
+    show_bar(player);
+    zoom_view_layout_end(token);
+}
+
+void show_bar(uint8_t* player) {
     // the message fonts and the click strip, and their bigger copies (the messages, interface_texts.cpp)
     for (int nvid : {14, 16, 17, 18, 449}) {
         set_hidden(vid_or_empty(nvid), 0);
@@ -236,17 +258,11 @@ void __fastcall show(uint8_t* player, void*) {
         interface_copy_colours(s);
         create_bar(player, s);
     }
-    interface_cursor_scale(interface_real_scale());   // in the window's pixels (a zoom shrinks the bar)
+    interface_cursor_scale(interface_scale());
     uint8_t* flagman = at<uint8_t*>(player, 0x10);
     const int panel = flagman && at<int>(at<uint8_t*>(flagman, 0x1c), 0x10) == B_ENGINE ? 1 : 0;
     reinterpret_cast<SetInt_t>(SET_PANEL)(player, nullptr, panel);
-    uint8_t* w = world();
-    at<float>(w, 0x34) = 0.0f;                    // boundsLeft
-    at<float>(w, 0x3c) = 0.0f;                    // boundsTop
-    at<float>(w, 0x38) = at<float>(w, 0x28);      // boundsRight = the map's width
-    // boundsBottom: the map's height and the bar's base, less 2 - the engine's own room below the map
-    at<float>(w, 0x40) = static_cast<float>(height(scaled_or_empty(BAR_VID, interface_scale()))) + at<float>(w, 0x2c) - 2.0f;
-    minimap_bounds(player);
+    set_bounds(player);
     uint8_t* side = interface_vid(SIDE_VID, interface_scale());
     if (!side) return;   // objects.res without VID 938
     if (created && at<int>(player, 0x18) > 0) {
@@ -269,6 +285,11 @@ void __fastcall hide(void* player, void* edx) {
 // screen (as on the way back from the Esc menu), at the scale it takes now (interface_choose_scale), the
 // factory's panel open again if it was. False when the bar is not built (TAB hid it, a menu is up): it is
 // built for the screen when it is shown.
+// zoom_view.cpp, after a zoom's step: the camera's room below the map for the bar's height at that zoom.
+void status_bar_room(uint8_t* player) {
+    if (player && at<int>(player, 0x18) > 0) set_bounds(player);
+}
+
 bool status_bar_rebuild(uint8_t* player) {
     if (!player || !g_hide || at<int>(player, 0x18) == 0) return false;
     const int panel = at<int>(player, 0x2c) & ~0x10;

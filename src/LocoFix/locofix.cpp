@@ -35,6 +35,7 @@ void install_minimap();
 void install_rain();
 void install_mouse_pan();
 void install_screen_scaling();
+void install_zoom();
 void install_lost_surfaces();
 void install_fog_buffer();
 void install_region_pulse();
@@ -166,6 +167,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         // hook in turn, so test mode supplies the virtual cursor and screen scaling maps it.
         install_test_mode();
         install_screen_scaling();
+        install_zoom();   // after screen scaling: the zoom's view draws through it (zoom.cpp, zoom_view.cpp)
         install_lost_surfaces();
         install_fog_buffer();
         install_region_pulse();
