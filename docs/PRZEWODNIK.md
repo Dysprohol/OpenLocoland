@@ -129,13 +129,11 @@ Misje grają się tak jak zawsze. Co się zmieniło:
   `[` i `]`), ale jej panel pokazywał dziesięć. Jedenasty i dalsze są teraz w drugim rzędzie nad
   pierwszym i można je klikać.
 - **Środkowy przycisk myszy** przeciąga mapę, także w misjach.
-- **Oddalanie kółkiem myszy** (pierwsza wersja). W misji obrót kółka do siebie pokazuje więcej mapy,
-  mniejszej; obrót z powrotem przywraca widok. Punkt pod kursorem zostaje na miejscu, a pasek, minimapa
-  i komunikaty zachowują swój rozmiar. Na razie tylko tam, gdzie obrazki interfejsu pozwalają na to
-  dokładnie - na przykład duże mapy (misje 8, 9, 11, 13-18, 20) w 1920 x 1080 przy zwykłym interfejsie
-  (o połowę) oraz z interfejsem dwa razy większym w 1920 x 1080 i 2560 x 1440 (do dwóch trzecich);
-  gdzie nie pozwalają, kółko nic nie robi. Nie nad interfejsem, w menu ani w edytorze. Oddalony widok
-  rysuje się dłużej, więc gra działa wtedy wolniej.
+- **Przybliżanie i oddalanie kółkiem myszy.** W misji obrót kółka od siebie przybliża mapę (półtora,
+  dwa i trzy razy), obrót do siebie pokazuje jej więcej (dwie trzecie, połowa i cała mapa, jeśli się
+  mieści). Punkt pod kursorem zostaje na miejscu, a pasek, minimapa, komunikaty i kursor zachowują swój
+  rozmiar. Nie nad interfejsem, w menu ani w edytorze. Oddalony widok rysuje się dłużej, więc gra działa
+  wtedy wolniej; przybliżony szybciej.
 - **Stała liczba klatek** (domyślnie 60) zamiast zajmowania przez grę całego rdzenia procesora.
 - **Postępy przechodzą z oryginału.** Profil z oryginału (wygrane misje, wyniki, ustawienia) jest
   przejmowany przy pierwszym uruchomieniu OpenLocoland.

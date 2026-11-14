@@ -646,27 +646,47 @@ row, script function 208) with the same rule for what fits, drawn by our code, n
 table of bigger VIDs holds its pictures too (1123-1135, 1173-1185) - editor-ui.md "The interface's size in
 the editor".
 
-**Zoom out** (LocoFix `zoom.cpp`, working.md "Zoom out with the wheel"): the mouse wheel in play draws the
-map smaller, the interface at its own size. The engine's screen is changed while a mission runs: right
-after a frame is presented the game gets a logical screen bigger than the window (`screen_set_logical`:
-the back, z, depth and fade snapshot surfaces of that size, the screen size and `Graphics_SetViewport`,
-also in full screen, where the picture is stretched into the flip chain's back buffer), the fog texture
-made big enough (`fog_buffer_cover`), the bar given up and built again (`status_bar_rebuild`:
-`Player_HideStateBar` releases the bar's list - `lea ecx,[edi+0x14]; call MenuRelease`, whose
-`ObjectList_RemoveAt` deletes every item -, then `Player_ShowStateBar`), and the message lines made again
-(`interface_messages_rescale`: each line's text, `Text+0x70`, a new text object in the scale's font and
-`ACT_SET_TEXT` 0x78, the click strip, the map point kept). The bar is built s = S / z times bigger, so the
-stretch down to the window brings it back to its size S to the pixel; so only the zooms such an s exists
-for are offered (1/2 and 1/3 at the normal size, 2/3 at twice), and only where the map caps the view on
-one axis at most. The camera is put with `SetPosition` so that the map point under the cursor stays under
-it - `SetPosition` moves every object of `World.menu` and the cursor by the camera's change, so the
-rebuilt bar and the messages keep their places. The wheel is the engine's own `Mouse+0x04`
-(`World+0x234`), stored by `Mouse_HandleMessage` and cleared by `Mouse_BeginFrame`; nothing in a mission
-read it before. The bar's side tiles (VID 938, ours) are in no list but `World.menu`, so a bar built again
-deletes the old ones first (`remove_sides`, through each one's `Delete`, whose `Frame_Destruct` takes it
-off the menu). The fade-in effect (`Effect` 5) copies the window's picture by the screen's size; with a
-screen bigger than the window it gets the window's size for the call (in 32-bit colour the copy is a lock
-and a loop that would read past the window's picture).
+**Zoom** (LocoFix `zoom.cpp`, `zoom_view.cpp`, working.md "Zoom with the wheel"): the mouse wheel in play
+draws the map bigger or smaller, the interface at its own size. A zoom z (window pixels per map pixel) is a
+logical screen of the window / z, at most the map on each axis, made between two frames (`screen_set_view`:
+the back, z and depth surfaces of that size, also in full screen, the screen size and `Graphics_SetViewport`;
+the fog texture big enough, `fog_buffer_cover`), and the camera put with `SetPosition` so that the map point
+under the cursor stays under it. The frame is drawn in two passes. The interface is every object of class
+FRAME (10) or TEXT (0x13): `Frame_Construct` (0x40c4d0) puts each on `World.menu`, and a text's constructor
+calls it (`GameWorld_CreateObject` case 0x13) - the bar, the minimap's frame, the money plate, the messages,
+the mouse tip and the scripts' texts (`PrintFile` is `CreateTextFromFile`; l01's
+`PrintTextAtCenterAndBottomFromFile` draws nothing). They are drawn from the same layer lists as the world;
+the world pass is `Graphics_DrawScene` without them (the culling test at 0x41faf2 and the shadow test
+`view_culling.cpp` replaces, and the draw call of layers 0 and 7, 0x41fbe0, which have none, ask
+`zoom_draw_filter`). After Direct3D's `EndScene` the logical picture is stretched into the window-sized back
+buffer - a Blt at the whole zooms 2 and 3, else a Blt into a texture drawn as one linear-filtered quad
+(vertices at -0.5: pixel for pixel at zoom 1, checked) - and the interface's pass draws layers 2-10 again with
+only those objects at the window's size. Its software sprites (layers 2-4, 10) go into a system-memory
+overlay put on with a colour-keyed Blt, their depth buffer is memory of ours (`depthBits` / `depthPitch`: the
+engine locks only when they are 0), and the hardware z-buffer is cleared to the engine's empty value (0x3ff)
+for its Direct3D items; without a depth copy the order stands in for the depth test (the interface's items are
+flat, z 2000-2005: software sprites up to the highest z of the Direct3D ones before them, the rest after -
+the bar's numbers, VID 4 and 8 at z 2005, over the type icons of VID 455 at 2003). Locking the window-sized
+picture for the software sprites instead cost dgVoodoo a GPU sync and copies each time: 16-17 ms a frame at
+1920x1080 against about 3.3 ms this way (the test rig's virtual adapter). `Minimap_Draw` (0x405800) is
+called by `Player_UpdateStateBar` in the update, after the frame's drawing: under a zoom its rectangle is
+kept and it is drawn in the interface's pass, its highlight from the world's view and after the overlay, so it
+brightens the dots as before. `Graphics_DrawEffects` (the fades, the nuke's flash, the snapshot of
+`Effect` 5) runs its timing in the world pass but draws in the interface's, over the whole window, as the
+original covers the bar; the scroll effect moves the camera and runs only in the world pass. The mouse: the
+engine's cursor stays logical (`WM_NCHITTEST` mapped) for world picking, orders and edge scrolling;
+`Menu_Update`, `MouseTip_Update` and `Player_UpdateStateBar` (the minimap's hover and click) get it in the
+window's pixels, and the minimap's right-click order its rectangle in logical pixels (0x431fce: the engine
+takes the map point as (screenX - left) * map / width). The bar is built with the screen and the view set to
+the window's (so it has the window's layout and the interface's scale) and again when a zoom view starts or
+ends; the camera's room below the map is its height / z in map pixels. Script functions 119 `ScreenX` and 120
+`ScreenY` and `MenuLoad` give the window's size under a zoom view, as on a map as big as the window, so the
+scripts' texts and the menus are laid out as at zoom 1; a menu up gets a window-sized screen drawn in one
+pass. Edge and arrow scrolling move the camera in map pixels a frame; `World_UpdateScroll`'s move
+(`SetPosition` at 0x41ccbf) is taken 1 / z times as far, so it is as fast on the screen at every zoom (not
+while the camera follows the flagman). The wheel is the engine's own `Mouse+0x04` (`World+0x234`), stored by
+`Mouse_HandleMessage` and cleared by `Mouse_BeginFrame`; nothing in a mission read it before. At the level's
+own zoom none of this runs: every hook passes the engine's call through.
 
 **Panels** (`Player.panel`, `Player_SetPanel`): 0 the unit bar, 1 the cars of the flagman train, 2 the
 build list of the flagman factory, 5 the queue of that factory, 6 hidden. The ten bar slots

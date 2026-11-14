@@ -129,14 +129,12 @@ The missions play as they always did. What changed:
   `[` and `]`), but its panel showed ten. The 11th and further now show in a second row above the
   first, and a click on them works.
 - **The middle mouse button** drags the map, in the missions too.
-- **Zoom out with the mouse wheel** (a first version). In a mission, turning the wheel towards you
-  shows more of the map, smaller; turning it back returns. The point under the cursor stays where it
-  is, and the bar, the minimap and the messages keep their size. For now only where the interface's
-  pictures allow that exactly - for example the big maps (missions 8, 9, 11, 13-18, 20) at 1920 x 1080
-  with the normal interface (half the size), and with the interface twice as big at 1920 x 1080 and
-  2560 x 1440 (two thirds); where they do not, the wheel does nothing. Not over the interface, in a
-  menu or in the editor. A zoomed-out view takes longer to draw, so the game runs slower while it is
-  on.
+- **Zoom with the mouse wheel.** In a mission, turning the wheel away from you brings the map closer
+  (one and a half, two and three times), turning it towards you shows more of it (two thirds, half, and
+  the whole map where it fits). The point under the cursor stays where it is, and the bar, the minimap,
+  the messages and the cursor keep their size. Not over the interface, in a menu or in the editor. A
+  zoomed-out view takes longer to draw, so the game runs slower while it is on; a zoomed-in one is
+  quicker.
 - **A steady frame rate** (60 by default) instead of the game using a whole processor core.
 - **Your progress carries over.** The profile you had in the original (missions won, scores,
   settings) is taken over the first time you start OpenLocoland.

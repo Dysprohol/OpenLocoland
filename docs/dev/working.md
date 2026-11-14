@@ -440,32 +440,34 @@ at 1600x1200 on a 2560x1440 screen (2026-11-12), where the cursor stopped at 159
 and the bar were reached; full screen opens on the primary monitor even when the window's saved
 place is on another one.
 
-**Zoom out with the wheel** (`zoom.cpp`, engine.md "Zoom out"). In a mission the mouse wheel towards
-the player draws the map smaller: the logical screen becomes the window times 1 / z, capped by the map,
-and is stretched down to the window as a small map's is stretched up; the interface is built s = S / z
-times bigger in it and comes out at its own size S. Only those zooms are offered: at the normal interface
-1/2 and 1/3, at twice 2/3, at three times none; a view the map caps on both axes is left out (its stretch
-would not be the zoom's and the bar would come out in-between), and so is one over the whole view of the
-biggest original map, 3072 x 2304 pixels (`MAX_PIXELS`; in test mode the test key's DWORD `ZoomMaxPixels`
-moves it). So at 1920 x 1080 the normal interface gets 1/2 on the 3072 maps and twice gets 2/3 there; at
-2560 x 1440 only twice gets 2/3 on the 3072 maps; the 2048 maps none at either; mission 1 none. The wheel
-does nothing over the interface, in a menu, while paused, while the scripts hold the camera (an intro)
-and in the editor; a level change goes back to zoom 1; a menu keeps the zoom (it is laid out in the
-middle of the screen of the moment and its 1024 x 768 middle is stretched, as at zoom 1). The cost of a
-frame follows the logical pixels. In the test rig (its virtual adapter, mission 13, no frame limit;
-the host's own numbers are the table below):
+**Zoom with the wheel** (`zoom.cpp`, `zoom_view.cpp`, engine.md "Zoom"). In a mission the mouse wheel away
+from the player draws the map bigger, towards the player smaller, one step a notch, with a short glide (150 ms)
+between steps; the map point under the cursor stays under it (at the map's edges the camera's limits win). The
+steps: 3, 2 and 1.5 times; the level's own (1, or mission 1's stretch of its 1024x768 screen); 2/3 and 1/2
+where the view stays within the map on at least one axis; and the whole map (its longer side, against the
+window, fills the window: black at the sides or above and below) when that shows more. A view over
+`MAX_PIXELS` map pixels - the whole of the biggest original map, 3072 x 2304 - is not offered (in test mode
+the test key's DWORD `ZoomMaxPixels` moves it, `ZoomGlide` sets the glide's ms, 0 none, and `ZoomFilter`
+the stretch: 0 nearest, 1 filtered, 2 by the zoom). The interface is drawn apart from the world, at the
+window's own pixels, so the bar, the minimap, the messages, the money plate, the tooltip and the cursor keep
+their size at every step and at every interface size; the world is stretched nearest-pixel at 2 and 3
+(exact big pixels) and filtered elsewhere. Border and arrow scrolling are as fast on the screen at every
+zoom. The wheel does nothing over the interface, in a menu, while paused, while the scripts hold the camera
+(an intro) and in the editor; a menu keeps the zoom and looks as at zoom 1; a level change goes back to the
+level's own zoom. At the level's own zoom nothing of it runs: the frame is the game's as before (checked
+against the build before it at 1920x1080: the bar's dumps the same, the interface's pixels the same, the
+frame rate not lower). The cost of a frame follows the logical pixels, plus the interface's pass (about
+3.5 ms at 1920x1080, 6.5 at 2560x1440). In the test rig (its virtual adapter, mission 13, frame limit 60,
+other games beside it - the host's own numbers are the table below):
 
-| window | view | fps |
+| window | zoom (view) | fps |
 |---|---|---|
-| 1920x1080 window | 1920x1080 / 2880x1620 / 3072x2160 | 44.7 / 18.5 / 12.1 |
-| 1920x1080 full screen | the same | 30.6 / 16.1 / 11.3 |
-| 2560x1440 window | 2560x1440 / 3072x2160 / 3072x2304 | 19.1 / 8.9 / 8.9 |
+| 1920x1080 window | 1 (1920x1080) / 1.5 / 2 / 2/3 (2880x1620) / 1/2 (3072x2160) / whole map (3072x2304) | 30 / 45 / 57 / 18 / 14 / 13 |
+| 2560x1440 window, interface 3x | 1.5 / 2 / 2/3 (3072x2160) / whole map (3072x2304) | 34 / 46 / 13.4 / 12.8 |
 
-A switch takes 6-9 ms and the process used at most 657 MB of its 2 GB of addresses. LocoFix.log gets
-each step's view, the switch's time and memory, and the average frame time of its first 3 s. The
-composition is the first way of making the view; drawing the interface apart from the world will give
-in-between zooms, whole-map views and zooming in - `zoom.cpp` keeps the zoom's state and input apart from
-`view_offers` / `view_size` / `view_apply`, which make the view.
+A step takes 0.3-9 ms (new surfaces only when the view grows) and the process used at most 685 MB of its
+2 GB of addresses. LocoFix.log gets each step's view, the switch's time and memory, and the average frame
+time of its first 3 s.
 
 **Frame rate at high resolutions.** The game draws on one thread, and the cost of a frame grows
 with the screen: the engine draws the ground with Direct3D, then locks the back buffer and the

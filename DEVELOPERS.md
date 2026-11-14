@@ -75,7 +75,7 @@ Paragraphs: Container; objects.res; Editing objects.res; Map; Demo; Editing maps
 
 Sections: "Rendering"; "Script machine"; "Support library"; "Pictures and animations"; "Trains and rails"; "Player and the state bar".
 
-Paragraphs: Lost surfaces; The fog buffer; The rain; Loading; Language; Values and variables; Calls from the engine; Bytecode; String; The error log; CRC32; `File`; The ini file and the registry; `Picture`; `PictureImpl`; Three ways to animate; Screenshots; The VID converter; Compressed frames; The coder; The model; The rail network; A train; Commands; Driving; How the cars follow; Repair car and arsenal; Factories; The balloon; One Player per army; The flagman; The state bar; The minimap; The interface's size; Zoom out; Panels; The factory panels; Messages.
+Paragraphs: Lost surfaces; The fog buffer; The rain; Loading; Language; Values and variables; Calls from the engine; Bytecode; String; The error log; CRC32; `File`; The ini file and the registry; `Picture`; `PictureImpl`; Three ways to animate; Screenshots; The VID converter; Compressed frames; The coder; The model; The rail network; A train; Commands; Driving; How the cars follow; Repair car and arsenal; Factories; The balloon; One Player per army; The flagman; The state bar; The minimap; The interface's size; Zoom; Panels; The factory panels; Messages.
 
 ### [editor.md](docs/dev/editor.md) (~24 KB)
 
@@ -115,7 +115,7 @@ Sections: "Changes from the original".
 
 Sections: "Working with the code"; "Resolutions and widescreen"; "Status and known bugs".
 
-Paragraphs: The test rig; Zoom out with the wheel; Frame rate at high resolutions; CI.
+Paragraphs: The test rig; Zoom with the wheel; Frame rate at high resolutions; CI.
 
 ### [release.md](docs/dev/release.md) (~41 KB)
 

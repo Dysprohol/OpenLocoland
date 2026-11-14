@@ -583,14 +583,15 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       device, pictures, lamp and buttons, fonts 3 and 7) enlarged by the build as the bar's are (VIDs
       1123-1135, 1173-1185); the cursor at the editor's size while the level is held, Run the level at the
       game's,
-  51. zoom out with the mouse wheel in play (`zoom.cpp`, engine.md "Zoom out", working.md "Zoom out with
-      the wheel"): the wheel towards the player draws the map on a logical screen bigger than the window,
-      stretched down to it, with the bar, the minimap and the message lines built that many times bigger
-      so they keep their size; the map point under the cursor stays under it. Only the exact steps the
-      interface's pictures give (normal 1/2 and 1/3, twice 2/3) where the map caps the view on one axis
-      at most, up to the whole view of a 3072 x 2304 map; nothing over the interface, in a menu, while
-      paused, during an intro or in the editor; a level change goes back to zoom 1. The engine stored the
-      wheel and nothing in a mission read it,
+  52. zoom with the mouse wheel in play (`zoom.cpp`, `zoom_view.cpp`, engine.md "Zoom", working.md "Zoom
+      with the wheel"): away from the player in (1.5, 2, 3 times), towards the player out (2/3, 1/2, the
+      whole map), with a short glide between steps and the map point under the cursor kept; the world is drawn
+      at the zoom and stretched to the window, the interface after it at the window's own pixels, so it keeps
+      its size at every zoom and interface size; up to the whole view of a 3072 x 2304 map; border and arrow
+      scrolling as fast on the screen at every zoom; nothing over the interface, in a menu, while paused,
+      during an intro or in the editor; a menu keeps the zoom and looks as at zoom 1; a level change goes back
+      to the level's own zoom, at which nothing of it runs. The engine stored the wheel and nothing in a
+      mission read it,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
