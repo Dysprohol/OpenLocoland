@@ -294,7 +294,8 @@ short line that only crosses the building is the post's, and a line a post owns 
 as the missions place them (7): for each place its line gives a light, the post nearest to it within 90 px of
 that colour, facing the same trains, beside that line's track and with no line of its own - at most one a
 place; any other post (another colour, the other way, a second one at the same end) is not the building's -
-on a map loaded from a file too, the missions' lines being the script's.
+on a map loaded from a file too. A line of the map's script (a mission opened as it is) is never a building's:
+it stays, with its posts, when the building is moved or deleted, and the building gets its own.
 
 ## 6a. Trains on the map
 

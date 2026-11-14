@@ -430,8 +430,14 @@ step of the place's), beside that line's track (its rail point, `post_dot`, on t
 the track past its ends, `line_reach`), within 90 px of the place (192 of the missions' 196 posts are within
 90 px of a line's end) and with no line of its own - is that line's; each place has at most one post, the
 nearest (ties: the line that is no building's, then the coordinates - never the order of the objects, which a
-save and load changes). A post is a building's when its place is one of that building's lines': the editor's
-lines through it and, on a map without editor blocks, the script's (`building_traces`). A post that stands as
+save and load changes). A post is a building's when its place is one of that building's line's: its editor
+line (`building_traces`). A line of the script - a mission opened as it is, a map without editor blocks - is
+never a building's: the editor cannot move or delete it, so when its building is moved or deleted the line
+stays where it is with its posts, which still show the trains it is there (it acts in play whatever stands
+beside it, MAP_RULES 7), and the building gets a line and posts of its own; save the mission under a new
+name first (its lines become the editor's) and they move with it. For two days (2026-11-12/13) such a line
+was the building's: its posts went with the building and the line was left bare - a one-way section nobody
+sees - and after a short move the building had two lines' places (the second review). A post that stands as
 no light a line needs - another colour, the other way, a second post at the same end, one the player placed
 or moved elsewhere - is no building's and no move, turn or deletion of a building takes it, nor does a new
 place reuse it (`give_building_line` reuses a post within 30 px only when it already stands as that light and
@@ -464,8 +470,7 @@ repair point were not); before them any line through the middle was the building
 v0.2.11 and posts moved and saved are known as they are, and a map is not changed by being opened. A post
 moved farther than 90 px from its place (or onto another track) and saved stays where the player put it after
 a load; a double saved in a map (The Factory's second red post on one spur) stays too - only one post is the
-light of a place. On a map without editor blocks the script's own line stays where it was when its building
-moves (the editor cannot change that script; saved under a new name it becomes an editor line). Checked in the game: a mission made on the template with the main line, a spur
+light of a place. Checked in the game: a mission made on the template with the main line, a spur
 with a factory at its dead end (line and red post made), a repair point on the main line (line,
 green and red posts), a crate on the line and the reinforcement point; played with a test script in
 the game folder's copy: the reinforcement, damaged to 60 hp, was pushed through the repair point and

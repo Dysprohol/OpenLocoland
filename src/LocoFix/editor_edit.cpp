@@ -7362,12 +7362,10 @@ std::vector<int> lines_of(uint8_t* o) {
 // step of the place's), beside that line's track (its rail point on the line or within 90 px along the
 // track past its ends), within 90 px of the place (192 of the missions' 196 posts are within 90 px of a
 // line's end) and with no line of its own - is that line's. Each place has at most one post, the
-// nearest; the places of every line take part, the editor's and the script's (on a map without
-// editor blocks the missions' lines are the script's, of the authors' lengths, so their posts stand
-// 60-70 px from where the editor's rule would put them), and a post is a building's when the place it
-// stands at is a place of that building's line. So a post the player moved along its line toward the
-// building and saved, and every post of a mission, is known after a load without anything stored with
-// the map, while a post that does not stand as a light the line needs - another colour, the other way,
+// nearest; the places of every line take part, the editor's and the script's, and a post is a
+// building's when the place it stands at is a place of that building's line (its editor line,
+// building_traces - a line of the script is never a building's). So a post the player moved along its
+// line toward the building and saved is known after a load without anything stored with the map, while a post that does not stand as a light the line needs - another colour, the other way,
 // a second post at the same end, one placed or moved by the player elsewhere - is no building's and
 // is never taken. Ties go by distance, then to the line that is no building's, then by the places'
 // and posts' coordinates - never by the order of the objects, which a save and load can change.
@@ -7387,16 +7385,16 @@ uint8_t* post_dot(uint8_t* o);   // posts, below
 int own_line(uint8_t* o);
 bool owns(uint8_t* o, const PushLine& l);
 
-// The ways of a building's lines: the editor's (lines_of) and, while the map's script has no editor
-// blocks, the script's that are its line (building_way).
+// The way of a building's line: the editor's (lines_of). A line of the script - a map without editor
+// blocks, as the missions are when opened as they are - is never a building's: the editor cannot move or
+// delete it, so it stays where it is with its posts, which still tell the trains it is there (the line
+// acts in play whatever stands beside it, MAP_RULES 7), and the building gets a line and posts of its
+// own. Until 2026-11-14 such a line was the building's, so the building's move or deletion took its
+// posts and left the line bare - a one-way section nobody sees -, and after a short move the building had
+// two lines' places (the second review). Saved under a new name a mission's lines become the editor's.
 std::vector<Trace> building_traces(uint8_t* o) {
     std::vector<Trace> out;
     for (int i : lines_of(o)) out.push_back(trace(mission_push_lines()[i]));
-    if (mission_managed() || (nvid_of(o) != VID_DEPOT && nvid_of(o) != VID_WORKSHOP)) return out;
-    for (const PushLine& l : mission_script_push_lines()) {
-        const Trace t = trace(l);
-        if (building_way(o, t.path)) out.push_back(t);
-    }
     return out;
 }
 
@@ -7470,13 +7468,9 @@ PostOwners post_owners() {
     };
     std::vector<Line> lines;
     std::set<int> theirs;
-    std::vector<std::vector<uint8_t*>> script_theirs;
     for (uint8_t* b : buildings) {
         for (int i : lines_of(b)) theirs.insert(i);
-        for (const Trace& t : building_traces(b)) {
-            lines.push_back({b, line_posts(t), line_reach(t)});
-            script_theirs.push_back(t.path);
-        }
+        for (const Trace& t : building_traces(b)) lines.push_back({b, line_posts(t), line_reach(t)});
     }
     // the other lines; a line a post owns (its own, a pair's) has its lights already - those posts - and
     // no places for others: a post's line has a green place at its begin by the rule, which could
@@ -7499,8 +7493,7 @@ PostOwners post_owners() {
         }
     for (const PushLine& l : mission_script_push_lines()) {
         const Trace t = trace(l);
-        if (std::find(script_theirs.begin(), script_theirs.end(), t.path) == script_theirs.end() && !owned(l, t))
-            lines.push_back({nullptr, line_posts(t), line_reach(t)});
+        if (!owned(l, t)) lines.push_back({nullptr, line_posts(t), line_reach(t)});   // the script's: never a building's
     }
     for (uint8_t* p : owners_of_lines) out.line.insert(p);   // another line's lights: never a building's
     struct Place {
