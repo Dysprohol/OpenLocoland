@@ -572,6 +572,16 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       it 1000 px left, which leaves it on a screen wider than about 1960 px (a white frame at x 280 on a 2560
       one) when the bar was just built; after every `Player_SetPanel` a marker under no slot goes far off
       the screen,
+  51. the editor's interface size (`editor_edit.cpp`, `editor_panel.cpp`, `interface_scale.cpp`, editor-ui.md
+      "The interface's size in the editor"): the editor's bar and its strip, the rows above it, the status
+      lines, the music player, the hints and tips, an object's panel, the Help and Menu buttons and every panel
+      twice or three times as big, the map and its marks drawn as before; a row of its own on the game's
+      settings page (**EDITOR INTERFACE** under **INTERFACE SIZE**, arrows VIDs 956/957,
+      `EditorInterfaceScale` "1"-"3" of the Players key; absent = normal), offering what the window takes by
+      the play interface's rule; the editor's own pictures (icons, buttons, the palette's icons, the panels'
+      device, pictures, lamp and buttons, fonts 3 and 7) enlarged by the build as the bar's are (VIDs
+      1123-1135, 1173-1185); the cursor at the editor's size while the level is held, Run the level at the
+      game's,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that

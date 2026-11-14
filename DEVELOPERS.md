@@ -101,11 +101,11 @@ Sections: "Editor mode" (continued).
 
 Paragraphs: Ground, gravel bed, decals; The relief and the heights of objects; A new map; How big a map can be; The map's frame; The armies' colours; On the track; The object's panel, the guns' sockets, the palette; Wholes, fly nests and mines; Flags; The rows of the ground's tools; The gravel bed in the Paint tool; Wrecks on the track; Trains, the vehicles' palette, patrols; On the train's own track; Rail kinds and ramps; The ground's picture, water, regions; Paint the ground; Regions, reviewed; Regions' handles, effects' marks; A fog that rises or pulses; Sheets of water and lava.
 
-### [editor-ui.md](docs/dev/editor-ui.md) (~16 KB)
+### [editor-ui.md](docs/dev/editor-ui.md) (~26 KB)
 
 Sections: "Editor mode" (continued).
 
-Paragraphs: Map exchange; The texts of the editor; The Help and Menu buttons; Ctrl+R; No window menu; Full screen, 1920 x 1080; The frame and the profiler.
+Paragraphs: Map exchange; The texts of the editor; The Help and Menu buttons; Ctrl+R; No window menu; Full screen, 1920 x 1080; The interface's size in the editor; The frame and the profiler.
 
 ### [changes.md](docs/dev/changes.md) (~43 KB)
 

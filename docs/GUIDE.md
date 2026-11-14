@@ -224,6 +224,12 @@ What you see:
 
   ![The editor's menu](img/editor-menu-en.jpg)
 
+**A bigger editor:** **EDITOR INTERFACE** in the game's settings (under **INTERFACE SIZE**) makes the
+editor's bar, its rows, the status line, the hints, the ? and menu buttons and every panel twice or three
+times as big, apart from the game's own interface; the map stays as sharp as before. It is offered as the
+game's is (twice from 1920 x 1080, three times from 2560 x 1440) and shows the next time the editor is
+drawn. **QUICK TEST, NO SAVE** shows the game's bar at the game's size.
+
 **Moving around:** the screen edge, the arrow keys, or drag with the middle mouse button.
 
 **The basic editing** (the Select tool, key 1):

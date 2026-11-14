@@ -165,6 +165,52 @@ closed with no map made); the
 palette's list of categories starts right under its title and ends close to the bottom strip; the
 grid's points of the placing helps are faint on bright ground. 2560 x 1440 is not checked.
 
+**The interface's size in the editor** (`editor_edit.cpp` "the editor's interface size", `interface_scale.cpp`
+`interface_editor_scale`). The editor's own interface - the bar and its strip, the rows above it, the status
+lines, the music player, the hints under the cursor and the strip's and rows' tips, an object's panel, the
+Help and Menu buttons and every panel (Help, Menu, the palettes, Arrivals, a factory's), the SAVED notice -
+can be drawn twice or three times as big, with a size of its own: **EDITOR INTERFACE** on the game's
+settings page under **INTERFACE SIZE** (`EditorInterfaceScale` "1"-"3" in the Players key, absent =
+normal; arrows VIDs 956/957, script function 208 `EditorInterfaceSizeMax()`). It is used as far as the
+editor's screen takes it, by the play interface's rule (twice from 960 px of height and 1328 of width,
+three times from 1440 and 1992; a small map's stretched logical screen divides it by the stretch), and
+only when the bigger copies of the editor's own pictures are there too; it is read at most 4 times a
+second, so a change shows when the editor is drawn next. How: the interface is laid out in a screen of
+the view's size divided by the scale (`ui_view`) by the same numbers as at the normal size, and its
+drawing multiplies every place by the scale (`draw_screen`, `draw_text` through it, `ui_fill` /
+`edit_fill`, all while a `UiDrawing` scope is open) and draws the bigger copy of each picture
+(`interface_vid`): the play interface's enlarged pictures and fonts (the bar 450, its side tiles 938, the
+icon atlas 455, the slot frame 456, the strip 497, fonts 2, 6 and 8) and the editor's own, enlarged by
+the same build step (`INTERFACE_VIDS`: the editor's icons 939, the buttons 942/943, the palette's icons
+944, the panels' device 466 - its bigger copies only the middle 584 x 532 of its 1024 x 768, where all of
+it is drawn -, the pictures 484/486, the lamp 472, the buttons 475-477, the titles' font 3 and the lit
+font 7). A text advances by its original font's box, so its bigger letters land exactly s times as far
+apart. The mouse is divided by the scale for the interface's hit tests (`ui_mouse`), so the hit boxes,
+the click-and-hold strips and the tips move with what is drawn; the panels get the interface's screen
+from `edit_view_box` and the mouse already divided. What is drawn on the map stays one map pixel to a
+screen pixel: the marks, the mines' and sockets' labels, the regions, the push lines, the tools'
+previews. A picture with no bigger copy is drawn at its own size in its place: the Track tool's kinds
+of rail (the rails' own pictures) and a decal's picture where the palette has no icon. A panel stands
+on the menu device, whose visible part is 579 x 479 round its middle, so it fits at both sizes (the
+interface's screen is 960 x 540 at twice on 1920 x 1080, 853 x 480 at three times on 2560 x 1440); where
+the screen is too short for it centred (three times on 2560 x 1440) the device moves up into it
+(`device()` in `editor_panel.cpp`; never at the normal size), and the first status line - it says what the
+panel's row under the mouse does - is drawn again in front of it. The cursor follows the editor's size while
+the level is held (`interface_cursor_scale` every held frame); Run the level shows the game's own bar at
+the game's **INTERFACE SIZE**, the cursor with it, and back in the editor the next frame puts the
+editor's again. At the normal size every number and every picture is what it was. The settings page's
+preview shows the play bar only (no picture of the editor's bar). The test mode's factory panel rows
+(`H`) are logged in the interface's screen (so `tools\rig\panel_rows_check.py` reads them at any size),
+and `G` / `T` click their middle times the scale, in the window's pixels (`logical_to_window`: a map narrower
+than the window has its logical screen centred in it). Checked in the rig (2026-11-14, a copy of The Factory with
+the factory panel's test settings): at the normal size the editor's bar, strip, rows and every panel
+pixel-identical to the build before at 1024 x 768, 1920 x 1080 and 2560 x 1440 in the same 34 steps (only the
+map's animations differ); at twice (1920 x 1080, 2560 x 1440) and three times (2560 x 1440) every bar entry, the
+palettes (a pick), the Arrivals panel, Help (contents and a page), the Menu panel, the Track and Paint rows, a
+hint, an object's panel by the right button, a drag and its undo, a click-and-hold strip, Run the level and back,
+Save and Load; the factory panel's 30 pages in Polish, German and Hungarian at both sizes with no fault of
+`panel_rows_check.py`; the settings page's row (its arrows, its tip, back in the editor at the size chosen).
+
 **The frame and the profiler** (`src/LocoFix/profile.cpp`, `profile.h`). `LOCOFIX_PROFILE=1` in the
 environment (`$env:LOCOFIX_PROFILE = "1"` before `test_game.ps1`) or the DWORD `EditorProfile` = 1 next
 to `FrameLimit` turns on a per-frame profiler for the run, in the editor and in play; off it costs one

@@ -641,6 +641,10 @@ the game will lay it out there: the bar at the interface's size across the windo
 `patch_data.make_bar_preview`: the bar's own pictures laid out as `Player_ShowStateBar` lays them out on a
 screen 3840 px wide, the middle of it enlarged pixel by pixel - it matches a 1x screenshot of the game's
 bar within the 16-bit colours' rounding) and the minimap's frame at its size on it in the corner.
+The editor's own interface has a size of its own (`EditorInterfaceScale`, the page's **EDITOR INTERFACE**
+row, script function 208) with the same rule for what fits, drawn by our code, not the engine's; the same
+table of bigger VIDs holds its pictures too (1123-1135, 1173-1185) - editor-ui.md "The interface's size in
+the editor".
 
 **Panels** (`Player.panel`, `Player_SetPanel`): 0 the unit bar, 1 the cars of the flagman train, 2 the
 build list of the flagman factory, 5 the queue of that factory, 6 hidden. The ten bar slots

@@ -224,6 +224,12 @@ Co widać:
 
   ![Menu edytora](img/editor-menu-pl.jpg)
 
+**Większy edytor:** **INTERFEJS EDYTORA** w ustawieniach gry (pod **WIELKOSC INTERFEJSU**) powiększa
+dwa albo trzy razy pasek edytora, jego wiersze, wiersz stanu, podpowiedzi, przyciski ? i menu oraz każdy
+panel, niezależnie od interfejsu samej gry; mapa zostaje tak ostra jak wcześniej. Wybór jest taki jak dla
+gry (dwa razy od 1920 x 1080, trzy razy od 2560 x 1440) i działa przy następnym rysowaniu edytora.
+**TEST BEZ ZAPISU** pokazuje pasek gry w wielkości gry.
+
 **Poruszanie się:** krawędź ekranu, klawisze strzałek albo przeciąganie środkowym przyciskiem myszy.
 
 **Podstawy edycji** (narzędzie Zaznacz, klawisz 1):
