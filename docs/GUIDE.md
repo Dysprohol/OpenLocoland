@@ -108,8 +108,10 @@ The missions play as they always did. What changed:
 - **The state bar across the whole screen.** On a wide screen the bar at the bottom runs from edge
   to edge instead of stopping in the middle.
 - **A bigger interface.** In the game's settings (Options in the main menu, and in a mission's Esc
-  menu), **INTERFACE SIZE** makes the bar at the bottom, its numbers and texts, the money and the
-  minimap twice or three times as big; the map itself stays as sharp as before. Only the sizes your
+  menu), **INTERFACE SIZE** makes the bar at the bottom, its numbers and texts, the money, the
+  minimap, the messages, the mouse tips and the cursor twice or three times as big; the map itself
+  stays as sharp as before. While the page is open, the bottom of the screen shows the bar and the
+  minimap as big and where they will stand. Only the sizes your
   screen has room for are offered: twice from a screen 1080 pixels high, three times from 1440. It
   changes when you go back to the game or start a mission. Mission 1 is a small map that is already
   shown enlarged to fill the screen, so its bar stays as it is there.

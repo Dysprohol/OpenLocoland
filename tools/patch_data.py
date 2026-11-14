@@ -511,6 +511,121 @@ def enlarge_font(source, output, k):
     big.save(output, "BMP")
 
 
+# The settings page's preview of the interface's size (LocoFix menu_version.cpp): the bottom of a screen 3840 px
+# wide as the state bar stands there at the normal size - the side tiles out to the edges, the base in the middle,
+# the two round buttons, ten empty slots with their empty lines - laid out as Player_ShowStateBar and status_bar.cpp
+# lay them out, from the same pictures. The page shows the middle of it, as wide as the window, enlarged pixel by
+# pixel to the scale the game would use (the bigger VIDs are the same pictures enlarged the same way) and the
+# minimap's frame (make_minimap_previews) on top in the corner. 24-bit BMP, magenta where nothing is (the key).
+BAR_PREVIEW_WIDTH = 3840
+
+
+def make_bar_preview(vid_folder, output):
+    """Writes `output` (vid\\barpreview.bmp) from the pictures of `vid_folder` (the assembled game's vid folder,
+    which has 450side.vid). Returns False (and writes nothing) when a picture is missing or not the expected one."""
+    import csv
+    import json
+    import shutil
+    import tempfile
+    from PIL import Image
+    import map_tool
+
+    work = tempfile.mkdtemp(prefix="barpreview_")
+    try:
+        def unpack(name):
+            folder = os.path.join(work, name)
+            map_tool.unpack(os.path.join(vid_folder, name + ".vid"), folder)
+            return folder, json.load(open(os.path.join(folder, "vid.json"), encoding="utf-8"))
+
+        def sprite_frame(name, index):
+            folder, meta = unpack(name)
+            sheet = Image.open(os.path.join(folder, "frames.png"))
+            sheet.load()
+            if sheet.mode == "P":
+                key = meta.get("transparentIndex")
+                sheet = sheet.convert("RGBA") if key is None else _palette_rgba(sheet, key)
+            else:
+                sheet = sheet.convert("RGBA")
+            c = meta["sheet"]
+            index = index if index >= 0 else meta["frameCount"] + index
+            x, y = (index % c["columns"]) * c["cellWidth"], (index // c["columns"]) * c["cellHeight"]
+            return sheet.crop((x, y, x + c["cellWidth"], y + c["cellHeight"]))
+
+        def texture_frame(name, index):
+            folder, meta = unpack(name)
+            with open(os.path.join(folder, "tiles.tsv"), encoding="utf-8") as f:
+                t = list(csv.DictReader(f, delimiter="	"))[index]
+            tex = Image.open(os.path.join(folder, "texture_%03d.png" % int(t["texture"]))).convert("RGBA")
+            ox, oy, w, h = (int(t[k]) for k in ("offsetX", "offsetY", "width", "height"))
+            frame = Image.new("RGBA", (meta["width"], meta["height"]))
+            frame.paste(tex.crop((ox, oy, ox + w, oy + h)), (int(t["x"]), int(t["y"])))
+            return frame
+
+        try:
+            base = sprite_frame("450sbar", 0)
+            sides = [sprite_frame("450side", i) for i in range(4)]
+            icon, b498, b499 = texture_frame("455icon", 0), texture_frame("498", 0), texture_frame("499", 0)
+            lines = {n: sprite_frame(n, -1) for n in ("463", "457", "458")}
+        except Exception:
+            return False
+        if base.size != (1024, 50) or any(t.size != (106, 50) for t in sides):
+            return False
+        width, height = BAR_PREVIEW_WIDTH, 50
+        strip = Image.new("RGBA", (width, height))
+
+        def put(picture, cx, cy):   # centred on (cx, cy), as the engine draws a FRAME's picture
+            _paste_clipped(strip, picture, cx - picture.width // 2, cy - picture.height // 2)
+
+        cx = width // 2
+        left = cx - 512
+        first = True
+        while left > 0:   # status_bar.cpp add_sides
+            put(sides[1] if first else sides[0], left - 53, 25)
+            left -= 106
+            first = False
+        right, first = cx + 512, True
+        while right < width:
+            put(sides[2] if first else sides[3], right + 53, 25)
+            right += 106
+            first = False
+        put(base, cx, 25)
+        x0, y0 = cx - 225, 50 - 25 - 2   # Player_ShowStateBar's fVar2, fVar3 (screen 3840 wide, the strip's rows)
+        put(b498, x0 - 49, y0 + 8)
+        put(b499, x0 - 11, y0 + 3)
+        for i in range(1, 11):
+            x = x0 + 41 * i
+            put(lines["463"], x + 3, y0 + 22)
+            put(lines["457"], x + 3, y0 + 21)
+            put(lines["458"], x + 3, y0 + 24)
+            put(icon, x, y0)
+        flat = Image.new("RGB", strip.size, PREVIEW_KEY)
+        body = strip.convert("RGB")
+        px = body.load()
+        for y in range(body.height):
+            for x in range(body.width):
+                if px[x, y] == PREVIEW_KEY:
+                    px[x, y] = (247, 0, 247)
+        flat.paste(body, (0, 0), strip.split()[3].point(lambda a: 255 if a >= 128 else 0))
+        flat.save(output, "BMP")
+        return True
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def _palette_rgba(image, key):
+    """A palette image as RGBA, the palette index `key` transparent."""
+    rgba = image.convert("RGBA")
+    alpha = image.point(lambda i: 0 if i == key else 255, "L")
+    rgba.putalpha(alpha)
+    return rgba
+
+
+def _paste_clipped(target, picture, x, y):
+    box = (max(0, -x), max(0, -y), min(picture.width, target.width - x), min(picture.height, target.height - y))
+    if box[0] < box[2] and box[1] < box[3]:
+        target.alpha_composite(picture.crop(box), (x + box[0], y + box[1]))
+
+
 def make_interface_pictures(game_folder, pictures, outputs):
     """Makes each enlarged picture of add_interface_rows: pictures[i] = (original, enlarged name, k) into
     outputs[i], from `game_folder` (the assembled game; a font of a language pack is made for every

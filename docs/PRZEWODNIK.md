@@ -109,8 +109,9 @@ Misje grają się tak jak zawsze. Co się zmieniło:
 - **Pasek stanu na całą szerokość.** Na szerokim ekranie pasek na dole biegnie od krawędzi do
   krawędzi zamiast kończyć się na środku.
 - **Większy interfejs.** W ustawieniach gry (Ustawienia w menu głównym i w menu pod Esc w misji)
-  **WIELKOSC INTERFEJSU** powiększa dwa albo trzy razy pasek na dole, jego numery i napisy, pieniądze
-  i minimapę; sama mapa zostaje tak samo ostra. Do wyboru są tylko wielkości, na które ekran ma
+  **WIELKOSC INTERFEJSU** powiększa dwa albo trzy razy pasek na dole, jego numery i napisy, pieniądze,
+  minimapę, komunikaty, podpowiedzi pod myszą i kursor; sama mapa zostaje tak samo ostra. Póki ta
+  strona jest otwarta, na dole ekranu widać pasek i minimapę tak duże i tam, gdzie staną w misji. Do wyboru są tylko wielkości, na które ekran ma
   miejsce: dwa razy od ekranu wysokiego na 1080 pikseli, trzy razy od 1440. Zmienia się, gdy wracasz
   do gry albo zaczynasz misję. Misja 1 to mała mapa, którą gra i tak powiększa na cały ekran, więc
   jej pasek zostaje, jaki był.

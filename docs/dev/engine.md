@@ -627,7 +627,11 @@ system's size) are loaded with `LoadImage` s times the system's cursor size - Wi
 picture and its hot spot together (the arrow's 6,5 of 32 x 32 is 18,15 of 96 x 96) - and loaded again
 when the bar is built at another scale. Messages are one line each, with no wrapping: the longest
 objective is 48 letters (German), the longest event message 44 - 1728 px at three times, inside
-2560.
+2560. While the settings page is open its preview (`menu_version.cpp`) shows the bottom of the window as
+the game will lay it out there: the bar at the interface's size across the window (`vidarpreview.bmp`,
+`patch_data.make_bar_preview`: the bar's own pictures laid out as `Player_ShowStateBar` lays them out on a
+screen 3840 px wide, the middle of it enlarged pixel by pixel - it matches a 1x screenshot of the game's
+bar within the 16-bit colours' rounding) and the minimap's frame at its size on it in the corner.
 
 **Panels** (`Player.panel`, `Player_SetPanel`): 0 the unit bar, 1 the cars of the flagman train, 2 the
 build list of the flagman factory, 5 the queue of that factory, 6 hidden. The ten bar slots

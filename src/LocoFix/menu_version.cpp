@@ -21,20 +21,19 @@
 // VID 471, menutact.lgc), the end-of-mission screen and the editor have no 467.
 //
 // While the settings page is open - the main menu's or the Esc menu's, while the arrows of its
-// minimap row (VID 952, game/maps/script/optfields.lgc) exist - the corner shows the minimap's frame
-// instead, as the state bar will put it there: the size the game would use on this window
-// (minimap.cpp: the player's choice as far as it fits), in the bottom right corner, in real pixels,
+// minimap row (VID 952, game/maps/script/optfields.lgc) exist - the bottom of the window shows the
+// interface as the game will put it there, in real pixels, as one picture: the state bar across the
+// window at the interface's size the game would use on this window (interface_scale.cpp; from
+// vid\barpreview.bmp, patch_data.make_bar_preview: the bar's own pictures laid out as the game lays them
+// out, made bigger pixel by pixel as the bigger VIDs are), and on it, in the bottom right corner, the
+// minimap's frame at the size the game would use (minimap.cpp: the player's choice as far as it fits),
 // from vid\464preview1-3.bmp (patch_data.make_minimap_previews, the same frame as VIDs 464/950/951);
-// for one bigger than the interface (interface_scale.cpp) a line above it says that a strip shows under the map (the pack's strings.ini
-// [strings] MenuOptionsMinimapStrip, in the pack's own font). It follows a click on the row at once
-// and goes with the page. The version gives way meanwhile: the corner is the preview's. (A mission on a
-// small map - mission 1, whose logical screen is stretched - has its minimap in the stretched
-// picture's corner; the preview shows the big maps' place.) In the Esc menu the engine has the bar
-// hidden and given up while the menu is open, so the real bar cannot show the change behind it; it
-// is built with the new size when the menu closes.
-//
-// A later field (the interface's scale) can show its picture the same way: a Picture loaded from a
-// BMP made by build.py, an Overlay for it, and a line in draw_menu_version.
+// for a minimap bigger than the interface a line above it says that a strip shows under the map (the
+// pack's strings.ini [strings] MenuOptionsMinimapStrip, in the pack's own font). It follows a click on
+// either row at once and goes with the page. The version gives way meanwhile. (A mission on a small map
+// - mission 1, whose logical screen is stretched - has the normal size, stretched; the preview shows a
+// big map's.) In the Esc menu the engine has the bar hidden and given up while the menu is open, so the
+// real bar cannot show the change behind it; it is built with the new size when the menu closes.
 #include "patch.h"
 #include <ddraw.h>
 #include <vector>
@@ -238,12 +237,18 @@ struct Overlay {
 
     // Puts the picture with its top left at (x, y).
     void draw(IDirectDrawSurface7* target, int x, int y, int wanted) {
+        draw_part(target, x, y, wanted, 0, picture.w * wanted);
+    }
+
+    // Puts `width` px of the picture (`wanted` times bigger) from its column `from` with their top left at (x, y).
+    void draw_part(IDirectDrawSurface7* target, int x, int y, int wanted, int from, int width) {
         IDirectDrawSurface7* s = ready(target, wanted);
         if (!s) return;
-        RECT to = {x, y, x + picture.w * wanted, y + picture.h * wanted};
+        RECT to = {x, y, x + width, y + picture.h * wanted};
+        RECT part = {from, 0, from + width, picture.h * wanted};
         const HRESULT hr = s->IsLost() == DDERR_SURFACELOST
                                ? DDERR_SURFACELOST
-                               : target->Blt(&to, s, nullptr, DDBLT_WAIT | DDBLT_KEYSRC, nullptr);
+                               : target->Blt(&to, s, &part, DDBLT_WAIT | DDBLT_KEYSRC, nullptr);
         if (SUCCEEDED(hr)) {
             failures = 0;
         } else if (hr == DDERR_SURFACELOST) {   // a lost surface (Alt+Tab in full screen): filled again
@@ -257,6 +262,7 @@ struct Overlay {
 
 Overlay g_version;
 Overlay g_preview[3];   // the minimap's frame at sizes 1-3
+Overlay g_bar[3];       // the bottom of the screen with the state bar, for the interface's sizes 1-3
 Overlay g_strip;        // "a strip shows under the map"
 
 void load_once() {
@@ -269,6 +275,19 @@ void load_once() {
         char name[64];
         wsprintfA(name, "vid\\464preview%d.bmp", k + 1);
         g_preview[k].picture = bmp_picture(patch::game_folder() + name);
+    }
+    // vidarpreview.bmp (patch_data.make_bar_preview): the bar at the normal size on a screen 3840 px wide; for
+    // the size s its middle 3840 / s px, which the Overlay makes s times bigger
+    const Picture bar = bmp_picture(patch::game_folder() + "vid\\barpreview.bmp");
+    for (int k = 0; k < 3 && bar.w > 0; ++k) {
+        Picture& p = g_bar[k].picture;
+        p.key = bar.key;
+        p.w = (bar.w + k) / (k + 1);
+        p.h = bar.h;
+        const int from = (bar.w - p.w) / 2;
+        p.pixels.resize(static_cast<size_t>(p.w) * p.h);
+        for (int y = 0; y < p.h; ++y)
+            for (int x = 0; x < p.w; ++x) p.pixels[static_cast<size_t>(y) * p.w + x] = bar.pixels[static_cast<size_t>(y) * bar.w + from + x];
     }
     char text[256] = {};
     GetPrivateProfileStringA("strings", "MenuOptionsMinimapStrip", "", text, sizeof text,
@@ -290,7 +309,17 @@ void draw_menu_version(IDirectDrawSurface7* target, const RECT& window, const RE
     if (size < 1) size = 1;
     const int margin = MARGIN * size;
     if (page) {
-        const int k = minimap_size_for_screen(window.right - window.left);
+        // the bar as it will stand across the window's bottom, at the interface's size the game would use there
+        const int window_w = window.right - window.left;
+        const int s = interface_scale_for_window();
+        Overlay& bar = g_bar[(s >= 1 && s <= 3 ? s : 1) - 1];
+        if (!bar.picture.pixels.empty()) {
+            const int full = bar.picture.w * s, shown = full < window_w ? full : window_w;
+            bar.draw_part(target, window.left + (window_w - shown) / 2, window.bottom - bar.picture.h * s, s,
+                          (full - shown) / 2, shown);
+        }
+        // and on it, in the corner, the minimap's frame at its own size
+        const int k = minimap_size_for_screen(window_w);
         Overlay& frame = g_preview[(k >= 1 && k <= 3 ? k : 1) - 1];
         if (frame.picture.pixels.empty()) return;
         const int top = window.bottom - frame.picture.h;

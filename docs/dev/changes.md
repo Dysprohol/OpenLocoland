@@ -563,6 +563,11 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       (red, yellow and green too) with their click strips and spacing times the scale, the mouse tip in
       the bigger font beside the cursor while the bar is up, and the Windows cursors loaded as many times
       bigger with their hot spots in proportion,
+  49. the settings page's preview (`menu_version.cpp`): while the page is open the bottom of the window
+      shows the state bar at the interface's size the game would use there, across the window, and the
+      minimap's frame at its size on it in the corner - one picture where they will stand, following a
+      click on either row; it replaces the corner's minimap-only preview (`vidarpreview.bmp`, made by
+      `build.py` from the bar's own pictures),
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
