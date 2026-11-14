@@ -482,21 +482,29 @@ def enlarge_vid(source, output, k):
 def enlarge_font(source, output, k):
     """Writes `output`: the font picture `source` (a grid of 16 x 16 cells, each a character and a one-pixel
     grid line on its right and bottom; the engine's FontVidConverter cuts a cell of a sixteenth less that
-    line) with every character k times bigger and the grid line kept one pixel. Raises on another shape."""
+    line) with every character k times bigger and the grid line kept one pixel. A cell is k - 1 rows taller
+    than the character (rows of the character's own background colour): the engine steps text lines by the
+    font's height + 1 (MessageList_ShowLine, _Scroll, _Update), so that step comes out exactly k times the
+    original's. Raises on another shape."""
+    from collections import Counter
     from PIL import Image
     image = Image.open(source)
     image.load()
     if image.width % 16 or image.height % 16 or image.width < 32 or image.height < 32:
         raise ValueError("not a 16 x 16 grid")
     cw, ch = image.width // 16, image.height // 16
-    nw, nh = (cw - 1) * k + 1, (ch - 1) * k + 1
+    nw, nh = (cw - 1) * k + 1, ch * k
     big = Image.new(image.mode, (16 * nw, 16 * nh))
     if image.mode == "P":
         big.putpalette(image.getpalette())
+    # the characters' background: the colour most cells' areas have most (the grid line's is another)
+    background = Counter(image.crop((c * cw, r * ch, c * cw + cw - 1, r * ch + ch - 1)).getpixel((0, 0))
+                         for r in range(16) for c in range(16)).most_common(1)[0][0]
     for row in range(16):
         for column in range(16):
             x, y = column * cw, row * ch
-            cell = Image.new(image.mode, (nw, nh), image.getpixel((x + cw - 1, y + ch - 1)))
+            cell = Image.new(image.mode, (nw, nh), image.getpixel((x + cw - 1, y + ch - 1)))   # the grid line
+            cell.paste(Image.new(image.mode, (nw - 1, nh - 1), background), (0, 0))
             glyph = image.crop((x, y, x + cw - 1, y + ch - 1))
             cell.paste(glyph.resize((glyph.width * k, glyph.height * k), Image.NEAREST), (0, 0))
             big.paste(cell, (column * nw, row * nh))

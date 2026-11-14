@@ -100,9 +100,10 @@ bool ready(int s) {
         uint8_t* original = vid(VIDS[i]);
         uint8_t* big = vid(FIRST_VID[s] + i);
         if (!original) continue;   // the edition has none: the engine uses its empty VID for both
-        const bool ok = big && (box_only(VIDS[i]) ||
-                                (at<short>(big, 0x2a6) == s * at<short>(original, 0x2a6) &&
-                                 at<short>(big, 0x2a8) == s * at<short>(original, 0x2a8)));
+        // a font is s - 1 rows taller than its letters (patch_data.enlarge_font: the line step height + 1 times s)
+        const short w = at<short>(original, 0x2a6), h = at<short>(original, 0x2a8);
+        const short bw = big ? at<short>(big, 0x2a6) : 0, bh = big ? at<short>(big, 0x2a8) : 0;
+        const bool ok = big && (box_only(VIDS[i]) || (bw == s * w && (bh == s * h || bh == s * (h + 1) - 1)));
         if (!ok) {
             patch::log("interface: VID %d is not %d times VID %d - no %dx interface", FIRST_VID[s] + i, s, VIDS[i], s);
             g_ready[s] = 0;
@@ -170,6 +171,21 @@ uint8_t* interface_vid(int nvid, int s) {
                 break;
             }
     return vid(nvid);
+}
+
+// The number of the bigger copy of `nvid` at the scale s (the original's number at 1, or when it has none).
+int interface_nvid(int nvid, int s) {
+    if (s > 1)
+        for (int i = 0; i < COUNT; ++i)
+            if (VIDS[i] == nvid) return vid(FIRST_VID[s] + i) ? FIRST_VID[s] + i : nvid;
+    return nvid;
+}
+
+// The scale of a bigger copy's number (2 or 3), 1 for any other number.
+int interface_scale_of(int nvid) {
+    for (int s = 2; s <= MAX_SCALE; ++s)
+        if (nvid >= FIRST_VID[s] && nvid < FIRST_VID[s] + COUNT) return s;
+    return 1;
 }
 
 // The number of the original for a bigger VID's number, else the number itself.
@@ -243,6 +259,8 @@ __declspec(naked) void slot_division() {
 
 }  // namespace
 
+void install_interface_texts();   // interface_texts.cpp
+
 void install_interface_scale() {
     // cmp dword [esi+0x18],0x50 / jle +0x47 / mov edx,[esi+0x20]
     const uint8_t division[] = {0x83, 0x7E, 0x18, 0x50, 0x7E, 0x47, 0x8B, 0x56, 0x20};
@@ -252,5 +270,6 @@ void install_interface_scale() {
         return;
     }
     patch::write_call(SLOT_DIVISION, nullptr, 0, reinterpret_cast<void*>(&slot_division), sizeof division, true);
+    install_interface_texts();
     if (chosen() > 1) patch::log("interface: scale %d chosen on the settings page", chosen());
 }

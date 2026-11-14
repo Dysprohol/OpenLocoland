@@ -612,7 +612,22 @@ buffer of 0x20008 bytes - a bigger one overruns it), so the enlarged texture pic
 455, the buttons 498/499, the message strip 449) have their tiles packed anew into sheets of that size.
 A font picture is a 16 x 16 grid of cells, each a letter and a one-pixel grid line right and below
 (`FontVidConverter_Load` cuts a sixteenth of the width and height less one), so a bigger font is made
-cell by cell with the line kept one pixel.
+cell by cell with the line kept one pixel. The messages, the objectives, the mouse tip and the cursor
+follow the same scale (`interface_texts.cpp`): the message list steps its lines by the font's picture
+height + 1 (`MessageList_ShowLine`, `_Scroll`, and `_Update` to find the clicked line), so a bigger font
+is made s - 1 rows taller than its letters and that step comes out s times the original's; its x 20 and
+y 5 and the click strip 10 px left of the text are times the scale (`MessageList_ShowLine` wrapped, the
+strip's VID 449 swapped in `World.vids` while the engine makes it). A text switches its font by number
+in the middle of a line (`<Font=16>`, the ESC byte: the messages' red, yellow and green), so while a text
+in a bigger font is drawn (`Text_Draw`) the interface's font numbers name their bigger copies. The mouse
+tip (`MouseTip_Update`, font VID 6, 5 px right of and 10 px above the cursor) is made in the bigger
+font with those offsets times the scale while the bar is up in play; the menus and the held editor keep
+the normal one. The cursors (`Cursor_Show`, Windows `.ani` files through `LoadCursorFromFileA` at the
+system's size) are loaded with `LoadImage` s times the system's cursor size - Windows scales the
+picture and its hot spot together (the arrow's 6,5 of 32 x 32 is 18,15 of 96 x 96) - and loaded again
+when the bar is built at another scale. Messages are one line each, with no wrapping: the longest
+objective is 48 letters (German), the longest event message 44 - 1728 px at three times, inside
+2560.
 
 **Panels** (`Player.panel`, `Player_SetPanel`): 0 the unit bar, 1 the cars of the flagman train, 2 the
 build list of the flagman factory, 5 the queue of that factory, 6 hidden. The ten bar slots

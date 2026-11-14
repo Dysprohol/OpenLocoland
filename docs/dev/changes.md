@@ -558,6 +558,11 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       from the Esc menu); a small map's logical screen (mission 1) keeps the normal size. The
       minimap's row got a first value, as the interface (`MinimapSize` "0" or absent, the default);
       only a minimap bigger than the interface leaves a strip below the map,
+  48. the messages, the objectives, the mouse tip and the cursor at the interface's size
+      (`interface_texts.cpp`, engine.md "The interface's size"): the message lines in the bigger fonts
+      (red, yellow and green too) with their click strips and spacing times the scale, the mouse tip in
+      the bigger font beside the cursor while the bar is up, and the Windows cursors loaded as many times
+      bigger with their hot spots in proportion,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
