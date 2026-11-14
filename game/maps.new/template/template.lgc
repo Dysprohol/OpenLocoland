@@ -857,77 +857,135 @@ FactoryTact(int t)
 }
 // CaptureTact(): a neutral factory or repair point becomes the player's where a campaign mission takes
 // its own (LDepoCapture / LMasterCapture of Captures.lgc, with a point beside the building, MAP_RULES.md
-// 7): a factory when a train of the player's reaches the outer end of the factory's exit line - where a
-// train coming in stops at its light - (CAPTURE_DEPOT px around it), a repair point when one reaches the
-// begin of its line, where trains enter it (CAPTURE_REPAIR px), and either when one comes within 100 px
-// of the building itself. The building's line is the push line of the map (PUSH_LINES, push_*[]) that
-// passes nearest to it, within 50 px; a push line's points are the screen's (y less the height, as
-// SetPushLine takes them), so the building is compared at its own (y - z) and the point taken back at
-// the building's height. Only the player's trains capture, as in the missions, and a
-// building captured stays the player's; ACT_SET_ARMY fires the engine's BuildingCapture event, whose
-// message (DepoCaptured / MasterCaptured) the player sees. Forts and mining plants are captured by
-// F162_0 of ai_default_event.lgc.
-#define CAPTURE_DEPOT 90
+// 7): a factory when a train of the player's comes to the outer end of the factory's own line, where a
+// train coming in stops at its light (within CAPTURE_FACTORY px of it - a train passing that near takes
+// it too, as in the missions), a repair point when one comes to the begin of its own line, where trains
+// enter it (CAPTURE_REPAIR px), and either when one comes within 100 px of the building itself. The
+// lines are the map's push lines (PUSH_LINES, push_*[]); a building's own line is one of the shape the
+// editor gives it (CaptureLine), and a building without one keeps the 100 px rule alone. A push line's
+// points are the screen's (y less the height, as SetPushLine takes them), so a building and a train are
+// compared at their own (y - z), whatever the height of the track there. Only the player's trains
+// capture, as in the missions, and a building captured stays the player's; ACT_SET_ARMY fires the
+// engine's BuildingCapture event, whose message (DepoCaptured / MasterCaptured) the player sees. Forts
+// and mining plants are captured by F162_0 of ai_default_event.lgc.
+#define CAPTURE_FACTORY 90
 #define CAPTURE_REPAIR 50
+#define CAPTURE_HIGH 400
+int capture_b[64];
+// CaptureLine(b): the building's own line (its index + 1), 0 for none. A factory's begins at the dead
+// end behind it (within 50 px of its middle) and goes away from it - the nearest such begin; a repair
+// point's passes it (within 30 px) and begins within 200 px of it - the nearest such line. The vector is
+// halved until it is short, so no product passes the 32 bits on a long line.
 CaptureLine(int b)
 {
-  int i,vx,vy,l,t,dx,dy,d,best,found,y;
+  int i,v,x,y,dx,dy,ex,ey,vx,vy,s,l,t,d,best,found;
+  v=GetUnitVid(b);
+  x=GetX(b);
   y=GetY(b)-GetZ(b);
-  best=2500;
   found=0;
+  best=999999;
 #ifdef PUSH_LINES
   for( i=0; i<PUSH_LINES; i++ )
   {
-    vx=push_ex[i]-push_bx[i];
-    vy=push_ey[i]-push_by[i];
-    l=vx*vx+vy*vy;
-    t=(GetX(b)-push_bx[i])*vx+(y-push_by[i])*vy;
-    if( t<0 )
-      t=0;
-    if( t>l )
-      t=l;
-    dx=GetX(b)-push_bx[i];
+    dx=x-push_bx[i];
     dy=y-push_by[i];
-    if( l>0 )
+    if( dx>=-200 && dx<=200 && dy>=-200 && dy<=200 )
     {
-      dx=dx-vx*t/l;
-      dy=dy-vy*t/l;
-    }
-    d=dx*dx+dy*dy;
-    if( d<best )
-    {
-      best=d;
-      found=i+1;
+      d=dx*dx+dy*dy;
+      if( v==102 && d<=2500 && d<best )
+      {
+        ex=x-push_ex[i];
+        ey=y-push_ey[i];
+        if( ex<-100 || ex>100 || ey<-100 || ey>100 || ex*ex+ey*ey>d )
+        {
+          best=d;
+          found=i+1;
+        }
+      }
+      if( v==104 )
+      {
+        vx=push_ex[i]-push_bx[i];
+        vy=push_ey[i]-push_by[i];
+        s=1;
+        while( vx>256 || vx<-256 || vy>256 || vy<-256 )
+        {
+          vx=vx/2;
+          vy=vy/2;
+          s=s*2;
+        }
+        l=vx*vx+vy*vy;
+        t=dx*vx+dy*vy;
+        if( l>0 && t>=0 && t<=l*s )
+        {
+          ex=dx-vx*t/l;
+          ey=dy-vy*t/l;
+          d=ex*ex+ey*ey;
+          if( d<=900 && d<best )
+          {
+            best=d;
+            found=i+1;
+          }
+        }
+      }
     }
   }
 #endif
   return found;
 }
+// CaptureTrain(x,y,r): a car of the player's train whose screen point (y less its height) lies within r
+// px of the screen point x,y, 0 for none. The engine's box is the map's (not the screen's): a car stands
+// lower on the screen than on the map by its height, so the box reaches CAPTURE_HIGH px further down.
+CaptureTrain(int x,int y,int r)
+{
+  int u,dx,dy,found;
+  found=0;
+  for( u=FirstInBox(x-r,y-r,x+r,y+r+CAPTURE_HIGH); u; u=NextInBox() )
+    if( !found && GetVid(GetUnitVid(u),VID_CLASS)==B_ENGINE )
+      if( Action(u,act_getarmy,0,0)==0 )
+      {
+        dx=GetX(u)-x;
+        dy=GetY(u)-GetZ(u)-y;
+        if( dx*dx+dy*dy<=r*r )
+          found=u;
+      }
+  return found;
+}
+// The neutral buildings are listed first and looked at after, so the engine's walk of the units and its
+// walk of a box are never under way together.
 CaptureTact()
 {
-  int b,v,u,i,x,y;
+  int b,v,u,i,k,n,x,y;
+  n=0;
   for( b=FirstUnit(u_monster); b; b=NextUnit() )
   {
     v=GetUnitVid(b);
-    if( (v==102 || v==104) && Action(b,act_getarmy,0,0)==2 )
-    {
-      x=GetX(b);
-      y=GetY(b);
-      u=FindNearestSprite(GETSPRITE_UNIT+GETSPRITE_CLASS+B_ENGINE+GETSPRITE_ARMY0,x,y,100);
-#ifdef PUSH_LINES
-      i=CaptureLine(b);
-      if( !u && i && v==102 )
-        u=FindNearestSprite(GETSPRITE_UNIT+GETSPRITE_CLASS+B_ENGINE+GETSPRITE_ARMY0,push_ex[i-1],push_ey[i-1]+GetZ(b),CAPTURE_DEPOT);
-      if( !u && i && v==104 )
-        u=FindNearestSprite(GETSPRITE_UNIT+GETSPRITE_CLASS+B_ENGINE+GETSPRITE_ARMY0,push_bx[i-1],push_by[i-1]+GetZ(b),CAPTURE_REPAIR);
-#endif
-      if( u )
+    if( (v==102 || v==104) && n<64 )
+      if( Action(b,act_getarmy,0,0)==2 )
       {
-        PlaySFX(25);
-        Effect(eff_nuke,0x006000);
-        Log("CAPTURE vid "+itoa(v)+" at "+itoa(x)+","+itoa(y)+" by a train at "+itoa(GetX(u))+","+itoa(GetY(u))+", "+itoa(SizeTo(u,x,y))+" px from it");
-        Action(b,act_setarmy,0,0);
+        capture_b[n]=b;
+        n++;
       }
+  }
+  for( k=0; k<n; k++ )
+  {
+    b=capture_b[k];
+    v=GetUnitVid(b);
+    x=GetX(b);
+    y=GetY(b);
+    u=FindNearestSprite(GETSPRITE_UNIT+GETSPRITE_CLASS+B_ENGINE+GETSPRITE_ARMY0,x,y,100);
+#ifdef PUSH_LINES
+    i=CaptureLine(b);
+    if( !u && i && v==102 )
+      u=CaptureTrain(push_ex[i-1],push_ey[i-1],CAPTURE_FACTORY);
+    if( !u && i && v==104 )
+      u=CaptureTrain(push_bx[i-1],push_by[i-1],CAPTURE_REPAIR);
+#endif
+    if( u )
+    {
+      PlaySFX(25);
+      Effect(eff_nuke,0x006000);
+      Log("CAPTURE vid "+itoa(v)+" at "+itoa(x)+","+itoa(y)+" by a train at "+itoa(GetX(u))+","+itoa(GetY(u))+", "+itoa(SizeTo(u,x,y))+" px from it");
+      Action(b,act_setarmy,0,0);
     }
   }
 }
