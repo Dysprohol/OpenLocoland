@@ -879,6 +879,8 @@ bool zoom_view_apply(double z, double surface_z) {
 
 // zoom.cpp, between two frames: a menu up gets a screen of at least 1024x768 drawn in one pass, and the zoom's
 // view back when it goes.
+float g_menu_camera[2] = {};   // the camera when a menu came up
+
 void zoom_view_between_frames() {
     if (!g_installed || !g_view || !graphics()) return;
     const bool menu = menu_background_shown();
@@ -886,9 +888,17 @@ void zoom_view_between_frames() {
         // the window's size, as at zoom 1 (screen_scaling.cpp's menu rule takes its 1024x768 middle)
         const int mw = window_w(), mh = window_h();
         const RECT whole = {0, 0, mw, mh};
+        g_menu_camera[0] = at<float>(world(), 0x44);
+        g_menu_camera[1] = at<float>(world(), 0x48);
         if (screen_set_view(mw, mh, (std::max)(mw, g_surface_w), (std::max)(mh, g_surface_h), &whole)) g_menu = true;
     } else if (!menu && g_menu) {
-        if (screen_set_view(g_view_w, g_view_h, g_surface_w, g_surface_h, &g_target)) g_menu = false;
+        if (!screen_set_view(g_view_w, g_view_h, g_surface_w, g_surface_h, &g_target)) return;
+        g_menu = false;
+        // the camera where it was before the menu (a menu's screen bigger than the map moves it: camera.cpp
+        // centres the map in it); SetPosition moves the interface's objects with it (the bar built at the menu's end)
+        using SetPosition_t = void(__fastcall*)(void* world, void* edx, float x, float y, int mode);
+        reinterpret_cast<SetPosition_t>(0x41c680)(world(), nullptr, g_menu_camera[0] + g_view_w * 0.5f,
+                                                  g_menu_camera[1] + g_view_h * 0.5f, 0);
     }
 }
 
