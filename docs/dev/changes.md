@@ -144,7 +144,8 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
      `Graphics_Init`, which saves the mode it starts with),
   5. a map smaller than the screen sits in the middle instead of at the right and bottom
      edge (`SetPosition` hooked - while the camera is clamped, the map bounds are widened
-     to the view size; for a level held in editor mode by 300 px more on every side),
+     to the view size; for a level held in editor mode by 300 px more on every side, times the
+     editor's interface size),
   6. logical screen (`screen_scaling.cpp`, see "Resolutions and widescreen"): on a map
      smaller than the window the game runs at min(window, map) and the picture is
      stretched to the window; menus made for 1024x768 (background VID 465 or 466) are

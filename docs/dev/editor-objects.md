@@ -52,7 +52,8 @@ and ] from any tool put the All objects entry on it, `choose_decal` -, and a sec
 deleted with the Delete tool's Shift+click), Train arrivals (a panel, "Train arrivals" below) and
 Mission settings (the dialog of the File menu, below).
 The camera of a held level goes 300 px past
-every edge of the map (`camera.cpp` widens the bounds `SetPosition` clamps to while the level is
+every edge of the map - 600 / 900 px at the editor's interface size of twice / three times, where its bar and a
+tool's rows stand as many times higher (editor-ui.md) - (`camera.cpp` widens the bounds `SetPosition` clamps to while the level is
 held), so the bar does not hide the bottom of a small map and the parts of the track out of
 sight - the main line's ends, the reinforcement's point - can be laid and picked. The rules of MAP_RULES.md the editor applies: a new
 unit gets the behave and the build list of an object of the same VID on the map (map_tool.py

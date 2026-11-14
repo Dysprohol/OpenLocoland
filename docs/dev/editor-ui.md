@@ -189,7 +189,9 @@ apart. The mouse is divided by the scale for the interface's hit tests (`ui_mous
 the click-and-hold strips and the tips move with what is drawn; the panels get the interface's screen
 from `edit_view_box` and the mouse already divided. What is drawn on the map stays one map pixel to a
 screen pixel: the marks, the mines' and sockets' labels, the regions, the push lines, the tools'
-previews. A picture with no bigger copy is drawn at its own size in its place: the Track tool's kinds
+previews. The bar and a tool's rows (up to three, 212 px at the normal size) stand s times as high and take the
+clicks over them, so the camera goes 300 px past the map's edges times the scale (`camera.cpp`: 600 / 900 px) -
+the map's bottom row comes out from under three rows of the Paint tool at three times too. A picture with no bigger copy is drawn at its own size in its place: the Track tool's kinds
 of rail (the rails' own pictures) and a decal's picture where the palette has no icon. A panel stands
 on the menu device, whose visible part is 579 x 479 round its middle, so it fits at both sizes (the
 interface's screen is 960 x 540 at twice on 1920 x 1080, 853 x 480 at three times on 2560 x 1440); where

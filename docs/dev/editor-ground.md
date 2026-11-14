@@ -349,7 +349,8 @@ are counted on the picture's size (its HEAD), not the map's: a map made bigger t
 `map_tool.py` (the template's 1024 x 768 ground in the middle of black) paints like a small one. A
 map's track should still stay within 7500 px (the crossing grid).
 
-**The map's frame.** The camera of a held level goes 300 px past the map, where nothing is drawn;
+**The map's frame.** The camera of a held level goes 300 px past the map (times the editor's interface
+size, editor-ui.md), where nothing is drawn;
 the outside gets a dim 32 px grid and the map's edge a frame, so an empty map stands out - the track
 out there stays visible between the lines.
 

@@ -188,7 +188,7 @@ Co widać:
 
 - **Mapę** tak, jak ją zrobiono, w bezruchu: poziom jest *wstrzymany* - nic się nie rusza, żaden
   skrypt nie działa. Poza mapą jest przyciemniona siatka, a krawędź mapy ma ramkę (można przewinąć
-  300 px poza krawędź: tory biegną tam dalej).
+  300 px poza krawędź, więcej przy większym **INTERFEJSIE EDYTORA**: tory biegną tam dalej).
 - **Pasek** na dole w wyglądzie paska stanu gry: narzędzia 1 - 0 w jego gniazdach, kolejne na
   **listwie** nad nim. Wybrane jest w ramce. Nad listwą wybrane narzędzie ma swój **rząd** ustawień:
   rodzaj szyny i rampę dla Torów, tekstury albo podsypkę dla Malowania terenu, listę wagonów dla

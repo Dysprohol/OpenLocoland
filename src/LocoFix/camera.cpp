@@ -10,10 +10,14 @@
 //
 // A level held in editor mode (editor.cpp) gets EDITOR_MARGIN more on every side: the main line
 // of a mission goes on past the edges of the map (MAP_RULES.md 4) and the editor's bar covers the
-// bottom of the view, so the editor's camera goes that far out.
+// bottom of the view, so the editor's camera goes that far out - times the editor's interface size
+// (editor_edit.cpp): its bar and the rows of a tool above it, up to three (212 px at the normal size), stand that
+// many times higher, and the rows take the clicks, so the map's bottom must come out from under them (600 px at
+// twice, 900 at three times; 300 at the normal size as before).
 #include "patch.h"
 
-bool editor_level_held();   // editor.cpp
+bool editor_level_held();     // editor.cpp
+int edit_interface_scale();   // editor_edit.cpp: the editor's interface size now
 
 namespace {
 
@@ -40,8 +44,9 @@ void __fastcall SetPosition_centered(void* world, void* edx, float x, float y, i
             hi += missing / 2;
         }
         if (editor_level_held()) {
-            lo -= EDITOR_MARGIN;
-            hi += EDITOR_MARGIN;
+            const float margin = EDITOR_MARGIN * static_cast<float>(edit_interface_scale());
+            lo -= margin;
+            hi += margin;
         }
     }
     g_original(world, edx, x, y, mode);

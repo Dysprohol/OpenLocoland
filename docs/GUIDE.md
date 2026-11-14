@@ -188,7 +188,7 @@ What you see:
 
 - **The map** as authored, standing still: the level is *held* - nothing moves, no script runs.
   Outside the map there is a dim grid and the map's edge has a frame (you can scroll 300 px past
-  the edge: the track goes on out there).
+  the edge, more with a bigger **EDITOR INTERFACE**: the track goes on out there).
 - **The bar** at the bottom in the look of the game's state bar: tools 1 - 0 in its slots, more
   tools in the **strip** above it. The chosen one is framed. Above the strip, the chosen tool has a
   **row** of its own settings: the kind of rail and its ramp for Track, the textures or the gravel bed
