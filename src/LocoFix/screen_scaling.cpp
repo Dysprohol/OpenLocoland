@@ -587,7 +587,13 @@ bool screen_set_view(int w, int h, int surface_w, int surface_h, const RECT* tar
         use_game_surfaces(g);
         if (!use_small_surfaces(g, surface_w, surface_h, true, true)) {
             patch::log("screen scaling: no %dx%d surfaces for the zoom", surface_w, surface_h);
-            if (had && old_w && !use_small_surfaces(g, old_w, old_h, true, true)) g_has_target = false;
+            if (had && old_w && use_small_surfaces(g, old_w, old_h, true, true)) return false;   // the old view stays
+            // nothing for the old view either: the level's own screen (the window's surfaces, its size)
+            g_has_target = false;
+            g_logical_w = g_base_w;
+            g_logical_h = g_base_h;
+            if (g_base_w) use_small_surfaces(g, g_base_w, g_base_h);
+            set_screen(g, g_base_w ? g_base_w : g_window_w, g_base_h ? g_base_h : g_window_h);
             return false;
         }
     }
@@ -608,6 +614,8 @@ bool screen_game_surfaces(IDirectDrawSurface7** out) {
 }
 bool screen_set_render_target(uint8_t* g, IDirectDrawSurface7* s) { return set_render_target(g, s); }
 void screen_set_screen(uint8_t* g, int w, int h) { set_screen(g, w, h); }
+// Whether a zoom's view is drawn (false: the level's own screen - also after a view's surfaces failed).
+bool screen_zoom_view() { return g_has_target; }
 // The cursor in the game area in the window's pixels (the last WM_NCHITTEST, before the mapping).
 POINT screen_window_cursor() { return g_raw_mouse; }
 

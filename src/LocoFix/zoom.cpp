@@ -48,6 +48,7 @@ void zoom_view_size(double z, int& w, int& h);
 bool zoom_view_apply(double z, double surface_z);
 void zoom_view_between_frames();
 void zoom_view_level_loading();
+bool mouse_pan_dragging();                     // mouse_pan.cpp
 void install_zoom_view();
 
 namespace {
@@ -114,6 +115,7 @@ double g_zoom = 1.0;  // the zoom drawn now (a step, or between two in a glide)
 
 // a glide
 bool g_gliding = false;
+bool g_after_menu = false;   // a glide a menu stopped: its step reached when the menu goes
 double g_from = 1.0, g_to = 1.0;
 int64_t g_glide_start = 0;
 
@@ -157,6 +159,7 @@ void make_steps() {
     }
     if (whole < last * 0.9999 && pixels(whole) <= max_pixels()) g_steps[g_step_count++] = whole;
     g_step = g_own;
+    g_zoom = own;   // the level's own (mission 1: its stretch), where a first glide starts
     g_made = true;
     if (test_mode()) {
         char text[200];
@@ -192,6 +195,7 @@ const char* refused(uint8_t* w) {
     if (flags & (WORLD_LOADING | WORLD_PAUSED)) return "loading or paused";
     if (!(at<unsigned>(w, WORLD_SCROLL_TYPE) & SCROLL_BY_PLAYER)) return "the scripts hold the camera";
     if (menu_background_shown()) return "a menu is up";
+    if (mouse_pan_dragging()) return "the map is being dragged";   // the drag holds its own map point
     if (uint8_t* hover = at<uint8_t*>(w, MENU_HOVER)) {
         static char text[48];
         wsprintfA(text, "over the interface (VID %d)", at<uint8_t*>(hover, 0x1c) ? at<int>(at<uint8_t*>(hover, 0x1c), 4) : -1);
@@ -319,6 +323,7 @@ void __fastcall scroll_move(void* w, void* edx, float x, float y, int mode) {
 void zoom_level_loading() {
     g_made = false;
     g_gliding = false;
+    g_after_menu = false;
     g_step = g_own = 0;
     g_steps[0] = 1.0;
     g_step_count = 1;
@@ -331,6 +336,15 @@ void zoom_level_loading() {
 void zoom_after_frame() {
     uint8_t* w = world();
     if (!w || !graphics() || !zoom_view_installed()) return;
+    if (g_gliding && menu_background_shown()) {   // a menu came up during a glide: its step after the menu
+        g_gliding = false;
+        g_after_menu = true;
+    }
+    if (g_after_menu && !menu_background_shown()) {
+        g_after_menu = false;
+        zoom_view_between_frames();   // the zoom's view back from the menu's screen first
+        reached(g_step, now_counter());
+    }
     zoom_view_between_frames();
     glide();
     measure_frame();

@@ -53,6 +53,7 @@
 #include <cmath>
 
 bool screen_set_view(int w, int h, int surface_w, int surface_h, const RECT* target);   // screen_scaling.cpp
+bool screen_zoom_view();
 bool screen_game_surfaces(IDirectDrawSurface7** out);
 bool screen_set_render_target(uint8_t* g, IDirectDrawSurface7* s);
 void screen_set_screen(uint8_t* g, int w, int h);
@@ -295,12 +296,14 @@ __declspec(naked) void screen_y_stub() {
     }
 }
 
-using MenuLoad_t = int(__cdecl*)(void* args);
+// MenuLoad is called with World.menu in ecx and the script's argument on the stack, which it takes off itself
+// (ret 4, the call at 0x43f2ec): thiscall.
+using MenuLoad_t = int(__fastcall*)(void* menu, void* edx, void* name);
 MenuLoad_t g_menu_load = nullptr;
-int __cdecl menu_load(void* args) {
+int __fastcall menu_load(void* menu, void* edx, void* name) {
     FloatSwap f;
     if (g_view) f.enter(window_w(), window_h());
-    const int r = g_menu_load(args);
+    const int r = g_menu_load(menu, edx, name);
     f.leave();
     return r;
 }
@@ -854,7 +857,17 @@ bool zoom_view_apply(double z, double surface_z) {
         target.top = (window_h() - (std::min)(th, window_h())) / 2;
         target.right = target.left + (std::min)(tw, window_w());
         target.bottom = target.top + (std::min)(th, window_h());
-        if (!screen_set_view(w, h, sw, sh, &target)) return false;
+        if (!screen_set_view(w, h, sw, sh, &target)) {
+            if (!was_view || screen_zoom_view()) return false;   // the view before stays
+            // no surfaces for the new view nor the old: the level's own screen came back - its interface too
+            g_view = false;
+            g_menu = false;
+            g_z = zoom_view_base();
+            move_interface(false);
+            status_bar_rebuild(player);
+            interface_messages_rescale();
+            return false;
+        }
         fog_buffer_cover((std::max)(w, sw), (std::max)(h, sh));
         g_view = true;
         g_menu = false;

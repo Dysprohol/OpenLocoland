@@ -120,6 +120,9 @@ void __fastcall UpdateScroll_hook(void* world_ptr, void* edx) {
 
 }  // namespace
 
+// zoom.cpp: the wheel is not taken while the map is dragged with the middle button.
+bool mouse_pan_dragging() { return g_drag.active; }
+
 void install_mouse_pan() {
     char value[8] = {};
     g_test_mode = GetEnvironmentVariableA("LOCOFIX_TEST", value, sizeof value) && value[0] == '1';

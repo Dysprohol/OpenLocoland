@@ -388,7 +388,7 @@ void install_frame_limit() {
 void frame_rate_section(const char* part) {
     if (!g_frequency) return;
     report_level();
-    if (part && *part) wsprintfA(g_level, "%s, %s", g_level_map, part);
+    if (part && *part) _snprintf_s(g_level, sizeof g_level, _TRUNCATE, "%s, %s", g_level_map, part);
     else lstrcpynA(g_level, g_level_map, sizeof g_level);
 }
 
