@@ -4,10 +4,11 @@
 // The file has two parts, so that another way of making the view can replace the second without touching
 // the first:
 //   1. THE ZOOM (state and input): the zoom in effect and the zooms a level has (make_steps: the steps, the
-//      caps), the wheel (zoom_after_frame), the point under the cursor kept (set_step), the resets (a level
+//      caps), the wheel (zoom_after_frame, refused), the point under the cursor kept (set_step), the resets (a level
 //      change: zoom_level_loading) and the log (each step's view size, switch time, memory and the average
 //      frame time over its first seconds).
-//   2. THE VIEW (view_apply): turns a zoom into what the game draws - here the composition below.
+//   2. THE VIEW (view_offers, view_size, view_apply - see "Between the two parts" below): turns a zoom into
+//      what the game draws - here the composition below.
 //
 // The view now (the composition): the game is drawn on a logical screen bigger than the window - w / z x
 // h / z for a zoom z below 1 - and screen_scaling.cpp stretches the picture down to the window, as it
@@ -49,8 +50,8 @@
 // change; at the map's edges the camera's limits win).
 //
 // THE PROBE (stage Z0, test mode only: LOCOFIX_TEST=1 and the DWORD ZoomProbe = 1 in the test key): the
-// wheel steps through the zooms 1, 2/3, 1/2 and 1/3, capped by the map only, and the interface is not built
-// again - it shrinks with the world. For measuring the frame rate and memory of big views.
+// wheel steps through the zooms 1, 2/3, 1/2 and 1/3 (capped by the map and MAX_PIXELS, not by the bar's size),
+// and the interface is not built again - it shrinks with the world. For measuring the frame rate and memory of big views.
 #include "patch.h"
 #include <algorithm>
 #include <psapi.h>
@@ -82,8 +83,7 @@ constexpr int MOUSE_WHEEL = 0x234, MOUSE_SCREEN_X = 0x240, MOUSE_SCREEN_Y = 0x24
 constexpr int MENU_HOVER = 0x24c + 0x14;
 constexpr unsigned WORLD_EDITOR = 0x1, WORLD_ACTIVE = 0x8, WORLD_PAUSED = 0x10, WORLD_LOADING = 0x20;
 constexpr unsigned SCROLL_BY_PLAYER = 0x1 | 0x20;   // SCROLL_FROM_BORDER, SCROLL_WITH_ARROWS
-constexpr int MAX_SCALE = 3;
-// The most logical pixels a zoom's view may have: the whole of the biggest original map (see the top).
+// The most map pixels a zoom's view may have: the whole of the biggest original map (see the top).
 constexpr int MAX_PIXELS = 3072 * 2304;
 constexpr double MEASURE_SECONDS = 3.0;   // the frame time logged for a step: over its first seconds
 
@@ -110,41 +110,33 @@ int test_value(const char* name, int fallback) {
     return r == ERROR_SUCCESS && type == REG_DWORD ? static_cast<int>(v) : fallback;
 }
 
-// ======== 2. THE VIEW ========
+// ======== BETWEEN THE TWO PARTS ========
+//
+// A zoom is a factor num / den (below 1: out). Its VIEW is the rectangle of the map it shows, w x h map
+// pixels; the camera (World+0x44/0x48) is that rectangle's top-left, and window_to_logical / logical_to_window
+// (screen_scaling.cpp) take a point of the window to a point of the view and back. The renderer (part 2)
+// offers three functions to part 1:
+//   view_offers(out, max)  the factors it can draw for this level and window, from 1 outward (1 not listed);
+//   view_size(z, w, h)     the view z shows here; false when it cannot show z here;
+//   view_apply(z, w, h)    the game draws that view from the next frame on: everything sized by the screen is
+//                          made again for it (the drawing surfaces, the screen size, the view and clip
+//                          rectangles, the fog texture, the window-to-view mapping) and the interface built
+//                          again at its own size in the window (the state bar with the panel that was open, the
+//                          message lines); false: nothing changed.
+// Part 2 does not touch the camera, the wheel, the steps or the level; part 1 does not touch the surfaces,
+// the screen size or the interface.
 
-// The game draws a w x h view of the map, shown in the window; `probe`: the interface is
-// left as it is. False when it cannot (nothing changed).
-bool view_apply(int w, int h, bool probe) {
-    if (!screen_set_logical(w, h)) return false;
-    fog_buffer_cover(w, h);
-    if (!probe) {
-        status_bar_rebuild(at<uint8_t*>(world(), WORLD_PLAYERS));   // the human's bar (World.players[0])
-        interface_messages_rescale();
-    }
-    return true;
-}
-
-// ======== 1. THE ZOOM ========
-
-// A zoom, as a fraction: the view is the window times den / num.
 struct Step {
     int num, den;
 };
-constexpr int MAX_STEPS = 4;
-constexpr Step PROBE_STEPS[MAX_STEPS] = {{1, 1}, {2, 3}, {1, 2}, {1, 3}};
 
-using SetPosition_t = void(__fastcall*)(void* world, void* edx, float x, float y, int mode);
+// ======== 2. THE VIEW (the composition) ========
+
+constexpr int MAX_SCALE = 3;
+constexpr int MAX_OFFERS = 3;
+constexpr Step PROBE_STEPS[MAX_OFFERS] = {{2, 3}, {1, 2}, {1, 3}};
 
 int g_probe = -1;   // -1 not read yet
-Step g_steps[MAX_STEPS] = {{1, 1}};   // the zooms of the level in effect (made by make_steps at zoom 1)
-int g_step_count = 1;
-int g_step = 0;     // index in g_steps of the zoom in effect
-
-// The frame time over a step's first seconds
-int64_t g_measure_from = 0;   // QueryPerformanceCounter at the step's second frame, 0 = not measuring
-int64_t g_measure_last = 0;
-int g_measure_frames = -1;    // -1: the step's first frame (its switch) is left out
-char g_measure_what[64] = "";
 
 bool probe() {
     if (g_probe < 0) {
@@ -154,13 +146,25 @@ bool probe() {
     return g_probe != 0;
 }
 
-int max_pixels() {
-    static const int value = test_value("ZoomMaxPixels", MAX_PIXELS);
-    return value;
+// The composition can draw z = S / s for each bigger scale s whose pictures exist (S: the interface without
+// the zoom); the probe: 2/3, 1/2, 1/3.
+int view_offers(Step* out, int max) {
+    int n = 0;
+    if (probe()) {
+        for (const Step& z : PROBE_STEPS)
+            if (n < max) out[n++] = z;
+        return n;
+    }
+    const int ui = interface_scale_for_window();
+    for (int s = ui + 1; s <= MAX_SCALE && n < max; ++s)
+        if (interface_scale_available(s)) out[n++] = {ui, s};
+    return n;
 }
 
-// The view of a zoom: the window times den / num, at most the map on each axis, at least the level's own.
-void size_of(const Step& z, int& w, int& h) {
+// The window times den / num, at most the map on each axis, at least the level's own screen. Not when the
+// map caps it on both axes: the stretch would then be less than the zoom and the bar not at its size (the
+// probe takes it).
+bool view_size(const Step& z, int& w, int& h) {
     int window_w = 0, window_h = 0, base_w = 0, base_h = 0;
     window_size(window_w, window_h);
     screen_base_size(base_w, base_h);
@@ -172,36 +176,58 @@ void size_of(const Step& z, int& w, int& h) {
     if (h > map_h) h = map_h;
     if (w < base_w) w = base_w;
     if (h < base_h) h = base_h;
+    if (z.num == z.den || probe()) return true;
+    const double stretch = (std::min)(static_cast<double>(window_w) / w, static_cast<double>(window_h) / h);
+    return stretch * z.den <= z.num * 1.001;
 }
 
-// The zooms of this level and window (at zoom 1, when the wheel is turned): see the top.
-void make_steps() {
-    Step wanted[MAX_STEPS] = {{1, 1}};
-    int n = 1;
-    if (probe()) {
-        for (int i = 1; i < MAX_STEPS; ++i) wanted[n++] = PROBE_STEPS[i];
-    } else {
-        const int ui = interface_scale_for_window();   // S: the interface without the zoom
-        for (int s = ui + 1; s <= MAX_SCALE && n < MAX_STEPS; ++s)
-            if (interface_scale_available(s)) wanted[n++] = {ui, s};
+bool view_apply(const Step&, int w, int h) {
+    if (!screen_set_logical(w, h)) return false;
+    fog_buffer_cover(w, h);
+    if (!probe()) {   // the probe leaves the interface as it was, shrinking with the world
+        status_bar_rebuild(at<uint8_t*>(world(), WORLD_PLAYERS));   // the human's bar (World.players[0])
+        interface_messages_rescale();
     }
+    return true;
+}
+
+// ======== 1. THE ZOOM (state and input) ========
+
+constexpr int MAX_STEPS = MAX_OFFERS + 1;
+
+using SetPosition_t = void(__fastcall*)(void* world, void* edx, float x, float y, int mode);
+
+Step g_steps[MAX_STEPS] = {{1, 1}};   // the zooms of the level in effect (made by make_steps at zoom 1)
+int g_step_count = 1;
+int g_step = 0;     // index in g_steps of the zoom in effect
+
+// The frame time over a step's first seconds
+int64_t g_measure_from = 0;   // QueryPerformanceCounter at the step's second frame, 0 = not measuring
+int64_t g_measure_last = 0;
+int g_measure_frames = -1;    // -1: the step's first frame (its switch) is left out
+char g_measure_what[64] = "";
+
+// The cap: MAX_PIXELS, or the test key's ZoomMaxPixels in test mode (a measurement on another machine).
+int max_pixels() {
+    static const int value = test_value("ZoomMaxPixels", MAX_PIXELS);
+    return value;
+}
+
+// The zooms of this level and window (at zoom 1, when the wheel is turned): 1, then each one the renderer
+// offers and can show here whose view shows more than the step before and is within the cap.
+void make_steps() {
+    Step offers[MAX_OFFERS];
+    const int n = view_offers(offers, MAX_OFFERS);
     g_step_count = 1;
     g_steps[0] = {1, 1};
     int last_w, last_h;
-    size_of(g_steps[0], last_w, last_h);
-    for (int i = 1; i < n; ++i) {
+    view_size(g_steps[0], last_w, last_h);
+    for (int i = 0; i < n; ++i) {
         int w, h;
-        size_of(wanted[i], w, h);
+        if (!view_size(offers[i], w, h)) break;
         if (w <= last_w && h <= last_h) continue;   // nothing more on the screen than the step before
-        if (!probe()) {
-            if (static_cast<double>(w) * h > max_pixels()) break;
-            // the map caps the view on both axes: the stretch would not be the zoom's, the bar not its size
-            int window_w = 0, window_h = 0;
-            window_size(window_w, window_h);
-            const double stretch = (std::min)(static_cast<double>(window_w) / w, static_cast<double>(window_h) / h);
-            if (stretch * wanted[i].den > wanted[i].num * 1.001) break;
-        }
-        g_steps[g_step_count++] = wanted[i];
+        if (static_cast<double>(w) * h > max_pixels()) break;
+        g_steps[g_step_count++] = offers[i];
         last_w = w;
         last_h = h;
     }
@@ -245,14 +271,14 @@ void set_step(int step) {
     QueryPerformanceCounter(&t0);
 
     int new_w, new_h;
-    size_of(g_steps[step], new_w, new_h);
+    view_size(g_steps[step], new_w, new_h);
     const int old_w = static_cast<int>(at<float>(g, 0x20c)), old_h = static_cast<int>(at<float>(g, 0x210));
     // the cursor: its place in the window, and the map point under it
     POINT cursor = {static_cast<LONG>(at<float>(w, MOUSE_SCREEN_X)), static_cast<LONG>(at<float>(w, MOUSE_SCREEN_Y))};
     const float map_x = at<float>(w, WORLD_CAMERA_X) + cursor.x, map_y = at<float>(w, WORLD_CAMERA_Y) + cursor.y;
     logical_to_window(cursor);
 
-    if (!view_apply(new_w, new_h, probe())) return;
+    if (!view_apply(g_steps[step], new_w, new_h)) return;
     g_step = step;
 
     POINT now = cursor;
