@@ -6773,27 +6773,22 @@ std::vector<Post> line_posts(const Trace& t) {
     return posts;
 }
 
-// The post standing within 30 px of a place (not one of `taken`).
-uint8_t* post_near(float x, float y, const std::vector<uint8_t*>& taken) {
-    uint8_t* found = nullptr;
-    for_each_object([&](uint8_t* o) {
-        if (!found && !removed(o) && nvid_of(o) == VID_SEMAPHORE && std::find(taken.begin(), taken.end(), o) == taken.end() &&
-            std::hypot(at<float>(o, O_X) - x, at<float>(o, O_Y) - y) < 30)
-            found = o;
-    });
-    return found;
-}
-
 // Puts the posts: one standing near a place is moved, turned and coloured, the others are made;
 // what they were goes into `objects` / `before` (a made one was not there).
 int direction_gap(int a, int b);   // below
+std::set<uint8_t*> buildings_lights();   // the posts that are a factory's or repair point's lights (post_owners, below)
 
 // `as_light` (a building's line): only a post that stands as that light already - its colour, facing
-// its trains within a step - is reused; another one near the place is the player's and stays.
+// its trains within a step - is reused; another one near the place is the player's and stays. Without it
+// (S, an entry's line) the nearest post within 30 px that has no line of its own and is no building's
+// light is moved, turned and coloured (ties: its coordinates); before 2026-11-14 the first within 30 px
+// in the objects' order, of any owner, was - a building's light or a post with its own line could go.
 void put_posts(const std::vector<Post>& posts, std::vector<uint8_t*>& objects, std::vector<State>& before,
                const std::vector<uint8_t*>& not_these = {}, bool as_light = false) {
     uint8_t* v = vid_by_number(VID_SEMAPHORE);
     if (!v) return;
+    std::set<uint8_t*> lights;   // the buildings' lights, asked once when needed
+    bool lights_known = false;
     for (const Post& p : posts) {
         std::vector<uint8_t*> taken = objects;   // a post near the place is reused - not one of `not_these`
         taken.insert(taken.end(), not_these.begin(), not_these.end());
@@ -6809,7 +6804,16 @@ void put_posts(const std::vector<Post>& posts, std::vector<uint8_t*>& objects, s
                     best = d, found = q;
             });
         } else {
-            found = post_near(p.x, p.y, taken);
+            if (!lights_known) lights = buildings_lights(), lights_known = true;
+            float best = 30;
+            for_each_object([&](uint8_t* q) {
+                if (removed(q) || nvid_of(q) != VID_SEMAPHORE || std::find(taken.begin(), taken.end(), q) != taken.end() || lights.count(q))
+                    return;
+                const float d = std::hypot(at<float>(q, O_X) - p.x, at<float>(q, O_Y) - p.y);
+                const bool tie = found && d == best &&
+                                 (at<float>(q, O_X) != at<float>(found, O_X) ? at<float>(q, O_X) < at<float>(found, O_X) : at<float>(q, O_Y) < at<float>(found, O_Y));
+                if ((d < best || tie) && own_line(q) < 0) best = d, found = q;
+            });
         }
         const float z = ground_z(v, p.x, p.y);
         if (found) {
@@ -7532,6 +7536,12 @@ PostOwners post_owners() {
                    static_cast<unsigned>(lines.size()), static_cast<unsigned>(places.size()),
                    1000.0 * static_cast<double>(t1.QuadPart - t0.QuadPart) / static_cast<double>(f.QuadPart));
     }
+    return out;
+}
+
+std::set<uint8_t*> buildings_lights() {
+    std::set<uint8_t*> out;
+    for (const auto& [post, b] : post_owners().building) out.insert(post);
     return out;
 }
 
