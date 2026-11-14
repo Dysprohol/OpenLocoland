@@ -46,6 +46,7 @@ void editor_hold_level();                         // editor.cpp: ... and the lev
 int recalc_grid_z_extern(uint8_t* world);         // ground.cpp
 int mouse_wheel_extern(uint8_t* world);           // menu_input.cpp
 int interface_max_for_window();                   // interface_scale.cpp
+int interface_editor_max_for_window();            // interface_scale.cpp: the same for the editor's interface
 bool custom_maps_extern(uint8_t* world, int function);   // custom_maps.cpp: 204-206, the custom maps page
 bool restart_game(bool editor, const std::string& map, bool back_to_editor = false);
 
@@ -63,6 +64,7 @@ constexpr int EXTERN_MOUSE_WHEEL = 201;       // GetMouseWheel(): the menu's cus
 constexpr int EXTERN_PLAYED_FROM_EDITOR = 202;   // PlayedFromEditor(): the Esc menu (menutact.lgc.patch)
 constexpr int EXTERN_BACK_TO_EDITOR = 203;       // BackToEditor()
 constexpr int EXTERN_INTERFACE_SIZE_MAX = 207;   // InterfaceSizeMax(): the settings page (optfields.lgc)
+constexpr int EXTERN_EDITOR_INTERFACE_SIZE_MAX = 208;   // EditorInterfaceSizeMax(): the same page
 constexpr uintptr_t SCRIPT_PUSH_INT = 0x442700;  // void __thiscall Script_PushInt(Script*, int)
 constexpr size_t WORLD_SCRIPT = 0x14c;
 // the scripts' Players key (player_registry.cpp moves it to HKEY_CURRENT_USER) and the menu's flag
@@ -126,6 +128,10 @@ int __fastcall CallExtern_restart(uint8_t* world, void* edx, int function) {
     if (function == EXTERN_MOUSE_WHEEL) return mouse_wheel_extern(world);
     if (function == EXTERN_INTERFACE_SIZE_MAX) {   // the biggest interface the window takes (interface_scale.cpp)
         reinterpret_cast<PushInt_t>(SCRIPT_PUSH_INT)(world + WORLD_SCRIPT, nullptr, interface_max_for_window());
+        return 0;
+    }
+    if (function == EXTERN_EDITOR_INTERFACE_SIZE_MAX) {   // ... the editor's (its own pictures too)
+        reinterpret_cast<PushInt_t>(SCRIPT_PUSH_INT)(world + WORLD_SCRIPT, nullptr, interface_editor_max_for_window());
         return 0;
     }
     if (custom_maps_extern(world, function)) return 0;

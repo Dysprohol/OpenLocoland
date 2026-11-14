@@ -6,11 +6,13 @@
 // sound or the music. The value is kept with SetReg next to the sound and music settings.
 //
 // Row 0, the minimap's size, is under the mouse buttons' row, OPT_DY below it as the page's own rows
-// are apart; it is the last one that fits above the panel's bottom strip. Row -4, the interface's
-// size, is in the free band between the page's title and the sound row (40 px above the sound row).
-// The page's own rows stay where they are: the panel's picture has dark slots behind the sound and
-// music bars at their rows, and with the rows moved those slots showed empty. The page has no room
-// for a third row of ours. Each field: a pair of arrows of its own, its texts MenuOptions<Name> and
+// are apart; it is the last one that fits above the panel's bottom strip. The interface's size and
+// the editor's interface size are in the free band between the page's title and the sound row, 24 px
+// apart (row -4, 40 px above the sound row, less 7 and plus 17: their arrows 7 px apart, the title
+// and the sound row's arrows clear). The page's own rows stay where they are: the panel's picture has
+// dark slots behind the sound and music bars at their rows, and with the rows moved those slots showed
+// empty. The page has no room for a fourth row of ours. A label must end before the left arrow: 20
+// letters. Each field: a pair of arrows of its own, its texts MenuOptions<Name> and
 // MenuOptions<Name><value> in each pack's strings.override.ini, and a line in each of the three
 // functions below.
 #define OPT_ROW_Y   89    // row 0, from the Y of CreateOptionsMenu: the mouse buttons' row + 40
@@ -24,13 +26,20 @@
 #define OPT_INTERFACE_LEFT  954
 #define OPT_INTERFACE_RIGHT 955
 #define OPT_INTERFACE_ROW   (-4)
+#define OPT_INTERFACE_UP    7    // the interface's row this much above row -4, the editor's ...
+#define OPT_EDITOR_DOWN     17   // ... this much below it
+#define OPT_EDITOR_LEFT     956
+#define OPT_EDITOR_RIGHT    957
 
 // LocoFix's InterfaceSizeMax (src/LocoFix/interface_scale.cpp, extern number 207): the biggest interface
 // size the game's window takes - the row offers no more
 extern InterfaceSizeMax() 207;
+// ... and EditorInterfaceSizeMax (extern number 208): the same for the editor's interface (its own pictures too)
+extern EditorInterfaceSizeMax() 208;
 
 int opt_minimap=0, opt_minimap_name=0, opt_minimap_value=0;
 int opt_interface=1, opt_interface_max=1, opt_interface_name=0, opt_interface_value=0;
+int opt_editor=1, opt_editor_max=1, opt_editor_name=0, opt_editor_value=0;
 int opt_x, opt_y, opt_z, opt_text_z;   // where CreateOptionsMenu put the page, and its depths
 string opt_text;
 
@@ -65,18 +74,32 @@ OptMinimapValue()
 }
 
 // The size shown: the chosen one as far as the window takes it (the game uses no more).
-OptInterfaceSizeText()
+OptInterfaceSizeText(int size,int max)
 {
-  if(opt_interface>=3 && opt_interface_max>=3) return OptString("MenuOptionsInterface3","3 TIMES AS BIG");
-  if(opt_interface>=2 && opt_interface_max>=2) return OptString("MenuOptionsInterface2","TWICE AS BIG");
+  if(size>=3 && max>=3) return OptString("MenuOptionsInterface3","3 TIMES AS BIG");
+  if(size>=2 && max>=2) return OptString("MenuOptionsInterface2","TWICE AS BIG");
   return OptString("MenuOptionsInterface1","NORMAL");
+}
+
+// The rows' Y: the interface's (editor 0) and the editor's interface's (1).
+OptInterfaceY(int editor)
+{
+  if(editor) return OptRowY(OPT_INTERFACE_ROW)+OPT_EDITOR_DOWN;
+  return OptRowY(OPT_INTERFACE_ROW)-OPT_INTERFACE_UP;
 }
 
 OptInterfaceValue()
 {
   if(opt_interface_value) Destroy(opt_interface_value);
-  opt_interface_value=PrintTextAtCenter(opt_x+OPT_VALUE_X+MENU_OPTIONS_SHIFT_X,OptRowY(OPT_INTERFACE_ROW)+opt_text_z,
-                                        opt_text_z,OptInterfaceSizeText(),2);
+  opt_interface_value=PrintTextAtCenter(opt_x+OPT_VALUE_X+MENU_OPTIONS_SHIFT_X,OptInterfaceY(0)+opt_text_z,
+                                        opt_text_z,OptInterfaceSizeText(opt_interface,opt_interface_max),2);
+}
+
+OptEditorValue()
+{
+  if(opt_editor_value) Destroy(opt_editor_value);
+  opt_editor_value=PrintTextAtCenter(opt_x+OPT_VALUE_X+MENU_OPTIONS_SHIFT_X,OptInterfaceY(1)+opt_text_z,
+                                     opt_text_z,OptInterfaceSizeText(opt_editor,opt_editor_max),2);
 }
 
 // After the page's own rows: X, Y as CreateOptionsMenu has them (GetRCX/GetRCY), the depth of its
@@ -99,12 +122,23 @@ OptFieldsCreate(int at_x,int at_y,int depth,int text_depth)
   if(opt_interface<1 || opt_interface>3) opt_interface=1;
   opt_interface_max=InterfaceSizeMax();
   if(opt_interface_max<1) opt_interface_max=1;
-  opt_interface_name=PrintText(opt_x-144+MENU_OPTIONS_SHIFT_X,OptRowY(OPT_INTERFACE_ROW)-8+opt_text_z,opt_text_z,
+  opt_interface_name=PrintText(opt_x-144+MENU_OPTIONS_SHIFT_X,OptInterfaceY(0)-8+opt_text_z,opt_text_z,
                                OptString("MenuOptionsInterface","INTERFACE SIZE"),2);
-  MenuCreate(OPT_INTERFACE_LEFT,0,opt_x+OPT_LEFT_X+MENU_OPTIONS_SHIFT_X,OptRowY(OPT_INTERFACE_ROW),opt_z);
-  MenuCreate(OPT_INTERFACE_RIGHT,0,opt_x+OPT_RIGHT_X+MENU_OPTIONS_SHIFT_X,OptRowY(OPT_INTERFACE_ROW),opt_z);
+  MenuCreate(OPT_INTERFACE_LEFT,0,opt_x+OPT_LEFT_X+MENU_OPTIONS_SHIFT_X,OptInterfaceY(0),opt_z);
+  MenuCreate(OPT_INTERFACE_RIGHT,0,opt_x+OPT_RIGHT_X+MENU_OPTIONS_SHIFT_X,OptInterfaceY(0),opt_z);
   opt_interface_value=0;
   OptInterfaceValue();
+
+  opt_editor=GetReg("SOFTWARE\\Gromada\\steam\\Players","EditorInterfaceScale","1");
+  if(opt_editor<1 || opt_editor>3) opt_editor=1;
+  opt_editor_max=EditorInterfaceSizeMax();
+  if(opt_editor_max<1) opt_editor_max=1;
+  opt_editor_name=PrintText(opt_x-144+MENU_OPTIONS_SHIFT_X,OptInterfaceY(1)-8+opt_text_z,opt_text_z,
+                            OptString("MenuOptionsEditorInterface","EDITOR INTERFACE"),2);
+  MenuCreate(OPT_EDITOR_LEFT,0,opt_x+OPT_LEFT_X+MENU_OPTIONS_SHIFT_X,OptInterfaceY(1),opt_z);
+  MenuCreate(OPT_EDITOR_RIGHT,0,opt_x+OPT_RIGHT_X+MENU_OPTIONS_SHIFT_X,OptInterfaceY(1),opt_z);
+  opt_editor_value=0;
+  OptEditorValue();
 }
 
 OptFieldsKill()
@@ -113,11 +147,16 @@ OptFieldsKill()
   if(opt_minimap_value) Destroy(opt_minimap_value);
   if(opt_interface_name) Destroy(opt_interface_name);
   if(opt_interface_value) Destroy(opt_interface_value);
+  if(opt_editor_name) Destroy(opt_editor_name);
+  if(opt_editor_value) Destroy(opt_editor_value);
   opt_minimap_name=0; opt_minimap_value=0; opt_interface_name=0; opt_interface_value=0;
+  opt_editor_name=0; opt_editor_value=0;
   Genocide(OPT_MINIMAP_LEFT);
   Genocide(OPT_MINIMAP_RIGHT);
   Genocide(OPT_INTERFACE_LEFT);
   Genocide(OPT_INTERFACE_RIGHT);
+  Genocide(OPT_EDITOR_LEFT);
+  Genocide(OPT_EDITOR_RIGHT);
 }
 
 // The menu item clicked (MenuVid()) while the page is open.
@@ -139,5 +178,14 @@ OptFieldsClick(int clicked)
     PlaySFX(24);
     SetReg("SOFTWARE\\Gromada\\steam\\Players","InterfaceScale",itoa(opt_interface));
     OptInterfaceValue();
+  }
+  if(clicked==OPT_EDITOR_LEFT || clicked==OPT_EDITOR_RIGHT)
+  {
+    if(opt_editor>opt_editor_max) opt_editor=opt_editor_max;   // what the row showed
+    if(clicked==OPT_EDITOR_LEFT && opt_editor>1) opt_editor=opt_editor-1;
+    if(clicked==OPT_EDITOR_RIGHT && opt_editor<opt_editor_max) opt_editor=opt_editor+1;
+    PlaySFX(24);
+    SetReg("SOFTWARE\\Gromada\\steam\\Players","EditorInterfaceScale",itoa(opt_editor));
+    OptEditorValue();
   }
 }
