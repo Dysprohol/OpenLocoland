@@ -1,11 +1,11 @@
-KLAVESY OVLADANI TOVARNY
+KLÁVESY OVLÁDÁNÍ TOVÁRNY
 
-VYBER A PREPNI (PO DRUHE)      0,HOME
-NA TOVARNU
+VYBER A PØEPNI (PO DRUHÉ)      0,HOME
+NA TOVÁRNU
 
-VYTVOR VUZ                     F1-F12,[,]
-ZRUS VYROBU VOZU               N,DEL
-POZASTAV VYROBU VOZU           M
-POSUN VOZ VLEVO VE FRONTE      <
-POSUN VOZ VPRAVO VE FRONTE     >
-PREPRIRAD VYROBU VOZU          ?
+VYTVOØ VÙZ                     F1-F12,[,]
+ZRUŠ VÝROBU VOZU               N,DEL
+POZASTAV VÝROBU VOZU           M
+POSUÒ VÙZ VLEVO VE FRONTÌ      <
+POSUÒ VÙZ VPRAVO VE FRONTÌ     >
+ZMÌNIT VÝROBU VOZU             ?

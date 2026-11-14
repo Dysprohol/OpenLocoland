@@ -1,14 +1,14 @@
-KLAVESY
+KLÁVESY
 
-NASTROJE LISTY          1-9, 0
-OTOCIT (STRANA 15)      R / E, KOLECKO
-DALSI ARMADA            A
-NAVESTIDLO CERV./ZELENE T
-USEK U NAVESTIDLA       L / SHIFT+L
-VYSKA OBJEKTU           PGUP / PGDN
-ZPET NA ZEM             HOME
+NÁSTROJE LIŠTY          1-9, 0
+OTOÈIT (STRANA 15)      R / E, KOLEÈKO
+DALSÍ ARMÁDA            A
+NÁVÌSTIDLO ÈERV./ZELENÉ T
+ÚSEK U NÁVÌSTIDLA       L / SHIFT+L
+VÝŠKA OBJEKTU           PGUP / PGDN
+ZPÌT NA ZEM             HOME
 DEKORACE / ROZESTUP     [ ] / < >
-STRKOVE LOZE TRATI      B
-ULOZIT MAPU             CTRL+S
+ŠTÌRKOVÉ LOŽE TRATI     B
+ULOŽIT MAPU             CTRL+S
 SPUSTIT / ZASTAVIT      CTRL+R
-NAPOVEDA                F1
+NÁPOVÌDA                F1

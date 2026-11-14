@@ -1,14 +1,14 @@
-VYBER A UMISTOVANI
+V›BÃR A UMISçOV¡NÕ
 
-VYBRAT OBJEKT           LTM NA NEJ
-PRESUNOUT HO            TAHNOUT HO
-OTOCIT HO (STRANA 15)   KOLECKO NEBO R / E
-JEHO PANEL              PTM NA NEJ
+VYBRAT OBJEKT           LTM NA NÃJ
+PÿESUNOUT HO            T¡HNOUT HO
+OTO»IT HO (STRANA 15)   KOLE»KO NEBO R / E
+JEHO PANEL              PTM NA NÃJ
 SMAZAT HO               DEL
-UMISTIT Z LISTY         VYBRAT, LTM NA MAPU
-ZPET K VYBERU           PTM NEBO ESC
-POSUNOUT POHLED         PROSTREDNI TLACITKO,
-                        SIPKY,
+UMÕSTIT Z LIäTY         VYBRAT, LTM NA MAPU
+ZPÃT K V›BÃRU           PTM NEBO ESC
+POSUNOUT POHLED         PROSTÿEDNÕ TLA»ÕTKO,
+                        äIPKY,
                         OKRAJ OBRAZOVKY
-ZPET / ZNOVU            CTRL+Z / CTRL+Y
-KAZDOU ZMENU LZE VRATIT (AZ 500 KROKU).
+ZPÃT / ZNOVU            CTRL+Z / CTRL+Y
+KAéDOU ZMÃNU LZE VR¡TIT (Aé 500 KROKŸ).
