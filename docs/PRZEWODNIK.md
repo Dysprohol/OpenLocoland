@@ -453,9 +453,11 @@ podgląd pokazuje gdzie; z dala od toru albo z Shiftem zostają tam, gdzie kurso
 Przeciągnięcie przenosi je razem z linią i semaforami na najbliższe właściwe miejsce (upuszczone z dala od toru
 albo z Shiftem: tam, gdzie upuszczone); usunięcie usuwa też linię i semafory. Jego semafory to te
 na końcach jego linii, także przesunięty bliżej albo wzdłuż linii - również w mapie wczytanej z
-pliku; po jednym w swoim kolorze, zwróconym do swoich pociągów, na każdym końcu. W misji otwartej
-tak, jak jest, linia budynku należy do skryptu misji: zostaje ze swoimi semaforami, a budynek dostaje
-nowe - zapisz najpierw misję pod nową nazwą, żeby przenosiły się razem z nim. Każdy inny semafor - odsunięty daleko, w innym kolorze, obrócony w drugą stronę, drugi na tym samym końcu - nie należy do budynku i zostaje tam, gdzie go postawiłeś.
+pliku; po jednym w swoim kolorze, zwróconym do swoich pociągów, na każdym końcu. Jego linia to ta, którą
+zrobił dla niego edytor; linia narysowana przez ciebie albo jego własna po obróceniu jej czy dołożeniu
+toru za ślepy koniec zostaje twoja - budynek robi wtedy nową. W misji otwartej tak, jak jest, linie
+należą do skryptu misji: przesunięcie budynku nie zmienia żadnej linii ani semafora - zapisz najpierw
+misję pod nową nazwą. Każdy inny semafor - odsunięty daleko, w innym kolorze, obrócony w drugą stronę, drugi na tym samym końcu - nie należy do budynku i zostaje tam, gdzie go postawiłeś.
 **Bloker** (kozioł oporowy, w grupie KOLEJ we Wszystkich obiektach) stawia się swobodnie i obraca
 R / E jak każdy obiekt: ustaw go sam na końcu toru.
 

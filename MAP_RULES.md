@@ -226,7 +226,7 @@ not forced to 0.
 
 | VID | Rule | Source |
 |---|---|---|
-| 102 factory | At the dead end of a straight spur (6+ rails in the missions) that meets the line through a Y - a curve pair each way - standing on the track; direction = the way out (0 north, 64 east, 128 south, 192 west); a factory push line (5). The player's factory needs a build list (`items`): the game's 14 factory units, in the order of their hotkeys, are `5 10 20 25 80 85 45 30 35 82 97 90 75 62` (F1-F12, `[`, `]`); the panel shows ten in a row, LocoFix adds a second row for the 11th-20th. **[tool]** rail point within 100 px, build list. **[editor]** a new factory takes the build list of one of the same army on the map, or these 14 when it is the player's or a neutral one (every mission's neutral factory has a list, so that it builds once captured); a warning without track within 100 px; its panel ticks the list (the game's order), the units it gets later and the player's limits (8). The enemy's AI (army 1 only) ignores the list and builds `level_queue_*` (the editor's plan, 8); a neutral or pirate factory builds nothing by itself (a map's plan orders it, 8), and only a neutral one is captured - on an editor map a train of the player's within 100 px of a neutral factory or repair point captures it (the runner's `CaptureTact`; the missions call `LDepoCapture`/`LMasterCapture` themselves) | l02, l05 (spur, Y, 128/0); sandbox test: a built train leaves through the Y |
+| 102 factory | At the dead end of a straight spur (6+ rails in the missions) that meets the line through a Y - a curve pair each way - standing on the track; direction = the way out (0 north, 64 east, 128 south, 192 west); a factory push line (5). The player's factory needs a build list (`items`): the game's 14 factory units, in the order of their hotkeys, are `5 10 20 25 80 85 45 30 35 82 97 90 75 62` (F1-F12, `[`, `]`); the panel shows ten in a row, LocoFix adds a second row for the 11th-20th. **[tool]** rail point within 100 px, build list. **[editor]** a new factory takes the build list of one of the same army on the map (an empty one stays empty), or, when none of its army is there, these 14 if it is the player's or a neutral one (every mission's neutral factory has a list, so that it builds once captured); changing a factory's army later leaves its list as it is; a warning without track within 100 px; its panel ticks the list (the game's order), the units it gets later and the player's limits (8). The enemy's AI (army 1 only) ignores the list and builds `level_queue_*` (the editor's plan, 8); a neutral or pirate factory builds nothing by itself (a map's plan orders it, 8), and only a neutral one is captured - on an editor map a train of the player's within 100 px of a neutral factory or repair point captures it (the runner's `CaptureTact`; the missions call `LDepoCapture`/`LMasterCapture` themselves) | l02, l05 (spur, Y, 128/0); sandbox test: a built train leaves through the Y |
 | 104 repair point | On a track trains drive through (a loop leg), the gate over the rails, turned along the track (0/128 on vertical track); every end of the loop meets the line through a Y each way; the leg is one way (5). It repairs only the car nearest to it (50 px), so the one-way push line through it matters: the train is pushed through and every car is repaired fully as it passes; a train standing in a repair point without one gets only its nearest car repaired. **[tool]** within 20 px of track | l05; sandbox tests: without a push line the loco 45 -> 150 hp, the wagon behind stayed at 22; with it the loco 45 -> 150 and the wagon 22 -> 75 (full: the player's army has 1.5x hp) |
 | 162 fort | A gate standing on the track (0-6 px in all 20 forts), turned along it (0/128 vertical, 64/192 horizontal, 32/96/160/224 diagonal). Guns (VID 115) on its wall: x +-47, z +92/+93 for 0/128; (-32, -24) and (+33, +23), z +93 for 32/160. It cannot be destroyed (U_OBJECT, maxHp 0); its guns can. **[tool]** within 8 px of track. **[editor]** a new fort comes with its guns at these places (64/192: (0, -33) and (0, +34); 96/224: (-33, +23) and (+33, -24), measured in l16 and l20), they move, turn and go with it; it snaps onto the line of the nearest straight track within 60 px, turned along it (R / E turn it round there), and is refused elsewhere. Its sockets: below | l10-l20; sandbox test: trains drive through it |
 | 165 mining plant | Not on the track. One gun on its wall, on the side its direction picks (sockets below) | l09, l11, l14, l15, l18 (30) |
@@ -286,16 +286,15 @@ posts - R / E turn it round on its leg, its line and posts with it; a crate snap
 elsewhere they are refused. A blocker is placed and turned freely (it snapped to a dead end until
 v0.2.2, issue #3).
 Moving or deleting the building
-moves or deletes its line and posts. Its line is one through its middle that runs out of it (5): a factory's from its middle
-or behind to at least 40 px ahead, a repair point's on through it, both ends at least 40 px away - one line a
-building, the one that fits best (a factory's from nearest its dead end, a repair point's nearest its middle,
-then the longest); a post's
-short line that only crosses the building is the post's, and a line a post owns gives no places for others. Its posts are found
-as the missions place them (7): for each place its line gives a light, the post nearest to it within 90 px of
-that colour, facing the same trains, beside that line's track and with no line of its own - at most one a
-place; any other post (another colour, the other way, a second one at the same end) is not the building's -
-on a map loaded from a file too. A line of the map's script (a mission opened as it is) is never a building's:
-it stays, with its posts, when the building is moved or deleted, and the building gets its own.
+moves or deletes its line and posts. Its line is only the editor line equal to the one the editor's rule
+makes for it where it stands (one building's at most); any other line - drawn by hand, a post's own, a
+mission's of the authors' length, the building's own after it was turned with R or track was laid past the
+dead end - is the map maker's and is never taken or erased by the building. Its posts are found as the missions
+place them (7), at that line's places only: for each place the post nearest to it within 90 px of that colour,
+facing the same trains, beside that line's track and with no line of its own - at most one a place; any other
+post (another colour, the other way, a second one at the same end) is not the building's - on a map loaded
+from a file too. On a map whose lines the editor does not save (a mission opened as it is) placing, moving,
+turning or deleting a building makes, takes and erases no line and no post.
 
 ## 6a. Trains on the map
 

@@ -453,9 +453,10 @@ shows where; away from the track, or with Shift, they stay where the cursor is, 
 Dragging one of them moves it, with its line and its semaphores, to the nearest right place (dropped away from the
 track or with Shift: where it is dropped); deleting it deletes them too. Its semaphores are those at
 the ends of its line, also one you moved closer or along the line - in a map loaded from a file too;
-one of its own colour, facing its trains, at each end. In a mission opened as it is, a building's line
-belongs to the mission's script: it stays with its semaphores and the building gets new ones - save the
-mission under a new name first to move them with it. Any other semaphore - moved far away, another colour, turned the other way, a second one at the same end - is not the building's and stays where you put it. A **blocker** (the buffer stop, in the RAILWAY group of All objects) is placed freely and
+one of its own colour, facing its trains, at each end. Its line is the one the editor made for it; a line you
+drew yourself, or its own after you turned it round or laid track past the dead end, stays yours - the
+building then makes a new one. In a mission opened as it is the lines belong to the mission's script: moving a
+building changes no line and no semaphore - save the mission under a new name first. Any other semaphore - moved far away, another colour, turned the other way, a second one at the same end - is not the building's and stays where you put it. A **blocker** (the buffer stop, in the RAILWAY group of All objects) is placed freely and
 turned with R / E like any object: set it at the end of a track yourself.
 
 **One-way lines** (**Push line**, key 4): a line on the track no train may enter against its

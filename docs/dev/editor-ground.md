@@ -423,54 +423,41 @@ editor's own rule gives on the editor's own lines. A post the player had moved t
 post of a mission (its lines are the script's, of the authors' lengths, so its posts stand 60-70 px from the
 editor's rule's places) was left where it stood when the building was dragged or turned, and the building got
 new ones: measured over a scripted run, The Factory 23 -> 26 semaphores, mission 3 10 -> 15, mission 5 10 -> 12.
-Now a building's posts are derived from the map the way the authors' maps place them (`post_owners`): a line
-needs a light at each place its rule gives one (`line_posts`: red at its end, green at a begin that is joined
-on), and the post that stands as that light - its colour, facing the same trains (its direction within one
-step of the place's), beside that line's track (its rail point, `post_dot`, on the line or within 90 px along
-the track past its ends, `line_reach`), within 90 px of the place (192 of the missions' 196 posts are within
-90 px of a line's end) and with no line of its own - is that line's; each place has at most one post, the
-nearest (ties: the line that is no building's, then the coordinates - never the order of the objects, which a
-save and load changes). A post is a building's when its place is one of that building's line's: its editor
-line (`building_traces`). A line of the script - a mission opened as it is, a map without editor blocks - is
-never a building's: the editor cannot move or delete it, so when its building is moved or deleted the line
-stays where it is with its posts, which still show the trains it is there (it acts in play whatever stands
-beside it, MAP_RULES 7), and the building gets a line and posts of its own; save the mission under a new
-name first (its lines become the editor's) and they move with it. For two days (2026-11-12/13) such a line
-was the building's: its posts went with the building and the line was left bare - a one-way section nobody
-sees - and after a short move the building had two lines' places (the second review). A post that stands as
-no light a line needs - another colour, the other way, a second post at the same end, one the player placed
-or moved elsewhere - is no building's and no move, turn or deletion of a building takes it, nor does a new
-place reuse it (`give_building_line` reuses a post within 30 px only when it already stands as that light and
-is no other building's or line's, from the same answer as the move's). Nothing is remembered in the session:
-the map answers in a session as after a save and load, so a building never takes more posts than its lines
-need (one a place). Until 2026-11-14 a memory (`g_post_owner`: the posts a building's line got, a building's
-post dragged or turned away) came first; the history did not undo it, so after an undo a post stayed another
-building's, and a post recoloured with T, given its own line with L or dragged far away was still taken at the
-building's next move while the same map saved and loaded kept it (the fix's second review). A line a post owns (its own, a pair's) gives no places: its lights are
-those posts - a post's line has a green place at its begin by the rule, which took a building's moved post
-near it away from the building (found in the rig: a light placed by hand near The Factory's repair point,
-whose moved green post then stayed behind at the repair point's drag). A building's line (`building_way`)
-passes its middle and runs out of it as the missions' lines do: a factory's from its middle or behind it (the
-dead end lies 22 px inside) to at least 40 px ahead, either way round; a repair point's on through it, both
-ends at least 40 px away (the missions' factory lines run 86-175 px from inside the factory - mission 18's
-enemy one only 47 px ahead of its middle -, their repair points' 139-304 px through it - mission 15's repair
-point 47 px from one end). So the building's line stays its own whatever the player did to it (turned round
-with R, track laid on past its dead end), and the short line a post gets is the post's when the post stands
-less than 40 px ahead of a factory's middle beside its spur, or its line ends less than 40 px from a repair
-point's middle. Farther out a post's line has the shape of the building's; a building has one line, the one
-that fits it best (`lines_of`: a factory's beginning nearest its spur's dead end, a repair point's passing
-nearest its middle, then the longest), so while its own line is there such a post's line - or a line on a
-parallel track within 30 px - is the post's (the second review: a red post 60 px ahead of a factory, with its
-own line, was taken as the factory's second light and deleted with its line). A building whose own line was
-deleted by hand takes the best such line for its own.
-Earlier versions of this fix: a factory's line had to begin at its spur's dead end (a turned line was left
-behind with its post and a new one made), then any line longer than 90 px was a building's (the 86-88 px
-factory lines of missions 8, 15, 18 and 20 were not), then 60 px out (mission 18's factory and mission 15's
-repair point were not); before them any line through the middle was the building's. Nothing new is stored: the missions, maps saved by
-v0.2.11 and posts moved and saved are known as they are, and a map is not changed by being opened. A post
-moved farther than 90 px from its place (or onto another track) and saved stays where the player put it after
-a load; a double saved in a map (The Factory's second red post on one spur) stays too - only one post is the
-light of a place. Checked in the game: a mission made on the template with the main line, a spur
+The rule now (third review, 2026-11-14) - when the editor is not sure a line or a post is the building's, it
+leaves it alone: a leftover the map maker deletes with one click is the mild failure, a hand-made line or post
+erased by a building's move must not happen (the tools are permissive). A building's line is only the editor
+line equal to the line the editor's own rule makes for it where it stands (`lines_of` / `rule_line_index`:
+`building_line`, `same_line` within 2 px); one line is at most one building's (the rule line of two buildings
+is neither's). Any other line - drawn with the Push line tool, a post's own (L), a mission's of the authors'
+length, the building's own after the player turned it with R or laid track on past the factory's dead end, the
+neighbour's line a pasted copy stands on - is the map maker's: no move, turn or deletion of a building takes or
+erases it, and a building without its rule line makes a new one at its next move and takes nothing (so after
+such changes the old line and its lights stay as a leftover). A building's posts (`post_owners`) are found only
+at that line's places (`line_posts`: red at its end, green at a begin that is joined on): at each place the
+nearest post within 90 px (192 of the missions' 196 posts are within 90 px of a line's end) of its colour,
+facing the same trains (direction within one step), beside that line's track (its rail point, `post_dot`, on
+the line or within 90 px along the track past its ends, `line_reach`) and with no line of its own - at most one
+a place; ties go to the line that is no building's, then by coordinates, never by the objects' order. The places
+of every other line compete for posts the same way, except a line a post owns (its own, a pair's): its lights
+are those posts. A post that stands as no light the building's line needs - another colour, the other way, a
+second one at the same end, one placed or moved elsewhere - is never taken, and a new place reuses a post
+within 30 px only when it already stands as that light and is no other building's or line's (`put_posts` with
+`as_light`); S and an entry's line reuse the nearest post that has no line of its own and is no building's
+light. Nothing is remembered in the session: the map answers the same in a session as after a save and load.
+On a map whose lines the editor does not save - a mission opened as it is - a building's placing, move, turn or
+deletion makes, takes and erases no line and no post (`give_building_line` and `take_building_lines` check
+`mission_managed`, as `give_post_line` does): a save under the same name keeps the script's lines and would
+have dropped a new one while keeping its posts. Save the mission under a new name first; its lines then become
+the editor's, but they are the authors' (86-304 px), not the editor's rule lines, so the first move of a
+building there leaves the authors' line and its lights as a leftover and makes the rule's. Measured: The
+Factory's lines are the editor's rule lines, so its buildings' lights go with them (23 throughout a full run,
+before 23 -> 26). Earlier versions of this fix guessed the line from its shape and fit (through the middle,
+40-90 px out, nearest the dead end, the longest), took a mission's script lines as the buildings' and kept a
+session memory of a building's posts; each review found a case where the guess gave a building a line or post
+the map maker had made and a move erased it (a 350 px hand line through a repair point, a pasted copy taking
+its neighbour's line, a post's L line of a factory without its own line), or where undo, T or L left the memory
+wrong. Nothing new is stored with a map, and a map is not changed by being opened. A double saved in a map (The
+Factory's second red post on one spur) stays - only one post is the light of a place. Checked in the game: a mission made on the template with the main line, a spur
 with a factory at its dead end (line and red post made), a repair point on the main line (line,
 green and red posts), a crate on the line and the reinforcement point; played with a test script in
 the game folder's copy: the reinforcement, damaged to 60 hp, was pushed through the repair point and
