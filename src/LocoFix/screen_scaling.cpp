@@ -34,6 +34,10 @@ void draw_fps_counter(IDirectDrawSurface7* back_buffer, const RECT& picture, dou
 void draw_menu_version(IDirectDrawSurface7* target, const RECT& window, const RECT& picture);
 // zoom.cpp: a level is about to load (the zoom goes back to 1)
 void zoom_level_loading();
+// zoom_view.cpp: a zoom's frame - the stretch of the world and the interface drawn after it at the window's size
+bool zoom_view_present(uint8_t* g, IDirectDrawSurface7* back_buffer, IDirectDrawSurface7* picture, const RECT& source,
+                       const RECT& target, const RECT& window);
+bool zoom_view_split();
 
 namespace {
 
@@ -64,6 +68,11 @@ float* screen_size(uint8_t* g) { return reinterpret_cast<float*>(g + 0x20c); }  
 int g_window_w = 0, g_window_h = 0;   // the resolution chosen in the launcher
 int g_logical_w = 0, g_logical_h = 0; // 0 = the whole window
 int g_base_w = 0, g_base_h = 0;       // the logical screen the level got at its load (0 = the whole window)
+// A zoom's view (zoom_view.cpp): the logical screen stretched by the zoom's factor into this part of the window
+// (centred; bars round it when the map is smaller than the view), not by screen_scaling's own rule.
+bool g_has_target = false;
+RECT g_target = {};
+POINT g_raw_mouse = {0, 0};           // the cursor in the game area in the window's pixels (the last WM_NCHITTEST)
 
 void set_screen(uint8_t* g, int w, int h) {
     screen_size(g)[0] = static_cast<float>(w);
@@ -167,9 +176,13 @@ bool create_small(uint8_t* g, int w, int h) {
 
 // In full screen only when `even_full_screen` (a zoom's screen bigger than the window, zoom.cpp): the
 // picture is then stretched into the flip chain's back buffer, which the game flips as before.
-bool use_small_surfaces(uint8_t* g, int w, int h, bool even_full_screen = false) {
+bool use_small_surfaces(uint8_t* g, int w, int h, bool even_full_screen = false, bool window_snapshot = false) {
     if ((*reinterpret_cast<uint32_t*>(g) & 0x80) && !even_full_screen) return false;   // full screen
     if (g_game[0] || !create_small(g, w, h)) return false;
+    if (window_snapshot && g_small_snapshot) {   // the zoom's split draws the fade at the window's size
+        g_small_snapshot->Release();
+        g_small_snapshot = nullptr;
+    }
     unlock(g);
     if (!set_render_target(g, g_small[0])) return false;
     for (int i = 0; i < 3; ++i) {
@@ -222,6 +235,7 @@ int __fastcall LevelLoad_hook(void* world, void* edx, const char* name) {
         g_logical_w = g_logical_h = 0;
     }
     g_base_w = g_base_h = 0;
+    g_has_target = false;
     const int result = g_level_load(world, edx, name);
     auto* w = static_cast<uint8_t*>(world);
     const int map_w = static_cast<int>(*reinterpret_cast<float*>(w + 0x28));
@@ -269,6 +283,10 @@ bool compute(uint8_t* g, Scaling& s) {
         y = (h - MENU_HEIGHT) / 2;
         w = MENU_WIDTH;
         h = MENU_HEIGHT;
+    } else if (g_has_target) {   // a zoom's view: stretched by the zoom's factor (zoom_view.cpp)
+        s.source = {0, 0, w, h};
+        s.target = g_target;
+        return true;
     }
     if (w == window_w && h == window_h) return false;
 
@@ -395,6 +413,13 @@ int __cdecl scale_frame(uint8_t* g, int present) {
     // With logical-sized surfaces the counter is drawn at the logical scale and stretched with
     // the picture: drawing on the window-sized one would make dgVoodoo copy it to memory and back.
     auto* picture = g_game[0] ? g_game[0] : back_buffer;
+    // A zoom with the interface apart (zoom_view.cpp): its own stretch, then the interface at the window's size.
+    if (g_has_target && picture != back_buffer && zoom_view_split() &&
+        zoom_view_present(g, back_buffer, picture, s.source, s.target, window)) {
+        draw_fps_counter(picture, window, 1.0);
+        if (presents_with_flip(g)) return 0;
+        return present_in_window(g, picture, window) ? 1 : 0;
+    }
     const int w = s.source.right - s.source.left, h = s.source.bottom - s.source.top;
     if (picture != back_buffer) draw_fps_counter(back_buffer, s.source, 1.0);
     if (!prepare_copy(back_buffer, w, h) || FAILED(g_copy->Blt(nullptr, back_buffer, &s.source, DDBLT_WAIT, nullptr))) {
@@ -445,7 +470,10 @@ void __fastcall Effect_hook(uint8_t* g, void* edx, int effect, int a, int b, int
     // than the window it would read past it (in 32-bit colour the copy is a Lock and a loop) - it gets the
     // window's size for the call, and the logical picture comes below.
     const float kept_w = screen_size(g)[0], kept_h = screen_size(g)[1];
-    const bool bigger = effect == 5 && g_window_w && (kept_w > g_window_w || kept_h > g_window_h);
+    // with the zoom's split the snapshot is the window's picture at the window's size (the interface pass draws
+    // the fade over the whole window, zoom_view.cpp): the engine copies it with the window's size, nothing after
+    const bool split = effect == 5 && g_window_w && zoom_view_split();
+    const bool bigger = effect == 5 && g_window_w && (split || kept_w > g_window_w || kept_h > g_window_h);
     if (bigger) {
         screen_size(g)[0] = static_cast<float>(g_window_w);
         screen_size(g)[1] = static_cast<float>(g_window_h);
@@ -455,7 +483,7 @@ void __fastcall Effect_hook(uint8_t* g, void* edx, int effect, int a, int b, int
         screen_size(g)[0] = kept_w;
         screen_size(g)[1] = kept_h;
     }
-    if (effect != 5 || !g_last_frame_scaled) return;
+    if (effect != 5 || !g_last_frame_scaled || split) return;
     auto* snapshot = surface(g, 0xc08);
     if (!snapshot || !g_copy) return;
     clear(snapshot, nullptr);
@@ -494,6 +522,7 @@ LRESULT CALLBACK scaling_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
         ScreenToClient(window, &p);
         RECT client;
         GetClientRect(window, &client);
+        if (PtInRect(&client, p)) g_raw_mouse = p;
         if (PtInRect(&client, p) && to_logical(p)) {
             ClientToScreen(window, &p);
             l = MAKELPARAM(p.x, p.y);
@@ -529,34 +558,58 @@ void screen_base_size(int& w, int& h) {
     h = g_base_h ? g_base_h : g_window_h;
 }
 
-// The game's screen while a mission runs (zoom.cpp): w x h logical pixels, stretched to the window keeping
-// the proportions; the level's own size gives back the surfaces of its load. The screen size, the view and
-// the clip rectangles are set as at a level load; the caller moves the camera and rebuilds what is laid out
-// against the screen. Called between two frames. False (nothing changed) when the surfaces cannot be made.
-bool screen_set_logical(int w, int h) {
+// The game's screen while a mission runs (zoom_view.cpp): w x h logical pixels drawn into surfaces of
+// surface_w x surface_h (bigger during a glide, which draws into their top-left part), stretched into `target`
+// of the window - or, with no target, the level's own screen again (its surfaces and its stretch as at its load).
+// A zoom's view always gets surfaces of its own, also in full screen (the game's window-sized ones then take
+// the stretched picture and the interface). The screen size, the view and the clip rectangles are set as at a
+// level load; the caller moves the camera. Called between two frames. False (nothing changed) when the surfaces
+// cannot be made.
+bool screen_set_view(int w, int h, int surface_w, int surface_h, const RECT* target) {
     auto* g = graphics();
     if (!g || !g_window_w || w <= 0 || h <= 0) return false;
-    const int cur_w = g_logical_w ? g_logical_w : g_window_w, cur_h = g_logical_h ? g_logical_h : g_window_h;
-    if (w == cur_w && h == cur_h) return true;
-    const bool bigger = w > g_window_w || h > g_window_h;
-    use_game_surfaces(g);
-    if (w == g_window_w && h == g_window_h) {
-        release_small();   // a zoom's big surfaces are not kept for the next time (tens of MB)
-        g_logical_w = g_logical_h = 0;
-        set_screen(g, w, h);
+    if (!target) {   // the level's own screen
+        const int base_w = g_base_w ? g_base_w : g_window_w, base_h = g_base_h ? g_base_h : g_window_h;
+        use_game_surfaces(g);
+        release_small();   // a zoom's surfaces are not kept for the next time (tens of MB)
+        g_has_target = false;
+        g_logical_w = g_base_w;
+        g_logical_h = g_base_h;
+        if (g_base_w) use_small_surfaces(g, base_w, base_h);
+        set_screen(g, base_w, base_h);
         return true;
     }
-    if (!use_small_surfaces(g, w, h, bigger) && bigger) {
-        // a screen bigger than the window needs surfaces of its own size: back to what there was
-        patch::log("screen scaling: no %dx%d surfaces, the screen stays %dx%d", w, h, cur_w, cur_h);
-        if (cur_w != g_window_w || cur_h != g_window_h) use_small_surfaces(g, cur_w, cur_h, true);
-        return false;
+    if (surface_w < w) surface_w = w;
+    if (surface_h < h) surface_h = h;
+    if (!g_game[0] || g_small_w != surface_w || g_small_h != surface_h) {
+        const bool had = g_game[0] != nullptr;
+        const int old_w = g_small_w, old_h = g_small_h;
+        use_game_surfaces(g);
+        if (!use_small_surfaces(g, surface_w, surface_h, true, true)) {
+            patch::log("screen scaling: no %dx%d surfaces for the zoom", surface_w, surface_h);
+            if (had && old_w && !use_small_surfaces(g, old_w, old_h, true, true)) g_has_target = false;
+            return false;
+        }
     }
+    g_has_target = true;
+    g_target = *target;
     g_logical_w = w;
     g_logical_h = h;
     set_screen(g, w, h);
     return true;
 }
+
+// zoom_view.cpp: the game's own window-sized surfaces (back buffer, z-buffer, depth buffer) while ours are in
+// use, and ways to point Direct3D and the engine at a surface set and a screen size for the interface's pass.
+bool screen_game_surfaces(IDirectDrawSurface7** out) {
+    if (!g_game[0]) return false;
+    for (int i = 0; i < 3; ++i) out[i] = g_game[i];
+    return true;
+}
+bool screen_set_render_target(uint8_t* g, IDirectDrawSurface7* s) { return set_render_target(g, s); }
+void screen_set_screen(uint8_t* g, int w, int h) { set_screen(g, w, h); }
+// The cursor in the game area in the window's pixels (the last WM_NCHITTEST, before the mapping).
+POINT screen_window_cursor() { return g_raw_mouse; }
 
 // The game area of the window in real pixels - the launcher's resolution (interface_scale.cpp); `w` and `h`
 // are left as they are before the first level has loaded.
