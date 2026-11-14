@@ -398,7 +398,9 @@ goes, it gets none) - before, it went back where it was; deleting a factory or a
 history. A factory is not turned by hand (its spur turns it); a repair
 point turns round on its leg - R / E, or TURN: ROUND in its panel, also while it is being placed -,
 and its line is made anew the other way with its posts (a green one at the new way in, a red one at
-the far end), one step of the history. A building's posts are those its line got and those standing within 30
+the far end), one step of the history. (The next lines tell the first two steps of issue #14's fix, of
+2026-11-10/11; both were replaced - see "A loaded map's posts" below - and the memory they describe is gone.)
+A building's posts are those its line got and those standing within 30
 px of where its line's rule puts them when one is dragged or turned round (`note_building_post`,
 `g_post_owner`; issue #14): before, only the second kind was found, so a post the player had moved away
 stayed when the repair point was turned or the factory dragged along its spur, and the building got new
@@ -433,10 +435,12 @@ lines through it and, on a map without editor blocks, the script's (`building_tr
 no light a line needs - another colour, the other way, a second post at the same end, one the player placed
 or moved elsewhere - is no building's and no move, turn or deletion of a building takes it, nor does a new
 place reuse it (`give_building_line` reuses a post within 30 px only when it already stands as that light and
-is no other building's or line's, from the same answer as the move's). What the editor remembers in the session
-(`g_post_owner`: the posts a building's line got, a building's post dragged or turned away, one dragged onto a
-building's place) comes first, but only onto a free place of its colour of that building - so a building never
-takes more posts than its lines need. A line a post owns (its own, a pair's) gives no places: its lights are
+is no other building's or line's, from the same answer as the move's). Nothing is remembered in the session:
+the map answers in a session as after a save and load, so a building never takes more posts than its lines
+need (one a place). Until 2026-11-14 a memory (`g_post_owner`: the posts a building's line got, a building's
+post dragged or turned away) came first; the history did not undo it, so after an undo a post stayed another
+building's, and a post recoloured with T, given its own line with L or dragged far away was still taken at the
+building's next move while the same map saved and loaded kept it (the fix's second review). A line a post owns (its own, a pair's) gives no places: its lights are
 those posts - a post's line has a green place at its begin by the rule, which took a building's moved post
 near it away from the building (found in the rig: a light placed by hand near The Factory's repair point,
 whose moved green post then stayed behind at the repair point's drag). A building's line (`building_way`)
