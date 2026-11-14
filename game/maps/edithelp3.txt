@@ -2,13 +2,13 @@ SELECTING AND PLACING
 
 SELECT AN OBJECT        LMB ON IT
 MOVE IT                 DRAG IT
-TURN IT (PAGE 15)       WHEEL OR R / E
+TURN IT (PAGE 15)       CTRL+WHEEL OR R / E
 ITS PANEL               RMB ON IT
 DELETE IT               DEL
 PLACE FROM THE BAR      PICK, LMB ON MAP
 BACK TO SELECTING       RMB OR ESC
 MOVE THE VIEW           MIDDLE BUTTON,
                         ARROWS, SCREEN EDGE
-ZOOM / BACK TO 100%     CTRL+WHEEL, CTRL+0
+ZOOM / BACK TO 100%     WHEEL, CTRL+0
 UNDO / REDO             CTRL+Z / CTRL+Y
 EVERY CHANGE CAN BE UNDONE (LAST 500 STEPS).

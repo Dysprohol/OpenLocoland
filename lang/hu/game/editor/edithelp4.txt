@@ -1,7 +1,7 @@
 BILLENTYÛK
 
 A SÁV ESZKÖZEI          1-9, 0
-FORGATÁS (15. OLDAL)    R / E, GÖRGÕ
+FORGATÁS (15. OLDAL)    R / E, CTRL+GÖRGÕ
 KÖVETKEZÕ SEREG         A
 SZEMAFOR PIROS / ZÖLD   T
 SZAKASZ A SZEMAFORNÁL   L / SHIFT+L

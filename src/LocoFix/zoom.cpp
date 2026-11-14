@@ -27,9 +27,10 @@
 // the camera (no border or arrow scrolling: an intro). The zoom stays while a menu is up (zoom_view.cpp gives the
 // menu its screen). A level change gives the level its own zoom.
 //
-// The map editor (a level held, editor.cpp): its plain wheel is its tools', so its zoom is Ctrl+wheel, passed in
-// by editor_edit.cpp (zoom_editor_wheel) - the same steps, caps and anchor; not while one of its panels is open.
-// Ctrl+0 puts the level's own zoom back (zoom_editor_reset). Run the level loads a level (its own zoom); coming
+// The map editor (a level held, editor.cpp): its window procedure takes the wheel over the map and passes it in
+// (zoom_editor_wheel; which keys mean the zoom there and which its tools: WHEEL_ZOOM_KEYS / WHEEL_TOOL_KEYS in
+// editor_edit.cpp) - the same steps, caps and anchor; not while one of its panels is open or a drag or a stroke is
+// under way. Ctrl+0 puts the level's own zoom back (zoom_editor_reset). Run the level loads a level (its own zoom); coming
 // back, editor.cpp asks for the editor's zoom again (zoom_editor_restore). The editor's camera margin past the
 // map is in map pixels, so camera.cpp takes it times zoom_ratio().
 //

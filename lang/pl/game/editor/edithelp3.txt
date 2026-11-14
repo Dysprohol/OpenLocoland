@@ -2,7 +2,7 @@ ZAZNACZANIE I STAWIANIE
 
 ZAZNACZ OBIEKT          LPM NA NIM
 PRZESU— GO              PRZECI•GNIJ GO
-OBR”∆ GO (STR. 15)      K”£KO LUB R / E
+OBR”∆ GO (STR. 15)      CTRL+K”£KO LUB R / E
 JEGO PANEL              PPM NA NIM
 USU— GO                 DEL
 POSTAW Z PASKA          WYB”R, LPM NA MAPIE
@@ -10,5 +10,5 @@ WR”∆ DO ZAZNACZANIA     PPM LUB ESC
 PRZESU— WIDOK           åRODKOWY PRZYCISK,
                         STRZA£KI,
                         KRAW Dè EKRANU
-POWI KSZENIE / 100%     CTRL+K”£KO, CTRL+0
+POWI KSZENIE / 100%     K”£KO, CTRL+0
 COFNIJ/PON”W (DO 500)   CTRL+Z / CTRL+Y

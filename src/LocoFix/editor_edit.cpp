@@ -74,7 +74,7 @@ void window_to_logical(POINT& p);   // screen_scaling.cpp
 void window_size(int& w, int& h);
 bool zoom_view_split();             // zoom_view.cpp: a zoom's view in effect - the interface drawn in the window
 void zoom_view_to_window(float& x, float& y);   // a point of the zoom's view in the window's pixels
-void zoom_editor_wheel(int notches);            // zoom.cpp: Ctrl+wheel, Ctrl+0
+void zoom_editor_wheel(int notches);            // zoom.cpp: the wheel over the map, Ctrl+0
 void zoom_editor_reset();
 double zoom_relative();
 const char* object_name(int nvid);  // editor_panel.cpp: the palette's names of the objects
@@ -1573,7 +1573,7 @@ struct UiDrawing {
     UiDrawing& operator=(const UiDrawing&) = delete;
 };
 int drawn_scale() { return g_ui_drawing ? g_ui : 1; }
-// Under a zoom (zoom.cpp, Ctrl+wheel) the map is drawn at the zoom and stretched to the window, and the interface
+// Under a zoom (zoom.cpp, the wheel) the map is drawn at the zoom and stretched to the window, and the interface
 // after it at the window's own pixels (zoom_view.cpp's second pass, edit_interface_pass): its screen is then the
 // window's, whatever the logical screen is, and its mouse the window's (g_win_mouse) divided by the scale. At the
 // level's own zoom none of this: the view and the logical mouse as before.
@@ -1709,6 +1709,12 @@ void map_to_ui(float& x, float& y) {
     y /= g_ui;
 }
 void no_mouse() { g_mouse = g_win_mouse = {-1, -1}; }
+
+// The mouse wheel in the editor, in one place: the keys held for the zoom (zoom.cpp) and for the tools (a brush's
+// size, the Track tool's ramp, turning what is placed or selected, the scatter's radius, a post's side), 0 = none.
+// The plain wheel zooms as in play; Ctrl+wheel is the tools'. To turn it round, swap the two.
+constexpr int WHEEL_ZOOM_KEYS = 0;
+constexpr int WHEEL_TOOL_KEYS = MK_CONTROL;
 bool on_bar(float x, float y);       // below
 bool on_options(float x, float y);
 int bar_entry_at(float x, float y);
@@ -9207,7 +9213,7 @@ void draw_ground_tool(bool heights) {
         }
         const bool inside = c.first >= 0 && c.first < grid_width() && c.second >= 0 && c.second < grid_height();
         std::snprintf(text, sizeof text,
-                      ui_format("StatusHeight", "Ground height: %s (M), radius %d (wheel), strength %d, edge %s - the ground here %d%s"),
+                      ui_format("StatusHeight", "Ground height: %s (M), radius %d (Ctrl+wheel), strength %d, edge %s - the ground here %d%s"),
                       brush_name(), g_radius, g_strength, g_hard_edge ? ui_text("WordHard", "hard") : ui_text("WordSoft", "soft"),
                       inside ? ground_cell(c.first, c.second) : 0,
                       g_flatten_level >= 0 ? ui_printf(ui_format("StatusLevelTaken", " - Flatten to %d (Alt+click)"), g_flatten_level).c_str() : "");
@@ -9220,7 +9226,7 @@ void draw_ground_tool(bool heights) {
         }
         draw_bed_reach(mx, my, r, shift_down());
         std::snprintf(text, sizeof text,
-                      ui_format("StatusBedBrush", "gravel bed: %s - click / drag on the track (dotted: the rails it re-beds), radius %d (wheel, + -) - Shift takes the beds away; %s"),
+                      ui_format("StatusBedBrush", "gravel bed: %s - click / drag on the track (dotted: the rails it re-beds), radius %d (Ctrl+wheel, + -) - Shift takes the beds away; %s"),
                       bed_kind_label(g_bed_kind), g_radius,
                       ui_text("WordBedPainted", "painted into the picture"));
     } else {
@@ -9236,7 +9242,7 @@ void draw_ground_tool(bool heights) {
                      ground_z(v, px, py) + (vid_liftable(v) ? g_place_lift : 0));
         const char* name = object_name(decal_nvid());
         std::snprintf(text, sizeof text,
-                      ui_format("StatusDecals", "Decals: %s, VID %d ([ ]), direction %d (R / E), radius %d (wheel, + -), spacing %d px (< >) - Shift takes away"),
+                      ui_format("StatusDecals", "Decals: %s, VID %d ([ ]), direction %d (R / E), radius %d (Ctrl+wheel, + -), spacing %d px (< >) - Shift takes away"),
                       name ? name : "?", decal_nvid(), v ? to_step(g_place_direction, at<int>(v, V_ND_DIR)) : 0, g_radius, g_spacing);
     }
     g_ground_status = text;
@@ -9330,7 +9336,7 @@ void draw_paint_tool() {
     if (tool() == Tool::Paint && g_paint_bed) {
         draw_bed_reach(mx, my, r, erase);
         std::snprintf(text, sizeof text,
-                      ui_format("StatusBed", "Paint - GRAVEL BED (dotted: where it goes): %s ([ ]), width %d px, brush %d px (wheel), strength %d, edge %s - %s; the right button puts the original back"),
+                      ui_format("StatusBed", "Paint - GRAVEL BED (dotted: where it goes): %s ([ ]), width %d px, brush %d px (Ctrl+wheel), strength %d, edge %s - %s; the right button puts the original back"),
                       bed_kind_name(g_bed_kind), g_bed_width, g_paint_radius, g_paint_strength,
                       g_paint_hard ? ui_text("WordHard", "hard") : ui_text("WordSoft", "soft"),
                       g_paint_objects ? ui_text("WordBedDecals", "decals under the rails") : ui_text("WordBedPainted", "painted into the picture"));
@@ -9343,13 +9349,13 @@ void draw_paint_tool() {
             fill(graphics(), nullptr, mx + r + 5, my - 7, mx + r + 19, my + 7, 0xff000000 | rgb);
         }
         std::snprintf(text, sizeof text,
-                      ui_format("StatusPaint", "Paint - TEXTURE: %s ([ ]), brush %d px (wheel), strength %d, edge %s - the right button puts the original back"),
+                      ui_format("StatusPaint", "Paint - TEXTURE: %s ([ ]), brush %d px (Ctrl+wheel), strength %d, edge %s - the right button puts the original back"),
                       ground_texture_name(g_texture), g_paint_radius, g_paint_strength,
                       g_paint_hard ? ui_text("WordHard", "hard") : ui_text("WordSoft", "soft"));
     } else {
         const WaterKind& k = WATER_KINDS[g_water_kind];
         const int level = water.level(k.nvid);
-        std::snprintf(text, sizeof text, ui_format("StatusWater", "Water: %s (W), level %s, brush %d px (wheel, + -) - Shift takes it away"),
+        std::snprintf(text, sizeof text, ui_format("StatusWater", "Water: %s (W), level %s, brush %d px (Ctrl+wheel, + -) - Shift takes it away"),
                       ui_text(k.key, k.english), level >= 0 ? std::to_string(level).c_str() : ui_text("WordNew", "new"), g_paint_radius);
         if (replaced) {
             const size_t used = std::strlen(text);
@@ -9786,7 +9792,7 @@ const char* hint_of(Tool t) {
     switch (t) {
     case Tool::Select: return ui_text("HintSelect", "click: select, drag: move, right: its panel, R / E: turn");
     case Tool::Delete: return ui_text("HintDelete", "click / drag: delete, Shift+click on a rail: its section");
-    case Tool::Track: return ui_text("HintTrack", "click: start / end, wheel: ramp, V: kind, middle: delete a rail");
+    case Tool::Track: return ui_text("HintTrack", "click: start / end, Ctrl+wheel: ramp, V: kind, middle: delete a rail");
     case Tool::Place: return ui_text("HintPlace", "click: place, R / E: turn, Shift: where the cursor is");
     case Tool::Decals:
         return bed_brush() ? ui_text("HintBedBrush", "click / drag on the track: this gravel bed, Shift: beds away")
@@ -9881,7 +9887,7 @@ void toggle_scatter() {
     scatter_save();
     const char* name = object_name(nvid);
     MESSAGE("MsgScatter", "%s (VID %d): %s", name ? name : "?", nvid,
-            scatter_on(nvid) ? ui_text("WordScatter", "a drag scatters it (radius: wheel, + -; spacing < >)") : ui_text("WordOneByOne", "placed one by one"));
+            scatter_on(nvid) ? ui_text("WordScatter", "a drag scatters it (radius: Ctrl+wheel, + -; spacing < >)") : ui_text("WordOneByOne", "placed one by one"));
 }
 
 // The status line of the placing helps (the Place tool, the Decals tool's decals).
@@ -11634,7 +11640,7 @@ const LabelTip LABEL_TIPS[] = {
     {"CtxTrain", "TipCtxTrain", "Train: turn it round (R), turn this car alone (E), couple to the train along the track (C)"},
     {"CtxUncoupleRow", "TipCtxUncouple", "Uncouple: in front of this car (U - it and the cars behind it are a new train) or behind it (Shift+U - the cars behind it); nothing moves"},
     {"CtxDelete", "TipCtxDelete", "Delete: this object (Del) - a car, or its whole train (Shift+Del)"},
-    {"CtxTurn", "TipCtxTurn", "Turn: R / E or the mouse wheel"},
+    {"CtxTurn", "TipCtxTurn", "Turn: R / E or Ctrl+wheel"},
     {"CtxPostFor", "TipCtxPostFor", "For trains: the way the trains this post is for go - the other way turns it round"},
     {"CtxColour", "TipCtxColour", "Colour: red stops its trains, green lets them in (T)"},
     {"CtxLine", "TipCtxLine", "Line: the post's own one-way line - what it does to its trains (L / Shift+L)"},
@@ -12119,7 +12125,7 @@ void draw_interface() {
                               static_cast<int>(std::lround(lift_of(g_selection[0])))).c_str());
     if (tool() == Tool::Track) {
         char bed[200];
-        std::snprintf(bed, sizeof bed, ui_format("StatusRailLevel", "rail (V): %s, level %d, every rail %s (wheel, PgUp / PgDn), gravel bed (B): %s"),
+        std::snprintf(bed, sizeof bed, ui_format("StatusRailLevel", "rail (V): %s, level %d, every rail %s (Ctrl+wheel, PgUp / PgDn), gravel bed (B): %s"),
                       rail_kind_name(RAIL_KINDS[g_rail_kind]), track_level(),
                       g_ramp > 0 ? ui_text("WordClimbs", "climbs") : g_ramp < 0 ? ui_text("WordDescends", "descends")
                                                                      : ui_text("WordFlat", "flat"),
@@ -12206,6 +12212,16 @@ void __fastcall DrawScene_editor(void* g, void* edx, int draw) {
 }
 
 }  // namespace
+
+// The cursor over the editor's own interface (the bar, the rows, an object's panel, the music player): the wheel
+// there zooms nothing - as in play over the bar.
+bool mouse_on_interface() {
+    if (mouse_on_bar() || mouse_on_options()) return true;
+    const POINT m = ui_mouse();
+    Box b;
+    if (context_rect(b) && b.contains(static_cast<float>(m.x), static_cast<float>(m.y))) return true;
+    return on_music(static_cast<float>(m.x), static_cast<float>(m.y));
+}
 
 // ---- editor.cpp's side ----
 
@@ -12490,11 +12506,15 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             !mouse_on_bar())
             delete_rail_at_cursor();
         return false;
-    case WM_MOUSEWHEEL:
-        if (g_ctrl || GetKeyState(VK_CONTROL) < 0 || (GET_KEYSTATE_WPARAM(w) & MK_CONTROL)) {   // Ctrl: the zoom (zoom.cpp)
-            zoom_editor_wheel(GET_WHEEL_DELTA_WPARAM(w) / WHEEL_DELTA);
+    case WM_MOUSEWHEEL: {
+        // the wheel's two meanings (WHEEL_ZOOM_KEYS, WHEEL_TOOL_KEYS above); Shift+wheel is always the tool's
+        // (the selected object's height, or the tool's own use with Shift as before)
+        const int keys = (g_ctrl || GetKeyState(VK_CONTROL) < 0 || (GET_KEYSTATE_WPARAM(w) & MK_CONTROL)) ? MK_CONTROL : 0;
+        if (!shift_down() && keys == WHEEL_ZOOM_KEYS) {   // the zoom (zoom.cpp) over the map; nothing over the interface
+            if (!mouse_on_interface()) zoom_editor_wheel(GET_WHEEL_DELTA_WPARAM(w) / WHEEL_DELTA);
             return true;
         }
+        if (!shift_down() && keys != WHEEL_TOOL_KEYS) return true;
         if (brush_tool())   // the brushes: the wheel sizes the brush, as + and - do
             brush_size(GET_WHEEL_DELTA_WPARAM(w) > 0 ? 1 : -1);
         else if (tool() == Tool::Track)   // the next rail climbs / falls a step, as PgUp / PgDn; nothing turns
@@ -12506,6 +12526,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         else
             turn(GET_WHEEL_DELTA_WPARAM(w) > 0 ? 1 : -1);
         return true;
+    }
     case WM_SYSKEYDOWN:
     case WM_SYSKEYUP:
         if (w != VK_MENU) return false;   // Alt+F4 and the accelerators as before

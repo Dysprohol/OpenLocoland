@@ -1,7 +1,7 @@
 KLÁVESY
 
 NÁSTROJE LIŠTY          1-9, 0
-OTOÈIT (STRANA 15)      R / E, KOLEÈKO
+OTOÈIT (STRANA 15)      R / E, CTRL+KOLEÈKO
 DALSÍ ARMÁDA            A
 NÁVÌSTIDLO ÈERV./ZELENÉ T
 ÚSEK U NÁVÌSTIDLA       L / SHIFT+L

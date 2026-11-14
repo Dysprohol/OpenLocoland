@@ -1,7 +1,7 @@
 KLAWISZE
 
 NARZÊDZIA PASKA         1-9, 0
-OBRÓÆ, ZAWRÓÆ (STR. 15) R / E, KÓ£KO
+OBRÓÆ, ZAWRÓÆ (STR. 15) R / E, CTRL+KÓ£KO
 NASTÊPNA ARMIA          A
 SEMAFOR CZERW./ZIELONY  T
 LINIA PRZY SEMAFORZE    L / SHIFT+L

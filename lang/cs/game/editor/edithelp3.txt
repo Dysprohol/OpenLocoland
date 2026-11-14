@@ -2,7 +2,7 @@ V›BÃR A UMISçOV¡NÕ
 
 VYBRAT OBJEKT           LTM NA NÃJ
 PÿESUNOUT HO            T¡HNOUT HO
-OTO»IT HO (STRANA 15)   KOLE»KO NEBO R / E
+OTO»IT HO (STRANA 15)   R / E, CTRL+KOLE»KO
 JEHO PANEL              PTM NA NÃJ
 SMAZAT HO               DEL
 UMÕSTIT Z LIäTY         VYBRAT, LTM NA MAPU
@@ -10,5 +10,5 @@ ZPÃT K V›BÃRU           PTM NEBO ESC
 POSUNOUT POHLED         PROSTÿEDNÕ TLA»ÕTKO,
                         äIPKY,
                         OKRAJ OBRAZOVKY
-PÿIBLÕéENÕ / 100%       CTRL+KOLE»KO, CTRL+0
+PÿIBLÕéENÕ / 100%       KOLE»KO, CTRL+0
 ZPÃT/ZNOVU (Aé 500)     CTRL+Z / CTRL+Y

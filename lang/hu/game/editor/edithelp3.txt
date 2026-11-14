@@ -2,13 +2,13 @@ KIJELÖLÉS ÉS LEHELYEZÉS
 
 OBJEKTUM KIJELÖLÉSE     BAL GOMB RAJTA
 MOZGATÁSA               HÚZÁS
-FORGATÁSA (15. OLDAL)   GÖRGÕ VAGY R / E
+FORGATÁSA (15. OLDAL)   R / E, CTRL+GÖRGÕ
 A PANELJE               JOBB GOMB RAJTA
 TÖRLÉSE                 DEL
 LEHELYEZÉS A SÁVRÓL     VÁLASZD, BAL GOMB
 VISSZA A KIJELÖLÉSHEZ   JOBB GOMB VAGY ESC
 NÉZET MOZGATÁSA         KÖZÉPSÕ GOMB,
                         NYILAK, KÉPERNYÕSZÉL
-NAGYÍTÁS / 100%         CTRL+GÖRGÕ, CTRL+0
+NAGYÍTÁS / 100%         GÖRGÕ, CTRL+0
 VISSZAVONÁS / ÚJRA      CTRL+Z / CTRL+Y
 MINDEN VÁLTOZÁS VISSZAVONHATÓ (500 LÉPÉS).
