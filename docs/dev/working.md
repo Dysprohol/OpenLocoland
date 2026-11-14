@@ -440,6 +440,33 @@ at 1600x1200 on a 2560x1440 screen (2026-11-12), where the cursor stopped at 159
 and the bar were reached; full screen opens on the primary monitor even when the window's saved
 place is on another one.
 
+**Zoom out with the wheel** (`zoom.cpp`, engine.md "Zoom out"). In a mission the mouse wheel towards
+the player draws the map smaller: the logical screen becomes the window times 1 / z, capped by the map,
+and is stretched down to the window as a small map's is stretched up; the interface is built s = S / z
+times bigger in it and comes out at its own size S. Only those zooms are offered: at the normal interface
+1/2 and 1/3, at twice 2/3, at three times none; a view the map caps on both axes is left out (its stretch
+would not be the zoom's and the bar would come out in-between), and so is one over the whole view of the
+biggest original map, 3072 x 2304 pixels (`MAX_PIXELS`; in test mode the test key's DWORD `ZoomMaxPixels`
+moves it). So at 1920 x 1080 the normal interface gets 1/2 on the 3072 maps and twice gets 2/3 there; at
+2560 x 1440 only twice gets 2/3 on the 3072 maps; the 2048 maps none at either; mission 1 none. The wheel
+does nothing over the interface, in a menu, while paused, while the scripts hold the camera (an intro)
+and in the editor; a level change goes back to zoom 1; a menu keeps the zoom (it is laid out in the
+middle of the screen of the moment and its 1024 x 768 middle is stretched, as at zoom 1). The cost of a
+frame follows the logical pixels. In the test rig (its virtual adapter, mission 13, no frame limit;
+the host's own numbers are the table below):
+
+| window | view | fps |
+|---|---|---|
+| 1920x1080 window | 1920x1080 / 2880x1620 / 3072x2160 | 44.7 / 18.5 / 12.1 |
+| 1920x1080 full screen | the same | 30.6 / 16.1 / 11.3 |
+| 2560x1440 window | 2560x1440 / 3072x2160 / 3072x2304 | 19.1 / 8.9 / 8.9 |
+
+A switch takes 6-9 ms and the process used at most 657 MB of its 2 GB of addresses. LocoFix.log gets
+each step's view, the switch's time and memory, and the average frame time of its first 3 s. The
+composition is the first way of making the view; drawing the interface apart from the world will give
+in-between zooms, whole-map views and zooming in - `zoom.cpp` keeps the zoom's state and input apart from
+`view_offers` / `view_size` / `view_apply`, which make the view.
+
 **Frame rate at high resolutions.** The game draws on one thread, and the cost of a frame grows
 with the screen: the engine draws the ground with Direct3D, then locks the back buffer and the
 depth buffer whole for the software sprites (dgVoodoo waits for the GPU and copies both to the

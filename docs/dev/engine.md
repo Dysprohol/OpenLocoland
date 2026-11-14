@@ -646,6 +646,28 @@ row, script function 208) with the same rule for what fits, drawn by our code, n
 table of bigger VIDs holds its pictures too (1123-1135, 1173-1185) - editor-ui.md "The interface's size in
 the editor".
 
+**Zoom out** (LocoFix `zoom.cpp`, working.md "Zoom out with the wheel"): the mouse wheel in play draws the
+map smaller, the interface at its own size. The engine's screen is changed while a mission runs: right
+after a frame is presented the game gets a logical screen bigger than the window (`screen_set_logical`:
+the back, z, depth and fade snapshot surfaces of that size, the screen size and `Graphics_SetViewport`,
+also in full screen, where the picture is stretched into the flip chain's back buffer), the fog texture
+made big enough (`fog_buffer_cover`), the bar given up and built again (`status_bar_rebuild`:
+`Player_HideStateBar` releases the bar's list - `lea ecx,[edi+0x14]; call MenuRelease`, whose
+`ObjectList_RemoveAt` deletes every item -, then `Player_ShowStateBar`), and the message lines made again
+(`interface_messages_rescale`: each line's text, `Text+0x70`, a new text object in the scale's font and
+`ACT_SET_TEXT` 0x78, the click strip, the map point kept). The bar is built s = S / z times bigger, so the
+stretch down to the window brings it back to its size S to the pixel; so only the zooms such an s exists
+for are offered (1/2 and 1/3 at the normal size, 2/3 at twice), and only where the map caps the view on
+one axis at most. The camera is put with `SetPosition` so that the map point under the cursor stays under
+it - `SetPosition` moves every object of `World.menu` and the cursor by the camera's change, so the
+rebuilt bar and the messages keep their places. The wheel is the engine's own `Mouse+0x04`
+(`World+0x234`), stored by `Mouse_HandleMessage` and cleared by `Mouse_BeginFrame`; nothing in a mission
+read it before. The bar's side tiles (VID 938, ours) are in no list but `World.menu`, so a bar built again
+deletes the old ones first (`remove_sides`, through each one's `Delete`, whose `Frame_Destruct` takes it
+off the menu). The fade-in effect (`Effect` 5) copies the window's picture by the screen's size; with a
+screen bigger than the window it gets the window's size for the call (in 32-bit colour the copy is a lock
+and a loop that would read past the window's picture).
+
 **Panels** (`Player.panel`, `Player_SetPanel`): 0 the unit bar, 1 the cars of the flagman train, 2 the
 build list of the flagman factory, 5 the queue of that factory, 6 hidden. The ten bar slots
 (`Player.barUnits`) are filled by `Player_SetBarSlot` - `Shift`+1..9 puts the flagman there (a train

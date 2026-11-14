@@ -583,6 +583,14 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       device, pictures, lamp and buttons, fonts 3 and 7) enlarged by the build as the bar's are (VIDs
       1123-1135, 1173-1185); the cursor at the editor's size while the level is held, Run the level at the
       game's,
+  51. zoom out with the mouse wheel in play (`zoom.cpp`, engine.md "Zoom out", working.md "Zoom out with
+      the wheel"): the wheel towards the player draws the map on a logical screen bigger than the window,
+      stretched down to it, with the bar, the minimap and the message lines built that many times bigger
+      so they keep their size; the map point under the cursor stays under it. Only the exact steps the
+      interface's pictures give (normal 1/2 and 1/3, twice 2/3) where the map caps the view on one axis
+      at most, up to the whole view of a 3072 x 2304 map; nothing over the interface, in a menu, while
+      paused, during an intro or in the editor; a level change goes back to zoom 1. The engine stored the
+      wheel and nothing in a mission read it,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
