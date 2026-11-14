@@ -3342,8 +3342,12 @@ void copy_unit_state(uint8_t* o) {
         }
     }
     // the player's, and a neutral one (army 2): every mission's neutral factory has the list, so that once
-    // the player captures it it builds; the enemy's AI ignores the list (MAP_RULES 6)
-    if (nvid_of(o) == VID_DEPOT && at<int>(o, O_ITEMS_COUNT) == 0 && (army_of(o) == 0 || army_of(o) == 2)) {
+    // the player captures it it builds; the enemy's AI ignores the list (MAP_RULES 6). Only when no factory
+    // of its own army lent it a list: an empty list copied from one of its army is the map maker's choice
+    // and stays empty (one of another army - the enemy's, which needs none - lends no choice). Changing a
+    // factory's army later leaves its list as it is.
+    const bool own_army_source = source && army_of(source) == army_of(o);
+    if (nvid_of(o) == VID_DEPOT && !own_army_source && at<int>(o, O_ITEMS_COUNT) == 0 && (army_of(o) == 0 || army_of(o) == 2)) {
         act(o, ACT_DELETE_ALL_ITEM);
         for (short n : DEPOT_UNITS) act(o, ACT_ADD_ITEM, n);
     }
