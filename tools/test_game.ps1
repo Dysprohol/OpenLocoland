@@ -306,8 +306,8 @@ if ($ClickOk -gt 0) {
   $gp = [W]::Rd($p.Id, 0x4a9a14); "at the dialog: P=0x{0:X8} flags=0x{1:X8}" -f $gp, [W]::Rd($p.Id, $gp)
   foreach ($h in $wins) { $fs = [W]::GetDlgItem($h, 1005); if ($fs -ne [IntPtr]::Zero) { "Box enabled: " + [W]::IsWindowEnabled($fs); if ($SetFull -eq 0 -and -not [W]::IsWindowEnabled($fs)) { "STOP: box disabled - not clicking OK"; Stop-Process -Id $p.Id -Force; return }; "Full screen ticked: " + [W]::SendMessage($fs, 0xF0, [IntPtr]::Zero, [IntPtr]::Zero); $cur = [int][W]::SendMessage($fs, 0xF0, [IntPtr]::Zero, [IntPtr]::Zero); if ($SetFull -ge 0 -and $cur -ne $SetFull) { [void][W]::SendMessage($fs, 0xF1, [IntPtr]$SetFull, [IntPtr]::Zero); "Setting the box -> " + [W]::SendMessage($fs, 0xF0, [IntPtr]::Zero, [IntPtr]::Zero) } }
     $list = [W]::GetDlgItem($h, 1001)
-    if ($list -ne [IntPtr]::Zero) { $sel = [int][W]::SendMessage($list, 0x147, [IntPtr]::Zero, [IntPtr]::Zero); "Resolution list $([W]::ComboLines($list)); selected: line $sel" }
-    if ($PickMode -and $list -ne [IntPtr]::Zero) { $i = [int][W]::SendText($list, 0x14D, [IntPtr](-1), $PickMode); "Picking '$PickMode' -> line $i"; [void][W]::SendMessage($h, 0x0111, [IntPtr]((1 -shl 16) -bor 1001), $list) }
+    if ($list -ne [IntPtr]::Zero) { $sel = [BitConverter]::ToInt32([BitConverter]::GetBytes([W]::SendMessage($list, 0x147, [IntPtr]::Zero, [IntPtr]::Zero).ToInt64()), 0); "Resolution list $([W]::ComboLines($list)); selected: line $sel" }
+    if ($PickMode -and $list -ne [IntPtr]::Zero) { $i = [BitConverter]::ToInt32([BitConverter]::GetBytes([int64][W]::SendText($list, 0x14D, [IntPtr](-1), $PickMode)), 0); "Picking '$PickMode' -> line $i"; [void][W]::SendMessage($h, 0x0111, [IntPtr]((1 -shl 16) -bor 1001), $list) }
     $ok = [W]::GetDlgItem($h, 1); if ($ok -ne [IntPtr]::Zero) { "Clicking OK"; [void][W]::PostMessage($h, 0x0111, [IntPtr]1, $ok) } }
   Start-Sleep -Seconds $ClickOk
   $p.Refresh(); "Process alive after OK: $(-not $p.HasExited)"
