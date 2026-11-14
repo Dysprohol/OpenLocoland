@@ -46,6 +46,7 @@ constexpr uintptr_t CALL_LOAD_CURSOR = 0x4255e2;  // Cursor_Show: call [LoadCurs
 constexpr uintptr_t IAT_LOAD_CURSOR = 0x47518c;
 constexpr uintptr_t OBJECT_MOVE_TO = 0x446640;
 constexpr uintptr_t MESSAGE_LIST_CLEAR = 0x424980;
+constexpr uintptr_t TIP_TEXT = 0x4a9d58;            // MouseTip_Update: the String with the tip's text
 constexpr int CURSOR_LOADED = 0x104;              // Cursor: the Windows cursors are loaded (Cursor_Show / _Hide)
 
 constexpr int FONTS[] = {2, 6, 8, 14, 16, 17, 18};   // the interface's fonts (patch_data.INTERFACE_VIDS)
@@ -150,19 +151,21 @@ void __fastcall mouse_tip(uint8_t* tip, void* edx, uint8_t* mouse) {
     }
     uint8_t* text = at<uint8_t*>(tip, 0x04);
     if (!text || text == before) return;
-    // the engine put it 5 px right of the cursor (unless held at the right edge) and 10 px above it (or, at the
-    // top edge, below it): those offsets times the scale. Frame_Construct added the camera, which is fractional
-    // after scrolling, so the place is told apart with half a pixel's room, not by equality.
+    // Its place laid out again as MouseTip_Update lays it out, with the offsets times the scale: 5 s px right of the
+    // cursor and 10 s px above it; below it (10 s px) when the tip would reach above the view's top; held at the
+    // view's right edge when "{text}" would reach past it - so the bigger offsets never push a tip off the screen.
     const float cam_x = at<float>(world(), 0x44), cam_y = at<float>(world(), 0x48);
     const float mx = at<float>(mouse, 0x10), my = at<float>(mouse, 0x14);
-    float x = at<float>(text, 0x30) - cam_x, y = at<float>(text, 0x34) - cam_y;   // y as created: screen y + z
-    const float size_y = at<float>(at<uint8_t*>(text, 0x1c), 0x20);
-    auto close_to = [](float a, float b) { return a - b < 0.5f && b - a < 0.5f; };
-    if (close_to(x, mx + TIP_RIGHT)) x = mx + TIP_RIGHT * s;
-    const float above = ((my - size_y) + 3000.0f) - TIP_UP;
-    if (close_to(y, above)) y = ((my - size_y) + 3000.0f) - TIP_UP * s;
-    else y += TIP_UP * (s - 1);
-    move_to(text, x + cam_x, y + cam_y);
+    uint8_t* font = at<uint8_t*>(text, 0x1c);
+    const float size_x = at<float>(font, 0x1c), size_y = at<float>(font, 0x20);
+    const float view_right = at<float>(graphics(), 0x224), view_top = at<float>(graphics(), 0x228);
+    const char* tip_text = *reinterpret_cast<const char* const*>(TIP_TEXT);
+    const float width = static_cast<float>((tip_text ? std::strlen(tip_text) : 0) + 2) * size_x;   // with the braces
+    float x = mx + TIP_RIGHT * s;
+    float y = (my - size_y) - TIP_UP * s;                     // the screen row the engine keeps as y - z
+    if (y + size_y * 0.5f <= view_top) y = size_y * 0.5f + my + TIP_UP * s;
+    if (view_right <= width + x) x = view_right - width;
+    move_to(text, x + cam_x, y + 3000.0f + cam_y);            // z 3000, as the engine makes it
 }
 
 // ---- the cursor ----

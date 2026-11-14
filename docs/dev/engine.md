@@ -622,14 +622,17 @@ strip's VID 449 swapped in `World.vids` while the engine makes it). A text switc
 in the middle of a line (`<Font=16>`, the ESC byte: the messages' red, yellow and green), so while a text
 in a bigger font is drawn (`Text_Draw`) the interface's font numbers name their bigger copies. The mouse
 tip (`MouseTip_Update`, font VID 6, 5 px right of and 10 px above the cursor) is made in the bigger
-font with those offsets times the scale while the bar is up in play; the menus and the held editor keep
+font with those offsets times the scale while the bar is up in play (its place laid out again the engine's
+way - flipped below the cursor at the top, held at the right edge - so a bigger tip stays on the screen); the menus and the held editor keep
 the normal one. The cursors (`Cursor_Show`, Windows `.ani` files through `LoadCursorFromFileA` at the
 system's size) are loaded with `LoadImage` s times the system's cursor size - Windows scales the
 picture and its hot spot together (the arrow's 6,5 of 32 x 32 is 18,15 of 96 x 96) - while the play
 bar is up at that scale, and at the normal size again when the bar is hidden or given up (the menus,
 the end screens, the held editor, TAB), as the mouse tip. A size changed in the Esc menu clears the
 message lines still on the screen at the next message (moved by the new step they would overlap, and a
-click would find a line never written). With the bar hidden, a click on a factory makes
+click would find a line never written). The list takes its numbers from the last bar's scale, so with the
+bar hidden at a mission's start (TAB remembered) the objectives come at that scale - at the game's start the
+normal one - and the first message after the bar is built at another scale clears them. With the bar hidden, a click on a factory makes
 `Player_SetPanel(2)` build the bar itself and then the list in the same call; the list takes the scale
 that bar gets. Messages are one line each, with no wrapping: the longest
 objective is 48 letters (German), the longest event message 44 - 1728 px at three times, inside

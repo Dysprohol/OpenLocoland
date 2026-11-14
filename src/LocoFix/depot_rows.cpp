@@ -34,6 +34,7 @@
 
 int interface_scale();                          // interface_scale.cpp
 int interface_choose_scale();
+void interface_copy_colours(int scale);
 uint8_t* interface_vid(int nvid, int scale);
 
 #include <cstdio>
@@ -247,6 +248,9 @@ void __fastcall set_panel(void* player, void* edx, int panel) {
         hide_marker(player);
         return;
     }
+    // the army colours onto the bigger copies first: when this call builds the bar (no bar yet, status_bar.cpp
+    // show()), World.vids below names the copies and show() would read them as the originals
+    interface_copy_colours(s);
     // the engine makes the list's objects from World.vids: the scale's bigger copies meanwhile
     uint8_t** vids = reinterpret_cast<uint8_t**>(world() + 0x294);
     constexpr int SWAPPED[] = {455, 497, 8};

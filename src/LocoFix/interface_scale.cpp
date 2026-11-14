@@ -217,7 +217,7 @@ void interface_copy_colours(int s) {
     for (int i = 0; i < COUNT; ++i) {
         uint8_t* original = vid(VIDS[i]);
         uint8_t* big = vid(FIRST_VID[s] + i);
-        if (!original || !big) continue;
+        if (!original || !big || original == big) continue;   // (a slot naming its copy: nothing to copy from)
         for (unsigned army = 0; army < 4; ++army) {
             auto* gamma = &at<uint32_t>(original, VID_ARMY_GAMMA + 8 * army);
             auto* has = &at<uint32_t>(big, VID_ARMY_GAMMA + 8 * army);
