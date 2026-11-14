@@ -36,6 +36,8 @@ int interface_scale();                          // interface_scale.cpp
 int interface_choose_scale();
 void interface_copy_colours(int scale);
 uint8_t* interface_vid(int nvid, int scale);
+void* zoom_view_layout_begin();                 // zoom_view.cpp: the window's layout under a zoom
+void zoom_view_layout_end(void* token);
 
 #include <cstdio>
 
@@ -235,7 +237,7 @@ void hide_marker(void* player) {
     if (x > off) reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(marker, nullptr, off, at<float>(marker, 0x34), at<float>(marker, 0x38));
 }
 
-void __fastcall set_panel(void* player, void* edx, int panel) {
+void set_panel_laid_out(void* player, void* edx, int panel) {
     const int wanted = panel & ~0x10;
     const bool list = wanted == PANEL_DEPOT_LIST || wanted == PANEL_DEPOT_QUEUE;
     // With no bar (hidden with TAB, a factory clicked) Player_SetPanel(2) builds the bar itself (Player vtable
@@ -264,6 +266,14 @@ void __fastcall set_panel(void* player, void* edx, int panel) {
     scale_panel(player, s);
     add_second_row(player);
     hide_marker(player);
+}
+
+// Player_SetPanel. Under a zoom the panel is laid out in the window's pixels, as the bar is (the engine centres
+// the factory list's strip, VID 497, on the screen's width): zoom_view.cpp sets the screen to the window's for it.
+void __fastcall set_panel(void* player, void* edx, int panel) {
+    void* token = zoom_view_layout_begin();
+    set_panel_laid_out(player, edx, panel);
+    zoom_view_layout_end(token);
 }
 
 void __fastcall handle_panel_action(void* player, void* edx, int object, int* index) {
