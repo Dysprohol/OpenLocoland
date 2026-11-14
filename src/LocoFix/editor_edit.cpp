@@ -7280,87 +7280,45 @@ bool building_line(uint8_t* o, PushLine& line) {
     return false;
 }
 
-// A line's way is a line of the building `o` as the missions' lines are (MAP_RULES 5): it passes the
-// building's middle (within 30 px) and runs out of it - a factory's from its middle or behind it (the
-// dead end of its spur lies 22 px inside) to at least BUILDING_LINE_OUT ahead of it, the way it faces,
-// either way round; a repair point's on through it, both its ends at least BUILDING_LINE_OUT from its
-// middle. The missions' factory lines run 86-175 px from inside the factory (l18's enemy one only 47 px
-// ahead of its middle), their repair points' lines 139-304 px through it (l15's repair point 47 px from
-// one end), the editor's 140 and 120 each side. So the building's own line stays the building's whatever
-// the player did to it - turned round with R in the Push line tool, track laid on past its dead end -, and
-// the short line a post gets (70 px, up to a link more) is not the building's when it only crosses it: a
-// post beside a factory's spur whose rail point is less than BUILDING_LINE_OUT ahead of the factory's
-// middle, a post at a repair point whose line ends less than BUILDING_LINE_OUT from its middle. Farther out
-// a post's line has the shape of the building's, and lines_of tells them apart: a building has one line,
-// the one that fits it best. Until 2026-11-12 any
-// line through the middle was the building's (a post's short line too); then for a day a factory's had to
-// begin at its spur's dead end, which a turned line does not - its move left the old line and post and made
-// new ones; then any line longer than 90 px was, which the missions' 86-88 px factory lines (l08, l15, l18,
-// l20) are not; then 60 px out, which l18's factory and l15's repair point are not.
-constexpr float BUILDING_LINE_OUT = 40;
+// A building's line is the one the editor makes for it where it stands, and nothing else: an editor
+// line equal to what building_line gives for it now (same_line, 2 px for the rail points' rounding).
+// When the editor is not sure a line is the building's it leaves it alone - a leftover line the map maker
+// deletes with a click is the mild failure; a line drawn by hand and erased by a building's move is the
+// one that must not happen (the editor's tools are permissive). So a line with other ends - drawn with
+// the Push line tool, a post's own (L), a mission's of the authors' length, the building's own line after
+// the player turned it with R or laid track on past the factory's dead end - is the map maker's: no move,
+// turn or deletion of the building takes or erases it, and the building, having no line, makes a new one
+// at its next move and takes nothing. One line is at most one building's: when it is the rule line of two
+// (one standing on the other's place), it is neither's. Until 2026-11-14 the line was guessed from its
+// shape (through the middle, so far out) and how well it fitted (nearest the dead end, longest): each
+// guess gave some building a line the map maker had drawn, and the move erased it (the three reviews of
+// this fix: a 350 px hand line through a repair point, a pasted copy taking its neighbour's line, a line
+// from behind a factory on track laid past its dead end, a post's L line of a factory whose own line was
+// deleted).
+bool same_line(const PushLine& a, const PushLine& b);   // posts, below
 
-bool building_way(uint8_t* o, const std::vector<uint8_t*>& path) {
-    if (path.size() < 2) return false;
-    const float x = at<float>(o, O_X), y = at<float>(o, O_Y);
-    const bool through = std::any_of(path.begin(), path.end(), [&](uint8_t* d) { return std::hypot(dot_wx(d) - x, dot_wy(d) - y) < 30; });
-    if (!through) return false;
-    uint8_t* front = path.front();
-    uint8_t* back = path.back();
-    if (nvid_of(o) == VID_DEPOT) {
-        const float a = at<int>(o, O_DIRECTION) * 6.2831853f / 256;
-        const float vx = std::sin(a), vy = -std::cos(a);   // the way it faces
-        auto ahead = [&](uint8_t* d) { return (dot_wx(d) - x) * vx + (dot_wy(d) - y) * vy; };
-        const float f = ahead(front), b = ahead(back);
-        return (f <= 10 && b >= BUILDING_LINE_OUT) || (b <= 10 && f >= BUILDING_LINE_OUT);
-    }
-    return std::hypot(dot_wx(front) - x, dot_wy(front) - y) >= BUILDING_LINE_OUT &&
-           std::hypot(dot_wx(back) - x, dot_wy(back) - y) >= BUILDING_LINE_OUT;
+// The index of the editor's line that is `o`'s rule line (building_line), -1 for none.
+int rule_line_index(uint8_t* o) {
+    if (nvid_of(o) != VID_DEPOT && nvid_of(o) != VID_WORKSHOP) return -1;
+    PushLine rule;
+    if (!building_line(o, rule)) return -1;
+    const std::vector<PushLine>& lines = mission_push_lines();
+    for (int i = 0; i < static_cast<int>(lines.size()); ++i)
+        if (same_line(lines[i], rule)) return i;
+    return -1;
 }
 
-float way_length(const std::vector<uint8_t*>& path) {
-    float len = 0;
-    for (size_t k = 1; k < path.size(); ++k)
-        len += std::hypot(dot_wx(path[k]) - dot_wx(path[k - 1]), dot_wy(path[k]) - dot_wy(path[k - 1]));
-    return len;
-}
-
-// How well a way that is a line of `o` (building_way) fits it, smaller better: a factory's - how far
-// ahead of its middle its dead-end side begins (its spur's dead end, 22 px behind, best); a repair
-// point's - how far its way passes from its middle.
-float building_fit(uint8_t* o, const std::vector<uint8_t*>& path) {
-    const float x = at<float>(o, O_X), y = at<float>(o, O_Y);
-    if (nvid_of(o) == VID_DEPOT) {
-        const float a = at<int>(o, O_DIRECTION) * 6.2831853f / 256;
-        const float vx = std::sin(a), vy = -std::cos(a);
-        auto ahead = [&](uint8_t* d) { return (dot_wx(d) - x) * vx + (dot_wy(d) - y) * vy; };
-        return (std::min)(ahead(path.front()), ahead(path.back()));
-    }
-    float best = 1e9f;
-    for (uint8_t* d : path) best = (std::min)(best, std::hypot(dot_wx(d) - x, dot_wy(d) - y));
-    return best;
-}
-
-// The editable line of a factory or repair point (its index; none, or one): of the editor's lines whose
-// way is its line (building_way) the one that fits it best (building_fit, within 2 px a tie), then the
-// longest, then the first. A building has one line, as every one of the missions': so a post's own line
-// that has the shape of a factory's - a post 40-90 px out along the spur whose 70 px line reaches back
-// past the factory's middle - or a line on a parallel track within 30 px of the middle is not the
-// building's while its own line is there (the second review of this fix: such a post was taken as the
-// factory's second light and deleted with its line). A building whose own line was deleted by hand takes
-// the best such line for its own.
+// The editable line of a factory or repair point (its index; none, or one): its rule line, when no other
+// building has the same rule line.
 std::vector<int> lines_of(uint8_t* o) {
     std::vector<int> out;
-    if (nvid_of(o) != VID_DEPOT && nvid_of(o) != VID_WORKSHOP) return out;
-    const std::vector<PushLine>& lines = mission_push_lines();
-    int best = -1;
-    float best_fit = 0, best_len = 0;
-    for (int i = 0; i < static_cast<int>(lines.size()); ++i) {
-        const Trace t = trace(lines[i]);
-        if (!building_way(o, t.path)) continue;
-        const float fit = building_fit(o, t.path), len = way_length(t.path);
-        if (best < 0 || fit < best_fit - 2 || (fit <= best_fit + 2 && len > best_len)) best = i, best_fit = fit, best_len = len;
-    }
-    if (best >= 0) out.push_back(best);
+    const int i = rule_line_index(o);
+    if (i < 0) return out;
+    bool shared = false;
+    for_each_object([&](uint8_t* b) {
+        if (!shared && b != o && !removed(b) && rule_line_index(b) == i) shared = true;
+    });
+    if (!shared) out.push_back(i);
     return out;
 }
 
@@ -13611,7 +13569,7 @@ void edit_log_building_posts(const char* tag) {
                     lines += ui_printf(" s(%d,%d->%d,%d)", l.bx, l.by, l.ex, l.ey);
                     break;
                 }
-        std::string near_lines;   // every editor line passing within 60 px: its nearest point, its ends' distances, building_way
+        std::string near_lines;   // every editor line passing within 60 px: its nearest point, its ends' distances, whether it is the rule line
         for (int i = 0; i < static_cast<int>(mission_push_lines().size()); ++i) {
             const Trace t = trace(mission_push_lines()[i]);
             if (t.path.empty()) continue;
@@ -13619,7 +13577,7 @@ void edit_log_building_posts(const char* tag) {
             for (uint8_t* d : t.path) nearest = (std::min)(nearest, std::hypot(dot_wx(d) - bx, dot_wy(d) - by));
             if (nearest >= 60) continue;
             near_lines += ui_printf(" e%d[near %.0f, ends %.0f/%.0f, %s]", i, nearest, std::hypot(dot_wx(t.path.front()) - bx, dot_wy(t.path.front()) - by),
-                                    std::hypot(dot_wx(t.path.back()) - bx, dot_wy(t.path.back()) - by), building_way(b, t.path) ? "fits" : "no");
+                                    std::hypot(dot_wx(t.path.back()) - bx, dot_wy(t.path.back()) - by), rule_line_index(b) == i ? "its rule line" : "not its rule line");
         }
         if (!near_lines.empty()) lines += " near:" + near_lines;
         unsigned nearby = 0;
