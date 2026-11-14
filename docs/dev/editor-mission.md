@@ -299,7 +299,19 @@ over the enemy's wagons brought by the player's locomotive is the engine's own (
 on any map. A map gets the new runner when it is saved (a map with the arrivals' blocks: every map made
 since v0.2.0) or by CONVERT in the Arrivals panel (an older one); a map saved now still runs in v0.2.11's
 game (the runner is script; v0.2.11's editor, saving it again, writes its own runner and keeps
-`PUSH_LINES` as an unknown define, harmless). Checked in play: see the capture-factory note.
+`PUSH_LINES` as an unknown define, harmless). Checked in play (rig, a 1024x768 map made in the editor:
+Track tool main line and spur, a factory placed with army 2 - snapped to the spur's dead end with its line and
+light -, an engine of the player's ordered to the factory): on main the engine stopped at the light, 167 px
+from the factory, which stayed neutral; with the change, the map re-saved, the same stop captured it
+(`CAPTURE vid 102 ... by a train at 434,376, 168 px from it`). A neutral repair point on the main line
+(facing east, line 656 -> 940) was captured by a train driving through it, 180 px before the building at its
+line's begin (main took it too, within 100 px, as the train went on through). With a build list set on the neutral factory
+(5 20), F1 on it once captured queued a locomotive, which was built - the list survives the capture. The
+released v0.2.11 game, a map saved by v0.2.11: not captured at the light (the player's report); the same game,
+a map saved with the change: captured, with one message (`DepoCaptured`). The 20 missions pass. A neutral
+factory placed in the editor starts with an empty build list (`copy_unit_state` gives the 14 units to the
+player's only; every mission's neutral factory has a list), so the map maker must tick its units, or the
+captured factory builds nothing. Not checked in play: CONVERT of a map without the arrivals' blocks.
 
 **The AI and the trains of an editor map - the review of 2026-11-05.** What the editor gives the trains,
 read in the code and the scripts and tried on POLIGON copies: the Train arrivals panel (an army's train made
