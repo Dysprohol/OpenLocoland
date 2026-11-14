@@ -872,10 +872,15 @@ FactoryTact(int t)
 #define CAPTURE_REPAIR 50
 #define CAPTURE_HIGH 400
 int capture_b[64];
-// CaptureLine(b): the building's own line (its index + 1), 0 for none. A factory's begins at the dead
-// end behind it (within 50 px of its middle) and goes away from it - the nearest such begin; a repair
-// point's passes it (within 30 px) and begins within 200 px of it - the nearest such line. The vector is
-// halved until it is short, so no product passes the 32 bits on a long line.
+// CaptureLine(b): the building's own line (its index + 1), 0 for none, by the shape the editor gives it.
+// A factory's begins at the dead end behind it - the editor looks for it within 40 px of a point 22 px
+// behind the middle, so within 75 px of the middle here (rail and ground heights apart too) - and goes
+// away from it: the nearest such begin. A repair point's follows the track each way from it until it has
+// gone 120 px, so a rail more (up to about 87 px) may end it: it begins within 240 px, its chord (begin to
+// end) is at most 480 px and the building lies along the chord within 90 px of it - on a track that curves
+// within those 120-210 px (a radius of 250 px puts the building about 80 px off the chord), or on rails
+// above the ground, it stands well off: the nearest such line. The vector is halved until it is short, so
+// no product passes the 32 bits.
 CaptureLine(int b)
 {
   int i,v,x,y,dx,dy,ex,ey,vx,vy,s,l,t,d,best,found;
@@ -889,10 +894,10 @@ CaptureLine(int b)
   {
     dx=x-push_bx[i];
     dy=y-push_by[i];
-    if( dx>=-200 && dx<=200 && dy>=-200 && dy<=200 )
+    if( dx>=-240 && dx<=240 && dy>=-240 && dy<=240 )
     {
       d=dx*dx+dy*dy;
-      if( v==102 && d<=2500 && d<best )
+      if( v==102 && d<=5625 && d<best )
       {
         ex=x-push_ex[i];
         ey=y-push_ey[i];
@@ -915,17 +920,18 @@ CaptureLine(int b)
         }
         l=vx*vx+vy*vy;
         t=dx*vx+dy*vy;
-        if( l>0 && t>=0 && t<=l*s )
-        {
-          ex=dx-vx*t/l;
-          ey=dy-vy*t/l;
-          d=ex*ex+ey*ey;
-          if( d<=900 && d<best )
+        if( l>0 && s<=2 && t>=0 && t<=l*s )
+          if( l*s*s<=230400 )
           {
-            best=d;
-            found=i+1;
+            ex=dx-vx*t/l;
+            ey=dy-vy*t/l;
+            d=ex*ex+ey*ey;
+            if( d<=8100 && d<best )
+            {
+              best=d;
+              found=i+1;
+            }
           }
-        }
       }
     }
   }
@@ -933,7 +939,8 @@ CaptureLine(int b)
   return found;
 }
 // CaptureTrain(x,y,r): a car of the player's train whose screen point (y less its height) lies within r
-// px of the screen point x,y, 0 for none. The engine's box is the map's (not the screen's): a car stands
+// px of the screen point x,y, 0 for none; a car dying (its animation ANI_DEATH or after, as the engine's
+// AskPlace leaves them out) is not one. The engine's box is the map's (not the screen's): a car stands
 // lower on the screen than on the map by its height, so the box reaches CAPTURE_HIGH px further down.
 CaptureTrain(int x,int y,int r)
 {
@@ -941,7 +948,7 @@ CaptureTrain(int x,int y,int r)
   found=0;
   for( u=FirstInBox(x-r,y-r,x+r,y+r+CAPTURE_HIGH); u; u=NextInBox() )
     if( !found && GetVid(GetUnitVid(u),VID_CLASS)==B_ENGINE )
-      if( Action(u,act_getarmy,0,0)==0 )
+      if( Action(u,act_getarmy,0,0)==0 && GetAnimation(u)<ANI_DEATH )
       {
         dx=GetX(u)-x;
         dy=GetY(u)-GetZ(u)-y;
