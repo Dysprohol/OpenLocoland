@@ -915,6 +915,40 @@ void zoom_view_between_frames() {
     }
 }
 
+// lost_surfaces.cpp, right after the surfaces came back from a loss (Alt+Tab in full screen, another program
+// taking the display), before the next frame: the view is made anew. Going back to the level's own surfaces first
+// puts Direct3D's render target and the engine's fields on the game's own set, ours are let go, and the view's
+// surfaces, the filtered stretch's texture and the overlay are made again - nothing of the zoom's from before the
+// loss is used after it (a frame on them crashed in dgVoodoo, 2026-11-14). If they cannot be made, the level's
+// own zoom.
+void zoom_view_restored() {
+    if (!g_installed || !g_view || !world() || !graphics()) return;
+    release_texture();
+    release_overlay();
+    screen_set_view(1, 1, 0, 0, nullptr);
+    bool ok;
+    if (g_menu) {
+        const int mw = window_w(), mh = window_h();
+        const RECT whole = {0, 0, mw, mh};
+        ok = screen_set_view(mw, mh, (std::max)(mw, g_surface_w), (std::max)(mh, g_surface_h), &whole);
+    } else {
+        ok = screen_set_view(g_view_w, g_view_h, g_surface_w, g_surface_h, &g_target);
+    }
+    if (ok) {
+        fog_buffer_cover((std::max)(g_view_w, g_surface_w), (std::max)(g_view_h, g_surface_h));
+        patch::log("zoom: the view's surfaces made again after the loss (%dx%d%s)", g_view_w, g_view_h,
+                   g_menu ? ", a menu up" : "");
+        return;
+    }
+    patch::log("zoom: no surfaces for the view after the loss - the level's own zoom");
+    g_view = false;
+    g_menu = false;
+    g_z = zoom_view_base();
+    move_interface(false);
+    status_bar_rebuild(at<uint8_t*>(world(), 0x220));
+    interface_messages_rescale();
+}
+
 // zoom.cpp: a level is loading - its own screen again (screen_scaling.cpp does the surfaces).
 void zoom_view_level_loading() {
     g_view = false;

@@ -33,6 +33,8 @@
 // came back; error.log no longer fills with the failed frames' errors.
 #include "patch.h"
 
+void zoom_view_restored();   // zoom_view.cpp: a zoom's own surfaces made again after a loss
+
 #include <ddraw.h>
 #include <intrin.h>
 
@@ -199,6 +201,7 @@ int __fastcall begin_scene_run(uint8_t* g, void*) {
             return 1;   // GameWorld_Run returns before the frame
         }
         reinterpret_cast<ReloadPalettes_t>(RELOAD_PALETTES)(g, nullptr);
+        zoom_view_restored();
         patch::log("lost surfaces: restored (%d frames skipped, %lu ms, %d locks given a stand-in)", g_skipped,
                    static_cast<unsigned long>(g_lost ? GetTickCount() - g_lost_since : 0), g_stand_in_locks);
         g_lost = false;
