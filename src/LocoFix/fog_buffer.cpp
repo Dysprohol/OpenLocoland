@@ -20,13 +20,15 @@
 // and ground snow get a texture of their own:
 // the smallest power of two holding a quarter of the chosen resolution on each side (512x512
 // at 1920x1080, 1024x512 at 2560x1440, 1024x1024 at 3840x2160; a logical screen is never
-// bigger), made like the grey one (P8 with the same palette, or what Texture_Construct falls
+// bigger but for a zoom out, see below), made like the grey one (P8 with the same palette, or what Texture_Construct falls
 // back to), and put at +0xbd4 for the length of those two calls only. Up to 1024x1024 pixels
 // none is made and nothing changes. It is made at the first Graphics_ReloadPalettes (the end of
 // Graphics_Init) and, like the grey texture, made again at the later ones (after a surface
 // restore). Should it not be made, fog and ground snow are left out on a screen the grey texture
 // does not cover (instead of writing past it) - logged once. It is not released when the game
-// ends (one texture, gone with the process).
+// ends (one texture, gone with the process). A zoom out (zoom.cpp) makes the screen bigger than the
+// window while a mission runs; it asks for a texture that covers it before the first frame
+// (fog_buffer_cover), and the bigger one is kept for the rest of the run.
 #include "patch.h"
 
 namespace {
@@ -157,6 +159,28 @@ void __fastcall draw_ground_snow(uint8_t* g, void* edx) {
 }
 
 }  // namespace
+
+// A zoom's screen of w x h (zoom.cpp, between two frames): our texture made big enough for it, if it is not.
+void fog_buffer_cover(int w, int h) {
+    uint8_t* g = *reinterpret_cast<uint8_t**>(0x4a9a14);
+    if (!g || !g_sized) return;
+    const int need_w = texels_for(static_cast<float>(w)), need_h = texels_for(static_cast<float>(h));
+    const int have_w = g_texture ? at<int>(g_texture, T_WIDTH) : g_width ? 0 : ORIGINAL;
+    const int have_h = g_texture ? at<int>(g_texture, T_HEIGHT) : g_height ? 0 : ORIGINAL;
+    if (need_w <= have_w && need_h <= have_h) return;
+    g_width = need_w > g_width ? need_w : g_width;
+    g_height = need_h > g_height ? need_h : g_height;
+    if (g_width < ORIGINAL) g_width = ORIGINAL;
+    if (g_height < ORIGINAL) g_height = ORIGINAL;
+    destroy(g_texture);
+    g_texture = make_texture(g_width, g_height);
+    g_warned = false;
+    if (g_texture)
+        patch::log("fog buffer: %dx%d (%s) for a %dx%d screen", at<int>(g_texture, T_WIDTH), at<int>(g_texture, T_HEIGHT),
+                   at<int>(g_texture, T_FORMAT) == FORMAT_P8 ? "P8" : "16-bit", w, h);
+    else
+        patch::log("fog buffer: no %dx%d texture for a %dx%d screen", g_width, g_height, w, h);
+}
 
 void install_fog_buffer() {
     const uint8_t reload_start[] = {0x64, 0xA1, 0x00, 0x00, 0x00, 0x00};   // mov eax,fs:[0]

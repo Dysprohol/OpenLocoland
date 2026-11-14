@@ -18,7 +18,8 @@
 // the game speed and money boxes, so it covers no part of the interface.
 //
 // LocoFix.log gets the measured frame rate of every level with the game clock against
-// the real time (the game's own "Average fps" in error.log comes out as 0 for missions).
+// the real time (the game's own "Average fps" in error.log comes out as 0 for missions), and of
+// every zoom step on its own (frame_rate_section).
 #include "patch.h"
 #include "profile.h"
 #include <ddraw.h>
@@ -42,6 +43,7 @@ void restart_level_loading(const char* map);   // restart.cpp
 void factions_level_loading(const char* map);  // factions.cpp
 void red_lights_level_loading(const char* map);  // red_lights.cpp
 const char* custom_maps_level_guard(const char* map);   // custom_maps.cpp: a map that is not there - the menu
+void zoom_after_frame();   // zoom.cpp: the wheel's zoom changes the screen between two frames
 
 namespace {
 
@@ -116,6 +118,7 @@ void wait_for_next_frame() {
 // (the window losing focus, the game waiting for messages) are left out. The game time
 // against the real time shows that the limit does not change the game speed.
 char g_level[MAX_PATH] = "";
+char g_level_map[MAX_PATH] = "";   // the level's map; g_level adds the zoom's part to it (frame_rate_section)
 int64_t g_last_frame = 0, g_level_time = 0;
 uint32_t g_last_game_time = 0;
 int64_t g_level_game_time = 0;   // ms
@@ -164,6 +167,7 @@ int __fastcall LevelLoad_measured(void* world, void* edx, const char* name) {
     report_level();
     const char* map = custom_maps_level_guard(editor_level_redirect(test_map_replace(name)));
     lstrcpynA(g_level, map ? map : "?", sizeof g_level);
+    lstrcpynA(g_level_map, g_level, sizeof g_level_map);
     restart_level_loading(map);
     factions_level_loading(map);
     red_lights_level_loading(map);
@@ -182,6 +186,7 @@ void __fastcall EndScene_limited(uint8_t* g, void* edx, int present) {
     lap.to(prof::WAIT);
     count_frame();
     prof::frame_end();
+    zoom_after_frame();
 }
 
 // ---- settings ----
@@ -376,6 +381,15 @@ void install_frame_limit() {
     } else {
         patch::log("frame rate per level skipped: unexpected bytes");
     }
+}
+
+// The frame rate measured so far goes to the log, and the next part is measured as the level's map with
+// `part` after it (zoom.cpp: each zoom step on its own, "l13.map, zoom 1/2 3840x2160").
+void frame_rate_section(const char* part) {
+    if (!g_frequency) return;
+    report_level();
+    if (part && *part) wsprintfA(g_level, "%s, %s", g_level_map, part);
+    else lstrcpynA(g_level, g_level_map, sizeof g_level);
 }
 
 void frame_limit_exit() {
