@@ -63,7 +63,6 @@ constexpr int MOUSE_WHEEL = 0x234, MOUSE_SCREEN_X = 0x240, MOUSE_SCREEN_Y = 0x24
 constexpr int MENU_HOVER = 0x24c + 0x14;
 constexpr unsigned WORLD_EDITOR = 0x1, WORLD_ACTIVE = 0x8, WORLD_PAUSED = 0x10, WORLD_LOADING = 0x20;
 constexpr unsigned SCROLL_BY_PLAYER = 0x1 | 0x20;   // SCROLL_FROM_BORDER, SCROLL_WITH_ARROWS
-constexpr unsigned SCROLL_TO_FLAGMAN = 0x4 | 0x8 | 0x10;
 // The most map pixels a zoom's view may have: the whole of the biggest original map (see the top).
 constexpr int MAX_PIXELS = 3072 * 2304;
 constexpr int GLIDE_MS = 150;
@@ -297,13 +296,14 @@ void measure_frame() {
     g_measure_last = t.QuadPart;
 }
 
-// World_UpdateScroll's move of the camera (SetPosition by the view's centre): border and arrow scrolling go
-// in map pixels a frame, so on the screen they would be z times faster zoomed in and slower zoomed out - the
-// move is taken 1 / z times as far (the level's own zoom: as it was). Not while the camera follows the flagman.
+// World_UpdateScroll's move of the camera (SetPosition by the view's centre, 0x41ccbf): border and arrow
+// scrolling - and the slide towards the flagman (scroll types 4 and 8, from his distance in map pixels) - go in
+// map pixels a frame, so on the screen they would be z times faster zoomed in and slower zoomed out: the move
+// is taken 1 / z times as far (the level's own zoom: as it was). Following the flagman (type 0x10) is another
+// call, untouched.
 void __fastcall scroll_move(void* w, void* edx, float x, float y, int mode) {
     uint8_t* g = graphics();
-    if (g_made && g_steps[g_own] > 0 && std::fabs(g_zoom - g_steps[g_own]) > 1e-6 &&
-        !(at<unsigned>(w, WORLD_SCROLL_TYPE) & SCROLL_TO_FLAGMAN)) {
+    if (g_made && g_steps[g_own] > 0 && std::fabs(g_zoom - g_steps[g_own]) > 1e-6) {
         const float cx = at<float>(g, 0x20c) * 0.5f + at<float>(w, WORLD_CAMERA_X);
         const float cy = at<float>(g, 0x210) * 0.5f + at<float>(w, WORLD_CAMERA_Y);
         const float k = static_cast<float>(g_steps[g_own] / g_zoom);
