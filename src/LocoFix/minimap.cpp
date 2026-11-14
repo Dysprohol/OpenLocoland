@@ -50,6 +50,7 @@
 int interface_scale();                 // interface_scale.cpp
 int interface_original_nvid(int nvid);
 int interface_scale_for_window();
+double interface_zoom_shrink();
 
 namespace {
 
@@ -126,8 +127,14 @@ bool fits(int size, int bar_scale, int screen_w) {
     return size <= 1 || screen_w - size * FRAME_W >= screen_w / 2 + BAR_CONTROLS_RIGHT * bar_scale;
 }
 
-int size_for(int screen_w, int bar_scale, bool fresh = false) {
+// `shrink`: a zoom out's stretch of the screen to the window (below 1, interface_scale.cpp): a size the player
+// chose is then that many times bigger, so it comes out at its own size (as the bar does).
+int size_for(int screen_w, int bar_scale, bool fresh = false, double shrink = 1.0) {
     int size = chosen_size(fresh);
+    if (size > 0 && shrink < 0.99) {
+        size = static_cast<int>(size / shrink + 0.5);
+        if (size > MAX_SIZE) size = MAX_SIZE;
+    }
     if (size == 0) size = bar_scale;
     while (size > 1 && !fits(size, bar_scale, screen_w)) --size;
     return size < 1 ? 1 : size;
@@ -274,7 +281,7 @@ bool g_installed = false;
 void* minimap_frame_for_screen() {
     if (!g_installed || !world() || !graphics()) return nullptr;
     const float* screen = reinterpret_cast<float*>(graphics() + 0x20c);   // width, height
-    const int k = size_for(static_cast<int>(screen[0]), interface_scale(), true);
+    const int k = size_for(static_cast<int>(screen[0]), interface_scale(), true, interface_zoom_shrink());
     if (k < 2) return nullptr;
     const int nvid = VID_MINIMAP_BIG[k - 2];
     if (nvid >= vid_count() || !vid_slot(nvid) || !vid_slot(VID_MINIMAP)) {
