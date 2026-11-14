@@ -290,8 +290,23 @@ void status_bar_room(uint8_t* player) {
     if (player && at<int>(player, 0x18) > 0) set_bounds(player);
 }
 
+// Player_SetPanel plays the panel's click (SFX 109, 0x42f27f) whenever the panel changes; the bar built again for a
+// zoom gives the bar up (panel 6) and opens its panel again, which is no click of the player's: it is left out then.
+static bool g_quiet_panel = false;
+constexpr uintptr_t PANEL_CLICK = 0x42f27f;   // Player_SetPanel: call PlaySFX(g_sound, 109, 0, 0)
+constexpr uintptr_t PLAY_SFX = 0x4447e0;
+using PlaySfx_t = int(__fastcall*)(void* sound, void* edx, int nsfx, int a, int b);
+static int __fastcall panel_click(void* sound, void* edx, int nsfx, int a, int b) {
+    if (g_quiet_panel) return 0;
+    return reinterpret_cast<PlaySfx_t>(PLAY_SFX)(sound, edx, nsfx, a, b);
+}
+
 bool status_bar_rebuild(uint8_t* player) {
     if (!player || !g_hide || at<int>(player, 0x18) == 0) return false;
+    struct Quiet {   // the rebuild's panel changes make no sound
+        Quiet() { g_quiet_panel = true; }
+        ~Quiet() { g_quiet_panel = false; }
+    } quiet;
     const int panel = at<int>(player, 0x2c) & ~0x10;
     g_hide(player, nullptr);   // the engine's: the bar's list released (its objects deleted), the panel 6
     show(player, nullptr);
@@ -311,4 +326,11 @@ void install_status_bar() {
                                                     reinterpret_cast<void*>(&hide), "Player_HideStateBar"));
     if (!g_hide) return;   // tiles that could not be hidden with the bar: rather none
     patch::redirect(SHOW_STATE_BAR, show_start, sizeof show_start, reinterpret_cast<void*>(&show), "Player_ShowStateBar");
+    const uint8_t* b = reinterpret_cast<const uint8_t*>(PANEL_CLICK);
+    int32_t rel;
+    std::memcpy(&rel, b + 1, 4);
+    if (b[0] == 0xE8 && PANEL_CLICK + 5 + rel == PLAY_SFX)
+        patch::write_call(PANEL_CLICK, nullptr, 0, reinterpret_cast<void*>(&panel_click), 5);
+    else
+        patch::log("state bar: the panel's click left as it is (unexpected bytes)");
 }
