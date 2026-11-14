@@ -68,6 +68,7 @@ bool arrivals_back();   // a step back inside the panel (an arrival -> the list)
 bool arrivals_has_back();
 // editor_factory.cpp: a factory's panel
 void factory_draw(POINT mouse);
+void factory_draw_after();   // its Direct3D line, after the panel's texts are written
 bool factory_click(POINT mouse);
 bool factory_release(POINT mouse);
 void factory_add_car(int nvid);
@@ -785,6 +786,7 @@ void panel_draw(POINT m) {
     edit_texts_begin();
     panel_draw_open(m);
     edit_texts_end();
+    if (g_panel == Panel::Factory) factory_draw_after();
 }
 
 void panel_draw_open(POINT m) {
