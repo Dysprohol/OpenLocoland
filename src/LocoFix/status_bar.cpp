@@ -43,7 +43,7 @@ uint8_t* interface_vid(int nvid, int scale);
 void interface_copy_colours(int scale);
 void interface_set_hidden(int nvid, int hidden);
 void install_interface_scale();
-void interface_cursor_follow();            // interface_texts.cpp: the cursors at the bar's scale
+void interface_cursor_scale(int scale);    // interface_texts.cpp: the cursors at the bar's scale while it is up
 
 namespace {
 
@@ -213,8 +213,8 @@ void __fastcall show(uint8_t* player, void*) {
         const int s = interface_choose_scale();
         interface_copy_colours(s);
         create_bar(player, s);
-        interface_cursor_follow();
     }
+    interface_cursor_scale(interface_scale());
     uint8_t* flagman = at<uint8_t*>(player, 0x10);
     const int panel = flagman && at<int>(at<uint8_t*>(flagman, 0x1c), 0x10) == B_ENGINE ? 1 : 0;
     reinterpret_cast<SetInt_t>(SET_PANEL)(player, nullptr, panel);
@@ -235,6 +235,7 @@ void __fastcall hide(void* player, void* edx) {
     g_hide(player, edx);
     if (uint8_t* side = interface_vid(SIDE_VID, 1)) set_hidden(side, 1);
     for (int nvid : {SIDE_VID, 14, 16, 17, 18, 449}) interface_set_hidden(nvid, 1);
+    interface_cursor_scale(1);
 }
 
 }  // namespace

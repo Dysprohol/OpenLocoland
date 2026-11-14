@@ -76,8 +76,22 @@ int g_scale = 1;          // the scale of the bar built last
 int g_ready[MAX_SCALE + 1] = {1, 1, -1, -1};   // -1 not looked at yet
 
 // The player's choice: InterfaceScale of the Players key, the text the script's SetReg writes (a DWORD
-// is taken too); 1 when it is absent or not 1-3.
-int chosen() {
+// is taken too); 1 when it is absent or not 1-3. Read from the registry when the bar is built (`fresh`);
+// the settings page's preview asks every frame and gets the value read at most 4 times a second, so a
+// click on the row shows within a quarter of a second.
+int read_chosen();
+int chosen(bool fresh = false) {
+    static int value = 1;
+    static DWORD at = 0;
+    const DWORD now = GetTickCount();
+    if (fresh || at == 0 || now - at >= 250) {
+        value = read_chosen();
+        at = now ? now : 1;
+    }
+    return value;
+}
+
+int read_chosen() {
     HKEY key;
     if (RegOpenKeyExA(HKEY_CURRENT_USER, REG_KEY, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) return 1;
     char text[16] = {};
@@ -132,7 +146,7 @@ int interface_choose_scale() {
     const int w = static_cast<int>(screen[0]), h = static_cast<int>(screen[1]);
     int window_w = w, window_h = h;
     window_size(window_w, window_h);
-    const int want = chosen();
+    const int want = chosen(true);
     int s = want < biggest(w, h) ? want : biggest(w, h);
     // a logical screen stretched to the window (screen_scaling.cpp keeps its proportions)
     const double stretch = (std::min)(static_cast<double>(window_w) / w, static_cast<double>(window_h) / h);
@@ -158,7 +172,8 @@ int interface_max_for_window() {
 // The scale the bar would get on the window's own screen (the settings page's previews).
 int interface_scale_for_window() {
     const int max = interface_max_for_window();
-    return chosen() < max ? chosen() : max;
+    const int want = chosen();
+    return want < max ? want : max;
 }
 
 // The VID of `nvid` at the scale `s`: its bigger copy, or itself (not one of the interface's, scale 1,

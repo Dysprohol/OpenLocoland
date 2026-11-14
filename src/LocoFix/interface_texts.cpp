@@ -20,9 +20,10 @@
 // menus (a 1024x768 picture stretched to the window) and the held editor keep the normal tip.
 //
 // The cursor: the game loads Windows cursors from cursores\*.ani (Cursor_Show, LoadCursorFromFileA - the system's
-// cursor size). At the interface's scale they are loaded s times the system's size (LoadImage; Windows scales the
-// picture and its hot spot together, so a click still lands on the point the cursor shows), and loaded again when
-// the bar is built at another scale.
+// cursor size). While the play bar is up at a bigger scale they are loaded s times the system's size (LoadImage;
+// Windows scales the picture and its hot spot together, so a click still lands on the point the cursor shows);
+// when the bar is hidden or given up (menus, end screens, the held editor, TAB) they are loaded at the normal
+// size again, as the mouse tip is normal there.
 #include "patch.h"
 
 int interface_scale();                         // interface_scale.cpp
@@ -44,6 +45,8 @@ constexpr uintptr_t CURSOR_HIDE = 0x425660;
 constexpr uintptr_t CALL_LOAD_CURSOR = 0x4255e2;  // Cursor_Show: call [LoadCursorFromFileA]
 constexpr uintptr_t IAT_LOAD_CURSOR = 0x47518c;
 constexpr uintptr_t OBJECT_MOVE_TO = 0x446640;
+constexpr uintptr_t MESSAGE_LIST_CLEAR = 0x424980;
+constexpr int CURSOR_LOADED = 0x104;              // Cursor: the Windows cursors are loaded (Cursor_Show / _Hide)
 
 constexpr int FONTS[] = {2, 6, 8, 14, 16, 17, 18};   // the interface's fonts (patch_data.INTERFACE_VIDS)
 constexpr int MESSAGE_FONT = 14, MESSAGE_STRIP = 449, TIP_FONT = 6;
@@ -107,6 +110,10 @@ ShowLine_t g_show_line = nullptr;
 
 void __fastcall show_line(uint8_t* list, void* edx, void* item, float x, float y) {
     const int s = interface_scale();
+    // the size changed since the lines on the screen were made (the settings page in the Esc menu): those lines
+    // go - moved by the new step they would overlap, and the line a click finds would be one never written
+    if (at<int>(list, ML_VID_TEXT) != interface_nvid(MESSAGE_FONT, s))
+        reinterpret_cast<void(__fastcall*)(void*, void*)>(MESSAGE_LIST_CLEAR)(list, nullptr);
     at<float>(list, ML_TEXT_X) = MESSAGE_X * s;
     at<float>(list, ML_TEXT_Y) = MESSAGE_Y * s;
     at<int>(list, ML_VID_TEXT) = interface_nvid(MESSAGE_FONT, s);
@@ -144,23 +151,27 @@ void __fastcall mouse_tip(uint8_t* tip, void* edx, uint8_t* mouse) {
     uint8_t* text = at<uint8_t*>(tip, 0x04);
     if (!text || text == before) return;
     // the engine put it 5 px right of the cursor (unless held at the right edge) and 10 px above it (or, at the
-    // top edge, below it): those offsets times the scale
+    // top edge, below it): those offsets times the scale. Frame_Construct added the camera, which is fractional
+    // after scrolling, so the place is told apart with half a pixel's room, not by equality.
     const float cam_x = at<float>(world(), 0x44), cam_y = at<float>(world(), 0x48);
     const float mx = at<float>(mouse, 0x10), my = at<float>(mouse, 0x14);
     float x = at<float>(text, 0x30) - cam_x, y = at<float>(text, 0x34) - cam_y;   // y as created: screen y + z
     const float size_y = at<float>(at<uint8_t*>(text, 0x1c), 0x20);
-    if (x == mx + TIP_RIGHT) x = mx + TIP_RIGHT * s;
-    if (y == ((my - size_y) + 3000.0f) - TIP_UP) y = ((my - size_y) + 3000.0f) - TIP_UP * s;
+    auto close_to = [](float a, float b) { return a - b < 0.5f && b - a < 0.5f; };
+    if (close_to(x, mx + TIP_RIGHT)) x = mx + TIP_RIGHT * s;
+    const float above = ((my - size_y) + 3000.0f) - TIP_UP;
+    if (close_to(y, above)) y = ((my - size_y) + 3000.0f) - TIP_UP * s;
     else y += TIP_UP * (s - 1);
     move_to(text, x + cam_x, y + cam_y);
 }
 
 // ---- the cursor ----
 
-int g_cursor_scale = 1;   // the scale the cursors were loaded at
+int g_cursor_scale = 1;    // the scale the cursors were loaded at
+int g_cursor_wanted = 1;   // the play bar's scale while it is up, else 1 (interface_cursor_scale)
 
 HCURSOR WINAPI load_cursor(LPCSTR path) {
-    const int s = interface_scale();
+    const int s = g_cursor_wanted;
     g_cursor_scale = s;
     if (s > 1) {
         const int w = GetSystemMetrics(SM_CXCURSOR) * s, h = GetSystemMetrics(SM_CYCURSOR) * s;
@@ -177,11 +188,15 @@ bool g_installed = false;
 
 }  // namespace
 
-// status_bar.cpp, after the bar is built: the cursors again when the scale changed.
-void interface_cursor_follow() {
-    if (!g_installed || interface_scale() == g_cursor_scale) return;
+// status_bar.cpp: the cursors at the play bar's scale while the bar is up (`s`), at the normal size when it
+// is hidden or given up (the menus, the end screens, the held editor, TAB) - loaded again when that changes.
+// While the game has its cursors unloaded (the window not active, SetCursor(-1)) only the size is noted:
+// Cursor_Show loads them at it.
+void interface_cursor_scale(int s) {
+    g_cursor_wanted = s;
+    if (!g_installed || s == g_cursor_scale) return;
     void* cursor = *reinterpret_cast<void**>(G_CURSOR);
-    if (!cursor) return;
+    if (!cursor || !at<int>(cursor, CURSOR_LOADED)) return;
     using Cursor_t = void(__fastcall*)(void* cursor, void* edx);
     reinterpret_cast<Cursor_t>(CURSOR_HIDE)(cursor, nullptr);
     reinterpret_cast<Cursor_t>(CURSOR_SHOW)(cursor, nullptr);

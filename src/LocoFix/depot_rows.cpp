@@ -33,6 +33,7 @@
 #include "patch.h"
 
 int interface_scale();                          // interface_scale.cpp
+int interface_choose_scale();
 uint8_t* interface_vid(int nvid, int scale);
 
 #include <cstdio>
@@ -215,9 +216,12 @@ void scale_panel(void* player, int s) {
 }
 
 void __fastcall set_panel(void* player, void* edx, int panel) {
-    const int s = interface_scale();
     const int wanted = panel & ~0x10;
-    if (s <= 1 || bar_count(player) == 0 || (wanted != PANEL_DEPOT_LIST && wanted != PANEL_DEPOT_QUEUE)) {
+    const bool list = wanted == PANEL_DEPOT_LIST || wanted == PANEL_DEPOT_QUEUE;
+    // With no bar (hidden with TAB, a factory clicked) Player_SetPanel(2) builds the bar itself (Player vtable
+    // slot 7, status_bar.cpp) and then the list in the same call: the scale is the one that bar will get.
+    const int s = list && bar_count(player) == 0 ? interface_choose_scale() : interface_scale();
+    if (s <= 1 || !list) {
         g_set_panel(player, edx, panel);
         if (s > 1) scale_panel(player, s);   // a panel that falls back to the unit bar adds nothing
         add_second_row(player);

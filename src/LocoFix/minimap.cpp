@@ -94,9 +94,23 @@ int vid_count() { return at<int>(world(), 0x290); }
 int g_size = 1;   // the step of the minimap the frame in use was made for
 // The player's choice: MinimapSize of the Players key, the text the script's SetReg writes (a
 // DWORD is taken too); 0 (as the interface) when it is absent or not 1-3.
-int chosen_size() {
+int read_size();
+// Read when the bar is built (`fresh`); the settings page's preview, asking every frame, gets the value read
+// at most 4 times a second.
+int chosen_size(bool fresh = false) {
+    static int value = 0;
+    static DWORD at = 0;
+    const DWORD now = GetTickCount();
+    if (fresh || at == 0 || now - at >= 250) {
+        value = read_size();
+        at = now ? now : 1;
+    }
+    return value;
+}
+
+int read_size() {
     HKEY key;
-    if (RegOpenKeyExA(HKEY_CURRENT_USER, REG_KEY, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) return 1;
+    if (RegOpenKeyExA(HKEY_CURRENT_USER, REG_KEY, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) return 0;
     char text[16] = {};
     DWORD size = sizeof text - 1, type = 0;
     const LONG r = RegQueryValueExA(key, "MinimapSize", nullptr, &type, reinterpret_cast<BYTE*>(text), &size);
@@ -112,8 +126,8 @@ bool fits(int size, int bar_scale, int screen_w) {
     return size <= 1 || screen_w - size * FRAME_W >= screen_w / 2 + BAR_CONTROLS_RIGHT * bar_scale;
 }
 
-int size_for(int screen_w, int bar_scale) {
-    int size = chosen_size();
+int size_for(int screen_w, int bar_scale, bool fresh = false) {
+    int size = chosen_size(fresh);
     if (size == 0) size = bar_scale;
     while (size > 1 && !fits(size, bar_scale, screen_w)) --size;
     return size < 1 ? 1 : size;
@@ -260,7 +274,7 @@ bool g_installed = false;
 void* minimap_frame_for_screen() {
     if (!g_installed || !world() || !graphics()) return nullptr;
     const float* screen = reinterpret_cast<float*>(graphics() + 0x20c);   // width, height
-    const int k = size_for(static_cast<int>(screen[0]), interface_scale());
+    const int k = size_for(static_cast<int>(screen[0]), interface_scale(), true);
     if (k < 2) return nullptr;
     const int nvid = VID_MINIMAP_BIG[k - 2];
     if (nvid >= vid_count() || !vid_slot(nvid) || !vid_slot(VID_MINIMAP)) {
