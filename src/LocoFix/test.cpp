@@ -58,33 +58,37 @@ WNDPROC g_game_wndproc = nullptr;
 bool g_activated = false;
 
 // test_game.ps1's c40051: the display taken away and given back, as when another program takes the display
-// (every surface lost): DirectDraw's mode set to 1280x720 and, 1.5 s later, back to the game area's size.
+// (every surface lost): the screen's mode set to 1280x720 for a while (ChangeDisplaySettingsEx, not kept) and,
+// 1.5 s later, back to the very mode it had (not the one the system keeps, which in the test rig's box is not the
+// job's). (DirectDraw's SetDisplayMode is refused: the game's DirectDraw has
+// no exclusive mode of its own, dgVoodoo draws in a window.)
 constexpr UINT TEST_DISPLAY_FLIP = 40051;
 constexpr UINT_PTR FLIP_TIMER = 0x7A11;
-int g_flip_w = 0, g_flip_h = 0;
-
-IDirectDraw7* game_ddraw() {
-    uint8_t* g = *reinterpret_cast<uint8_t**>(0x4a9a14);   // g_graphics
-    return g ? *reinterpret_cast<IDirectDraw7**>(g + 0xbec) : nullptr;
-}
+DEVMODEA g_flip_mode = {};
 
 LRESULT CALLBACK test_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
     if (m == WM_COMMAND && LOWORD(w) == TEST_DISPLAY_FLIP) {
-        RECT client;
-        GetClientRect(window, &client);
-        g_flip_w = client.right;
-        g_flip_h = client.bottom;
-        IDirectDraw7* dd = game_ddraw();
-        const HRESULT hr = dd ? dd->SetDisplayMode(1280, 720, 16, 0, 0) : E_FAIL;
-        patch::log("test: display mode 1280x720 (%08lX), back to %dx%d in 1.5 s", static_cast<unsigned long>(hr), g_flip_w, g_flip_h);
+        g_flip_mode = {};
+        g_flip_mode.dmSize = sizeof g_flip_mode;
+        if (!EnumDisplaySettingsA(nullptr, ENUM_CURRENT_SETTINGS, &g_flip_mode)) {
+            patch::log("test: the display's mode cannot be read - no flip");
+            return 0;
+        }
+        DEVMODEA mode = {};
+        mode.dmSize = sizeof mode;
+        mode.dmPelsWidth = 1280;
+        mode.dmPelsHeight = 720;
+        mode.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT;
+        const LONG r = ChangeDisplaySettingsExA(nullptr, &mode, nullptr, CDS_FULLSCREEN, nullptr);
+        patch::log("test: display mode 1280x720 (%ld), back in 1.5 s", r);
         SetTimer(window, FLIP_TIMER, 1500, nullptr);
         return 0;
     }
     if (m == WM_TIMER && w == FLIP_TIMER) {
         KillTimer(window, FLIP_TIMER);
-        IDirectDraw7* dd = game_ddraw();
-        const HRESULT hr = dd ? dd->SetDisplayMode(g_flip_w, g_flip_h, 16, 0, 0) : E_FAIL;
-        patch::log("test: display mode back to %dx%d (%08lX)", g_flip_w, g_flip_h, static_cast<unsigned long>(hr));
+        g_flip_mode.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL | DM_DISPLAYFREQUENCY;
+        const LONG r = ChangeDisplaySettingsExA(nullptr, &g_flip_mode, nullptr, CDS_FULLSCREEN, nullptr);
+        patch::log("test: display mode back to %lux%lu (%ld)", g_flip_mode.dmPelsWidth, g_flip_mode.dmPelsHeight, r);
         return 0;
     }
     if (m == WM_NCHITTEST) l = MAKELPARAM(g_cursor.x, g_cursor.y);
