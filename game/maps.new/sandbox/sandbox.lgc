@@ -153,6 +153,11 @@ int arrival_last[]={0,0,0};
 int arrival_unit[]={0,0,0};
 int arrival_part[]={0,0,0};
 int arrival_car[]={0,0,0};
+#define PUSH_LINES 6
+int push_bx[]={-195,-195,319,1313,674,745,0};
+int push_by[]={1299,149,936,511,1211,236,0};
+int push_ex[]={88,17,319,1313,674,745,0};
+int push_ey[]={1299,149,1061,386,861,586,0};
 int order_vid[]={20,25,0};
 int order_x[]={1810,1437,0};
 int order_y[]={1129,1375,0};
