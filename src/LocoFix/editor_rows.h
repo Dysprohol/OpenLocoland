@@ -28,6 +28,7 @@ public:
     // the one under the mouse, nothing when the rows were not drawn in the last 250 ms (the panel closed).
     void tip(float l, float t, float r, float b, const std::string& text, bool first = false);   // first: over the ones before
     const char* tip_at(POINT m) const;
+    bool fresh() const;   // drawn in the last 250 ms: the panel is open
 
     // Click-and-hold, the way building menus of the Anno games do it: on a hold area a short click
     // runs `click`; held HOLD_MS, a strip of `choices` (VIDs) opens above it and letting go on one runs

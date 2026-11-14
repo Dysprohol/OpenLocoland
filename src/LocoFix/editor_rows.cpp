@@ -26,8 +26,10 @@ void PanelRows::tip(float l, float t, float r, float b, const std::string& text,
     else tips_.push_back({l, t, r, b, text});
 }
 
+bool PanelRows::fresh() const { return GetTickCount() - drawn_ <= 250; }
+
 const char* PanelRows::tip_at(POINT m) const {
-    if (GetTickCount() - drawn_ > 250) return nullptr;
+    if (!fresh()) return nullptr;
     for (const Cell& c : cells_)   // the strip of a held choice covers the rows
         if (held() && m.x >= c.l && m.x < c.r && m.y >= c.t && m.y < c.b) return nullptr;
     for (const Tip& t : tips_)

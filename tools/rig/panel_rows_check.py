@@ -10,6 +10,9 @@ box. For each page this prints what is wrong (counted):
 - RIGHT       a text runs past the row's right end (the panel's 46 characters from its left);
 - BOTTOM/TOP  a text is below the last row (into the button bar) or above the first (the strip above
               the title, an entry's problem, is a row of its own);
+- TIGHT       a choice's click area reaches a text or another choice's on the same row (a text choice
+              takes clicks 2 px beyond its text), so a click there can take the other one;
+- EMPTY       a choice of no width (cut to nothing);
 
 and, with --notes, what to look at (not counted):
 
@@ -52,6 +55,9 @@ def check(page, px, py, notes=False):
     right = px + LEFT + WIDTH * CW
     top, bottom = py + TOP - CH / 2 - 1, py + BOTTOM + CH / 2 + 1
     faults = []
+    for a in page:
+        if a["choice"] and a["r"] <= a["l"]:
+            faults.append(f"EMPTY  a choice of no width at {a['l']},{a['t']}")
     page = [a for a in page if a["r"] > a["l"]]   # an empty text (a note's unused row) takes no room
     for k, a in enumerate(page):
         is_area = a["choice"] and (a["text"] == "" or a["text"].startswith(("unit ", "car ")))
@@ -67,6 +73,17 @@ def check(page, px, py, notes=False):
             if a["t"] < top and not on_strip:
                 faults.append(f"TOP    {top - a['t']:+.0f} px: {a['text']!r}")
         for b in page[k + 1:]:
+            v = min(a["b"], b["b"]) - max(a["t"], b["t"])   # how much they share in height
+            a_area0 = a["choice"] and (a["text"] == "" or a["text"].startswith(("unit ", "car ")))
+            b_area0 = b["choice"] and (b["text"] == "" or b["text"].startswith(("unit ", "car ")))
+            # where a click takes each: a text choice 2 px beyond its text, an area (icon, row) its box
+            def hit(x, area):
+                return (x["l"] - 2, x["r"] + 2) if x["choice"] and not area else (x["l"], x["r"])
+            (al, ar), (bl, br) = hit(a, a_area0), hit(b, b_area0)
+            share = min(ar, br) - max(al, bl)
+            if v > 1 and share > 0 and (a["choice"] or b["choice"]) and not (a_area0 and b_area0)                     and not (a_area0 and inside(b, a)) and not (b_area0 and inside(a, b))                     and not (a["l"] < b["r"] and b["l"] < a["r"]):   # (a real overlap is OVERLAP below)
+                faults.append(f"TIGHT  click areas share {share} px: {a['text'] or '(row)'!r} [{a['l']}-{a['r']}] and "
+                              f"{b['text'] or '(row)'!r} [{b['l']}-{b['r']}]")
             if a["l"] >= b["r"] or b["l"] >= a["r"] or a["t"] >= b["b"] or b["t"] >= a["b"]:
                 continue
             a_area = a["choice"] and (a["text"] == "" or a["text"].startswith(("unit ", "car ")))

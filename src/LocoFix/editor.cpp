@@ -1554,6 +1554,10 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
                 // the factory panel's last frame, as PanelRows recorded it (recording starts with the
                 // first F step): every text and choice with its box - or the middle of the n-th one,
                 // (y << 16) | x, for test_game.ps1 to click there as the mouse would (0: none)
+                if (!factory_rows().fresh()) {   // not drawn now: its boxes are an old frame's
+                    patch::log("panel rows: the factory panel is not open");
+                    return 0;
+                }
                 const std::vector<PanelRows::Drawn>& rows = factory_rows().drawn();
                 if (data->dwData == TEST_PANEL_ROWS) {
                     patch::log("panel rows: %d", static_cast<int>(rows.size()));

@@ -234,8 +234,8 @@ come (those of a gating condition only while it holds); the template's win and l
 template (`map_tool.py new --script`) has both blocks, no arrivals and no reinforcement waves.
 The editor sets no limits of its own: any number of arrivals, waves and trains in the factory's queue;
 an arrival's train up to 30 cars (`temp_array`), a train of the queue up to 16 (the AI builds and
-takes `ARR_LENGTH` cars). The panel's last line names a limit of the game's AI only once it is
-reached: more than 10 patrols or posts (the rest attack), more than 16 enemy trains (they wait for a
+takes `ARR_LENGTH` cars). The Arrivals panel's list (its last rows) and a factory's plan (the row above its
+line) name a limit of the game's AI only once it is reached: more than 10 patrols or posts (the rest attack), more than 16 enemy trains (they wait for a
 free place in `ai_trains`).
 
 An editor map made before keeps its reinforcement and its blocks until the panel's CONVERT: the new
@@ -576,11 +576,18 @@ rows there are (`LIST_PAGE`, `TEMPLATE_PAGE`). The editor's own signs, the same 
 with ":" and a note is in parentheses - neither is ever clicked -; a choice is lit under the mouse, and lit and
 underlined when it is set; "..." at its end opens another page (TEMPLATE..., AI..., CONVERT IT IN THE
 ARRIVALS PANEL...); - + change a number, < > move a car or turn the pages; a list entry's two rows are one
-choice. A text longer than its row is cut and ends with "." (an abbreviation's dot; trailing spaces and commas
-dropped first) and its whole text is the status line's while the mouse is over it (`fit`) - a list entry's
+choice. What is neither: a word that names the number after it (NOT BEFORE, EVERY, N:, the Arrivals panel's
+words, shared), a knob's authors' name under its label (a value), a warning beginning with "!" (with the button
+that mends it after it), and the counts 1/3. A text longer than its row is cut and ends with "." (an abbreviation's dot; trailing spaces and commas
+dropped first, and never inside a number or a time: back to the space before it, as "EVERY 1:3." would read
+as another time) and its whole text is the status line's while the mouse is over it (`fit`, `cut_to`; a cut
+note's whole text over all its rows) - a list entry's
 task and a train's price stay whole, its name is cut (`fit_head`); a long note wraps at spaces into its rows
 (`note`); a value starts at the value column, or a character after a label longer than that column (English
-IN THE LIST:, Hungarian KIVÁLASZTVA:). The arrow back at the bottom left says so in the status line ("Back one
+IN THE LIST:, Hungarian KIVÁLASZTVA:, a knob's Czech NEUTRÁLNÍ VLAKY:), and a train's car icons a character
+after the longest of CARS:, + CAR, TEMPLATE..., REMOVE (English TEMPLATE... took clicks of the first car's
+click-and-hold area, which is checked first). The arrow back's tip only while the factory panel is drawn
+(`PanelRows::fresh`). The arrow back at the bottom left says so in the status line ("Back one
 page", Esc and the right button too). What the old layout got wrong (found with the test steps `H` and `G<n>`,
 below, and `tools\rig\panel_rows_check.py`): the authors' trains' 12th row lay on the page arrows' row - a
 click on > took that train into the entry instead of turning the page; a neutral or pirate factory's note
@@ -591,7 +598,23 @@ AFTER TRAIN n IS MADE notes that looked like choices; a list entry joined name a
 names that hold one ("MORTAR + CARS: 7: PATROLS", now " - "). What the panel does did not change: the same
 choices, the same steps of the history, the same data. Test mode: `H` writes the open factory panel's texts
 and choices with their boxes to `LocoFix.log` (WM_COPYDATA 40052), `G<n>` clicks the middle of the n-th one
-(40051) as `k<x>:<y>` does - the same numbers in every language, so one list of steps walks all six.
+(40051) as `k<x>:<y>` does - the same numbers in every language, so one list of steps walks all six;
+`T[<k>|]<text>` clicks the k-th whose text begins so, one list of steps for builds numbered differently.
+The groove line is two Direct3D fills: drawn among the queued texts, the texts' lock waits for the GPU. On the
+enemy's plan and the authors' trains that was the page's only Direct3D drawing (+1 to 1.5 ms a frame there),
+so it is drawn after `panel_draw`'s last lock (`factory_draw_after`); the other pages draw Direct3D before
+that lock anyway - the icons, and a set choice's underline (`PanelRows::put`), e.g. the open tab of our
+factory's plan. Checked in the rig (2026-11-13/14, a test map from
+TheFactory with a factory of every army, 12 + 7 + 3 + 1 entries): every page walked in all six languages at
+1024 x 768, 1920 x 1080 and 640 x 480 and the map without arrivals - `panel_rows_check.py` 0 faults on every
+page (the old layout 8-13 a walk); the same edits by text in the old and the new build - every row's choices,
+- +, < >, the problem's button, the pages, the tabs, + CAR (the Vehicles palette), the click-and-hold strip
+on + CAR and on a car, the convert link, the arrow back - gave the same history lines, a byte-identical
+saved script and the same map, undo x5 + redo x5 the same script again, and a load + save the panel's
+entries, unlocks, limits and AI values unchanged; the panel's draw time with the box alone (`EditorProfile`,
+60 fps throughout) the same as before or less (1024 x 768: the plan 1.99 ms against 2.03, the authors'
+trains 1.70 against 1.79, an entry 3.20 against 3.06, the build list 2.7-2.9 against 3.3); the 20 missions
+passed.
 
 **A factory's plan** (`editor_factory.cpp` the panel, `editor_mission.cpp` "factories" and the
 runner's `PlanTact`). What a script can make a factory build, seen in play (probe maps of the

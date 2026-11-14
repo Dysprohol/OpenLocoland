@@ -155,16 +155,28 @@ float row_y(int k) { return g_py + TOP + k * ROW; }
 float left() { return g_px + LEFT; }
 float right_end() { return g_px + LEFT + WIDTH * g_cw; }   // where every row ends
 
-// A text cut to the characters left of the row at y from x: cut, it ends with CUT (trailing spaces and
-// commas dropped) and its whole text is the status line's while the mouse is over it.
-std::string fit(const std::string& text, float x, float y) {
-    const int room = static_cast<int>((right_end() - x) / g_cw);
+// `text` cut to `room` characters with its mark: never inside a number or a time (back to the space before
+// it - "EVERY 1:3." would read as another time), then trailing spaces and commas dropped.
+std::string cut_to(const std::string& text, int room) {
     if (room <= 0) return std::string();
     if (static_cast<int>(text.size()) <= room) return text;
-    std::string cut = text.substr(0, room - std::strlen(CUT));
+    const size_t at = static_cast<size_t>((std::max)(0, room - static_cast<int>(std::strlen(CUT))));
+    std::string cut = text.substr(0, at);
+    const size_t word = cut.find_last_of(' ') == std::string::npos ? 0 : cut.find_last_of(' ') + 1;
+    const bool in_word = text[at] != ' ';
+    if (in_word && std::any_of(text.begin() + word, text.begin() + at, [](char c) { return c >= '0' && c <= '9'; }))
+        cut.resize(word);
     while (!cut.empty() && std::strchr(" ,:;-(", cut.back())) cut.pop_back();
-    g_rows.tip(x - 2, y - ROW / 2, right_end(), y + ROW / 2, text, true);
     return cut + CUT;
+}
+
+// A text cut to the characters left of the row at y from x (`reserve` of them kept for what follows it, a
+// condition's " >"): cut, it ends with CUT and its whole text is the status line's while the mouse is over it.
+std::string fit(const std::string& text, float x, float y, int reserve = 0) {
+    const int room = static_cast<int>((right_end() - x) / g_cw) - reserve;
+    if (static_cast<int>(text.size()) <= room) return text;
+    if (room > 0) g_rows.tip(x - 2, y - ROW / 2, right_end(), y + ROW / 2, text, true);
+    return cut_to(text, room);
 }
 
 // `head` + `tail` in the row at y from x; too long, `head` is cut (fit's mark) and `tail` - the task, the
@@ -173,10 +185,8 @@ std::string fit_head(const std::string& head, const std::string& tail, float x, 
     const int room = static_cast<int>((right_end() - x) / g_cw) - static_cast<int>(tail.size());
     if (static_cast<int>(head.size()) <= room) return fit(head + tail, x, y);
     if (room <= 2) return fit(head + tail, x, y);
-    std::string cut = head.substr(0, room - std::strlen(CUT));
-    while (!cut.empty() && std::strchr(" ,:;-(", cut.back())) cut.pop_back();
     g_rows.tip(x - 2, y - ROW / 2, right_end(), y + ROW / 2, head + tail, true);
-    return cut + CUT + tail;
+    return cut_to(head, room) + tail;
 }
 
 // A note - what something means, never a choice: in parentheses.
@@ -202,7 +212,9 @@ void note(int k, int rows, const std::string& text) {
     }
     lines.push_back(line);
     lines.resize(rows);   // a row each, an empty one too: the same texts in every language (the test's numbers)
-    for (int i = 0; i < rows; ++i) put(left(), row_y(k + i), fit(lines[i], left(), row_y(k + i)));
+    if (static_cast<int>(lines.back().size()) > WIDTH)   // cut: the whole note in the status line over all its rows
+        g_rows.tip(left() - 2, row_y(k) - ROW / 2, right_end(), row_y(k + rows - 1) + ROW / 2, all, true);
+    for (int i = 0; i < rows; ++i) put(left(), row_y(k + i), cut_to(lines[i], WIDTH));
 }
 
 // The groove between a list and its actions: drawn after the panel's texts are written (factory_draw_after,
@@ -604,7 +616,13 @@ float draw_cars(const FactoryTrain& t, float y) {
     if (g_car >= 0 && g_car < g_first_car) g_first_car = g_car;
     if (g_car >= g_first_car + SHOWN_CARS) g_first_car = g_car - SHOWN_CARS + 1;
     g_first_car = (std::max)(0, (std::min)(g_first_car, n - SHOWN_CARS));
-    float x = g_px + LEFT + LABEL;
+    // the icons from the value column, or a character after the longest of CARS:, + CAR, TEMPLATE..., REMOVE,
+    // so a click on that text's end never lands on the first car's click-and-hold area (checked first)
+    size_t widest = 0;
+    for (const char* k : {ui_text("ArrCars", "CARS:"), ui_text("ArrAddCar", "+ CAR"), ui_text("ArrTemplates", "TEMPLATE..."),
+                          ui_text("ArrRemoveCar", "REMOVE")})
+        widest = (std::max)(widest, std::strlen(k));
+    float x = (std::max)(g_px + LEFT + LABEL, g_px + LEFT + (widest + 1) * g_cw);
     const float cy = y + ROW;
     for (int i = g_first_car; i < n && i < g_first_car + SHOWN_CARS; ++i) {
         const float cx = x + ICON / 2;
@@ -672,7 +690,7 @@ float draw_when(const FactoryTrain& t, float y) {
                                         r.cond_n = mission_condition(r.cond).first;
                                     }); });
         const Condition& c = mission_condition(t.cond);
-        x = put(x, y, fit(ui_text(c.key, c.english), x + 2 * g_cw, y), true);   // room for " >"
+        x = put(x, y, fit(ui_text(c.key, c.english), x, y, 2), true);   // room for " >"
         x = put(x, y, ">", false, [] { change({"OpPlanWhen", "factory plan time"}, [](FactoryTrain& r) {
                                         r.cond = next_condition(r.cond, 1);
                                         r.cond_n = mission_condition(r.cond).first;
@@ -812,15 +830,20 @@ float knob_rows(float y, const char* key, const char* english, const char* name,
     return y + 3 * ROW + 4;
 }
 
+// A knob's value column: KNOB_LABEL, or a character after a longer label (Czech NEUTRÁLNÍ VLAKY:).
+float knob_x(const char* key, const char* english) {
+    return (std::max)(g_px + LEFT + KNOB_LABEL, g_px + LEFT + (std::strlen(ui_text(key, english)) + 1) * g_cw);
+}
+
 float knob_number(float y, const char* key, const char* english, const char* name, const std::string& shown, std::function<void(int)> by,
                   const char* note_key, const char* note) {
-    number(g_px + LEFT + KNOB_LABEL, y, shown, std::move(by));
+    number(knob_x(key, english), y, shown, std::move(by));
     return knob_rows(y, key, english, name, note_key, note);
 }
 
 float knob_choice(float y, const char* key, const char* english, const char* name,
                   const std::vector<std::pair<std::string, std::function<void()>>>& choices, int current, const char* note_key, const char* note) {
-    float x = g_px + LEFT + KNOB_LABEL;
+    float x = knob_x(key, english);
     for (size_t i = 0; i < choices.size(); ++i) x = put(x, y, choices[i].first, static_cast<int>(i) == current, choices[i].second) + g_cw;
     return knob_rows(y, key, english, name, note_key, note);
 }
@@ -917,7 +940,9 @@ bool factory_click(POINT m) { return g_rows.press(m) || g_rows.click(m); }
 bool factory_release(POINT m) { return g_rows.release(m); }   // as arrivals_release
 const char* factory_tip(POINT m) {
     if (!g_hold_tip.empty() && g_rows.held()) return g_hold_tip.c_str();
-    if (factory_has_back() && panel_on_previous(m)) return ui_text("TipPanelBack", "Back one page (Esc and the right button too)");
+    // the arrow back: only while this panel is the one drawn (factory_tip runs every frame, any panel open)
+    if (g_rows.fresh() && factory_has_back() && panel_on_previous(m))
+        return ui_text("TipPanelBack", "Back one page (Esc and the right button too)");
     return g_rows.tip_at(m);
 }
 
