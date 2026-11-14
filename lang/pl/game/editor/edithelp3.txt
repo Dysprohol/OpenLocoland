@@ -10,5 +10,5 @@ WR”∆ DO ZAZNACZANIA     PPM LUB ESC
 PRZESU— WIDOK           åRODKOWY PRZYCISK,
                         STRZA£KI,
                         KRAW Dè EKRANU
-COFNIJ / PON”W          CTRL+Z / CTRL+Y
-KAØD• ZMIAN  MOØNA COFN•∆ (DO 500 KROK”W).
+POWI KSZENIE / 100%     CTRL+K”£KO, CTRL+0
+COFNIJ/PON”W (DO 500)   CTRL+Z / CTRL+Y

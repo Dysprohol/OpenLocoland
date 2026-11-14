@@ -10,5 +10,5 @@ ZPÌT K VÝBÌRU           PTM NEBO ESC
 POSUNOUT POHLED         PROSTØEDNÍ TLAÈÍTKO,
                         ŠIPKY,
                         OKRAJ OBRAZOVKY
-ZPÌT / ZNOVU            CTRL+Z / CTRL+Y
-KAŽDOU ZMÌNU LZE VRÁTIT (AŽ 500 KROKÙ).
+PØIBLÍŽENÍ / 100%       CTRL+KOLEÈKO, CTRL+0
+ZPÌT/ZNOVU (AŽ 500)     CTRL+Z / CTRL+Y
