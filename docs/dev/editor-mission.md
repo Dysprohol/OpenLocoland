@@ -607,7 +607,7 @@ that lock anyway - the icons, and a set choice's underline (`PanelRows::put`), e
 factory's plan. Checked in the rig (2026-11-13/14, a test map from
 TheFactory with a factory of every army, 12 + 7 + 3 + 1 entries): every page walked in all six languages at
 1024 x 768, 1920 x 1080 and 640 x 480 and the map without arrivals - `panel_rows_check.py` 0 faults on every
-page (the old layout 8-13 a walk); the same edits by text in the old and the new build - every row's choices,
+page (the old layout 8-16 a walk); the same edits by text in the old and the new build - every row's choices,
 - +, < >, the problem's button, the pages, the tabs, + CAR (the Vehicles palette), the click-and-hold strip
 on + CAR and on a car, the convert link, the arrow back - gave the same history lines, a byte-identical
 saved script and the same map, undo x5 + redo x5 the same script again, and a load + save the panel's
