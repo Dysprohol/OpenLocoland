@@ -13611,6 +13611,17 @@ void edit_log_building_posts(const char* tag) {
                     lines += ui_printf(" s(%d,%d->%d,%d)", l.bx, l.by, l.ex, l.ey);
                     break;
                 }
+        std::string near_lines;   // every editor line passing within 60 px: its nearest point, its ends' distances, building_way
+        for (int i = 0; i < static_cast<int>(mission_push_lines().size()); ++i) {
+            const Trace t = trace(mission_push_lines()[i]);
+            if (t.path.empty()) continue;
+            float nearest = 1e9f;
+            for (uint8_t* d : t.path) nearest = (std::min)(nearest, std::hypot(dot_wx(d) - bx, dot_wy(d) - by));
+            if (nearest >= 60) continue;
+            near_lines += ui_printf(" e%d[near %.0f, ends %.0f/%.0f, %s]", i, nearest, std::hypot(dot_wx(t.path.front()) - bx, dot_wy(t.path.front()) - by),
+                                    std::hypot(dot_wx(t.path.back()) - bx, dot_wy(t.path.back()) - by), building_way(b, t.path) ? "fits" : "no");
+        }
+        if (!near_lines.empty()) lines += " near:" + near_lines;
         unsigned nearby = 0;
         for_each_object([&](uint8_t* p) {
             if (removed(p) || nvid_of(p) != VID_SEMAPHORE) return;
