@@ -7552,6 +7552,7 @@ std::vector<uint8_t*> posts_of_others(uint8_t* o, const PostOwners& owners) {
 // not the editor's to take: it stays.
 bool take_building_lines(uint8_t* o, std::vector<uint8_t*>& posts, const PostOwners* owners) {
     if (!o || (nvid_of(o) != VID_DEPOT && nvid_of(o) != VID_WORKSHOP)) return false;
+    if (!mission_managed()) return false;   // lines the editor does not save: none is taken, nor a post (give_building_line)
     std::vector<int> own = lines_of(o);
     const PostOwners mine = owners ? PostOwners() : post_owners();
     const PostOwners& all = owners ? *owners : mine;
@@ -7944,7 +7945,14 @@ void turn_post(uint8_t* o) {
 
 // After a factory or repair point is placed or moved (the last step of the history is its change):
 // its line and posts, into that step.
+// On a map whose lines the editor does not save - a mission opened as it is, a script without editor blocks
+// - a building gets no line and no posts, as a post gets no line there (give_post_line): a save under the same
+// name would drop the line and keep the posts, so in play the building would have no push line and stray
+// lights beside its old ones; the building's move, turn or deletion takes nothing either (take_building_lines).
+// Saved under a new name the mission's lines become the editor's. Until 2026-11-14 every move or turn of a
+// building there made a new line and posts beside the script's (the third review).
 void give_building_line(uint8_t* o) {
+    if (!mission_managed()) return;
     PushLine line;
     if (!building_line(o, line)) return;
     const Trace t = trace(line);
