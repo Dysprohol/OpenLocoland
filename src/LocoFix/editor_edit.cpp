@@ -9434,12 +9434,12 @@ constexpr float LINE_HEIGHT = 14;
 // character - the look of the game's tips.
 std::vector<std::pair<float, float>> g_status_ends;   // this frame's status lines: their top, how far right they reach
 
-void status_line(float x, float y, const char* text) {
+void status_line(float x, float y, const char* text, int step = 5) {   // step: in front of what (draw_screen)
     UiDrawing ui;
     float cw = 6;
     if (uint8_t* v = vid_by_number(FONT_TIPS)) cw = at<float>(v, V_SIZE_X);
     g_status_ends.push_back({y, x + 2 + cw * (std::strlen(text) + 2)});
-    if (vid_by_number(FONT_TIPS)) draw_text(FONT_TIPS, x + 2, y + 1, (std::string(" ") + text + " ").c_str());
+    if (vid_by_number(FONT_TIPS)) draw_text(FONT_TIPS, x + 2, y + 1, (std::string(" ") + text + " ").c_str(), false, step);
     else reinterpret_cast<Printf_t>(PRINTF)(graphics(), (x + 6) * drawn_scale(), (y + 2) * drawn_scale(), "%s", text);
 }
 
@@ -12090,7 +12090,7 @@ void draw_overlay() {
     }
     // at three times on 2560 x 1440 a panel's device reaches the top of the screen: the first status line, which
     // says what the panel's row under the mouse does, again over it (at the normal size the device is clear of it)
-    if (panel_open() && g_ui > 1) status_line(v.l, v.t, status);
+    if (panel_open() && g_ui > 1) status_line(v.l, v.t, status, 25);   // in front of the panel (its steps 10-13)
     lap.to(prof::ED_PANELS);
 }
 
