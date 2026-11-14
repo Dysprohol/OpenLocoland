@@ -7263,23 +7263,41 @@ bool building_line(uint8_t* o, PushLine& line) {
     return false;
 }
 
-// A line's way is a line of the building `o` as the missions have them (MAP_RULES 5): it passes the
-// building's middle (within 30 px) and a factory's begins at the dead end of its spur, a repair point's
-// runs on through it (its middle is not at the line's begin or end). A short line of a post that only
-// crosses the building - a post placed beside a factory's spur gets one - is the post's, not the
-// building's: before, it was taken for the building's, so the post had "no line of its own" and the
-// building's step took the line (and, with the posts found by their places, the post).
+// A line's way is a line of the building `o` as the missions' lines are (MAP_RULES 5): it passes the
+// building's middle (within 30 px) and runs out of it - a factory's from its middle or behind it (the
+// dead end of its spur lies 22 px inside) to at least BUILDING_LINE_OUT ahead of it, the way it faces,
+// either way round; a repair point's on through it, both its ends at least BUILDING_LINE_OUT from its
+// middle. The missions' factory lines run 86-175 px from inside the factory (l18's enemy one only 47 px
+// ahead of its middle), their repair points' lines 139-304 px through it (l15's repair point 47 px from
+// one end), the editor's 140 and 120 each side. So the building's own line stays the building's whatever
+// the player did to it - turned round with R in the Push line tool, track laid on past its dead end -, and
+// the short line a post gets (70 px, up to a link more) is not the building's when it only crosses it: a
+// post beside a factory's spur whose rail point is less than BUILDING_LINE_OUT ahead of the factory's
+// middle, a post at a repair point whose line ends less than BUILDING_LINE_OUT from its middle. Farther out
+// a post's line has the very shape of the building's and is taken for it (the post itself stays - it does
+// not stand as the building's light - and loses that line when the building moves). Until 2026-11-12 any
+// line through the middle was the building's (a post's short line too); then for a day a factory's had to
+// begin at its spur's dead end, which a turned line does not - its move left the old line and post and made
+// new ones; then any line longer than 90 px was, which the missions' 86-88 px factory lines (l08, l15, l18,
+// l20) are not; then 60 px out, which l18's factory and l15's repair point are not.
+constexpr float BUILDING_LINE_OUT = 40;
+
 bool building_way(uint8_t* o, const std::vector<uint8_t*>& path) {
     if (path.size() < 2) return false;
-    size_t at_middle = path.size();
-    float best = 30;
-    for (size_t k = 0; k < path.size(); ++k) {
-        const float d = std::hypot(dot_wx(path[k]) - at<float>(o, O_X), dot_wy(path[k]) - at<float>(o, O_Y));
-        if (d < best) best = d, at_middle = k;
+    const float x = at<float>(o, O_X), y = at<float>(o, O_Y);
+    const bool through = std::any_of(path.begin(), path.end(), [&](uint8_t* d) { return std::hypot(dot_wx(d) - x, dot_wy(d) - y) < 30; });
+    if (!through) return false;
+    uint8_t* front = path.front();
+    uint8_t* back = path.back();
+    if (nvid_of(o) == VID_DEPOT) {
+        const float a = at<int>(o, O_DIRECTION) * 6.2831853f / 256;
+        const float vx = std::sin(a), vy = -std::cos(a);   // the way it faces
+        auto ahead = [&](uint8_t* d) { return (dot_wx(d) - x) * vx + (dot_wy(d) - y) * vy; };
+        const float f = ahead(front), b = ahead(back);
+        return (f <= 10 && b >= BUILDING_LINE_OUT) || (b <= 10 && f >= BUILDING_LINE_OUT);
     }
-    if (at_middle == path.size()) return false;
-    if (nvid_of(o) == VID_DEPOT) return dot_links(path.front()) == 1;
-    return at_middle > 0 && at_middle + 1 < path.size();
+    return std::hypot(dot_wx(front) - x, dot_wy(front) - y) >= BUILDING_LINE_OUT &&
+           std::hypot(dot_wx(back) - x, dot_wy(back) - y) >= BUILDING_LINE_OUT;
 }
 
 // The editable lines of a factory or repair point: those whose way is its line (building_way).
