@@ -286,12 +286,13 @@ posts - R / E turn it round on its leg, its line and posts with it; a crate snap
 elsewhere they are refused. A blocker is placed and turned freely (it snapped to a dead end until
 v0.2.2, issue #3).
 Moving or deleting the building
-moves or deletes its line and posts. Its line is one through its middle that, for a factory, begins at its
-spur's dead end and, for a repair point, runs on through it (5); a post's short line that only crosses the
-building is the post's. Its posts are found as the missions relate them (7): a post within
-90 px of a place its line gives a post, beside that line's track, whose nearest such place is its line's
-(not another line's) and that has no line of its own - on a map loaded from a file too, the missions' lines
-being the script's.
+moves or deletes its line and posts. Its line is one through its middle that runs out of it (5): a factory's from its middle
+or behind to at least 40 px ahead, a repair point's on through it, both ends at least 40 px away; a post's
+short line that only crosses the building is the post's, and a line a post owns gives no places for others. Its posts are found
+as the missions place them (7): for each place its line gives a light, the post nearest to it within 90 px of
+that colour, facing the same trains, beside that line's track and with no line of its own - at most one a
+place; any other post (another colour, the other way, a second one at the same end) is not the building's -
+on a map loaded from a file too, the missions' lines being the script's.
 
 ## 6a. Trains on the map
 

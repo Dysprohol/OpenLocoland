@@ -453,7 +453,7 @@ podgląd pokazuje gdzie; z dala od toru albo z Shiftem zostają tam, gdzie kurso
 Przeciągnięcie przenosi je razem z linią i semaforami na najbliższe właściwe miejsce (upuszczone z dala od toru
 albo z Shiftem: tam, gdzie upuszczone); usunięcie usuwa też linię i semafory. Jego semafory to te
 na końcach jego linii, także przesunięty bliżej albo wzdłuż linii - również w mapie wczytanej z
-pliku; semafor odsunięty daleko zostaje tam, gdzie go postawiłeś.
+pliku; po jednym w swoim kolorze, zwróconym do swoich pociągów, na każdym końcu. Każdy inny semafor - odsunięty daleko, w innym kolorze, obrócony w drugą stronę, drugi na tym samym końcu - nie należy do budynku i zostaje tam, gdzie go postawiłeś.
 **Bloker** (kozioł oporowy, w grupie KOLEJ we Wszystkich obiektach) stawia się swobodnie i obraca
 R / E jak każdy obiekt: ustaw go sam na końcu toru.
 
