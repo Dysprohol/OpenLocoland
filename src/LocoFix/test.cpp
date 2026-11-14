@@ -26,6 +26,7 @@
 // scripts keep their volumes with SetReg only on the settings page).
 // Outside test mode nothing changes.
 #include "patch.h"
+#include <ddraw.h>
 
 namespace {
 
@@ -56,7 +57,36 @@ WNDPROC g_game_wndproc = nullptr;
 
 bool g_activated = false;
 
+// test_game.ps1's c40051: the display taken away and given back, as when another program takes the display
+// (every surface lost): DirectDraw's mode set to 1280x720 and, 1.5 s later, back to the game area's size.
+constexpr UINT TEST_DISPLAY_FLIP = 40051;
+constexpr UINT_PTR FLIP_TIMER = 0x7A11;
+int g_flip_w = 0, g_flip_h = 0;
+
+IDirectDraw7* game_ddraw() {
+    uint8_t* g = *reinterpret_cast<uint8_t**>(0x4a9a14);   // g_graphics
+    return g ? *reinterpret_cast<IDirectDraw7**>(g + 0xbec) : nullptr;
+}
+
 LRESULT CALLBACK test_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
+    if (m == WM_COMMAND && LOWORD(w) == TEST_DISPLAY_FLIP) {
+        RECT client;
+        GetClientRect(window, &client);
+        g_flip_w = client.right;
+        g_flip_h = client.bottom;
+        IDirectDraw7* dd = game_ddraw();
+        const HRESULT hr = dd ? dd->SetDisplayMode(1280, 720, 16, 0, 0) : E_FAIL;
+        patch::log("test: display mode 1280x720 (%08lX), back to %dx%d in 1.5 s", static_cast<unsigned long>(hr), g_flip_w, g_flip_h);
+        SetTimer(window, FLIP_TIMER, 1500, nullptr);
+        return 0;
+    }
+    if (m == WM_TIMER && w == FLIP_TIMER) {
+        KillTimer(window, FLIP_TIMER);
+        IDirectDraw7* dd = game_ddraw();
+        const HRESULT hr = dd ? dd->SetDisplayMode(g_flip_w, g_flip_h, 16, 0, 0) : E_FAIL;
+        patch::log("test: display mode back to %dx%d (%08lX)", g_flip_w, g_flip_h, static_cast<unsigned long>(hr));
+        return 0;
+    }
     if (m == WM_NCHITTEST) l = MAKELPARAM(g_cursor.x, g_cursor.y);
     if (m == WM_ACTIVATEAPP && !w) return 0;   // the game keeps running behind other windows
     if (m == WM_SHOWWINDOW && w && !g_activated) {
