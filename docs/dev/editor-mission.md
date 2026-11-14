@@ -290,16 +290,21 @@ the light takes the factory too, as the missions' radii (up to 150 at l07, l16) 
 lines from `PUSH_LINES`, `push_bx/by/ex/ey[]`, which the editor writes into the settings' block with the
 arrivals' arrays - the same lines as main()'s `SetPushLine` calls, in the screen's points (y less the
 height). A building's own line (`CaptureLine`) is one of the shape the editor gives it: a factory's begins
-within 50 px of its middle (at the dead end 22 px behind it) and its end is farther from it than its begin
-- the nearest such begin; a repair point's passes within 30 px of its middle and begins within 200 px of it
-(the editor's runs 120 px each way) - the nearest such line. Any other line - a light's, a level entry's, a
+within 75 px of its middle (`building_line` takes the dead end within 40 px of a point 22 px behind the
+middle; rail and ground heights apart add a little) and its end is farther from it than its begin - the
+nearest such begin; a repair point's begins within 240 px of it, is at most 480 px from begin to end and
+passes within 90 px of it - the nearest such line. The editor's repair line follows the track 120 px each
+way and stops at the first point past that, so a rail more (up to about 87 px) can end it; on a track
+that curves within those 120-210 px (a radius of 250 px) the building stands about 80 px off the straight
+from begin to end (the review of 2026-11-14 found the 30 px first used too tight there). Any other line - a light's, a level entry's, a
 hand-drawn one, another building's - is not taken, and a building without a line of its own (no dead end
 near, the line deleted with its rails, a map through CONVERT whose lines are elsewhere) keeps the 100 px
 alone. The vector of a long line is halved until it is short before the products, so nothing passes 32
 bits (a 1300 px line did). The trains are compared on the screen too: `CaptureTrain` walks the engine's
 box round the point (`FirstInBox`, map coordinates, reaching 400 px further down since a car stands that
-much lower on the screen than on the map by its height) and takes a car of class B_ENGINE and army 0 whose
-GetX, GetY - GetZ lies within the radius - so the height of the track at the light (a ramp, a bridge, high
+much lower on the screen than on the map by its height) and takes a car of class B_ENGINE and army 0, not dying (its
+animation below ANI_DEATH, as the engine's `AskPlace` leaves dying ones out), whose GetX, GetY - GetZ lies
+within the radius - so the height of the track at the light (a ramp, a bridge, high
 ground) does not move the point. The neutral buildings are listed first and looked at after, so the units'
 walk and the box's are never under way together. Without the arrays (a script written before) the runner
 keeps the 100 px alone (`#ifdef PUSH_LINES`); POLIGON (`maps.new/sandbox`) has its six lines written in. The moment is the missions':
@@ -331,7 +336,12 @@ beginning 280 px away that passes 6 px from the factory and ends where the playe
 px line through the factory and a light's 70 px line ending at the engine - the runner before took the
 factory in the first second (`by a train at 250,475, 403 px from it`), the new one never did (the engine
 stopped at the light, 167 px away: no line of its own, the 100 px alone); with the factory's own line among
-them it was taken at its light. The 20 missions pass. Not checked in play: CONVERT of a map without the
+them it was taken at its light. The 20 missions pass. The second review (a dying car, a factory's reach,
+a repair point on a curve): a repair point placed by the editor on the straight point after a bend (the
+Track tool's run from a straight line into a 35-degree diagonal) got its line round the bend, 272 px from
+begin to end with the building 30 px off that straight, and a train driving through took it at the line's
+begin (3 px on the screen); the re-saved factory map was taken as before; the 20 missions pass. A dying car
+was read in the code only. Not checked in play: CONVERT of a map without the
 arrivals' blocks; a light on a ramp or a bridge (the test map is flat - the point does not use any height
 but the car's own).
 

@@ -327,9 +327,10 @@ for a neutral one) - any army takes it and may take it back (`FortCaptured<army>
 **[editor]** The runner's `CaptureTact` does the same on an editor map for every neutral factory and repair
 point: a car of the player's within 90 px of the outer end of the factory's own line (a train passing that
 near takes it too, as in the missions), 50 px of the begin of the repair point's own line, or 100 px of the
-building; the player's trains only. A building's own line has the shape the editor gives it - a factory's
-begins within 50 px of it and goes away from it, a repair point's passes it and begins within 200 px -; a
-building without one keeps the 100 px alone. The editor writes the lines as `PUSH_LINES`,
+building; the player's trains only, never a car dying. A building's own line has the shape the editor
+gives it - a factory's begins within 75 px of it and goes away from it, a repair point's begins within 240
+px, is at most 480 px from end to end and passes within 90 px of it (round a curve the building stands
+well off the straight from begin to end) -; a building without one keeps the 100 px alone. The editor writes the lines as `PUSH_LINES`,
 `push_bx/by/ex/ey[]` too, so a map made before gets this when it is saved again (editor-mission.md "Capturing").
 
 ## 6a. Trains on the map
