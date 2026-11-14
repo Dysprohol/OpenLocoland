@@ -95,7 +95,8 @@ const char* const SETTINGS[][2] = {
 const char* const OWN[] = {"CUSTOM_MAP", "MONEY", "START_DAYNIGHT", "RAIN", "NUKE", "OBJECTIVES_FILE",
                            "WIN_FILE", "LOOSE_FILE", "BRIEF_LIST", "BRIEF_HEADER", "HISCORES_FILE",
                            "PLAYER_REINFORCEMENT", "LIMIT_ATACKERS", "ARRIVALS", "UNLOCKS", "UNIT_LIMITS", "ORDERS",
-                           "PLANS", "CLEVER_ATTACK", "PRICES", "FACTIONS", "PASS_RED_LIGHTS", "NEUTRAL_TRAINS", "FACTIONS_PEACEFUL"};
+                           "PLANS", "CLEVER_ATTACK", "PRICES", "FACTIONS", "PASS_RED_LIGHTS", "NEUTRAL_TRAINS", "FACTIONS_PEACEFUL",
+                           "PUSH_LINES"};
 constexpr int POSTS = 10;               // ATA_STAND0 ... ATA_STAND9
 
 // the train types of TrainsTactDeclares.lgc (ATT_<size>_<kind>)
@@ -1200,24 +1201,80 @@ const char* const ARRIVALS_RUNNER[] = {
     "      unlock_time[i]=-1;",
     "    }",
     "}",
-    "// CaptureTact(): a neutral factory or repair point becomes the player's when a train of the player's",
-    "// comes within 100 px of it (the missions call LDepoCapture / LMasterCapture of Captures.lgc for",
-    "// their one such building; forts and mining plants are captured by F162_0 of ai_default_event.lgc).",
+    "// CaptureTact(): a neutral factory or repair point becomes the player's where a campaign mission takes",
+    "// its own (LDepoCapture / LMasterCapture of Captures.lgc, with a point beside the building, MAP_RULES.md",
+    "// 7): a factory when a train of the player's reaches the outer end of the factory's exit line - where a",
+    "// train coming in stops at its light - (CAPTURE_DEPOT px around it), a repair point when one reaches the",
+    "// begin of its line, where trains enter it (CAPTURE_REPAIR px), and either when one comes within 100 px",
+    "// of the building itself. The building's line is the push line of the map (PUSH_LINES, push_*[]) that",
+    "// passes nearest to it, within 50 px; a push line's points are the screen's (y less the height, as",
+    "// SetPushLine takes them), so the building is compared at its own (y - z) and the point taken back at",
+    "// the building's height. Only the player's trains capture, as in the missions, and a",
+    "// building captured stays the player's; ACT_SET_ARMY fires the engine's BuildingCapture event, whose",
+    "// message (DepoCaptured / MasterCaptured) the player sees. Forts and mining plants are captured by",
+    "// F162_0 of ai_default_event.lgc.",
+    "#define CAPTURE_DEPOT 90",
+    "#define CAPTURE_REPAIR 50",
+    "CaptureLine(int b)",
+    "{",
+    "  int i,vx,vy,l,t,dx,dy,d,best,found,y;",
+    "  y=GetY(b)-GetZ(b);",
+    "  best=2500;",
+    "  found=0;",
+    "#ifdef PUSH_LINES",
+    "  for( i=0; i<PUSH_LINES; i++ )",
+    "  {",
+    "    vx=push_ex[i]-push_bx[i];",
+    "    vy=push_ey[i]-push_by[i];",
+    "    l=vx*vx+vy*vy;",
+    "    t=(GetX(b)-push_bx[i])*vx+(y-push_by[i])*vy;",
+    "    if( t<0 )",
+    "      t=0;",
+    "    if( t>l )",
+    "      t=l;",
+    "    dx=GetX(b)-push_bx[i];",
+    "    dy=y-push_by[i];",
+    "    if( l>0 )",
+    "    {",
+    "      dx=dx-vx*t/l;",
+    "      dy=dy-vy*t/l;",
+    "    }",
+    "    d=dx*dx+dy*dy;",
+    "    if( d<best )",
+    "    {",
+    "      best=d;",
+    "      found=i+1;",
+    "    }",
+    "  }",
+    "#endif",
+    "  return found;",
+    "}",
     "CaptureTact()",
     "{",
-    "  int b,v;",
+    "  int b,v,u,i,x,y;",
     "  for( b=FirstUnit(u_monster); b; b=NextUnit() )",
     "  {",
     "    v=GetUnitVid(b);",
     "    if( (v==102 || v==104) && Action(b,act_getarmy,0,0)==2 )",
-    "      if( FindNearestSprite(GETSPRITE_UNIT+GETSPRITE_CLASS+B_ENGINE+GETSPRITE_ARMY0,GetX(b),GetY(b),100) )",
+    "    {",
+    "      x=GetX(b);",
+    "      y=GetY(b);",
+    "      u=FindNearestSprite(GETSPRITE_UNIT+GETSPRITE_CLASS+B_ENGINE+GETSPRITE_ARMY0,x,y,100);",
+    "#ifdef PUSH_LINES",
+    "      i=CaptureLine(b);",
+    "      if( !u && i && v==102 )",
+    "        u=FindNearestSprite(GETSPRITE_UNIT+GETSPRITE_CLASS+B_ENGINE+GETSPRITE_ARMY0,push_ex[i-1],push_ey[i-1]+GetZ(b),CAPTURE_DEPOT);",
+    "      if( !u && i && v==104 )",
+    "        u=FindNearestSprite(GETSPRITE_UNIT+GETSPRITE_CLASS+B_ENGINE+GETSPRITE_ARMY0,push_bx[i-1],push_by[i-1]+GetZ(b),CAPTURE_REPAIR);",
+    "#endif",
+    "      if( u )",
     "      {",
     "        PlaySFX(25);",
     "        Effect(eff_nuke,0x006000);",
+    "        Log(\"CAPTURE vid \"+itoa(v)+\" at \"+itoa(x)+\",\"+itoa(y)+\" by a train at \"+itoa(GetX(u))+\",\"+itoa(GetY(u))+\", \"+itoa(SizeTo(u,x,y))+\" px from it\");",
     "        Action(b,act_setarmy,0,0);",
-    "        BuildingCapture(b);",
-    "        Log(\"CAPTURE vid \"+itoa(v)+\" at \"+itoa(GetX(b))+\",\"+itoa(GetY(b)));",
     "      }",
+    "    }",
     "  }",
     "}",
     "// OrdersFind(), on the level's first frame, and OrdersTact(t), once a second: the orders of the map's",
@@ -2858,6 +2915,19 @@ std::vector<std::string> settings_block(const Mission& m, const ArrivalsState& a
         column("arrival_at_x", [](size_t) { return std::string("0"); });
         column("arrival_at_y", [](size_t) { return std::string("0"); });
         column("arrival_since", [](size_t) { return std::string("0"); });
+        // the push lines of main() once more, as data: the runner's CaptureTact finds each neutral
+        // factory's and repair point's own line and captures where the missions do (MAP_RULES.md 7)
+        define("PUSH_LINES", std::to_string(g_lines.size()));
+        auto lines = [&](const char* name, int PushLine::*field) {
+            std::vector<std::string> items;
+            for (const PushLine& l : g_lines) items.push_back(std::to_string(l.*field));
+            items.push_back("0");
+            array(name, items);
+        };
+        lines("push_bx", &PushLine::bx);
+        lines("push_by", &PushLine::by);
+        lines("push_ex", &PushLine::ex);
+        lines("push_ey", &PushLine::ey);
         auto texts = [&](const char* name, const std::function<std::string(const Ordered&)>& of) {
             std::vector<std::string> items;
             for (const Ordered& o : orders) items.push_back(of(o));
