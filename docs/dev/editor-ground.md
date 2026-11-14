@@ -451,8 +451,12 @@ enemy one only 47 px ahead of its middle -, their repair points' 139-304 px thro
 point 47 px from one end). So the building's line stays its own whatever the player did to it (turned round
 with R, track laid on past its dead end), and the short line a post gets is the post's when the post stands
 less than 40 px ahead of a factory's middle beside its spur, or its line ends less than 40 px from a repair
-point's middle. Farther out a post's line has the very shape of the building's and is taken for it: the post
-itself stays (it does not stand as the building's light) and loses that line when the building moves.
+point's middle. Farther out a post's line has the shape of the building's; a building has one line, the one
+that fits it best (`lines_of`: a factory's beginning nearest its spur's dead end, a repair point's passing
+nearest its middle, then the longest), so while its own line is there such a post's line - or a line on a
+parallel track within 30 px - is the post's (the second review: a red post 60 px ahead of a factory, with its
+own line, was taken as the factory's second light and deleted with its line). A building whose own line was
+deleted by hand takes the best such line for its own.
 Earlier versions of this fix: a factory's line had to begin at its spur's dead end (a turned line was left
 behind with its post and a new one made), then any line longer than 90 px was a building's (the 86-88 px
 factory lines of missions 8, 15, 18 and 20 were not), then 60 px out (mission 18's factory and mission 15's

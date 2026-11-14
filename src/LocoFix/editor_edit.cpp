@@ -7281,8 +7281,8 @@ bool building_line(uint8_t* o, PushLine& line) {
 // the short line a post gets (70 px, up to a link more) is not the building's when it only crosses it: a
 // post beside a factory's spur whose rail point is less than BUILDING_LINE_OUT ahead of the factory's
 // middle, a post at a repair point whose line ends less than BUILDING_LINE_OUT from its middle. Farther out
-// a post's line has the very shape of the building's and is taken for it (the post itself stays - it does
-// not stand as the building's light - and loses that line when the building moves). Until 2026-11-12 any
+// a post's line has the shape of the building's, and lines_of tells them apart: a building has one line,
+// the one that fits it best. Until 2026-11-12 any
 // line through the middle was the building's (a post's short line too); then for a day a factory's had to
 // begin at its spur's dead end, which a turned line does not - its move left the old line and post and made
 // new ones; then any line longer than 90 px was, which the missions' 86-88 px factory lines (l08, l15, l18,
@@ -7307,13 +7307,50 @@ bool building_way(uint8_t* o, const std::vector<uint8_t*>& path) {
            std::hypot(dot_wx(back) - x, dot_wy(back) - y) >= BUILDING_LINE_OUT;
 }
 
-// The editable lines of a factory or repair point: those whose way is its line (building_way).
+float way_length(const std::vector<uint8_t*>& path) {
+    float len = 0;
+    for (size_t k = 1; k < path.size(); ++k)
+        len += std::hypot(dot_wx(path[k]) - dot_wx(path[k - 1]), dot_wy(path[k]) - dot_wy(path[k - 1]));
+    return len;
+}
+
+// How well a way that is a line of `o` (building_way) fits it, smaller better: a factory's - how far
+// ahead of its middle its dead-end side begins (its spur's dead end, 22 px behind, best); a repair
+// point's - how far its way passes from its middle.
+float building_fit(uint8_t* o, const std::vector<uint8_t*>& path) {
+    const float x = at<float>(o, O_X), y = at<float>(o, O_Y);
+    if (nvid_of(o) == VID_DEPOT) {
+        const float a = at<int>(o, O_DIRECTION) * 6.2831853f / 256;
+        const float vx = std::sin(a), vy = -std::cos(a);
+        auto ahead = [&](uint8_t* d) { return (dot_wx(d) - x) * vx + (dot_wy(d) - y) * vy; };
+        return (std::min)(ahead(path.front()), ahead(path.back()));
+    }
+    float best = 1e9f;
+    for (uint8_t* d : path) best = (std::min)(best, std::hypot(dot_wx(d) - x, dot_wy(d) - y));
+    return best;
+}
+
+// The editable line of a factory or repair point (its index; none, or one): of the editor's lines whose
+// way is its line (building_way) the one that fits it best (building_fit, within 2 px a tie), then the
+// longest, then the first. A building has one line, as every one of the missions': so a post's own line
+// that has the shape of a factory's - a post 40-90 px out along the spur whose 70 px line reaches back
+// past the factory's middle - or a line on a parallel track within 30 px of the middle is not the
+// building's while its own line is there (the second review of this fix: such a post was taken as the
+// factory's second light and deleted with its line). A building whose own line was deleted by hand takes
+// the best such line for its own.
 std::vector<int> lines_of(uint8_t* o) {
     std::vector<int> out;
     if (nvid_of(o) != VID_DEPOT && nvid_of(o) != VID_WORKSHOP) return out;
     const std::vector<PushLine>& lines = mission_push_lines();
-    for (int i = 0; i < static_cast<int>(lines.size()); ++i)
-        if (building_way(o, trace(lines[i]).path)) out.push_back(i);
+    int best = -1;
+    float best_fit = 0, best_len = 0;
+    for (int i = 0; i < static_cast<int>(lines.size()); ++i) {
+        const Trace t = trace(lines[i]);
+        if (!building_way(o, t.path)) continue;
+        const float fit = building_fit(o, t.path), len = way_length(t.path);
+        if (best < 0 || fit < best_fit - 2 || (fit <= best_fit + 2 && len > best_len)) best = i, best_fit = fit, best_len = len;
+    }
+    if (best >= 0) out.push_back(best);
     return out;
 }
 

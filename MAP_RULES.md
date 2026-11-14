@@ -287,7 +287,9 @@ elsewhere they are refused. A blocker is placed and turned freely (it snapped to
 v0.2.2, issue #3).
 Moving or deleting the building
 moves or deletes its line and posts. Its line is one through its middle that runs out of it (5): a factory's from its middle
-or behind to at least 40 px ahead, a repair point's on through it, both ends at least 40 px away; a post's
+or behind to at least 40 px ahead, a repair point's on through it, both ends at least 40 px away - one line a
+building, the one that fits best (a factory's from nearest its dead end, a repair point's nearest its middle,
+then the longest); a post's
 short line that only crosses the building is the post's, and a line a post owns gives no places for others. Its posts are found
 as the missions place them (7): for each place its line gives a light, the post nearest to it within 90 px of
 that colour, facing the same trains, beside that line's track and with no line of its own - at most one a
