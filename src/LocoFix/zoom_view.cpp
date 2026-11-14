@@ -851,6 +851,16 @@ bool zoom_view_apply(double z, double surface_z) {
         int w, h, sw, sh;
         zoom_view_size(z, w, h);
         zoom_view_size((std::min)(z, surface_z), sw, sh);
+        // The surfaces: the ones in use while they hold the view and are not much too big (the engine locks them
+        // whole for its software sprites each frame, so their size costs); otherwise made for two steps of the
+        // ladder farther out, so a turn of the wheel makes new ones every few notches, not at each.
+        if (g_view && g_surface_w >= sw && g_surface_h >= sh &&
+            static_cast<double>(g_surface_w) * g_surface_h <= 2.5 * static_cast<double>(sw) * sh) {
+            sw = g_surface_w;
+            sh = g_surface_h;
+        } else {
+            zoom_view_size((std::min)(z, surface_z) / (1.12 * 1.12), sw, sh);
+        }
         const int tw = static_cast<int>(std::lround(w * z)), th = static_cast<int>(std::lround(h * z));
         RECT target;
         target.left = (window_w() - (std::min)(tw, window_w())) / 2;

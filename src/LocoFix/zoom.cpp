@@ -66,10 +66,15 @@ constexpr unsigned WORLD_EDITOR = 0x1, WORLD_ACTIVE = 0x8, WORLD_PAUSED = 0x10, 
 constexpr unsigned SCROLL_BY_PLAYER = 0x1 | 0x20;   // SCROLL_FROM_BORDER, SCROLL_WITH_ARROWS
 // The most map pixels a zoom's view may have: the whole of the biggest original map (see the top).
 constexpr int MAX_PIXELS = 3072 * 2304;
-constexpr int GLIDE_MS = 150;
+// THE LADDER: one notch is a step of LADDER (12 %) from the level's own zoom, which is on it exactly, inward up to
+// MAX_IN (the last step lands on it exactly), outward while the view is within the map and the cap (then the whole
+// map, if that shows more). The glide to it: GLIDE_MS, eased out; a notch during a glide goes on from where the
+// glide is towards the step after its target, so fast turns add up into one move. The editor's zoom takes the
+// same (zoom_ladder_step, zoom_glide_ms).
+constexpr double LADDER = 1.12;
+constexpr double MAX_IN = 3.0;
+constexpr int GLIDE_MS = 220;
 constexpr double MEASURE_SECONDS = 3.0;   // the frame time logged for a step: over its first seconds
-constexpr double IN_STEPS[] = {3.0, 2.0, 1.5};
-constexpr double OUT_STEPS[] = {2.0 / 3.0, 0.5};
 
 template <typename T>
 T& at(void* base, int offset) {
@@ -105,7 +110,7 @@ int glide_ms() {
 
 // ======== 1. THE ZOOM (state and input) ========
 
-constexpr int MAX_STEPS = 8;
+constexpr int MAX_STEPS = 64;
 double g_steps[MAX_STEPS] = {1.0};   // the zooms of the level, from in to out (made by make_steps)
 int g_step_count = 1;
 int g_own = 0;        // the index of the level's own zoom
@@ -145,29 +150,35 @@ double pixels(double z) {
 // The zooms of this level and window (at its own zoom, when the wheel is first turned).
 void make_steps() {
     const double own = zoom_view_base(), whole = zoom_view_whole();
+    // inward: own x 1.12^k up to MAX_IN, the last one MAX_IN itself (written from the outermost in)
+    double in[MAX_STEPS];
+    int n_in = 0;
+    if (own < MAX_IN * 0.9999) {
+        for (double z = own * LADDER; z < MAX_IN * 0.9999 && n_in < MAX_STEPS / 2 - 1; z *= LADDER) in[n_in++] = z;
+        in[n_in++] = MAX_IN;
+    }
     g_step_count = 0;
-    for (double z : IN_STEPS)
-        if (z > own * 1.0001) g_steps[g_step_count++] = z;
+    for (int i = n_in - 1; i >= 0; --i) g_steps[g_step_count++] = in[i];
     g_own = g_step_count;
     g_steps[g_step_count++] = own;
+    // outward: own / 1.12^k while the view is within the map on an axis and within the cap, then the whole map
     double last = own;
-    for (double z : OUT_STEPS) {
-        if (z >= last * 0.9999 || z <= whole * 1.0001) continue;   // not out of the last, or beyond the whole map
-        if (pixels(z) > max_pixels()) break;
+    for (double z = own / LADDER; g_step_count < MAX_STEPS - 1; z /= LADDER) {
+        if (z <= whole * 1.0001 || pixels(z) > max_pixels()) break;
         g_steps[g_step_count++] = z;
         last = z;
     }
-    if (whole < last * 0.9999 && pixels(whole) <= max_pixels()) g_steps[g_step_count++] = whole;
+    if (whole < last * 0.9999 && pixels(whole) <= max_pixels() && g_step_count < MAX_STEPS) g_steps[g_step_count++] = whole;
     g_step = g_own;
     g_zoom = own;   // the level's own (mission 1: its stretch), where a first glide starts
     g_made = true;
     if (test_mode()) {
-        char text[200];
+        char text[MAX_STEPS * 12];
         int n = 0;
         for (int i = 0; i < g_step_count; ++i)
-            n += wsprintfA(text + n, "%s%d/1000%s", i ? " " : "", static_cast<int>(g_steps[i] * 1000 + 0.5),
+            n += wsprintfA(text + n, "%s%d%s", i ? " " : "", static_cast<int>(g_steps[i] * 1000 + 0.5),
                            i == g_own ? "*" : "");
-        patch::log("zoom: steps (in to out, * the level's own) %s", text);
+        patch::log("zoom: steps x1000 (in to out, * the level's own) %s", text);
     }
 }
 
@@ -268,7 +279,7 @@ void glide() {
         reached(g_step, now_counter());
         return;
     }
-    t = t * t * (3 - 2 * t);
+    t = 1.0 - (1.0 - t) * (1.0 - t) * (1.0 - t);   // eased out: quick at first, settling softly
     const double z = g_from * std::pow(g_to / g_from, t);
     if (!show_zoom(z, (std::min)(g_from, g_to))) {   // the surfaces of the bigger view: no new ones per frame
         g_gliding = false;
@@ -376,3 +387,7 @@ void install_zoom() {
     }
     patch::write_call(CALL_SCROLL_MOVE, nullptr, 0, reinterpret_cast<void*>(&scroll_move), 5);
 }
+
+// The editor's zoom (another file) takes the same ladder and glide.
+double zoom_ladder_step() { return LADDER; }
+int zoom_glide_ms() { return glide_ms(); }
