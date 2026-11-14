@@ -107,6 +107,7 @@ void edit_commit_mission(const ArrivalsState& arrivals_before, const FactoryStat
 void panel_open_arrivals();   // editor_panel.cpp
 void edit_open_enemy_factory();   // editor_edit.cpp: the panel of the map's first enemy factory
 bool edit_open_factory_at(float x, float y);   // editor_edit.cpp: the panel of the factory at a map point
+int edit_interface_scale();                     // editor_edit.cpp: the editor's interface size now
 const PanelRows& factory_rows();                // editor_factory.cpp: what the panel's last frame drew (test mode)
 bool edit_test_pick(int nvid, int army);   // editor_edit.cpp: test mode - the palette object to place
 void new_map_dialog(HWND owner);                // editor_newmap.cpp
@@ -1561,8 +1562,9 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
                     return 0;
                 }
                 const std::vector<PanelRows::Drawn>& rows = factory_rows().drawn();
+                const int scale = edit_interface_scale();   // the boxes are the interface's screen's (editor_edit.cpp)
                 if (data->dwData == TEST_PANEL_ROWS) {
-                    patch::log("panel rows: %d", static_cast<int>(rows.size()));
+                    patch::log("panel rows: %d (the interface's screen, scale %d)", static_cast<int>(rows.size()), scale);
                     for (size_t i = 0; i < rows.size(); ++i)
                         patch::log("panel row %d %s %.0f,%.0f-%.0f,%.0f %s", static_cast<int>(i), rows[i].choice ? "choice" : "text",
                                    rows[i].l, rows[i].t, rows[i].r, rows[i].b, rows[i].text.c_str());
@@ -1584,7 +1586,7 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
                 }
                 if (n < 0 || n >= static_cast<int>(rows.size())) return 0;
                 const PanelRows::Drawn& d = rows[n];
-                const int x = static_cast<int>((d.l + d.r) / 2), y = static_cast<int>((d.t + d.b) / 2);
+                const int x = static_cast<int>((d.l + d.r) / 2 * scale), y = static_cast<int>((d.t + d.b) / 2 * scale);
                 patch::log("panel row %d clicked at %d,%d: %s %s", n, x, y, d.choice ? "choice" : "text", d.text.c_str());
                 return (y << 16) | x;
             }

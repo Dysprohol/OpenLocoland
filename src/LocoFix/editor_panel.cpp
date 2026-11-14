@@ -371,10 +371,19 @@ Place menu_button() {
     return {(l + r) / 2 + MENU_X, vb + MENU_Y};
 }
 
+// The device's visible part round its middle (the rest of its 1024 x 768 is empty).
+constexpr float DEVICE_LEFT = -287, DEVICE_TOP = -213, DEVICE_RIGHT = 292, DEVICE_BOTTOM = 266;
+
+// The device in the middle of the view - of the interface's screen (editor_edit.cpp: the view divided by
+// the editor's interface size) -, moved in where that screen is too small for it there (three times on
+// 2560 x 1440: 480 high, the visible part 479).
 Place device() {
     float l, t, r, b;
     edit_view_box(l, t, r, b);
-    return {(l + r) / 2, (t + b) / 2};
+    Place d{(l + r) / 2, (t + b) / 2};
+    if (d.y + DEVICE_BOTTOM > b) d.y = (std::max)(b - DEVICE_BOTTOM, t - DEVICE_TOP);
+    if (d.x + DEVICE_RIGHT > r) d.x = (std::max)(r - DEVICE_RIGHT, l - DEVICE_LEFT);
+    return d;
 }
 
 Place picture() {

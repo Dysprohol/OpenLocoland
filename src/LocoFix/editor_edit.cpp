@@ -9788,8 +9788,8 @@ void draw_hint() {
     const int entry_under = bar_entry_at(mx, my);
     // the buttons that are not tools: the music player at the top right, the bar's Help and Menu
     const char* button = music_hint(m);
-    if (!button && panel_on_help(g_mouse)) button = ui_text("HintHelpButton", "the editor's help pages (F1)");
-    if (!button && panel_on_menu(g_mouse)) button = ui_text("HintMenuButton", "new, load, save, export, quick test, exit");
+    if (!button && panel_on_help(m)) button = ui_text("HintHelpButton", "the editor's help pages (F1)");
+    if (!button && panel_on_menu(m)) button = ui_text("HintMenuButton", "new, load, save, export, quick test, exit");
     if (!button && entry_under < 0 && (on_bar(mx, my) || on_options(mx, my))) return;   // the plates, the rows
     const Entry& hinted = entry_under >= 0 ? ENTRIES[entry_under] : entry();
     const char* text = button ? button
@@ -12010,11 +12010,11 @@ void draw_overlay() {
         std::snprintf(tool_text + n, sizeof tool_text - n, ui_format("StatusToolArmy", ", army %d (%s)"), place_army(), army_name(place_army()));
     }
     if (hover >= 0 && *shown.key) std::snprintf(tool_text + std::strlen(tool_text), sizeof tool_text - std::strlen(tool_text), " (%s)", shown.key);
-    if (const char* tip = panel_tip(g_mouse)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // the Help or Menu button
+    if (const char* tip = panel_tip(um)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // the Help or Menu button
     if (const char* tip = music_tip(um)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // the music player
     if (const char* tip = context_tip(um)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // a row of an object's panel
-    if (const char* tip = arrivals_tip(g_mouse)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // a row of the Arrivals panel
-    if (const char* tip = factory_tip(g_mouse)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);    // a row of a factory's panel
+    if (const char* tip = arrivals_tip(um)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);   // a row of the Arrivals panel
+    if (const char* tip = factory_tip(um)) std::snprintf(tool_text, sizeof tool_text, "%s", tip);    // a row of a factory's panel
     std::snprintf(status, sizeof status, ui_format("StatusLine", "EDITOR - %s - undo %u, redo %u%s   %s"), tool_text,
                   static_cast<unsigned>(g_undo.size()), static_cast<unsigned>(g_redo.size()),
                   g_dirty ? ui_text("StatusNotSaved", " - not saved") : "",
@@ -12084,7 +12084,13 @@ void draw_overlay() {
     draw_context();
     draw_row_tip();
     draw_hint();
-    panel_draw(g_mouse);   // the Help and Menu buttons, an open panel in front of everything
+    {
+        UiDrawing ui;
+        panel_draw(um);   // the Help and Menu buttons, an open panel in front of everything
+    }
+    // at three times on 2560 x 1440 a panel's device reaches the top of the screen: the first status line, which
+    // says what the panel's row under the mouse does, again over it (at the normal size the device is clear of it)
+    if (panel_open() && g_ui > 1) status_line(v.l, v.t, status);
     lap.to(prof::ED_PANELS);
 }
 
@@ -12134,7 +12140,10 @@ void __fastcall DrawScene_editor(void* g, void* edx, int draw) {
         draw_overlay();
     }
     prof::Lap saved;
-    if (draw) panel_draw_saved();   // the SAVED notice, also over the level Run the level runs
+    if (draw) {   // the SAVED notice, also over the level Run the level runs - at the editor's size
+        UiDrawing ui;
+        panel_draw_saved();
+    }
     saved.to(prof::ED_PANELS);
 }
 
@@ -12152,7 +12161,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
     if (panel_open() && stroke_under_way()) end_strokes("a panel opened");
     if (m == WM_LBUTTONDOWN && music_click(ui_point(logical(l)))) return true;   // the music player, also over an open panel
     if ((m == WM_KEYDOWN || m == WM_KEYUP) && w == VK_SHIFT) g_shift = m == WM_KEYDOWN;   // also while a panel takes the keys (Shift+- +)
-    if (panel_message(window, m, w, g_mouse)) {   // the Help and Menu buttons, an open panel
+    if (panel_message(window, m, w, ui_mouse())) {   // the Help and Menu buttons, an open panel
         if (panel_open() && stroke_under_way()) end_strokes("a panel opened");
         return true;
     }
@@ -12739,6 +12748,7 @@ void edit_log_rail_points(float x, float y) {
 }
 
 bool edit_dirty() { return g_dirty; }
+int edit_interface_scale() { return g_ui; }   // the editor's interface size now (the test mode's panel clicks)
 
 // editor_panel.cpp's drawing: pictures and texts in front of the scene as the bar's, the view and the bar.
 void edit_draw_picture(int nvid, int frame, float x, float y, int step);   // below, with the panels' queue
@@ -12807,8 +12817,8 @@ bool edit_font_size(int font, float& w, float& h) {
     h = v ? at<float>(v, V_SIZE_Y) : 13;
     return v != nullptr;
 }
-void edit_view_box(float& l, float& t, float& r, float& b) {
-    const Box v = view();
+void edit_view_box(float& l, float& t, float& r, float& b) {   // the interface's screen
+    const Box v = ui_view();
     l = v.l, t = v.t, r = v.r, b = v.b;
 }
 void edit_bar_box(float& l, float& t, float& r, float& b) {
@@ -13370,9 +13380,7 @@ void edit_pick_queue_point(void* factory, int train) {
 
 // ---- the Arrivals panel's side (editor_arrivals.cpp) ----
 
-void edit_fill(float l, float t, float r, float b, uint32_t argb) {
-    reinterpret_cast<FillRect_t>(FILL_RECT)(graphics(), nullptr, l, t, r, b, argb);
-}
+void edit_fill(float l, float t, float r, float b, uint32_t argb) { ui_fill(graphics(), nullptr, l, t, r, b, argb); }
 
 // A change of the arrivals as one step of the history (they were `before`).
 void edit_commit_arrivals(const UiText& what, const ArrivalsState& before) {
