@@ -875,6 +875,7 @@ bool on_its_point(int nvid) { return nvid == VID_MINE || nvid == VID_MINE_MARKER
 void give_building_line(uint8_t* o);
 struct PostOwners;
 bool take_building_lines(uint8_t* o, std::vector<uint8_t*>& posts, const PostOwners* owners = nullptr);
+bool take_buildings_lines(const std::vector<uint8_t*>& chosen, std::vector<uint8_t*>& posts);   // several, one answer of whose posts are
 void note_building_post(uint8_t* post);   // a building's post about to be moved away from its place (below)
 void claim_building_post(uint8_t* post);   // ... and at its new place (below)
 void resnap_on_track(uint8_t* o, float x, float y, int direction, const UiText& what, bool free = false);
@@ -3254,7 +3255,7 @@ void delete_objects(const std::vector<uint8_t*>& chosen) {
     const std::vector<PushLine> lines_before = mission_push_lines();
     bool lines_changed = false;
     std::vector<uint8_t*> posts;
-    for (uint8_t* o : chosen) lines_changed |= take_building_lines(o, posts);
+    lines_changed |= take_buildings_lines(chosen, posts);
     const std::vector<int> own = lines_going_with(objects);   // the posts' own lines no other post owns
     for (int i : own) mission_push_lines().erase(mission_push_lines().begin() + i);
     lines_changed |= !own.empty();
@@ -7417,6 +7418,9 @@ struct PostOwners {
 // Whose every post is, as above; `fresh`: a post whose remembered building is left out (a post just
 // dragged or turned: claim_building_post asks where it stands now).
 PostOwners post_owners(uint8_t* fresh = nullptr) {
+    LARGE_INTEGER t0;
+    QueryPerformanceCounter(&t0);
+    RailMemo memo;   // one answer: every line's way and every post's rail point searched once (outside a scope nothing is kept)
     PostOwners out;
     struct Live {
         uint8_t* post;
@@ -7428,7 +7432,7 @@ PostOwners post_owners(uint8_t* fresh = nullptr) {
     for_each_object([&](uint8_t* o) {
         if (removed(o)) return;
         if (nvid_of(o) == VID_DEPOT || nvid_of(o) == VID_WORKSHOP) buildings.push_back(o);
-        else if (nvid_of(o) == VID_SEMAPHORE) posts.push_back({o, post_dot(o), at<float>(o, O_X), at<float>(o, O_Y)});
+        else if (nvid_of(o) == VID_SEMAPHORE) posts.push_back({o, nullptr, at<float>(o, O_X), at<float>(o, O_Y)});   // its rail point when near a place
     });
     if (posts.empty()) return out;
     auto by_place = [](float ax, float ay, float bx, float by) { return ax != bx ? ax < bx : ay < by; };
@@ -7512,16 +7516,18 @@ PostOwners post_owners(uint8_t* fresh = nullptr) {
     };
     std::vector<Pair> pairs;
     for (size_t k = 0; k < posts.size(); ++k) {
-        const Live& p = posts[k];
-        if (!p.dot || done.count(p.post)) continue;
+        Live& p = posts[k];
+        if (done.count(p.post)) continue;
         const bool is_red = red(p.post);
         const int dir = at<int>(p.post, O_DIRECTION);
-        bool own_checked = false, has_own = false;
+        bool own_checked = false, has_own = false, dot_checked = false;
         for (size_t i = 0; i < places.size(); ++i) {
             const Place& place = places[i];
             if (place.filled || place.post.red != is_red || direction_gap(dir, place.post.direction) > 32) continue;
             const float d = std::hypot(p.x - place.post.x, p.y - place.post.y);
-            if (d >= POST_OWN_REACH || !lines[place.line].reach.count(p.dot)) continue;
+            if (d >= POST_OWN_REACH) continue;
+            if (!dot_checked) p.dot = post_dot(p.post), dot_checked = true;   // asked only of a post near a place: it is a search
+            if (!p.dot || !lines[place.line].reach.count(p.dot)) continue;
             if (!own_checked) has_own = own_line(p.post) >= 0, own_checked = true;   // a post with a line of its own: the player's signal
             if (has_own) break;
             pairs.push_back({d, i, k});
@@ -7544,6 +7550,14 @@ PostOwners post_owners(uint8_t* fresh = nullptr) {
         done.insert(post);
         if (uint8_t* b = lines[place.line].building) out.building[post] = b;
         else out.line.insert(post);
+    }
+    if (g_test) {
+        LARGE_INTEGER t1, f;
+        QueryPerformanceCounter(&t1);
+        QueryPerformanceFrequency(&f);
+        patch::log("edit test: post owners - %u posts, %u lines, %u places in %.2f ms", static_cast<unsigned>(posts.size()),
+                   static_cast<unsigned>(lines.size()), static_cast<unsigned>(places.size()),
+                   1000.0 * static_cast<double>(t1.QuadPart - t0.QuadPart) / static_cast<double>(f.QuadPart));
     }
     return out;
 }
@@ -7607,6 +7621,18 @@ bool take_building_lines(uint8_t* o, std::vector<uint8_t*>& posts, const PostOwn
     for (auto it = own.rbegin(); it != own.rend(); ++it) lines.erase(lines.begin() + *it);
     g_push_selected = -1;
     return true;
+}
+
+// The buildings among `chosen` (a deletion) take their lines and posts, from one answer of whose the
+// posts are - asked once, not once a building (that was a step's cost growing with the square of the
+// buildings deleted at once).
+bool take_buildings_lines(const std::vector<uint8_t*>& chosen, std::vector<uint8_t*>& posts) {
+    const bool any = std::any_of(chosen.begin(), chosen.end(), [](uint8_t* o) { return nvid_of(o) == VID_DEPOT || nvid_of(o) == VID_WORKSHOP; });
+    if (!any) return false;
+    const PostOwners owners = post_owners();
+    bool changed = false;
+    for (uint8_t* o : chosen) changed |= take_building_lines(o, posts, &owners);
+    return changed;
 }
 
 // ---- what goes with deleted rails (delete_objects) ----
