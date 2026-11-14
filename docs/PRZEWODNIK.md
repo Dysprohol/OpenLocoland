@@ -129,9 +129,9 @@ Misje grają się tak jak zawsze. Co się zmieniło:
   `[` i `]`), ale jej panel pokazywał dziesięć. Jedenasty i dalsze są teraz w drugim rzędzie nad
   pierwszym i można je klikać.
 - **Środkowy przycisk myszy** przeciąga mapę, także w misjach.
-- **Przybliżanie i oddalanie kółkiem myszy.** W misji obrót kółka od siebie przybliża mapę (półtora,
-  dwa i trzy razy), obrót do siebie pokazuje jej więcej (dwie trzecie, połowa i cała mapa, jeśli się
-  mieści). Punkt pod kursorem zostaje na miejscu, a pasek, minimapa, komunikaty i kursor zachowują swój
+- **Przybliżanie i oddalanie kółkiem myszy.** W misji obrót kółka od siebie przybliża mapę (do trzech
+  razy), obrót do siebie pokazuje jej więcej (aż do całej mapy, jeśli się mieści), po trochu z każdym
+  ząbkiem i płynnie. Punkt pod kursorem zostaje na miejscu, a pasek, minimapa, komunikaty i kursor zachowują swój
   rozmiar. Nie nad interfejsem, w menu ani w edytorze. Oddalony widok rysuje się dłużej, więc gra działa
   wtedy wolniej; przybliżony szybciej.
 - **Stała liczba klatek** (domyślnie 60) zamiast zajmowania przez grę całego rdzenia procesora.

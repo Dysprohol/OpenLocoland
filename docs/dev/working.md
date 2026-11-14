@@ -441,16 +441,19 @@ and the bar were reached; full screen opens on the primary monitor even when the
 place is on another one.
 
 **Zoom with the wheel** (`zoom.cpp`, `zoom_view.cpp`, engine.md "Zoom"). In a mission the mouse wheel away
-from the player draws the map bigger, towards the player smaller, one step a notch, with a short glide (150 ms)
-between steps; the map point under the cursor stays under it (at the map's edges the camera's limits win). The
-steps: 3, 2 and 1.5 times; the level's own (1, or mission 1's stretch of its 1024x768 screen); 2/3 and 1/2
-where the view stays within the map on at least one axis; and the whole map (its longer side, against the
-window, fills the window: black at the sides or above and below) when that shows more. A view over
+from the player draws the map bigger, towards the player smaller, 12 % a notch, with a glide of 220 ms eased
+out (quick at first, settling softly; a notch during a glide goes on from where it is, so a fast turn is one
+smooth move); the map point under the cursor stays under it (at the map's edges the camera's limits win). The
+steps are a ladder with the level's own zoom on it (1, or mission 1's stretch of its 1024x768 screen): inward
+1.12, 1.25, 1.40 ... up to 3 times (the last step 3 itself; 10 notches from 1), outward 0.89, 0.80, 0.71 ...
+while the view stays within the map on at least one axis, then the whole map (its longer side, against the
+window, fills the window: black at the sides or above and below) when that shows at least 3 % more; a step
+within half a notch of the whole map is left to it. Changing the zoom makes no sound. A view over
 `MAX_PIXELS` map pixels - the whole of the biggest original map, 3072 x 2304 - is not offered (in test mode
 the test key's DWORD `ZoomMaxPixels` moves it, `ZoomGlide` sets the glide's ms, 0 none, and `ZoomFilter`
 the stretch: 0 nearest, 1 filtered, 2 by the zoom). The interface is drawn apart from the world, at the
 window's own pixels, so the bar, the minimap, the messages, the money plate, the tooltip and the cursor keep
-their size at every step and at every interface size; the world is stretched nearest-pixel at 2 and 3
+their size at every step and at every interface size; the world is stretched nearest-pixel at 3
 (exact big pixels) and filtered elsewhere. Border and arrow scrolling are as fast on the screen at every
 zoom. The wheel does nothing over the interface, in a menu, while paused, while the scripts hold the camera
 (an intro) and in the editor; a menu keeps the zoom and looks as at zoom 1; a level change goes back to the

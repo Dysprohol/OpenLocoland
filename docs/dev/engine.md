@@ -659,7 +659,7 @@ the mouse tip and the scripts' texts (`PrintFile` is `CreateTextFromFile`; l01's
 the world pass is `Graphics_DrawScene` without them (the culling test at 0x41faf2 and the shadow test
 `view_culling.cpp` replaces, and the draw call of layers 0 and 7, 0x41fbe0, which have none, ask
 `zoom_draw_filter`). After Direct3D's `EndScene` the logical picture is stretched into the window-sized back
-buffer - a Blt at the whole zooms 2 and 3, else a Blt into a texture drawn as one linear-filtered quad
+buffer - a Blt at a whole zoom (3, the top of the ladder), else a Blt into a texture drawn as one linear-filtered quad
 (vertices at -0.5: pixel for pixel at zoom 1, checked) - and the interface's pass draws layers 2-10 again with
 only those objects at the window's size. Its software sprites (layers 2-4, 10) go into a system-memory
 overlay put on with a colour-keyed Blt, their depth buffer is memory of ours (`depthBits` / `depthPitch`: the
@@ -685,8 +685,13 @@ scripts' texts and the menus are laid out as at zoom 1; a menu up gets a window-
 pass. Edge and arrow scrolling move the camera in map pixels a frame; `World_UpdateScroll`'s move
 (`SetPosition` at 0x41cb3f) is taken 1 / z times as far, so it is as fast on the screen at every zoom (not
 while the camera follows the flagman). The wheel is the engine's own `Mouse+0x04` (`World+0x234`), stored by
-`Mouse_HandleMessage` and cleared by `Mouse_BeginFrame`; nothing in a mission read it before. At the level's
-own zoom none of this runs: every hook passes the engine's call through.
+`Mouse_HandleMessage` and cleared by `Mouse_BeginFrame`; nothing in a mission read it before. The bar built
+again when a zoom view starts or ends goes through `Player_SetPanel`, which plays the panel's click (SFX 109,
+0x42f27f) whenever the panel changes; that call is left silent while the bar is rebuilt, so a zoom makes no
+sound (a click on a slot still plays it). The surfaces are made with room for two notches more out and kept
+while they are big enough and at most 2.5 times the view's area, so a run of notches makes them once; after
+lost surfaces (`lost_surfaces.cpp`) the view's surfaces, texture and overlay are made anew before the next
+frame. At the level's own zoom none of this runs: every hook passes the engine's call through.
 
 **Panels** (`Player.panel`, `Player_SetPanel`): 0 the unit bar, 1 the cars of the flagman train, 2 the
 build list of the flagman factory, 5 the queue of that factory, 6 hidden. The ten bar slots

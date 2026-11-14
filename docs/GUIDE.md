@@ -130,8 +130,8 @@ The missions play as they always did. What changed:
   first, and a click on them works.
 - **The middle mouse button** drags the map, in the missions too.
 - **Zoom with the mouse wheel.** In a mission, turning the wheel away from you brings the map closer
-  (one and a half, two and three times), turning it towards you shows more of it (two thirds, half, and
-  the whole map where it fits). The point under the cursor stays where it is, and the bar, the minimap,
+  (up to three times), turning it towards you shows more of it (up to the whole map where it fits), a
+  little with every notch and smoothly. The point under the cursor stays where it is, and the bar, the minimap,
   the messages and the cursor keep their size. Not over the interface, in a menu or in the editor. A
   zoomed-out view takes longer to draw, so the game runs slower while it is on; a zoomed-in one is
   quicker.

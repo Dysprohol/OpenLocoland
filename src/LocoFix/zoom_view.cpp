@@ -16,7 +16,7 @@
 // - The world pass is Graphics_DrawScene as it is, without the interface's objects; Graphics_DrawEffects runs its
 //   timing there but draws nothing (the scroll effect moves the camera there, at the zoom's screen).
 // - After Direct3D's EndScene (screen_scaling.cpp's scale_frame) the logical picture is stretched into the
-//   window-sized back buffer - a nearest-pixel Blt at whole zooms (2, 3: exact big pixels), else a Blt into a
+//   window-sized back buffer - a nearest-pixel Blt at whole zooms (3: exact big pixels), else a Blt into a
 //   texture drawn as one linear-filtered quad (checked to the pixel at zoom 1: no shift) - and the interface's
 //   pass draws layers 2-10 again with only the interface's objects, at the window's size, then the minimap's
 //   inside (Minimap_Draw: the engine calls it in the update, after the frame's drawing - held for this pass),

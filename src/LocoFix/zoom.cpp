@@ -3,7 +3,7 @@
 //
 // The file has two parts, so that the way the view is made (zoom_view.cpp) stays apart from the zoom itself:
 //   1. THE ZOOM (state and input): the zooms a level has (make_steps: the steps, the caps), the wheel
-//      (zoom_after_frame, refused), the point under the cursor kept (go_to), a short glide between steps, the
+//      (zoom_after_frame, refused), the point under the cursor kept (go_to), an eased glide between steps, the
 //      resets (a level change: zoom_level_loading), edge and arrow scrolling at the same speed on the screen at
 //      every zoom (scroll_move), and the log (each step's view, switch time, memory and frame time).
 //   2. THE VIEW (zoom_view.cpp): zoom_view_size says the view (map rectangle) a zoom shows, zoom_view_apply
@@ -11,9 +11,11 @@
 //      window's size (two passes) - and zoom_view_between_frames gives a menu its screen while it is up.
 //
 // A zoom z is window pixels per map pixel; the level's own zoom is 1 (or a small map's own stretch: mission 1 at
-// 1920x1080 is 1.40625). The steps, from in to out: 3, 2, 1.5 (those above the level's own), the level's own,
-// 2/3 and 1/2 (those whose view is within the map on at least one axis), and the whole map (the zoom at which its
-// longer side, against the window, fills the window) when that shows more than the last of them. A view the map
+// 1920x1080 is 1.40625). The steps are a ladder of 12 % a notch with the level's own zoom on it: inward own x
+// 1.12^k up to 3 (the last step 3 itself), outward own / 1.12^k while the view is within the map on at least one
+// axis, then the whole map (the zoom at which its longer side, against the window, fills the window) when that
+// shows at least 3 % more than the last of them (a step within half a notch of the whole map is left out, the
+// whole map taking its place). A view the map
 // caps on one axis keeps the zoom (the picture is narrower or lower than the window, black round it); views
 // bigger than MAX_PIXELS map pixels are not offered (the frame's cost follows the logical pixels: the whole view
 // of the biggest original map, 3072x2304, is the most; the test key's DWORD ZoomMaxPixels moves it in test mode).
@@ -26,9 +28,12 @@
 // while a menu is up (zoom_view.cpp gives the menu its screen). A level change gives the level its own zoom.
 //
 // A change is made between two frames, right after one is presented (frame_limit.cpp's wrapper of
-// Graphics_EndScene). A step is reached in a short glide (GLIDE_MS; the test key's ZoomGlide in test mode, 0 =
-// none): the zooms in between are drawn in the surfaces of the glide's bigger view, the map point under the
-// cursor kept under it at each of them; a notch during a glide goes on from where the glide is.
+// Graphics_EndScene). A step is reached in a glide of GLIDE_MS (220 ms; the test key's ZoomGlide in test mode, 0 =
+// none), eased out (quick at first, settling softly) and even in the logarithm: the zooms in between are drawn in
+// surfaces made with room for two steps more out (zoom_view.cpp keeps them while they are big enough and not much
+// too big, so a run of notches makes them once), the map point under the cursor kept under it at each of them; a
+// notch during a glide goes on from where the glide is towards the step after its target. Changing the zoom makes
+// no sound: the state bar built again for a zoom does not play the panel's click (status_bar.cpp).
 #include "patch.h"
 #include <algorithm>
 #include <cmath>
@@ -165,10 +170,12 @@ void make_steps() {
     double last = own;
     for (double z = own / LADDER; g_step_count < MAX_STEPS - 1; z /= LADDER) {
         if (z <= whole * 1.0001 || pixels(z) > max_pixels()) break;
+        // a step within half a notch of the whole map is left to the whole map (no notch that hardly moves)
+        if (z <= whole * 1.06 && pixels(whole) <= max_pixels()) break;
         g_steps[g_step_count++] = z;
         last = z;
     }
-    if (whole < last * 0.9999 && pixels(whole) <= max_pixels() && g_step_count < MAX_STEPS) g_steps[g_step_count++] = whole;
+    if (whole < last * 0.97 && pixels(whole) <= max_pixels() && g_step_count < MAX_STEPS) g_steps[g_step_count++] = whole;
     g_step = g_own;
     g_zoom = own;   // the level's own (mission 1: its stretch), where a first glide starts
     g_made = true;
