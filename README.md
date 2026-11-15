@@ -138,13 +138,15 @@ starts, and tools built around the game stay in their authors' own repositories 
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Discord
-https://discord.gg/NG5DnHFvYM
+- https://discord.gg/meYzd2gTgf - OpenLocoland's official place: its section on the CSG server -
+  releases, bug reports, suggestions and custom maps.
+- https://discord.gg/NG5DnHFvYM - a server about the game Locoland in general, made by spacenerdy.
 
 ## Thanks
 
 OpenLocoland is better thanks to the people who gave something of their own to it:
 
-- **spacenerdy** (from Discord) - the Discord server.
+- **spacenerdy** (from Discord) - the server about the game Locoland in general.
 - **Danetry** (from Discord) - support of the Czech fan translation of the game.
 - **just_Martin** (from Discord) - the OpenLocoland logo (the installer's header and the launcher's
   picture).

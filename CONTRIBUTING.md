@@ -26,8 +26,8 @@ taken in has to be tested on every edition of the game and kept working afterwar
 
 Tools built around the game - editor plugins, script helpers, converters -, mods and maps stay in
 their authors' own repositories, where they can be released on their own schedule. This repository
-does not take them in. The [Discord server](https://discord.gg/NG5DnHFvYM) is the place to show
-them.
+does not take them in. The [OpenLocoland section of the CSG Discord server](https://discord.gg/meYzd2gTgf)
+is the place to show them.
 
 ## What the repository cannot hold
 
