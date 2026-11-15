@@ -101,7 +101,7 @@ Misje grają się tak jak zawsze. Co się zmieniło:
   Misja 1 (mapa 1024 x 768) i menu są powiększane do wysokości okna. Obiekty i cienie są rysowane na
   całym ekranie.
 
-  ![Misja w 1920 x 1080](img/widescreen.jpg)
+  ![Misja w 1920 x 1080](img/widescreen-mission.jpg)
 
 - **Pasek stanu na całą szerokość.** Na szerokim ekranie pasek na dole biegnie od krawędzi do
   krawędzi zamiast kończyć się na środku.

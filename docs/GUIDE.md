@@ -100,7 +100,7 @@ The missions play as they always did. What changed:
   (a 1024 x 768 map) and the menus are scaled up to fill the height of the window. The objects and
   the shadows are drawn across the whole screen.
 
-  ![A mission at 1920 x 1080](img/widescreen.jpg)
+  ![A mission at 1920 x 1080](img/widescreen-mission.jpg)
 
 - **The state bar across the whole screen.** On a wide screen the bar at the bottom runs from edge
   to edge instead of stopping in the middle.

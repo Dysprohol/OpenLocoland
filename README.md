@@ -1,6 +1,6 @@
 ![OpenLocoland logo](docs/img/openlocoland_logo.png)
 
-![The Factory, a custom map made in the editor, zoomed out with the mouse wheel, at 1920 x 1080](docs/img/thefactory-zoom.jpg)
+![The Factory, a custom map made in the editor, zoomed out with the mouse wheel, at 1920 x 1080](docs/img/widescreen.jpg)
 
 **[Download this map - The Factory (8 MB)](https://github.com/Dysprohol/OpenLocoland/releases/download/v0.2.12/TheFactory-1.4.zip)**
 and add it in the editor with Menu > IMPORT MAP; it needs v0.2.12.
