@@ -613,30 +613,54 @@ void draw_templates_screen() {
     }
 }
 
+// A text over as many rows as it needs, wrapped at spaces within the panel's width (a word longer than a row is
+// cut into it); the y after it. The panel's notes in every language (issue #20: the refusal broke mid-word and ran
+// out of the panel).
+float put_wrapped(float y, const std::string& text) {
+    std::string line;
+    auto flush = [&] {
+        put(g_px + LEFT, y, line);
+        y += ROW;
+        line.clear();
+    };
+    for (size_t p = 0; p < text.size();) {
+        size_t e = text.find(' ', p);
+        if (e == std::string::npos) e = text.size();
+        std::string word = text.substr(p, e - p);
+        p = e + 1;
+        if (!line.empty() && line.size() + 1 + word.size() > WIDTH) flush();
+        while (word.size() > WIDTH) {   // no space in it to break at
+            line = word.substr(0, WIDTH);
+            word = word.substr(WIDTH);
+            flush();
+        }
+        line += (line.empty() ? "" : " ") + word;
+    }
+    if (!line.empty()) flush();
+    return y;
+}
+
 // A map whose script does not run arrivals: why, or the authors' reinforcement and CONVERT.
 void draw_legacy() {
     const std::string refusal = mission_arrivals_refusal();
     if (!refusal.empty()) {
-        put(g_px + LEFT, g_py + TOP, refusal.substr(0, WIDTH));
-        if (refusal.size() > WIDTH) put(g_px + LEFT, g_py + TOP + ROW, refusal.substr(WIDTH));
+        put_wrapped(g_py + TOP, refusal);
         return;
     }
     float y = g_py + TOP;
     if (mission_reinforcement_waves() > 0) {
-        put(g_px + LEFT, y, ui_text("ArrLegacy1", "THIS MAP HAS THE AUTHORS' REINFORCEMENT:"));
-        y += ROW;
+        y = put_wrapped(y, ui_text("ArrLegacy1", "THIS MAP HAS THE AUTHORS' REINFORCEMENT:"));
         std::string train;
         for (int c : mission_reinforcement_train()) train += (train.empty() ? "" : ",") + std::to_string(c);
-        put(g_px + LEFT, y, ui_printf(ui_format("ArrLegacy2", "%d WAVES OF %s AT ITS POINT LOCOMOTIVE"), mission_reinforcement_waves(),
-                                      train.c_str()));
-        y += 2 * ROW;
+        y = put_wrapped(y, ui_printf(ui_format("ArrLegacy2", "%d WAVES OF %s AT ITS POINT LOCOMOTIVE"), mission_reinforcement_waves(),
+                                     train.c_str()));
+        y += ROW;
     }
     if (!mission_start().empty()) {   // the AI makes them at the start: CONVERT makes trains of the map with their orders
-        put(g_px + LEFT, y, ui_printf(ui_format("ArrLegacyStart1", "AND %d ENEMY START TRAINS OF THE SCRIPT:"),
-                                      static_cast<int>(mission_start().size())));
+        y = put_wrapped(y, ui_printf(ui_format("ArrLegacyStart1", "AND %d ENEMY START TRAINS OF THE SCRIPT:"),
+                                     static_cast<int>(mission_start().size())));
+        y = put_wrapped(y, ui_text("ArrLegacyStart2", "CONVERT PUTS THEM ON THE MAP WITH THEIR ORDERS"));
         y += ROW;
-        put(g_px + LEFT, y, ui_text("ArrLegacyStart2", "CONVERT PUTS THEM ON THE MAP WITH THEIR ORDERS"));
-        y += 2 * ROW;
     }
     put(g_px + LEFT, y, ui_text("ArrConvert", "CONVERT TO ARRIVALS"), false, [] { edit_convert_arrivals(); });
 }
