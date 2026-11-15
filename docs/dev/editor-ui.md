@@ -86,7 +86,7 @@ game shows its own (`maps\menu4.lst` -> `menu41.txt` ...): `maps\edithelp.lst` l
 is (the bar, the status line, the two buttons), the bar's tools, selecting and placing (the mouse,
 undo), the keys, laying track, trains, the object's panel, all objects and decals, the mission,
 saving and playing, the ground (height, paint, water, regions, map size), the ground tools' rows,
-then the train arrivals and the orders (13, 14) turning (15) and the citadel, Charybdis, fly nests and mines (16; page 1 names 13-16), a factory's plan (17), the crusher, Scylla and the decorations' sets (18), the gravel bed (19), the neutrals and the pirates (20), the map files (21: a map is its folder, the
+then the train arrivals and the orders (13, 14) turning (15) and the citadel, Charybdis, fly nests and mines (16), a factory's plan (17), the crusher, Scylla and the decorations' sets (18), the gravel bed (19), the neutrals and the pirates (20), the map files (21: a map is its folder, the
 page finds it, Rename or delete, the names), placing - the track as a help, overlaps, flags (22), the rails' lattice (23), the placing helps (30: the grid, onto the track, the height, the turn, scattering), copy and paste and the ground under rising rails (31) - in the format of those pages (CP1250, CRLF, the first line the page's title, at most
 44 characters a line - the ESC pairs not counted, so a line with lit words is longer in the file - and 14
 lines, ESC 7 / ESC 2 switch to the lit font VID 7 and back to VID 2):
