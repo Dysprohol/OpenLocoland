@@ -228,7 +228,7 @@ const char* refused(uint8_t* w) {
     if (flags & WORLD_EDITOR) {   // the map editor (its level held: paused, its own scroll type)
         if (!editor_level_held()) return "editor mode, the level not held";
         if (panel_open()) return "a panel of the editor is open";
-        if (edit_busy()) return "a drag or a stroke is under way";
+        if (edit_busy()) return "a drag, a stroke or a pan is under way";
         if (flags & WORLD_LOADING) return "loading";
         return nullptr;
     }
@@ -394,6 +394,14 @@ void zoom_editor_wheel(int notches) { g_editor_notches += notches; }
 
 // editor_edit.cpp: Ctrl+0 - the level's own zoom again (after the frame).
 void zoom_editor_reset() { g_editor_reset = true; }
+
+// editor_edit.cpp, a button pressed (a drag, a stroke or a pan may begin): a glide under way is at its step at once,
+// so the camera and the mouse's map point move no more under what the press begins.
+void zoom_editor_settle() {
+    if (!g_gliding || !world() || !graphics()) return;
+    g_gliding = false;
+    reached(g_step, now_counter());
+}
 
 // The zoom against the level's own: 1 at its own zoom, 2 at twice as big, 0.5 at half (the editor's status line).
 double zoom_relative() { return g_made && g_steps[g_own] > 0 ? g_zoom / g_steps[g_own] : 1.0; }

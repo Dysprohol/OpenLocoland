@@ -76,6 +76,7 @@ bool zoom_view_split();             // zoom_view.cpp: a zoom's view in effect - 
 void zoom_view_to_window(float& x, float& y);   // a point of the zoom's view in the window's pixels
 void zoom_editor_wheel(int notches);            // zoom.cpp: the wheel over the map, Ctrl+0
 void zoom_editor_reset();
+void zoom_editor_settle();                      // a glide under way to its step at once
 double zoom_relative();
 const char* object_name(int nvid);  // editor_panel.cpp: the palette's names of the objects
 bool palette_state(int nvid, int& behave, std::vector<short>& items);   // editor_panel.cpp
@@ -1722,6 +1723,7 @@ bool mouse_on_bar() { return on_bar(static_cast<float>(ui_mouse().x), static_cas
 bool mouse_on_options() { return on_options(static_cast<float>(ui_mouse().x), static_cast<float>(ui_mouse().y)); }
 int mouse_entry() { return bar_entry_at(static_cast<float>(ui_mouse().x), static_cast<float>(ui_mouse().y)); }
 POINT g_middle_down = {-1, -1};   // where the middle button went down (a click of it, not a drag)
+bool g_middle_held = false;        // the middle button down: the map is being panned (mouse_pan.cpp)
 bool g_ctrl = false, g_shift = false;
 
 bool shift_down() { return g_shift || GetKeyState(VK_SHIFT) < 0; }
@@ -12228,6 +12230,10 @@ bool mouse_on_interface() {
 // A message of the editor window while the level is held; true when it was handled here.
 bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
     g_view_window = window;
+    // a press may begin a drag or a stroke (or a middle-button pan): a zoom's glide under way ends at its step first,
+    // so what the press begins is in one view - else each glide frame moved the camera under a drag (the object
+    // jumped away from the cursor) and a Delete sweep's last point (a stretch never swept)
+    if (m == WM_LBUTTONDOWN || m == WM_RBUTTONDOWN || m == WM_MBUTTONDOWN) zoom_editor_settle();
     if (m >= WM_MOUSEFIRST && m <= WM_MOUSELAST && m != WM_MOUSEWHEEL) take_mouse(l);
     // a panel open (F1, the Help or Menu button during a right-button stroke) ends a stroke: the
     // Ground height's repeat timer went on raising the ground unseen under it, and a Paint stroke
@@ -12415,6 +12421,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         if (LOWORD(w) == WA_INACTIVE) {
             end_strokes("the game left (Alt+Tab)");
             no_mouse();
+            g_middle_held = false;
         }
         // the keys held when the game was left or came back were let go in another window: Alt stayed
         // down for the editor after Alt+Tab, and the next click in Ground height or Paint was the
@@ -12500,8 +12507,10 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         return true;
     case WM_MBUTTONDOWN:   // the middle button pans the map (mouse_pan.cpp); a click of it in the Track tool
         g_middle_down = g_mouse;   // deletes the rail under the cursor
+        g_middle_held = true;      // no zoom while it pans (edit_busy)
         return false;
     case WM_MBUTTONUP:
+        g_middle_held = false;
         if (tool() == Tool::Track && std::abs(g_mouse.x - g_middle_down.x) + std::abs(g_mouse.y - g_middle_down.y) < 4 &&
             !mouse_on_bar())
             delete_rail_at_cursor();
@@ -12842,7 +12851,9 @@ void edit_zoom_changed() {
     window_to_logical(p);
     g_mouse = p;
 }
-bool edit_busy() { return stroke_under_way(); }
+bool edit_busy() {   // also the middle button's pan: it holds its own map point
+    return stroke_under_way() || (g_middle_held && (g_test || GetKeyState(VK_MBUTTON) < 0));
+}
 
 // zoom_view.cpp's second pass under a zoom: the interface over the stretched map, at the window's size (the
 // screen and the view are the window's now).
