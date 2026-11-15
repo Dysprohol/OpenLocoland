@@ -3,7 +3,7 @@
 ![The Factory, a custom map made in the editor, zoomed out with the mouse wheel, at 1920 x 1080](docs/img/widescreen.jpg)
 
 **[Download this map - The Factory (8 MB)](https://github.com/Dysprohol/OpenLocoland/releases/download/v0.2.12/TheFactory-1.4.zip)**
-and add it in the editor with Menu > IMPORT MAP; it needs v0.2.12.
+and add it in the editor with Menu > IMPORT MAP; it needs v0.2.10 or newer.
 
 **Locoland** (Gromada, 2003) is a little-known strategy game about armed trains: you lay track,
 send out locomotives with cannons and rocket launchers, and drive the invaders out of a land of
