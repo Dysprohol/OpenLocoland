@@ -1,6 +1,9 @@
 ![OpenLocoland logo](docs/img/openlocoland_logo.png)
 
-![A mission of Locoland on a wide screen](docs/img/widescreen.jpg)
+![The Factory, a custom map made in the editor, zoomed out with the mouse wheel, at 1920 x 1080](docs/img/thefactory-zoom.jpg)
+
+**[Download this map - The Factory (8 MB)](https://github.com/Dysprohol/OpenLocoland/releases/download/v0.2.12/TheFactory-1.4.zip)**
+and add it in the editor with Menu > IMPORT MAP; it needs v0.2.12.
 
 **Locoland** (Gromada, 2003) is a little-known strategy game about armed trains: you lay track,
 send out locomotives with cannons and rocket launchers, and drive the invaders out of a land of
@@ -22,7 +25,9 @@ The [trailer](https://www.youtube.com/watch?v=04BeRSnfL6o) and more videos of th
 ## What you get
 
 - **The game on today's Windows.** It runs in a window or on full screen in any resolution up to
-  4K, shows more of the map on a wide screen and keeps a steady 60 frames a second.
+  4K, shows more of the map on a wide screen and keeps a steady 60 frames a second. The mouse wheel
+  zooms the map in and out, and on a big screen the bar, the minimap and the editor can be drawn twice
+  or three times as big (the game's settings page).
 - **Old bugs fixed.** Some of the original's crashes, missing sounds and a car the factory could
   never build are fixed; the ones still open are listed in [BUGS.md](BUGS.md).
 - **Languages with their gaps filled.** English, German, Hungarian, Polish and Russian get their
@@ -38,7 +43,7 @@ The [trailer](https://www.youtube.com/watch?v=04BeRSnfL6o) and more videos of th
   during the mission, plan what the enemy's factory builds, decide who fights whom - and play them
   at once. The trains that come onto the map, the enemy factory's plan and every train's orders are
   set from panels in the editor, and a quick test runs the map without saving it. The help inside
-  the editor has 32 pages, and the custom maps page lists every map folder it finds.
+  the editor has 33 pages, and the custom maps page lists every map folder it finds.
 - **Maps for friends.** A map goes to a friend as one file and turns up on their custom maps page.
 - **An OpenLocoland logo at the start.** The game opens with the project's logo for a few seconds in
   place of the original intro movies; any key or a click skips it.
@@ -107,8 +112,8 @@ rest around it: the bar, the tools and the help in the look of the game.
   Italian CD, the English beta/demo), which now install as they are.
 - **New missions.** Our own missions and an alternative campaign made in the editor, next to the
   original twenty.
-- **More fixes and polish.** The bugs still open in [BUGS.md](BUGS.md), the interface scaled up on
-  big screens, the editor tried in full screen, and whatever turns up while playing.
+- **More fixes and polish.** The bugs still open in [BUGS.md](BUGS.md), the editor tried in full
+  screen, and whatever turns up while playing.
 - **Releases after players' reports.** The next releases follow what players report and ask for in
   Issues.
 - **The engine in readable code.** The understood parts of the engine rewritten in C++ one by one,
