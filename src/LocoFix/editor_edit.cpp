@@ -11854,7 +11854,8 @@ void draw_overlay() {
     const float cam_x = at<float>(w, W_CAMERA_X), cam_y = at<float>(w, W_CAMERA_Y);
     g_ui = interface_editor_scale();   // the editor's interface this frame, the cursor with it
     interface_cursor_scale(g_ui);
-    const bool over_bar = mouse_on_bar() || mouse_on_options();
+    // over the bar or the rows: no tool's preview - unless a stroke begun on the map goes on under them
+    const bool over_bar = !stroke_under_way() && (mouse_on_bar() || mouse_on_options());
     const float mx = cam_x + g_mouse.x, my = cam_y + g_mouse.y;
 
     prof::Lap lap;
@@ -12268,11 +12269,12 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         }
         if (g_drag.active) continue_drag(g_mouse);
         continue_entry_drag(g_mouse);
-        if (panel_open() || mouse_on_bar() || mouse_on_options() ||
-            !view().contains(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
-            // nothing is painted or raised unseen under a panel, the bar or the rows, nor out of the
-            // window (the mouse captured: a drag out of it painted and raised the map beyond the view
-            // along the way); the stroke goes on where the cursor comes back (not along the way)
+        if (panel_open() || !view().contains(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
+            // nothing is painted or raised under a panel (opening one ends the stroke) nor out of the window
+            // (the mouse captured: a drag out of it painted and raised the map beyond the view along the way);
+            // the stroke goes on where the cursor comes back (not along the way). A stroke begun on the map goes
+            // on under the bar and the rows until its button is let go (issue #20: it stopped there); a press
+            // on them stays theirs (WM_LBUTTONDOWN), and nothing of them is clicked by a stroke passing over
             g_stroke.gap = g_gstroke.gap = g_sweep.gap = true;
             return false;
         }
@@ -12405,7 +12407,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         // the stroke ends as with the button up
         if (!g_test && GetKeyState(g_stroke.right ? VK_RBUTTON : VK_LBUTTON) >= 0) end_strokes("the button let go out of sight (the repeat timer)");
         else if (g_stroke.active && tool() == Tool::Height && GetTickCount() - g_stroke.time >= HEIGHT_REPEAT && !g_stroke.gap)
-            height_step(true);   // held still - not over the bar, the rows or out of the window (gap)
+            height_step(true);   // held still - not under a panel or out of the window (gap)
         else if (!g_stroke.active) KillTimer(window, HEIGHT_TIMER);
         return true;
     case WM_LBUTTONUP:
