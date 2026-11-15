@@ -184,7 +184,7 @@ end. Checked: a ramp dragged from 400,200 to 600,300 and down onto the bar, let 
 - *An object's own height.* The object's height above the ground is its z less the ground under it
   (`World_GetGroundZForVid`); a drag and a Ground height stroke keep it. PgUp / PgDn (Shift: 16; Track
   and Push line tools aside, where PgUp / PgDn are the ramps), Shift+wheel and Home set it for the
-  selection (a fort's or mining plant's guns go with it), -32 to 400, each change one step of the
+  selection (a fort's or mining plant's guns go with it), -512 to 400, each change one step of the
   history; the status line shows it. Saved as the SPR z and kept when the map is loaded:
   `Object_Construct` takes the z it is given, except for the 17 VIDs with flag 0x200, which it puts
   on the ground (units 70 and 517-519, the civil robots 72 and 77, the objects 74, 79 and 414, the

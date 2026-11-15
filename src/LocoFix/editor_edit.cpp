@@ -3278,7 +3278,10 @@ void toggle_semaphore() {
 // Track tool's ramps), regions (their height is the level of their water or fog) and the VIDs whose
 // flag 0x200 makes Object_Construct put them on the ground whatever their z (some units and guns:
 // 70, 72, 74, 77, 79, 401 ...) - the game would put them back when the map is loaded.
-constexpr int LIFT_STEP = 4, LIFT_BIG_STEP = 16, MIN_LIFT = -32, MAX_LIFT = 400;
+// How deep: the missions' maps have their liftable objects down to 448 below the ground (l17's VID 199; the Blue
+// druse, VID 280, to 254 on l16; most maps' deepest 50-160) - saved, loaded and drawn so by the game - so the
+// editor goes as deep as they do (issue #21; it stopped at 32).
+constexpr int LIFT_STEP = 4, LIFT_BIG_STEP = 16, MIN_LIFT = -512, MAX_LIFT = 400;
 constexpr uint32_t VID_FLAG_ON_GROUND = 0x200;
 
 UiText why_not_liftable(uint8_t* o) {
