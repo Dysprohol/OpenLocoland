@@ -97,9 +97,12 @@ list is the page's file, the `[Editor]` key of its category and the category's E
 tab-separated (`maps\edithelp5.txt<TAB>HelpCatTrack<TAB>TRACK AND TRAINS`); the categories come in
 the order of their first pages, a page keeps its number (its line), and a line with the file alone is
 in the category of the page before - so a new page is one line of the list, with a category of its
-own (a new `HelpCat...` key in the six packs) or an existing one. Six now: BASICS (1-4, 15), TRACK AND
-TRAINS (5, 6, 23), OBJECTS (7, 8, 16, 18, 20, 22, 30, 31), MISSION, SAVING (9, 10, 21), GROUND (11, 12, 19), ARRIVALS, FACTORIES (13,
-14, 17). The 29 rows of categories and titles (up to 37 characters) do not fit a page's 14 lines, so
+own (a new `HelpCat...` key in the six packs) or an existing one. Six now: BASICS (1-4, 15, 31), TRACK AND
+TRAINS (5, 6, 23, 24, 28, 33), OBJECTS (7, 8, 16, 18, 22, 30), MISSION, SAVING (9, 10, 20, 21, 29), GROUND (11, 12,
+19, 32), ARRIVALS, FACTORIES (13, 14, 17, 25, 26, 27). The contents has a row for every page of a category and no
+second page, and the panel holds six rows: a category of more runs over the bottom strip and out of the panel
+(OBJECTS had 9 pages in v0.2.11, TRACK AND TRAINS 7 with page 33; 20, 26, 29 and 31 were moved on 2026-11-15) -
+a new page goes to a category with fewer than six. The 29 rows of categories and titles (up to 37 characters) do not fit a page's 14 lines, so
 the contents are laid out as the palette: the categories down the left (two lines at most, the chosen
 one lit and underlined; the mouse over one, Up / Down or a click chooses it), the chosen one's pages on
 the right as the Menu panel's rows - the lamp (VID 472, pulsing under the mouse) and the page's title
