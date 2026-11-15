@@ -1,6 +1,6 @@
 # OpenLocoland - przewodnik gracza
 
-Wersja 0.2.11; edytor map jest wciąż w budowie. [English version: GUIDE.md](GUIDE.md)
+Wersja 0.2.12; edytor map jest wciąż w budowie. [English version: GUIDE.md](GUIDE.md)
 
 **OpenLocoland** to nieoficjalna, fanowska nowa edycja gry **Locoland** (Gromada / ESDigital
 Games, 2003): oryginalna gra działa z poprawkami dla dzisiejszego Windowsa, kilkoma ulepszeniami,
@@ -211,10 +211,10 @@ Co widać:
   początku wyłączona; edytor pamięta, czy grała i który plik. **TEST BEZ ZAPISU** i **ZAGRAJ
   ZAPISANA MAPE** grają własną muzykę mapy.
 - **Przyciski ? i menu** na lewym końcu paska (tam, gdzie gra ma przycisk pauzy). **?** (albo F1)
-  otwiera pomoc: 32 strony z tym, co jest w tym rozdziale, w skrócie. Zaczyna się od **spisu
+  otwiera pomoc: 33 strony z tym, co jest w tym rozdziale, w skrócie. Zaczyna się od **spisu
   treści**: kategorie (PODSTAWY, TORY I POCIAGI, OBIEKTY, MISJA I ZAPIS, TEREN, PRZYJAZDY I FABRYKI)
   po lewej, strony tej pod myszą po prawej - kliknięcie otwiera stronę. Strona ma swoją kategorię za
-  tytuł i swój numer (5 / 32); strzałki, Page Up / Down i kółko zmieniają strony, a **SPIS TRESCI**,
+  tytuł i swój numer (5 / 33); strzałki, Page Up / Down i kółko zmieniają strony, a **SPIS TRESCI**,
   `Esc` albo prawy przycisk wracają do spisu.
 
   ![Spis treści pomocy](img/help-contents-pl.jpg)
@@ -240,8 +240,8 @@ gry (dwa razy od 1920 x 1080, trzy razy od 2560 x 1440) i działa przy następny
 **Powiększenie:** kółko myszy nad mapą pokazuje więcej mapy (aż do całej, gdy się mieści) albo ją przybliża
 (do trzech razy), a punkt pod kursorem zostaje na miejscu, jak w misji; `Ctrl+0` wraca do 100 %. To, co kółko
 robiło dotąd dla narzędzi - obrót, rozmiar pędzla, rampa Torów, promień rozrzucania - jest teraz pod
-Ctrl+kółkiem (Shift+kółko i klawisze jak dotąd); nad paskiem, jego wierszami i panelami kółko robi to, co
-robiło. Wiersz stanu mówi, jakie jest powiększenie. Pasek, wiersze, panele i wiersz stanu zachowują swoją
+Ctrl+kółkiem (Shift+kółko i klawisze jak dotąd); nad paskiem i jego wierszami kółko nic nie robi, a w otwartym
+panelu (pomoc, paleta) zmienia strony jak dotąd. Wiersz stanu mówi, jakie jest powiększenie. Pasek, wiersze, panele i wiersz stanu zachowują swoją
 wielkość; wszystko na mapie - zaznaczanie, przeciąganie, narzędzia - działa jak wcześniej. Oddalony widok
 edytor rysuje dłużej, więc działa wolniej. Test poziomu zaczyna się w powiększeniu samej gry, a po powrocie
 wraca twoje.
@@ -253,7 +253,7 @@ wraca twoje.
 | zaznaczenie | kliknij obiekt (wagon lub jednostka przed każdym innym obiektem, one przed szynami; najmniejszy z nich pod kursorem); oznacza go kółko |
 | przesunięcie | przeciągnij go |
 | obrót | R / E albo Ctrl+kółko |
-| wyżej / niżej | PgUp / PgDn o 4 (z Shift o 16) albo Shift+kółko; Home stawia z powrotem na ziemi - wiersz stanu pokazuje wysokość nad ziemią |
+| wyżej / niżej | PgUp / PgDn o 4 (z Shift o 16) albo Shift+kółko, od 512 pod ziemią do 400 nad nią; Home stawia z powrotem na ziemi - wiersz stanu pokazuje wysokość nad ziemią |
 | zmiana armii | A: nasi, wróg, neutralni, piraci - flagi zmieniają kolor (przy stawianiu A ustala armię następnego obiektu) |
 | usunięcie | Del (Shift+Del: cały pociąg); narzędzie Usun: kliknięcie, albo przeciągnięcie z wciśniętym przyciskiem usuwa wszystko, nad czym przejdzie kursor (jeden krok cofania); Shift+klik: cały odcinek toru |
 | cofnij / ponów | Ctrl+Z / Ctrl+Y - każdą zmianę; pamięta ostatnie 500 kroków |
@@ -313,7 +313,8 @@ nową krawędzią - tor może biec jeszcze 300 px dalej, poza zasięgiem wzroku.
 kampanii; `[` i `]` też je wybierają), **ROZMIAR** (8 - 200 px; także Ctrl+kółko), **SILA** (ile
 pokrywa jedno pociągnięcie: mniejsza pozwala mieszać tekstury) i **KRAWEDZ** miękką albo twardą. Maluj
 przeciągając lewym przyciskiem; prawy (albo Shift+przeciąganie) przywraca oryginalny obraz; Alt+klik
-pobiera teksturę spod kursora (także z obrazu pomalowanego i zapisanego wcześniej). Namaluj
+pobiera teksturę spod kursora (także z obrazu pomalowanego i zapisanego wcześniej). Pociągnięcie zaczęte
+na mapie trwa też pod paskiem i jego wierszami, aż puścisz przycisk. Namaluj
 piaszczystą drogę tam, gdzie pobiegną tory, i kilka plam innych tekstur. Pomalowany obraz zapisuje
 się razem z mapą.
 
@@ -356,7 +357,7 @@ w jego wierszu -, więc szyny zostają widoczne w wykopie; **ZASLANIANE** pozwal
 a teren może przykryć szyny.
 
 Obiekt może też stać wyżej albo niżej sam: zaznacz go i naciśnij `PgUp` / `PgDn` (albo Shift+kółko,
-albo WYSOKOSC w jego panelu); `Home` stawia go z powrotem na ziemi. Wagony i szyny zostają na torach.
+albo WYSOKOSC w jego panelu) - od 512 pod ziemią (zagłębiony w nią) do 400 nad nią; `Home` stawia go z powrotem na ziemi. Wagony i szyny zostają na torach.
 Kilka jednostek i dział gra zawsze sama stawia na ziemi; wiersz stanu to mówi.
 
 ### 4. Główna linia
@@ -803,7 +804,8 @@ rzadziej stawiane rzeczy, na końcu dwa panele.
 
 | Klawisz | |
 |---|---|
-| kółko | powiększenie nad mapą (Ctrl+0: 100 %) |
+| kółko | powiększenie nad mapą; nad paskiem i jego wierszami nic; w pomocy i palecie: strony |
+| Ctrl+0 | powiększenie z powrotem 100 % |
 | R / E, Ctrl+kółko | obrót: o krok kierunków obiektu (R w prawo, E w lewo); zawrócenie pociągu (E: tylko zaznaczonego wagonu), wraku na torze, semafora przy torze, a w narzędziu Linia jednokierunkowa linii; fabrykę i punkt naprawczy obraca ich tor (strona pomocy 15) |
 | A | następna armia; przy stawianiu: armia następnego obiektu |
 | T | semafor czerwony / zielony; na linii: pchanie tak / nie |
@@ -813,7 +815,8 @@ rzadziej stawiane rzeczy, na końcu dwa panele.
 | U / Shift+U / C | odczep przed wagonem / za nim, doczep go (do pociągu na jego torze) |
 | `[` `]` | następny obiekt rzędu nad paskiem, tekstura |
 | `<` `>` | odstęp dekoracji |
-| Ctrl+kółko, `+` `-` | rozmiar pędzla (Wysokosc terenu, Dekoracje, Malowanie, Woda) |
+| Ctrl+kółko, `+` `-` | rozmiar pędzla (Wysokosc terenu, Dekoracje, Malowanie, Woda), promień rozrzucania |
+| Shift+kółko | zaznaczony obiekt wyżej / niżej o 4 |
 | M | Wysokosc terenu: następny tryb (podnieś/obniż, wyrównaj, wygładź, rampa, nierówności) |
 | H | wysokości terenu (poziomice) przy każdym narzędziu |
 | B | podsypka nowych torów |

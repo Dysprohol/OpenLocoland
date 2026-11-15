@@ -1,6 +1,6 @@
 # OpenLocoland - player's guide
 
-Version 0.2.11; the map editor is still work in progress. [Polish version: PRZEWODNIK.md](PRZEWODNIK.md)
+Version 0.2.12; the map editor is still work in progress. [Polish version: PRZEWODNIK.md](PRZEWODNIK.md)
 
 **OpenLocoland** is an unofficial, fan-made new edition of **Locoland** (Gromada / ESDigital
 Games, 2003): the original game runs with fixes for today's Windows, a few improvements, a page
@@ -212,10 +212,10 @@ What you see:
   settings. Off at first; the editor remembers whether it played and which file. **QUICK TEST, NO
   SAVE** and **PLAY THE SAVED MAP** play the map's own music.
 - **The ? and menu buttons** at the left end of the bar (where the game has its pause button).
-  **?** (or F1) opens the help: 32 pages with everything of this chapter in short. It starts on
+  **?** (or F1) opens the help: 33 pages with everything of this chapter in short. It starts on
   its **contents**: the categories - BASICS; TRACK AND TRAINS; OBJECTS; MISSION, SAVING; GROUND;
   ARRIVALS, FACTORIES - on the left, the pages of the one under the mouse on the right - a click opens
-  one. A page has its category for the title and its number (5 / 32); the arrows, Page Up / Down and
+  one. A page has its category for the title and its number (5 / 33); the arrows, Page Up / Down and
   the wheel turn the pages, and **CONTENTS**, `Esc` or the right button go back to the contents.
 
   ![The help's contents](img/help-contents-en.jpg)
@@ -241,8 +241,8 @@ drawn. **QUICK TEST, NO SAVE** shows the game's bar at the game's size.
 **Zoom:** the mouse wheel over the map shows more of it (down to the whole map where it fits) or brings it
 closer (up to three times), the point under the cursor staying where it is, as in a mission; `Ctrl+0` goes
 back to 100 %. What the wheel did for the tools before - turning, a brush's size, the Track tool's ramp, the
-scatter's radius - is now Ctrl+wheel (Shift+wheel and the keys as before); over the bar, its rows and the
-panels the wheel does what it did there. The status line says how far you are zoomed. The bar, the rows, the panels and
+scatter's radius - is now Ctrl+wheel (Shift+wheel and the keys as before); over the bar and its rows the
+wheel does nothing, and in an open panel (the help, the palette) it turns the pages as before. The status line says how far you are zoomed. The bar, the rows, the panels and
 the status line keep their size; everything on the map - picking, dragging, the tools - works as before.
 Zoomed out the editor draws more and runs slower. Run the level starts at the game's own zoom, and coming
 back you get yours again.
@@ -254,7 +254,7 @@ back you get yours again.
 | select | click an object (a car or unit before any other object, those before the rails; the smallest of them under the cursor); the circle marks it |
 | move | drag it |
 | turn | R / E or Ctrl+wheel |
-| raise / lower it | PgUp / PgDn by 4 (with Shift by 16), or Shift+wheel; Home puts it back on the ground - the status line shows its height above the ground |
+| raise / lower it | PgUp / PgDn by 4 (with Shift by 16), or Shift+wheel, from 512 below the ground to 400 above; Home puts it back on the ground - the status line shows its height above the ground |
 | change its army | A: ours, enemy, neutral, pirates - the flags change colour (while placing, A sets the army of the next object) |
 | delete | Del (Shift+Del: a whole train); the Delete tool: a click, or a drag with the button held deletes everything the cursor passes over (one undo step); Shift+click: a whole section of track |
 | undo / redo | Ctrl+Z / Ctrl+Y - every change; the last 500 steps are kept |
@@ -317,7 +317,8 @@ grass, forest floor, sand, desert, snow, ice, rock, dark rock, lava, swamp, lake
 campaign's maps; `[` and `]` pick them too), **SIZE** (8 - 200 px; Ctrl+wheel too), **STRENGTH**
 (how much a pass covers: lower it to blend textures) and **EDGE** soft or hard. Paint by dragging
 with the left button; the right button (or Shift+drag) puts the original picture back; Alt+click
-takes the texture under the cursor (also one of a picture painted and saved before). Paint a sand path where the track will run and some
+takes the texture under the cursor (also one of a picture painted and saved before). A stroke begun on
+the map goes on under the bar and its rows until you let go of the button. Paint a sand path where the track will run and some
 patches of other textures. The painted picture is saved with the map.
 
 ### 3. Water, swamp, lava
@@ -359,7 +360,7 @@ COVERED** -, so rails stay in sight in a cutting; **COVERED** lets the brush cha
 terrain may go over the rails.
 
 An object can stand higher or lower on its own: select it and press `PgUp` / `PgDn` (or Shift+wheel,
-or HEIGHT in its panel); `Home` puts it back on the ground. Train cars and rails stay on the track.
+or HEIGHT in its panel) - from 512 below the ground (sunk into it) to 400 above; `Home` puts it back on the ground. Train cars and rails stay on the track.
 A few units and guns are always put on the ground by the game itself; the status line says so.
 
 ### 4. The main line
@@ -805,7 +806,8 @@ tools, the rarer things placed, the two panels last.
 
 | Key | |
 |---|---|
-| wheel | zoom over the map (Ctrl+0: 100 %) |
+| wheel | zoom over the map; over the bar and its rows nothing; in the help and the palette: the pages |
+| Ctrl+0 | the zoom back to 100 % |
 | R / E, Ctrl+wheel | turn: a step of the object's directions (R right, E left); turn round a train (E: only the selected car), a wreck on the track, a semaphore beside the track and, in the Push line tool, the line; a factory and a repair point follow their track (help page 15) |
 | A | next army; while placing: the army of the next object |
 | T | semaphore red / green; on a line: pushing on / off |
@@ -815,7 +817,8 @@ tools, the rarer things placed, the two panels last.
 | U / Shift+U / C | uncouple in front of / behind the car, couple it (to the train along its track) |
 | `[` `]` | the next object of the row above the bar, the texture |
 | `<` `>` | the decals' spacing |
-| Ctrl+wheel, `+` `-` | the brush's size (Ground height, Decals, Paint, Water) |
+| Ctrl+wheel, `+` `-` | the brush's size (Ground height, Decals, Paint, Water), the scatter's radius |
+| Shift+wheel | the selected object up / down by 4 |
 | M | Ground height: the next mode (raise/lower, flatten, smooth, ramp, rough) |
 | H | the ground's heights (contour lines) with any tool |
 | B | the gravel bed of new track |
