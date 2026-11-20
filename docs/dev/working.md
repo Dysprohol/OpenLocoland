@@ -172,7 +172,7 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
   only stops the clock - the objects are updated with no time going by, nothing moves, and what the update
   draws (the minimap) is drawn every frame. `c40053` switches LocoFix's cheaper drawing (`perf.h`: the fixes
   from 54 on) off and on again, `c40056` only the fixes from 56 on (the locks of the picture), so a run can time
-  them apart from the lights' 54 and 55.
+  them apart from the lights' 54 and 55, and `c40057` only the fixes from 60 on (the third round).
   Shots after each step (the game's own) of a held level, both ways, compared pixel by pixel - each shot of
   one way must equal a shot of the other - show that a change draws the same picture; a level running with
   `c40053` every few seconds gives both ways' `profile:` lines under the same conditions.
@@ -563,6 +563,26 @@ sprites' lock (they read the ground under them where they blend), the copy of th
 hardware z-buffer (0.4 ms a frame on mission 13 at 1920x1080, 0.7 on mission 1, 1.5 zoomed out), and in the editor its own overlay's locks (6 a
 frame, 6 ms in the rig on mission 13). No readback at all would need the ground and the sprites put together in
 memory of ours and the picture uploaded once a frame - a renderer's work, not started.
+
+The third round (2026-11-20; the laptop then made 34 fps on mission 13, 15 zoomed out, 54 on mission 1, the sprites'
+lock 8-12 ms a frame there). A Blt from a system-memory surface has dgVoodoo upload the whole surface: fix 59's
+screen-sized overlay for the messages cost 1.2 ms a frame, and the next frame's sprites' lock waited for that upload
+too; a surface of the letters' own size (fix 60) took mission 13's frame from 17.4-18.2 to 14.9-15.4 ms of CPU time at
+1920x1080 in the rig, mission 1's from 10.2-10.9 to 7.9 ms. The editor's own overlay (fix 61) now has no lock of the
+picture: 7 -> 1 a frame, 14.9 -> 10.7 ms on mission 13. On the weak laptop (Iris Xe, full screen 1920x1080) fixes
+60 and 61 took mission 13 from 32.8 to 35.3 fps and the editor on mission 13 from 32.8 to 46.8 fps. A third change,
+the depth buffer's clear filling only what the ground's heights do not overwrite when zoomed out, saved 0.3-0.9 ms
+a frame in the rig and nothing on the laptop, so it was left out. `c40057` switches 60 and 61. Measured and left
+as they are: the lights' draws zoomed out are mostly
+their fill on the CPU (about 45 us a light in the rig; 85-90 % of the lights' texels change from one frame to the
+next, so keeping a light's texture when it is unchanged saved nothing - tried, dropped); the scripts push about 1000
+values a frame on mission 13 (`Script_PushValue`, a string copy each). An experiment (not in the code) split the
+sprites' lock in the rig at 1920x1080 into a wait for the GPU (1.5-2.6 ms) and the copy of the picture to the CPU
+(1.7-2.2 ms; zoomed out 1-2.5 and 5.2-6.4 ms), its unlock's upload costing about 0.5 ms (2.1 zoomed out) at the next
+draw; and a prototype with no readback - the sprites drawn into memory of ours over a CPU copy standing in for the
+ground's tiles, the picture uploaded with one Blt - took 1.7 ms off mission 13's frame at 1920x1080 and 2 ms zoomed
+out, the ground still drawn by Direct3D as well (a real one would not draw it twice). On the rig's fast GPU that is
+small; what it would give on weak graphics only a run there can say.
 
 Before drawing, the engine skips objects far from the screen centre, with a box sized for
 1024x768: objects (`World_DrawLayer`) within x +-1024 and y +-512, their shadows (the shadow

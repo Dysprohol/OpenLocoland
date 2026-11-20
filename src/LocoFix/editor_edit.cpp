@@ -52,13 +52,16 @@
 // Every text shown is looked up in [Editor] of the language pack (editor_text.h); the messages go
 // to LocoFix.log in English.
 #include "patch.h"
+#include "perf.h"
 #include "profile.h"
+#include "soft_overlay.h"
 #include "editor_ground.h"
 #include "editor_mission.h"
 #include "editor_text.h"
 #include "ground.h"
 #include "rail_rules.h"
 #include <windowsx.h>
+#include <ddraw.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdarg>
@@ -8327,9 +8330,170 @@ void brush_size(int steps) {
 
 // ---- drawing ----
 
+// ---- the overlay's software pictures without a lock of the picture (fix 61) ----
+//
+// The overlay's texts and software pictures (layers 2-4: the bar's pieces and keys, the status lines, the rows'
+// and the panels' texts, the mines' labels) are drawn into the locked back buffer by the engine's SpriteVid_Draw,
+// a lock of their own (SoftwareLock) after Direct3D drawing - with dgVoodoo each a wait for the GPU and a copy of
+// the picture: 6 a frame in the test rig on mission 13 at 1920 x 1080, 5 ms. Within the overlay's part of a frame
+// such a picture is drawn twice into memory of ours (soft_overlay.h: two passes, against the real depth buffer)
+// instead, and what it drew put on the picture as dgVoodoo's unlock would, at the very moment the engine's code
+// unlocked: a picture of its own at once; inside a SoftwareLock at its end, or before what unlocks the picture in
+// it - a Direct3D picture (draw_vid), a rectangle (the engine's Graphics_FillRect and draw_fill_vertices unlock
+// through the surface, which lost_surfaces.cpp's guard hands to edit_soft_unlock), a software picture that cannot
+// be drawn twice.
+// Drawn twice the same: SpriteVid_Draw's kinds with one depth for the picture and plain writes (16-bit or 8-bit
+// pixels, the depth test "<=" - the second pass writes where the first did); not those with a depth per pixel (its
+// test "<": the second pass would write nothing) or blending (they read the picture): for those the engine's lock,
+// as before - inside a SoftwareLock kept to its end. A 32-bit picture, a surface of ours that cannot be made and
+// perf::off(61) (test commands 40053, 40056, 40057) keep the engine's way; a Blt that fails puts the pixels into a
+// lock of the picture. The same rare case as fix 59: a pixel drawn in the 16-bit colour it already had is no change
+// to dgVoodoo, here its block is cut to 16 bits.
+namespace soft {
+
+constexpr uintptr_t SURFACE_LOCK_FN = 0x4123c0;     // Surface_Lock(surface, &pitch, flags)
+constexpr uintptr_t SPRITE_VID_VTABLE = 0x4755c8;   // SpriteVid: DrawObject = SpriteVid_Draw
+constexpr size_t BACK_BITS = 0x208, BACK_PITCH = 0x214, DEPTH_BITS = 0x218, DEPTH_PITCH = 0x21c;
+constexpr size_t BACK_BUFFER = 0xc04, DEPTH_BUFFER = 0xbf8;
+constexpr size_t VID_LAYER = 0x33c, VID_IMAGE_FLAGS = 0x2a0;
+using Lock_t = void*(__stdcall*)(void* surface, int* pitch, unsigned flags);
+
+soft_overlay::Overlay g_overlays[2] = {soft_overlay::Overlay("the editor's overlay"), soft_overlay::Overlay("the editor's overlay")};
+soft_overlay::Overlay* g_current = nullptr;   // installed: backBufferBits is its first pass
+int g_last = 0;                               // the overlay used last (a zoom draws at two sizes a frame)
+bool g_window = false;       // the overlay's part of the frame
+int g_scopes = 0;            // SoftwareLocks open on ours
+bool g_real_ours = false;    // the back buffer locked by the engine's way inside such a SoftwareLock, to its end
+bool g_depth_ours = false;   // the depth buffer locked for ours
+int g_kept_pitch = 0;
+
+void unlock(void* s) {   // IDirectDrawSurface7::Unlock, vtable slot 0x80
+    reinterpret_cast<HRESULT(__stdcall*)(void*, void*)>((*reinterpret_cast<void***>(s))[0x80 / 4])(s, nullptr);
+}
+
+bool software(const uint8_t* v) {
+    const int layer = at<int>(const_cast<uint8_t*>(v), VID_LAYER);
+    return layer >= 2 && layer <= 4;
+}
+
+// SpriteVid_Draw's kinds that write the same pixels when drawn again (see the top).
+bool twice(const uint8_t* v) {
+    if (at<uintptr_t>(const_cast<uint8_t*>(v), 0) != SPRITE_VID_VTABLE) return false;
+    const uint16_t f = at<uint16_t>(const_cast<uint8_t*>(v), VID_IMAGE_FLAGS);
+    return (f & 1) && ((f & 8) == 0 || (f & 6) == 0);
+}
+
+void lock_depth(uint8_t* g) {
+    if (at<void*>(g, DEPTH_BITS)) return;
+    int pitch = 0;
+    at<void*>(g, DEPTH_BITS) = reinterpret_cast<Lock_t>(SURFACE_LOCK_FN)(at<void*>(g, DEPTH_BUFFER), &pitch, 0);
+    at<int>(g, DEPTH_PITCH) = pitch / 2;
+    g_depth_ours = at<void*>(g, DEPTH_BITS) != nullptr;
+}
+
+void unlock_depth(uint8_t* g) {
+    if (!g_depth_ours) return;
+    g_depth_ours = false;
+    if (at<void*>(g, DEPTH_BITS)) {
+        unlock(at<void*>(g, DEPTH_BUFFER));
+        at<void*>(g, DEPTH_BITS) = nullptr;
+    }
+}
+
+// Ours in place of the back buffer's lock; false: the engine's way (also when the back buffer is locked already).
+bool install(uint8_t* g) {
+    if (g_current) return true;
+    if (!g_window || !g || perf::off(61) || at<void*>(g, BACK_BITS) || (at<uint32_t>(g, 0) & 2)) return false;
+    auto* back = at<IDirectDrawSurface7*>(g, BACK_BUFFER);
+    DDSURFACEDESC2 d = {};
+    d.dwSize = sizeof d;
+    if (!back || FAILED(back->GetSurfaceDesc(&d)) || d.ddpfPixelFormat.dwRGBBitCount != 16) return false;
+    const int w = static_cast<int>(d.dwWidth), h = static_cast<int>(d.dwHeight);
+    int k = g_overlays[g_last].width() == w ? g_last : g_overlays[1 - g_last].width() == w ? 1 - g_last : 1 - g_last;
+    if (!g_overlays[k].make(w, h)) return false;
+    g_last = k;
+    g_current = &g_overlays[k];
+    lock_depth(g);
+    g_kept_pitch = at<int>(g, BACK_PITCH);
+    at<void*>(g, BACK_BITS) = g_current->pass(0);
+    at<int>(g, BACK_PITCH) = w;
+    return true;
+}
+
+// What ours drew put on the picture (where the engine would unlock).
+void flush() {
+    if (!g_current) return;
+    uint8_t* g = static_cast<uint8_t*>(graphics());
+    soft_overlay::Overlay& o = *g_current;
+    g_current = nullptr;
+    at<void*>(g, BACK_BITS) = nullptr;
+    at<int>(g, BACK_PITCH) = g_kept_pitch;
+    auto* back = at<IDirectDrawSurface7*>(g, BACK_BUFFER);
+    if (o.collect() && !o.put(g, back)) {   // the engine's way: the pixels into a lock of the picture
+        int pitch = 0;
+        if (auto* bits = static_cast<uint16_t*>(reinterpret_cast<Lock_t>(SURFACE_LOCK_FN)(back, &pitch, 0))) {
+            o.write_into(bits, pitch / 2);
+            unlock(back);
+        }
+    }
+    o.clear();
+    unlock_depth(g);
+}
+
+// The end of a SoftwareLock on ours (scope: the back buffer was not locked at its start, so whatever locks it now
+// was taken inside it and ends with it, as the SoftwareLock's own lock would), or of the overlay's part.
+void release(uint8_t* g, bool scope) {
+    flush();
+    if (g_real_ours || (scope && g && at<void*>(g, BACK_BITS))) {
+        g_real_ours = false;
+        if (g && at<void*>(g, BACK_BITS)) {
+            unlock(at<void*>(g, BACK_BUFFER));
+            at<void*>(g, BACK_BITS) = nullptr;
+        }
+        unlock_depth(g);
+    }
+}
+
+// A picture through Graphics_DrawVid; true: drawn here.
+bool draw(uint8_t* v, int frame, float x, float y, float z) {
+    uint8_t* g = static_cast<uint8_t*>(graphics());
+    if (!g_window || !g) return false;
+    const bool sw = software(v);
+    if (sw && twice(v) && install(g)) {
+        soft_overlay::Overlay& o = *g_current;
+        for (int k = 0; k < 2; ++k) {
+            at<void*>(g, BACK_BITS) = o.pass(k);
+            reinterpret_cast<DrawVid_t>(DRAW_VID)(g, nullptr, v, frame, x, y, z);
+        }
+        at<void*>(g, BACK_BITS) = o.pass(0);
+        if (g_scopes == 0) flush();   // a picture of its own: the engine locked and unlocked around it
+        return true;
+    }
+    if (!g_current) return false;   // not ours: the engine's way, into its lock if it has one
+    flush();
+    if (sw && g_scopes > 0) {   // inside a SoftwareLock: the engine's lock to its end, as SoftwareLock had it
+        int pitch = 0;
+        at<void*>(g, BACK_BITS) = reinterpret_cast<Lock_t>(SURFACE_LOCK_FN)(at<void*>(g, BACK_BUFFER), &pitch, 0);
+        at<int>(g, BACK_PITCH) = pitch / 2;
+        g_real_ours = at<void*>(g, BACK_BITS) != nullptr;
+        lock_depth(g);
+    }
+    return false;
+}
+
+struct Window {   // the overlay's part of a frame
+    Window() { g_window = true; }
+    ~Window() {
+        release(static_cast<uint8_t*>(graphics()), false);
+        g_window = false;
+    }
+};
+
+}  // namespace soft
+
 // Graphics_DrawVid draws at (x, y - z) of the view with the depth z.
 void draw_vid(uint8_t* v, int frame, float x, float y, float z) {
-    if (v) reinterpret_cast<DrawVid_t>(DRAW_VID)(graphics(), nullptr, v, frame, x, y, z);
+    if (v && !soft::draw(v, frame, x, y, z)) reinterpret_cast<DrawVid_t>(DRAW_VID)(graphics(), nullptr, v, frame, x, y, z);
 }
 
 // In front of the scene, as Unit_Draw draws the health bars (depth about 1900).
@@ -9404,13 +9568,21 @@ void unlock_surface(void* s) {   // IDirectDrawSurface7::Unlock, vtable slot 0x8
     if (s) reinterpret_cast<HRESULT(__stdcall*)(void*, void*)>((*reinterpret_cast<void***>(s))[0x80 / 4])(s, nullptr);
 }
 
+// In the overlay's part of a frame the lock is ours (fix 61, soft:: above): no lock of the picture, its end puts
+// what was drawn on it.
 struct SoftwareLock {
     uint8_t* g = static_cast<uint8_t*>(graphics());
-    bool back = false, depth = false;
+    bool back = false, depth = false, soft = false;
     explicit SoftwareLock(bool when = true) {
         if (!g || !when) return;
         back = *reinterpret_cast<void**>(g + G_BACK_BITS) == nullptr;
         depth = *reinterpret_cast<void**>(g + G_DEPTH_BITS) == nullptr;
+        if (back && soft::install(g)) {
+            soft = true;
+            back = depth = false;
+            ++soft::g_scopes;
+            return;
+        }
         lock();
     }
     void lock() {
@@ -9433,6 +9605,11 @@ struct SoftwareLock {
     }
     void unlock() {
         if (!g) return;
+        if (soft) {
+            soft = false;
+            if (--soft::g_scopes == 0) soft::release(g, true);
+            else soft::flush();
+        }
         if (back && *reinterpret_cast<void**>(g + G_BACK_BITS)) {
             unlock_surface(*reinterpret_cast<void**>(g + G_BACK_BUFFER));
             *reinterpret_cast<void**>(g + G_BACK_BITS) = nullptr;
@@ -12201,6 +12378,7 @@ void __fastcall DrawScene_editor(void* g, void* edx, int draw) {
     const double began = ground_clock();
     g_draw_scene(g, edx, draw);
     g_frame_times.scene += ground_clock() - began;
+    const soft::Window soft_window;   // the overlay's software pictures without a lock (fix 61)
     if (held) {
         ++g_frame_times.frames;
         prof::Lap frame;
@@ -12860,10 +13038,21 @@ bool edit_busy() {   // also the middle button's pan: it holds its own map point
     return stroke_under_way() || (g_middle_held && (g_test || GetKeyState(VK_MBUTTON) < 0));
 }
 
+// lost_surfaces.cpp's guard: an Unlock of the back buffer while the editor's overlay draws into memory of ours in
+// its place (fix 61) - what was drawn put on the picture where the engine's unlock would have put it. True: it was
+// ours (nothing is locked to unlock). A Lock of it then (nothing should: its pointer is set) puts it on first too.
+bool edit_soft_unlock(void* surface) {
+    uint8_t* g = static_cast<uint8_t*>(graphics());
+    if (!soft::g_current || !g || surface != at<void*>(g, soft::BACK_BUFFER)) return false;
+    soft::flush();
+    return true;
+}
+
 // zoom_view.cpp's second pass under a zoom: the interface over the stretched map, at the window's size (the
 // screen and the view are the window's now).
 void edit_interface_pass() {
     if (!world() || !graphics()) return;
+    const soft::Window soft_window;   // the software pictures without a lock (fix 61)
     draw_interface();
     UiDrawing ui;
     panel_draw_saved();

@@ -670,6 +670,30 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       in one run: the back buffer's locks 7.3 -> 3.9 ms a frame (4 -> 1), `other` 3.6 -> 1.5 ms; held frames with
       the minimap drawn are the same to the pixel both ways on missions 13, 7 (fog), 1 and 3 and on mission 18
       (night) but for a white spark that moves from frame to frame even in a held level (screen captures),
+  60. the messages' pixels put on from a surface of their own size (`soft_overlay.cpp`, engine.md "Locks under
+      dgVoodoo"): fix 59 put the letters on the picture with a colour-keyed Blt from a system-memory surface as big
+      as the screen, and dgVoodoo uploads the whole of such a surface at every Blt from it - 1.2 ms a frame at
+      1920x1080 in the test rig, a wait of its own while a message line is on the screen. The pixels now go into a
+      surface the size of their box (rounded up to 64 x 32; a few kept), and the Blt takes 0.02 ms; the same
+      pixels, the same place. Fix 59's way of drawing and putting on is shared now (`soft_overlay.cpp`) with the
+      editor's overlay (61). Mission 13 at 1920x1080 in the test rig, switched in one run (c40057): the frame's
+      CPU time 17.4-18.2 -> 14.9-15.4 ms (the put 1.2 ms less, and the sprites' lock of the next frame about 1 ms
+      less: it no longer waits for that upload); held frames the same to the pixel both ways,
+  61. the editor's overlay without locks of the picture (`editor_edit.cpp`): its texts and software pictures - the
+      bar's pieces and keys, the status lines, the rows', the panels' and the mines' texts - were drawn into the
+      locked back buffer, a lock of their own after Direct3D drawing each (6 a frame on mission 13, about 5 ms in
+      the test rig). Within the overlay's part of a frame such a picture is drawn twice into memory of ours, as
+      fix 59 draws the messages, and put on the picture the same way at the moment the engine's code unlocked: a
+      picture of its own at once, inside one of the overlay's locks at its end or before anything that unlocks the
+      picture inside it (a Direct3D picture or rectangle - their unlock through the surface comes to
+      `edit_soft_unlock`). Only SpriteVid_Draw's kinds that write the same pixels when drawn again are drawn so (one
+      depth for the picture, no blending); a picture with a depth per pixel (a building, a rail) or one that blends
+      keeps the engine's lock, inside one of the overlay's locks to its end as before. The editor on mission 13 at
+      1920x1080 in the test rig, switched in one run: the back buffer's locks 7 -> 1 a frame, the frame's CPU time
+      14.8-15.0 -> 10.6-10.8 ms (the bar 4.0 -> 1.4 ms, the status lines 2.2 -> 0.2 ms); held frames the same to
+      the pixel both ways with the Select tool, the Menu and Help panels, a help page, the Track tool's rows and the
+      Factory and Repair point tools' previews (where a part blinks or a status line changes by itself between two
+      shots, the same part differs between two shots of the same way),
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that

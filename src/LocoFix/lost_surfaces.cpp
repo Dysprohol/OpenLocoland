@@ -35,6 +35,7 @@
 #include "profile.h"
 
 void zoom_view_restored();   // zoom_view.cpp: a zoom's own surfaces made again after a loss
+bool edit_soft_unlock(void* surface);   // editor_edit.cpp: the overlay's memory in place of the back buffer's lock
 
 #include <ddraw.h>
 #include <intrin.h>
@@ -112,6 +113,7 @@ StandIn* stand_in_of(IDirectDrawSurface7* s, bool make) {
 HRESULT STDMETHODCALLTYPE guarded_lock(IDirectDrawSurface7* s, RECT* rect, DDSURFACEDESC2* desc, DWORD flags, HANDLE event) {
     const Table* t = table_of(s);
     if (!t) return DDERR_GENERIC;   // cannot happen: only guarded vtables point here
+    edit_soft_unlock(s);   // the editor's overlay drawn into memory of ours in its place: on the picture first
     const int64_t began = prof::on() ? prof::now() : 0;
     const HRESULT hr = t->lock(s, rect, desc, flags, event);
     if (began) prof::surface_lock(s, reinterpret_cast<uintptr_t>(_ReturnAddress()), prof::now() - began);
@@ -146,6 +148,7 @@ HRESULT STDMETHODCALLTYPE guarded_lock(IDirectDrawSurface7* s, RECT* rect, DDSUR
 }
 
 HRESULT STDMETHODCALLTYPE guarded_unlock(IDirectDrawSurface7* s, RECT* rect) {
+    if (edit_soft_unlock(s)) return DD_OK;   // not locked: the editor's overlay drew into memory of ours (fix 61)
     if (StandIn* f = stand_in_of(s, false); f && f->locked) {
         f->locked = false;
         return DD_OK;

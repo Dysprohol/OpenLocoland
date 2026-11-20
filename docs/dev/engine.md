@@ -46,7 +46,8 @@ unlock does, without waiting for the GPU (LocoFix fix 58 does the minimap's lock
 drawing costs a wait for the GPU whatever its rectangle (the minimap's 400 x 300 lock as much as the whole
 buffer); a lock with no Direct3D drawing since the last unlock costs almost nothing. The depth buffer is a
 system-memory surface, but after a Blt into it (the ground's heights, `Graphics_Clear`'s depth fill) its next lock
-waits as well (LocoFix fix 56).
+waits as well (LocoFix fix 56). A Blt from a system-memory surface has dgVoodoo upload the whole surface, whatever
+rectangle is copied: a 1920 x 1080 one 1.2 ms a Blt in the test rig, one of a text's size 0.02 ms (LocoFix fix 60).
 
 **Lost surfaces** (`src/LocoFix/lost_surfaces.cpp`, `BUGS.md` F22). DirectDraw takes the surfaces
 away whenever a full-screen game is not the window in front - Alt+Tab, a window or a notification
