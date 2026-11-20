@@ -11,12 +11,15 @@
 //     R <x> <y> <z> <direction>                     rail_of(x, y, z, direction)
 //     J <n> {<x> <y> <shape> <z0> <z1>}*n <px> <py>  rail_point_links(rails, point)
 //     Q <n> {<x> <y> <shape> <z0> <z1>}*n <loose>    track_report(rails, loose)
+//     W <n> {<x> <y> <z> <direction> <nvid>}*n <loose>  network_report of rail objects laid in that order (rail_net.h)
 //
 // (z "any" = None) and gets one output line: the candidates "x y shape fx fy sx sy" separated by
 // ";", the plan "<code> <step> x y shape e0x e0y e1x e1y;...", the cells "cx,cy ...|cx,cy ..."
 // (sorted), the rail "x y shape z0 z1", the points "ex ey z links;..." (sorted), the report
-// "kind x y ex ey z value;..." in its order ("twice x y shape z0 z1 count;" for a rail laid twice).
+// "kind x y ex ey z value;..." in its order ("twice x y shape z0 z1 count;" for a rail laid twice); W the
+// same report, "|" and each rail's way on at end 0 and end 1 ("on|reverse|none on|reverse|none;").
 #define _CRT_SECURE_NO_WARNINGS
+#include "../src/LocoFix/rail_net.h"
 #include "../src/LocoFix/rail_rules.h"
 
 #include <algorithm>
@@ -123,11 +126,36 @@ int main() {
                                 " " + std::to_string(j.links) + ";");
             std::sort(items.begin(), items.end());
             for (const std::string& i : items) out += i;
-        } else if (kind == "Q") {
-            const std::vector<rail::Rail> rails = read_rails(in);
+        } else if (kind == "Q" || kind == "W") {
+            std::vector<rail::Rail> rails;
+            std::string ways;
+            std::vector<rail::Problem> report;
             int loose = 0;
-            in >> loose;
-            for (const rail::Problem& p : rail::track_report(rails, loose != 0)) {
+            if (kind == "Q") {
+                rails = read_rails(in);
+                in >> loose;
+                report = rail::track_report(rails, loose != 0);
+            } else {   // rail objects in the map's order, laid on the network (rail_net.h)
+                int n;
+                in >> n;
+                rail::Network net;
+                std::vector<std::pair<int, int>> nodes;
+                for (int i = 0; i < n; ++i) {
+                    float x, y, z;
+                    int direction, nvid;
+                    in >> x >> y >> z >> direction >> nvid;
+                    rail::RailVid v;
+                    v.altitude = nvid == 600 || nvid == 601 ? 7.0f : 10.0f;
+                    rails.push_back(rail::rail_of(x, y, static_cast<double>(z) + v.altitude - rail::ALTITUDE, direction));
+                    nodes.push_back(net.lay(x, y, z, direction, v));
+                }
+                for (const auto& nd : nodes)
+                    ways += std::string(rail::way_code(net.way(nd.first, nd.second))) + " " + rail::way_code(net.way(nd.second, nd.first)) + ";";
+                in >> loose;
+                for (const rail::Problem& p : rail::network_report(rails, net, nodes))
+                    if (p.kind != rail::Joint::Loose || loose) report.push_back(p);
+            }
+            for (const rail::Problem& p : report) {
                 out += std::string(rail::joint_code(p.kind)) + " " + num(p.at.x) + " " + num(p.at.y) + " ";
                 if (p.kind == rail::Joint::Twice)
                     out += std::to_string(p.shape) + " " + std::to_string(p.z) + " " + std::to_string(p.z1) + " " + std::to_string(p.value);
@@ -135,6 +163,7 @@ int main() {
                     out += std::to_string(p.end.x) + " " + std::to_string(p.end.y) + " " + std::to_string(p.z) + " " + std::to_string(p.value);
                 out += ";";
             }
+            if (kind == "W") out += "|" + ways;
         }
         std::cout << out << "\n";
     }

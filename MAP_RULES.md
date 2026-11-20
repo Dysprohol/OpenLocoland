@@ -138,11 +138,21 @@ the editor of the game (DEVELOPERS.md "Editor mode", `editor_edit.cpp`) applies 
   it, and rails moved off the lattice still link within 2 px. A train reverses where it turns 0x20 (45
   degrees) or more from link to link (`RailDot_Search`); rails linked end to end never turn that much, so
   the one linked joint a train cannot go through is a V: two rails sharing a point with nothing going on
-  the other way. `check-track` lists, besides the rails laid twice and the points of more than 6 links,
-  every rail end that is not linked and not just the end of a track: at **two heights**, **not joined**
-  (other rails end there at an angle), a **V**, and a **near miss** (an end with no other rail ending there
-  within 8 px of another rail's way) - `rail_end_state` / `track_report`, the same as `rail_rules.h`
-  (`tools/test_rail_rules.py`). **[editor]** the Track tool marks them (red) and the ends of track (yellow).
+  the other way. A rail links only through its own look-outs, when it is laid or loaded: the look-out of
+  a rail laid earlier never finds the point of one laid later. Where both look-outs find each other's
+  point (ends meeting the opposite way, on the lattice) the order does not matter; where only one does - an
+  end in the middle of a curve, two diagonals whose tips are a lattice step apart, a rail laid half along
+  past another's end - the link is there or not by the rails' order in the map, and a link into a rail's
+  side turns 45 degrees or more, so the trains reverse there all the same. `check-track` lays the map's
+  rails in its order as loading does (`rail_network`, the same as `src/LocoFix/rail_net.h`) and asks at
+  every rail end whether a train going toward it finds a link on within 0x20 of its way; it lists,
+  besides the rails laid twice and the points of more than 6 links, every end without one that is not
+  just the end of a track: at **two heights**, **not joined** (other rails end there), **trains turn
+  round** (a V, or an end linked into a rail's side), and a **near miss** (no other rail ends there, but
+  its look-out lands on another rail's point or it lies within 8 px of another rail's way) -
+  `network_report`, the look of the track (`rail_end_state`, `track_report`) naming what is wrong;
+  `tools/test_rail_rules.py` compares it with the C++. **[editor]** the Track tool marks them (red) and
+  the ends of track (yellow).
 - A point has at most 6 links ("Too many links"). The rail ends at a joint that point the same
   way at the same height share one point, which links to the far point of each of those rails
   and to the point of the rails ending the opposite way - so the limit is per point, not per

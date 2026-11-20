@@ -59,6 +59,7 @@
 #include "editor_mission.h"
 #include "editor_text.h"
 #include "ground.h"
+#include "rail_net.h"
 #include "rail_rules.h"
 #include <windowsx.h>
 #include <ddraw.h>
@@ -4108,11 +4109,19 @@ std::vector<rail::Rail> rails_of(const std::vector<RailObject>& objects) {
 // a near miss (an end within 8 px of another rail), rails meeting at two heights, at an angle the engine
 // does not link (a dead end), a V, a point of more than 6 links; the status line counts them, and Check
 // the track (the Menu) goes through them one by one. Rails laid twice are listed by the check only (the
-// engine just shares their points). The same report as map_tool.py check-track (rail::track_report);
+// engine just shares their points). The same report as map_tool.py check-track (rail::network_report);
 // it is a view: it adds nothing to the history and changes nothing of the map. Kept while the rails
-// are the same (a hash of every rail's place, height, direction and VID, taken once a frame), so a
-// frame costs a walk over the rails; a change of the track computes it again (The Factory: see the log's
-// "track joints" line for the time).
+// are the same (a hash of every rail's place, height, direction and VID in the map's order, taken once a
+// frame), so a frame costs a walk over the rails; a change of the track computes it again (The Factory: see
+// the log's "track joints" line for the time).
+//
+// Whether an end joins is the rail network's answer (issue #24, rail_net.h), not the look of the track:
+// the rails laid one by one in the map's order, as loading builds the network for Run the level and a
+// played map, and at each end whether a train going toward it finds a link on within 0x20 of its way. The
+// look of the track (rail::track_report) only names what is wrong where the network has no way on - before,
+// an end whose look-out landed near another rail's point counted as joined, and a diagonal ending in the
+// middle of a curve laid after it, or two diagonals whose tips were a step apart, showed no mark while the
+// trains found no way on there.
 struct TrackJoints {
     bool valid = false;
     uint64_t signature = 0;
@@ -4120,7 +4129,50 @@ struct TrackJoints {
     std::vector<float> draw_z;           // the height each is drawn at (its rail's z at that end)
     int loose = 0, look = 0, twice = 0;  // the ends of track; the places to look at (not the rails laid twice); those
     int counts[7] = {};                  // by rail::Joint
+    rail::Network net;                   // the map's rails laid in its order (the preview lays its run on it)
+    int live_differs = -1;               // rail ends where g_railMap answers otherwise (the order of laying in this session)
 } g_joints;
+
+// ---- the rail network as loading builds it (rail_net.h) ----
+constexpr uintptr_t RAIL_LIFT_SET = 0x4a9d80, RAIL_LIFT0 = 0x4a9d84, RAIL_LIFT1 = 0x4a9d94;   // Rail_Action's ramp tables
+constexpr size_t V_ALTITUDE = 0x60;
+
+// What Rail_Action reads of a rail VID; the ramp tables as the engine's first rail filled them (or will).
+rail::RailVid rail_vid(uint8_t* v) {
+    rail::RailVid r;
+    if (!v) return r;
+    r.size_x = at<float>(v, V_SIZE_X);
+    r.size_y = at<float>(v, V_SIZE_Y);
+    r.altitude = at<float>(v, V_ALTITUDE);
+    r.dir_half_step = at<int>(v, V_DIR_HALF_STEP);
+    r.frames = at<int>(v, V_ND_DIR);
+    const uint8_t set = *reinterpret_cast<const uint8_t*>(RAIL_LIFT_SET);
+    const float size_z = at<float>(v, V_SIZE_Z);
+    for (int g = 0; g < 4; ++g) {
+        r.lift0[g] = set & 1 ? reinterpret_cast<const float*>(RAIL_LIFT0)[g] : g == 1 ? size_z : 0.0f;
+        r.lift1[g] = set & 2 ? reinterpret_cast<const float*>(RAIL_LIFT1)[g] : g == 2 ? size_z : 0.0f;
+    }
+    return r;
+}
+
+// The same question asked of g_railMap itself (a check of the network above, logged when they differ).
+rail::Way live_way(uint8_t* d, uint8_t* f) {
+    if (!d || !f || d == f) return rail::Way::None;
+    auto link_dot = [](uint8_t* p, int k) { return at<uint8_t*>(p, DOT_LINKS + k * DOT_LINK_SIZE + LINK_DOT); };
+    auto link_dir = [](uint8_t* p, int k) { return static_cast<int>(at<uint8_t>(p, DOT_LINKS + k * DOT_LINK_SIZE + LINK_DIRECTION)); };
+    int arrival = -1;
+    for (int k = 0; k < at<int>(f, DOT_LINK_COUNT) && k < rail::MAX_LINKS; ++k)
+        if (link_dot(f, k) == d) arrival = link_dir(f, k);
+    if (arrival < 0) arrival = rail::direction_of(at<int>(d, DOT_X) - at<int>(f, DOT_X), at<int>(d, DOT_Y) - at<int>(f, DOT_Y));
+    bool other = false;
+    for (int k = 0; k < at<int>(d, DOT_LINK_COUNT) && k < rail::MAX_LINKS; ++k) {
+        if (link_dot(d, k) == f) continue;
+        other = true;
+        const int a = (arrival - link_dir(d, k)) & 0xff, b = (link_dir(d, k) - arrival) & 0xff;
+        if ((std::min)(a, b) < 0x20) return rail::Way::Pass;
+    }
+    return other ? rail::Way::Turn : rail::Way::None;
+}
 
 // draw_overlay's frames: while it draws, track_joints walks the rails once a frame (the marks, the status
 // line and the preview's snap ask for it); a click, a key or an undo between frames walks them again
@@ -4149,7 +4201,34 @@ const TrackJoints& track_joints() {
     TrackJoints j;
     j.valid = true;
     j.signature = h;
-    j.report = rail::track_report(rails_of(objects), true);
+    std::vector<std::pair<int, int>> nodes;   // each rail's points in j.net
+    {
+        std::map<uint8_t*, rail::RailVid> vids;
+        for (const RailObject& r : objects) {
+            uint8_t* v = vid_of(r.object);
+            auto found = vids.find(v);
+            if (found == vids.end()) found = vids.emplace(v, rail_vid(v)).first;
+            nodes.push_back(j.net.lay(at<float>(r.object, O_X), at<float>(r.object, O_Y), at<float>(r.object, O_Z), at<int>(r.object, O_DIRECTION),
+                                      found->second));
+        }
+    }
+    j.report = rail::network_report(rails_of(objects), j.net, nodes);
+    // g_railMap asked the same: it answers otherwise only where rails were laid in this session in another order than
+    // the map's (a rail put back by an undo links again then) - the next load builds it in the map's order
+    j.live_differs = 0;
+    std::string differ;
+    for (size_t n = 0; n < objects.size(); ++n)
+        for (int i = 0; i < 2; ++i) {
+            const rail::Way live = live_way(rail_node(objects[n].object, i), rail_node(objects[n].object, 1 - i));
+            const rail::Way built = j.net.way(i ? nodes[n].second : nodes[n].first, i ? nodes[n].first : nodes[n].second);
+            if (live == built) continue;
+            if (++j.live_differs <= 4) {
+                const rail::Point e = rail::end_of(objects[n].rail, i);
+                differ += ui_printf(" %.1f,%.1f (here %s, in the map's order %s)", e.x, e.y, rail::way_code(live), rail::way_code(built));
+            }
+        }
+    if (j.live_differs && (j.live_differs != g_joints.live_differs || g_test))
+        patch::log("edit: track joints: the network laid in this session differs from the map's order at %d rail ends:%s", j.live_differs, differ.c_str());
     for (const rail::Problem& p : j.report) {
         ++j.counts[static_cast<int>(p.kind)];
         if (p.kind == rail::Joint::Loose) ++j.loose;
@@ -4393,17 +4472,52 @@ bool doubles_a_rail(const std::vector<rail::Rail>& there, const rail::Plan& plan
     return false;
 }
 
+// What the rails of a run will be at its end `to` (issue #24): the network's answer - the run laid on the
+// map's network (track_joints, rail_net.h) as lay_step lays it, each rail's place, direction, height and VID,
+// and whether a train coming along it finds a way on there - with the look of the track (rail::end_state of
+// the run's last end among `there` and the run's rails before it) naming what is wrong where it does not
+// (rail::truthful). Before, the look alone answered: green where the run's end only came near another rail's
+// point. `level`: the ground level the run's first rail is laid at (plan_laid). The network is left as it was.
+rail::End run_end_state(const std::vector<rail::Rail>& there, const std::vector<rail::Segment>& segs, const std::vector<rail::Point>& points,
+                        int level, rail::Point to) {
+    if (segs.empty()) return rail::End::Loose;
+    std::vector<rail::Rail> with = there;
+    for (size_t k = 0; k + 1 < segs.size(); ++k) with.push_back({segs[k].x, segs[k].y, segs[k].shape, segs[k].z0, segs[k].z1});
+    const rail::Segment& last = segs.back();
+    const bool at0 = rail::close(last.end0.x, to.x) && rail::close(last.end0.y, to.y);
+    const rail::Vec end = rail::ENDS[last.shape][at0 ? 0 : 1];
+    const int z = at0 ? last.z0 : last.z1;
+    const rail::End look = rail::end_state(with, to, end, z, -1);
+    bool others = false;   // another rail ends there (not the same way at the same height)
+    for (const rail::Rail& r : with)
+        for (int i = 0; i < 2; ++i) {
+            const rail::Point e = rail::end_of(r, i);
+            if (rail::close(e.x, to.x) && rail::close(e.y, to.y) && !(rail::ENDS[r.shape][i] == end && rail::height_of(r, i) == z)) others = true;
+        }
+    track_joints();
+    rail::Network& net = g_joints.net;
+    const size_t mark = net.mark();
+    const int nvid = RAIL_KINDS[g_rail_kind];
+    const rail::RailVid v = rail_vid(vid_by_number(nvid));
+    std::pair<int, int> laid = {-1, -1};
+    for (size_t k = 0; k < segs.size() && k < points.size(); ++k) {
+        const float rail_z = static_cast<float>(level + static_cast<int>(k) * g_ramp * rail::RAMP) + 6.0f - rail_altitude(nvid) -
+                             (g_ramp < 0 ? rail::RAMP : 0);
+        laid = net.lay(static_cast<float>(segs[k].x), static_cast<float>(segs[k].y), rail_z, step_direction(segs[k], points[k], g_ramp), v);
+    }
+    const rail::Way way = at0 ? net.way(laid.first, laid.second) : net.way(laid.second, laid.first);
+    net.back_to(mark);
+    const bool reached = (look == rail::End::Linked || look == rail::End::Sharp) && way == rail::Way::None && rail::reaches(with, to, end, z, -1);
+    return rail::truthful(look, way, others, reached);
+}
+
 TrackStep snap_run(const std::vector<rail::Rail>& there, const TrackStep& s, int z) {
     if (!s.valid || s.segments.empty()) return s;
-    auto state_of = [&](const std::vector<rail::Segment>& segs, rail::Point to) {
-        std::vector<rail::Rail> with = there;
-        for (size_t k = 0; k + 1 < segs.size(); ++k) with.push_back({segs[k].x, segs[k].y, segs[k].shape, segs[k].z0, segs[k].z1});
-        const rail::Segment& last = segs.back();
-        const bool at0 = rail::close(last.end0.x, to.x) && rail::close(last.end0.y, to.y);
-        return rail::end_state(with, to, rail::ENDS[last.shape][at0 ? 0 : 1], at0 ? last.z0 : last.z1, -1);
+    auto state_of = [&](const std::vector<rail::Segment>& segs, const std::vector<rail::Point>& points, int level, rail::Point to) {
+        return run_end_state(there, segs, points, level, to);
     };
     const rail::Point e = s.to;
-    const rail::End now = state_of(s.segments, e);
+    const rail::End now = state_of(s.segments, s.points, s.level, e);
     if (now != rail::End::Near && now != rail::End::DeadEnd && now != rail::End::Sharp) return s;
     // the rail ends within reach of where it would end (each end vector: what an arrival must oppose)
     struct Target {
@@ -4454,7 +4568,7 @@ TrackStep snap_run(const std::vector<rail::Rail>& there, const TrackStep& s, int
             if (f.second > best_d + 0.01 || (f.second > best_d - 0.01 && rails >= best_rails)) continue;
             int level = 0;
             const rail::Plan plan = plan_laid(there, points, level);
-            if (plan.error != rail::Error::None || state_of(plan.segments, points.back()) != rail::End::Linked) continue;
+            if (plan.error != rail::Error::None || state_of(plan.segments, points, level, points.back()) != rail::End::Linked) continue;
             if (doubles_a_rail(there, plan)) continue;   // a rail that is there already: not this way
             best = s;
             best.level = level;
@@ -4485,7 +4599,7 @@ TrackStep snap_run(const std::vector<rail::Rail>& there, const TrackStep& s, int
             for (const rail::Point& p : s.points) points.push_back({rail::round3(p.x + dx), rail::round3(p.y + dy)});
             int level = 0;
             const rail::Plan plan = plan_laid(there, points, level);
-            if (plan.error != rail::Error::None || state_of(plan.segments, points.back()) != rail::End::Linked) continue;
+            if (plan.error != rail::Error::None || state_of(plan.segments, points, level, points.back()) != rail::End::Linked) continue;
             if (doubles_a_rail(there, plan)) continue;
             TrackStep moved = s;
             moved.level = level;
@@ -8659,10 +8773,10 @@ std::string g_track_status;   // the status line's part for the Track tool
 
 void fill_diamond(float x, float y, float r, uint32_t argb);
 
-// What the end of the rails a click lays will be (issue #7: the dot while laying): rail::end_state of
-// the run's last rail end at its far point among the rails there and the run's own rails before it -
-// Linked: green, it joins the track there; Near / Heights / DeadEnd / Sharp: orange, it ends at a rail
-// without joining it; Loose: a new end of track. `px` gets how far the nearest rail's way is (Near).
+// What the end of the rails a click lays will be (issue #7: the dot while laying; issue #24: the network's
+// answer, run_end_state) - Linked: green, a train coming along the run goes on there; Near / Heights /
+// DeadEnd / Sharp: orange, it ends at a rail without a way on; Loose: a new end of track. `px` gets how far
+// the nearest rail's way is (Near).
 struct RunEnd {
     rail::End state = rail::End::Loose;
     rail::Point at = {};
@@ -8677,12 +8791,13 @@ RunEnd run_end(const std::vector<RailObject>& rails, const TrackStep& s) {
     static struct {
         bool valid = false;
         uint64_t rails = 0;
-        int level = 0, ramp = 0;
+        int level = 0, ramp = 0, kind = 0;
         std::vector<rail::Point> points;
         RunEnd end;
     } memo;
     const uint64_t signature = track_joints().signature;
-    if (memo.valid && memo.rails == signature && memo.level == s.level && memo.ramp == g_ramp && memo.points.size() == s.points.size() &&
+    if (memo.valid && memo.rails == signature && memo.level == s.level && memo.ramp == g_ramp && memo.kind == g_rail_kind &&
+        memo.points.size() == s.points.size() &&
         std::equal(s.points.begin(), s.points.end(), memo.points.begin(),
                    [](const rail::Point& a, const rail::Point& b) { return rail::close(a.x, b.x) && rail::close(a.y, b.y); }))
         return memo.end;
@@ -8690,6 +8805,7 @@ RunEnd run_end(const std::vector<RailObject>& rails, const TrackStep& s) {
     memo.rails = signature;
     memo.level = s.level;
     memo.ramp = g_ramp;
+    memo.kind = g_rail_kind;
     memo.points = s.points;
     memo.end = run_end_now(rails, s);
     return memo.end;
@@ -8703,9 +8819,9 @@ RunEnd run_end_now(const std::vector<RailObject>& rails, const TrackStep& s) {
     out.at = s.to;
     out.z = at0 ? last.z0 : last.z1;
     std::vector<rail::Rail> there = rails_of(rails);
+    out.state = run_end_state(there, s.segments, s.points, s.level, s.to);
     for (size_t k = 0; k + 1 < s.segments.size(); ++k)
         there.push_back({s.segments[k].x, s.segments[k].y, s.segments[k].shape, s.segments[k].z0, s.segments[k].z1});
-    out.state = rail::end_state(there, s.to, rail::ENDS[last.shape][at0 ? 0 : 1], out.z, -1);
     out.px = 1e9;
     for (const rail::Rail& r : there) out.px = (std::min)(out.px, rail::way_distance(s.to, r));
     return out;
@@ -8720,7 +8836,7 @@ std::string run_end_words(const RunEnd& e) {
                          static_cast<int>(std::lround(e.px)));
     case rail::End::Heights: return ui_text("RunEndHeights", "ok, but the end meets a rail at another height - not joined (orange)");
     case rail::End::DeadEnd: return ui_text("RunEndAngle", "ok, but the end meets rails at an angle - not joined (orange)");
-    case rail::End::Sharp: return ui_text("RunEndSharp", "ok, but trains could only turn round at the end (a V, orange)");
+    case rail::End::Sharp: return ui_text("RunEndSharp", "ok, but the end links only at a sharp angle - trains could only turn round there (orange)");
     case rail::End::Loose: break;
     }
     return ui_text("WordOk", "ok");
@@ -8889,7 +9005,7 @@ std::string problem_words(const rail::Problem& p) {
     case rail::Joint::Twice: return ui_text("CheckTwice", "the same rail is laid twice here - trains do not mind, but deleting one leaves the other");
     case rail::Joint::Links: return ui_printf(ui_format("CheckLinks", "%d rails meet at one point - the game takes 6, the others do not join"), p.value);
     case rail::Joint::Heights: return ui_printf(ui_format("CheckHeights", "rails meet at two heights (%d and %d) - they do not join"), p.z, p.value);
-    case rail::Joint::Sharp: return ui_text("CheckSharp", "two rails leave one point the same way and nothing goes on - trains can only turn round here");
+    case rail::Joint::Sharp: return ui_text("CheckSharp", "the rails link here only at a sharp angle (a V, or an end linked into a rail's side) - trains can only turn round here");
     case rail::Joint::DeadEnd: return ui_text("CheckDeadEnd", "rails meet at an angle the game does not join - trains stop here");
     case rail::Joint::Near: return ui_text("CheckNear", "a rail end stops a few px from another rail and does not join it");
     case rail::Joint::Loose: break;

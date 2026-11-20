@@ -413,7 +413,18 @@ rails link only where their points are at the same height; the rail ends pointin
 at a joint share one point (a junction's point: the far points of its rails and the point
 across). `map_tool.py rail_of`, `rail_point_links` and `check-track` model this; on missions
 11, 12 and 15 the links logged in the game (the editor's test command `D`) are exactly these.
-A point has at most 6 links; a link stores the other point, its
+A rail links only through its own two look-outs, when its direction is set (laid, loaded, put back):
+`RailDot_Connect` adds the link both ways, but nothing looks again from the rails already there, so the
+look-out of a rail laid earlier never finds a point of one laid later. Ends meeting the opposite way find
+each other's point both ways, so there the order does not matter; where only one look-out finds the
+other's point - an end in the middle of a curve, two diagonals whose tips are a lattice step apart, a
+rail laid half along past another's end - the link is there or not by the rails' order (loading: the
+map's order). Found on a tester's map (issue #24, CaptureTheGear 745.5,250: a diagonal ending in the
+middle of a curve laid after it, its point 763,237 with one link only, `D`). The editor's marks lay the
+rails on a copy of the network in the map's order and ask it (`rail_net.h`, editor-objects.md "The
+network's answer"); on the 20 missions that copy and `g_railMap` give the same answer at every rail end.
+A point has at most 6 links (a 7th is dropped on the full side only - the other point keeps its half,
+"R_DOT: Too many links"); a link stores the other point, its
 length (y counts 1.5 times), the index of the way back and its direction. After a level is
 loaded `RailMap_FindCrossings` marks links that cross another track (a grid of 75 px cells),
 because a moving train there blocks the other track. Per point: `broken` (a destroyed rail

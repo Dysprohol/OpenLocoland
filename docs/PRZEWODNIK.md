@@ -422,7 +422,8 @@ tej samej wysokości, więc tor może wyglądać na połączony, choć nie jest.
 toru ma mały **żółty** znak - bocznica, linia za krawędzią mapy - a **czerwony** pokazuje miejsce, gdzie
 tor wygląda na połączony, ale nie jest, albo gdzie pociągi mogą tylko zawrócić: koniec kilka pikseli od
 innej szyny, szyny stykające się na dwóch wysokościach albo pod kątem, V (dwie szyny z jednego punktu i
-nic dalej). Trzeci wiersz stanu je liczy. Gdy kładziesz linię, koniec podglądu jest **zielony** tam, gdzie
+nic dalej), koniec, który tylko dotyka boku innej szyny. Znaki pytają sieć torów, którą gra buduje, gdy
+mapa rusza, więc mówią, gdzie pociągi jadą dalej, a nie tylko jak tor wygląda. Trzeci wiersz stanu je liczy. Gdy kładziesz linię, koniec podglądu jest **zielony** tam, gdzie
 kliknięcie połączy się z torem, a **pomarańczowy** tam, gdzie skończy się przy szynie bez połączenia; wiersz
 stanu mówi dlaczego. **PRZYCIAGANIE: WL.** w rzędzie (domyślnie) kładzie ostatnie szyny takiego
 kliknięcia od nowa, tak żeby jego koniec trafił w pobliski koniec szyny i się z nim połączył - podgląd to

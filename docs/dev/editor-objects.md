@@ -283,14 +283,61 @@ near, 14 two heights, 19 not joined, 4 V, 1 over 6 links; 1 laid twice), the mar
 showing the plain and swamp rails linked at the same points' height, apart at the swamp rail's lower point,
 and the 8-rail point with 7 refs and 6 links (the engine dropped two).
 
+**The network's answer** (issue #24, a tester's report on v0.2.12: "the track connection marker reports
+incorrectly a good connection"; `rail_net.h`, `track_joints`, `run_end_state`). What the marks, the preview's
+dot, snap and Check the track called joined was the look of the track: two ends meeting the opposite way at
+one height, an end whose look-out landed within 2 px of another rail's point, or whose point another rail's
+look-out found. The engine is narrower (engine.md "The rail network"): a rail links only through its own
+look-outs when it is laid, so where only one of two look-outs finds the other's point the link is there only
+if that rail came later in the map; a link into a rail's side turns 45 degrees or more, and trains reverse
+there; a 7th link is dropped. Found in the game on a tester's map (CaptureTheGear, from the Discord): its
+diagonal ending at 745.5,250 in the middle of a curve laid after it had no mark ("0 to look at") while `D`
+showed its point 763,237 with one link only - no way on. Every pair of rails of the lattice tried (12 x 12
+shapes, 9 x 9 places, both orders): the look and the network differed at 1008 rail ends - 816 called joined
+where trains find no way on (an end in a curve's middle, two diagonals whose tips are a step apart, a rail
+laid half along past another's end), 192 called an end of track where trains go on (two curves laid half over
+each other as an S). Now the network answers: `track_joints` lays the map's rails one by one in its order on a
+copy of the network (`rail::Network`: `RailMap_AddDot`'s whole px, `RailMap_FindDot`'s first point within 1 px
+at the same height, `RailDot_Connect` both ways with 6 a side, the VID's size and altitude, the engine's ramp
+tables) - as loading builds it, which is what Run the level and a played map run - and at every rail end asks
+whether a train going toward it finds a link on within 0x20 of its way (`RailDot_Search`'s turn). The look
+(`track_report`) only names what is wrong where it does not (`network_report`, `truthful`): an end the look
+took for joined is "not joined" where other rails end, "trains turn round" where it links only at a sharp
+angle, a near miss where its look-out lands on another rail's point or it lies within 8 px of a rail's way,
+else the end of a track (yellow); an end the look took for unjoined that has a way on gets no mark. The
+preview's dot and the snap lay the click's rails on that copy as `lay_step` will lay them (place, direction,
+height, VID) and take them off again (`Network::mark` / `back_to`). The words of a V are now "the rails link
+here only at a sharp angle (a V, or an end linked into a rail's side)" (six languages). `map_tool.py
+check-track` gives the same list (`network_report`, `rail_network`; `tools/test_rail_rules.py` compares the
+two on 405 random orders of rails and every map of the game, and finds them the same). In test mode the
+copy's answer is compared with `g_railMap`'s at every rail end after each change, and where they differ the
+log says so ("the network laid in this session differs from the map's order at N rail ends"). It never did in
+the runs below: a rail laid goes to the end of the layer list, and so does one an undo puts back (it links
+again then) - the session's network is the map's order. Checked in the game: CaptureTheGear before - no
+mark at 745.5,250, "0 to look at" - and after - a red diamond there, "near miss 1", Check the track "2 of 2:
+near at 745.5,250" -, the network and the copy the same at all its 658 rail ends; the 20 missions loaded one
+after another in the editor with the Track tool, the counts the same as before at each (l12's four V's, l15's
+two heights) and the copy the same as `g_railMap` at every rail end; on POLIGON a diagonal ending in the middle
+of a main-line rail (-36,1375), then a curve from the next joint whose middle is under that end (laid after
+it, as on the tester's map): the curve's preview dot
+green "joins the track there" before - its end leads nowhere - and light now; laid, nothing to look at before,
+now the diagonal's end a near miss and the curve's end yellow (6 ends of track, the copy agreeing). Ctrl+Z /
+Ctrl+Y of the curve 1 near / back; the diagonal deleted (middle button) 0 to look at, put back by Ctrl+Z - laid
+after the curve now, its look-out links into the curve's point: "trains turn round 1" at the curve's dead
+end, as `D` and `map_tool.py` give it. A spur of three rails laid from the main line's joint 425.5,1375
+(green, nothing to look at), then Run the level: a train of the arrivals, selected and sent to the spur's end
+with the right button, drove through the junction and the spur's two joints and stood at its end (`D`: the
+locomotive at 596,1425).
+
 While a line is laid, the preview's end is the same question asked before the click (`run_end`: `end_state`
-of the run's last rail end among the rails there and the run's own): a **green** diamond where the rails of
+of the run's last rail end among the rails there and the run's own; since issue #24 the network's answer,`
+`run_end_state`, above): a **green** diamond where the rails of
 the click will join the track, an **orange** one where they end at a rail without joining it (a near
 miss, two heights, an angle, a V), a light one at a new end of track; the run's other points are small and
 light (before, every point was green), all red when the 6-link limit keeps the run out. The first status
 line says it in words instead of "ok" - "ok, the end joins the track there (green)", "ok, but the end stops
 5 px from a rail without joining it (orange)", "... meets a rail at another height - not joined", "...
-meets rails at an angle", "ok, but trains could only turn round at the end (a V, orange)". Laying is as
+meets rails at an angle", "ok, but the end links only at a sharp angle - trains could only turn round there (orange)". Laying is as
 before. Checked in the game on `tjtest`: a run of two straights onto the near-miss cluster's loose end
 (green), a curve ending 5 px from its vertical (orange, "5 px"), a curve onto a V's straight from the same
 side (V), a destroyed swamp line's rail onto the swamp rail at the plain rails' height (two heights), a
@@ -298,7 +345,7 @@ diagonal onto the joint of the two-heights cluster (angle), and a line laid (two
 history: the counts 37 -> 39 ends of track, Ctrl+Z 37, Ctrl+Y 39).
 
 **Snap** (`snap_run`, the row's SNAP: ON / OFF, on by default and kept while the editor runs like the
-row's other choices; `g_snap`). When the rails of a click would end at a rail without joining it - a near
+row's other choices; `g_snap`). When the rails of a click would end at a rail without joining it (the network's answer, `run_end_state`) - a near
 miss, an angle, a V; not two heights, which would take a ramp - the run's last one to three rails are laid
 again along the lattice, by at most one rail more, so that the run reaches a rail end within 44 px of
 where it would end (half a diagonal rail) pointing the opposite way at the height of its point (or within
@@ -400,7 +447,9 @@ it: everything that can matter there lies within 90 px (a rail ending there, one
 either look-out, one whose way passes within 8 px). The test host, families of parallel lines (straight every 25 and
 35.5 px, diagonals every 71): 315 rails 3.0 -> 0.7 ms a report, 960 20.4 -> 4.4, 4080 184 -> 15.3, 16660 1729 -> 58.5;
 in the game, at the start of the Track tool and after a rail laid: a synthetic map of 5070 rails 196-204 -> 11-14 ms,
-The Factory 3.3-3.5 -> 0.6 ms, the same counts. `test_rail_rules.py` still finds the C++ and `map_tool.py` the same
+The Factory 3.3-3.5 -> 0.6 ms, the same counts. With the network's answer (issue #24) a change of the track
+also lays the map's rails on the copy of the network: the log's "track joints" time on the 20 missions went
+0.14-1.35 -> 0.25-3.81 ms (l14, 732 rails, the most) - once a change, not a frame. `test_rail_rules.py` still finds the C++ and `map_tool.py` the same
 (and on the synthetic 960 and 4080 rails); `map_tool.py` keeps the plain loop (5.9 s for 4080 rails - a check of a
 saved map, not a frame).
 

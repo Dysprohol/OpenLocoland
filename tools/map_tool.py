@@ -3606,11 +3606,12 @@ def track_report(rails, loose=False):
     return report
 
 
-def track_problems(rails):
+def track_problems(rails, report=None):
     """The joints of a map's rails where the engine's network is not what the track looks like
-    (track_report, without the plain ends of track) as texts: [(point, text), ...]."""
+    (track_report, or the `report` given - network_report -, without the plain ends of track) as texts:
+    [(point, text), ...]."""
     texts = []
-    for kind, point, end, z, value in track_report(rails):
+    for kind, point, end, z, value in (track_report(rails) if report is None else report):
         if kind == "twice":
             texts.append((point, f"rail of shape {end} at {point[0]:g},{point[1]:g} (points at {z[0]}, {z[1]}) "
                                  f"{value} times"))
@@ -3624,12 +3625,204 @@ def track_problems(rails):
             texts.append((point, f"rail ends {end} at height {z} have no rail ending the opposite way: the track "
                                  f"ends there"))
         elif kind == "sharp":
-            texts.append((point, f"rail ends {end} at height {z} share one point and nothing goes on the other way: "
-                                 f"trains only turn round there (a V)"))
+            texts.append((point, f"rail ends {end} at height {z}: every link on turns 45 degrees or more - trains "
+                                 f"only turn round there (a V, or an end linked into a rail's side)"))
         elif kind == "near":
-            texts.append((point, f"the rail end {end} at height {z} stops within {NEAR_MISS:g} px of another rail and "
-                                 f"does not link (a near miss)"))
+            texts.append((point, f"the rail end {end} at height {z} stops near another rail and does not link "
+                                 f"(a near miss)"))
     return texts
+
+
+# ---- the rail network as the engine builds it (src/LocoFix/rail_net.h, issue #24) ----
+#
+# track_report answers by the look of the track. The engine links a rail only through its own look-outs
+# when it is laid (loaded), so a point of a rail laid later is never found by an earlier rail's look-out,
+# a link does not mean a way on (a train reverses where the next link turns 0x20 or more), and a point
+# takes 6 links. rail_network lays the rails one by one in the map's order, as loading does, and
+# rail_way asks at a rail end whether a train going toward it finds a link on within 0x20 of its way;
+# network_report is track_report with that answer (what check-track prints and the editor's marks show).
+
+RAIL_ALTITUDE_OF = {610: 10, 611: 10, 600: 7, 601: 7}   # Vid.altitude: the height of a rail's points over it
+_CORDIC = (64, 37, 19, 10, 5, 2, 1)                      # Math_DirectionOfVector's table (0x47e094)
+
+
+def rail_direction_of(dx, dy):
+    """Math_DirectionOfVector: the direction 0-255 of (dx, dy) by CORDIC steps."""
+    acc = 0x80
+    if dx < 0:
+        acc, dx, dy = 0x180, -dx, -dy
+    for s, angle in enumerate(_CORDIC):
+        if dy < 0:
+            dx, dy, acc = dx - (dy >> s), dy + (dx >> s), acc - angle
+        else:
+            dx, dy, acc = dx + (dy >> s), dy - (dx >> s), acc + angle
+    return (acc >> 1) & 0xff
+
+
+def _f32(v):
+    return struct.unpack("<f", struct.pack("<f", v))[0]
+
+
+class RailNetwork:
+    """RailMap with RailMap_AddDot, RailMap_FindDot and RailDot_Connect; dots[n] = [x, y, z, [[dot, dir], ...]]."""
+
+    def __init__(self):
+        self.dots = []
+        self.cells = {}
+
+    def find(self, x, y, z):
+        best = -1
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                for n in self.cells.get((x + dx, y + dy), ()):
+                    if self.dots[n][2] == z and (best < 0 or n < best):
+                        best = n
+        return best
+
+    def add_dot(self, x, y, z):
+        ix, iy, iz = int(_f32(x)), int(_f32(y)), int(_f32(z))
+        found = self.find(ix, iy, iz)
+        if found >= 0:
+            return found
+        self.dots.append([ix, iy, iz, []])
+        self.cells.setdefault((ix, iy), []).append(len(self.dots) - 1)
+        return len(self.dots) - 1
+
+    def connect(self, a, b):
+        if a < 0 or b < 0 or any(link[0] == b for link in self.dots[a][3]):
+            return
+        da, db = self.dots[a], self.dots[b]
+        direction = rail_direction_of(db[0] - da[0], db[1] - da[1])
+        if len(da[3]) < MAX_RAIL_LINKS:
+            da[3].append([b, direction])
+        if len(db[3]) < MAX_RAIL_LINKS:
+            db[3].append([a, (direction - 0x80) & 0xff])
+
+    def lay(self, x, y, z, direction, altitude=RAIL_ALTITUDE, size=(71.0, 50.0), ramp=RAIL_RAMP):
+        """Rail_Action ACT_CHANGE_DIRECTION of a rail object: (point of end 0, point of end 1)."""
+        x, y, z = _f32(x), _f32(y), _f32(z)
+        frame = ((direction + RAIL_HALF_STEP) & 255) * RAIL_FRAMES >> 8
+        group, shape = (frame // 12) & 3, frame % 12
+        e0, e1 = RAIL_ENDS[shape]
+        z0 = z + (0, ramp, 0, 0)[group] + altitude
+        z1 = z + altitude + (0, 0, ramp, 0)[group]
+        n0 = self.add_dot(size[0] * e0[0] * 0.25 + x, size[1] * e0[1] * 0.25 + y, z0)
+        n1 = self.add_dot(size[0] * e1[0] * 0.25 + x, size[1] * e1[1] * 0.25 + y, z1)
+        self.connect(n0, self.find(int(size[0] * e0[0] * 0.75 + x), int(size[1] * e0[1] * 0.75 + y), int(z0)))
+        self.connect(n1, self.find(int(size[0] * e1[0] * 0.75 + x), int(size[1] * e1[1] * 0.75 + y), int(z1)))
+        self.connect(n1, n0)
+        return n0, n1
+
+    def way(self, d, f):
+        """At the point d of a rail end, coming from the rail's other point f: "on" (a link on within 0x20 of
+        the way), "reverse" (links on, all turning more) or "none"."""
+        if d < 0 or f < 0 or d == f:
+            return "none"
+        dd, df = self.dots[d], self.dots[f]
+        arrival = next((direction for dot, direction in df[3] if dot == d), None)
+        if arrival is None:
+            arrival = rail_direction_of(dd[0] - df[0], dd[1] - df[1])
+        other = False
+        for dot, direction in dd[3]:
+            if dot == f:
+                continue
+            other = True
+            if min((arrival - direction) & 0xff, (direction - arrival) & 0xff) < 0x20:
+                return "on"
+        return "reverse" if other else "none"
+
+
+def rail_network(objects):
+    """The network of rail objects (x, y, z, direction, nvid) laid in their order, as loading lays them:
+    (RailNetwork, [(point of end 0, point of end 1) of each])."""
+    net = RailNetwork()
+    nodes = [net.lay(x, y, z, direction, RAIL_ALTITUDE_OF.get(nvid, RAIL_ALTITUDE)) for x, y, z, direction, nvid in objects]
+    return net, nodes
+
+
+def rail_reaches(rails, point, end, z, self_index=None):
+    """Whether a lone rail end looks joined to another rail: its look-out within the engine's 2 px of another
+    rail's point at its height, or the end within NEAR_MISS of another rail's way; rails the same as its own
+    (laid twice) do not count. The same as rail_net.h reaches."""
+    hx, hy = RAIL_HALF
+    lx, ly = _engine_point((point[0] - end[0] * hx, point[1] - end[1] * hy), end, 0.75)
+    me = rails[self_index] if self_index is not None else None
+    for n, rail in enumerate(rails):
+        if n == self_index:
+            continue
+        if me is not None and rail[2] == me[2] and abs(rail[0] - me[0]) < 0.01 and abs(rail[1] - me[1]) < 0.01 \
+                and rail[3:] == me[3:]:
+            continue
+        for k, e in enumerate(RAIL_ENDS[rail[2]]):
+            if rail[3 + k] == z:
+                px, py = _engine_point(rail[:2], e, 0.25)
+                if abs(px - lx) < 2 and abs(py - ly) < 2:
+                    return True
+        if _way_distance(point, rail) <= NEAR_MISS:
+            return True
+    return False
+
+
+def rail_truthful(look, way, others, near):
+    """What a rail end is: the network's way on decides; the look (rail_end_state) names what is wrong.
+    `others`: another rail ends at the place; `near`: a lone end looks joined (rail_reaches). An end the
+    look took for joined without a link on: "deadend" where others end, "near" where it reaches a rail,
+    else "loose" (a rail laid half along past another's end)."""
+    if way == "on":
+        return "linked"
+    if way == "reverse":
+        return "heights" if look == "heights" else "sharp"
+    if look in ("linked", "sharp"):
+        return "deadend" if others else "near" if near else "loose"
+    return look
+
+
+def network_report(objects, loose=False):
+    """track_report of rail objects (x, y, z, direction, nvid) in the map's order with the network's answer:
+    an end with a way on is not listed, one without is listed with the look's reason, or - where the look
+    took it for joined - as "deadend" (another rail ends there), "near" (none does) or "sharp" (links on,
+    all too sharp). The same as src/LocoFix/rail_net.h network_report (tools/test_rail_rules.py compares)."""
+    rails = [rail_of(x, y, z + RAIL_ALTITUDE_OF.get(nvid, RAIL_ALTITUDE) - RAIL_ALTITUDE, direction)
+             for x, y, z, direction, nvid in objects]
+    net, nodes = rail_network(objects)
+    hx, hy = RAIL_HALF
+    ends, keys_at = {}, Counter()
+    for n, rail in enumerate(rails):
+        for i, end in enumerate(RAIL_ENDS[rail[2]]):
+            key = (round(rail[0] + end[0] * hx, 3), round(rail[1] + end[1] * hy, 3), end, rail[3 + i])
+            way = net.way(nodes[n][i], nodes[n][1 - i])
+            if key not in ends:
+                ends[key] = [way, n]
+                keys_at[key[:2]] += 1
+            elif way == "on" or (way == "reverse" and ends[key][0] == "none"):
+                ends[key][0] = way
+    twice, out, looked = [], [], set()
+    for kind, point, end, z, value in track_report(rails, loose=True):
+        if kind == "twice":
+            twice.append((kind, point, end, z, value))
+            continue
+        if kind == "links":
+            out.append((kind, point, end, z, value))
+            continue
+        key = (point[0], point[1], end, z)
+        looked.add(key)
+        way, first = ends.get(key, ("none", None))
+        near = kind == "sharp" and way == "none" and first is not None and rail_reaches(rails, point, end, z, first)
+        state = rail_truthful(kind, way, keys_at[key[:2]] > 1, near)
+        if state != "linked":
+            out.append((state, point, end, z, value if state == "heights" else None))
+    for key, (way, first) in ends.items():
+        if key not in looked and way != "on":
+            near = rail_reaches(rails, key[:2], key[2], key[3], first)
+            out.append((rail_truthful("linked", way, keys_at[key[:2]] > 1, near), key[:2], key[2], key[3], None))
+    out.sort(key=lambda p: (p[1], p[2], p[3], 0 if p[0] == "links" else 1))
+    return twice + [p for p in out if p[0] != "loose" or loose]
+
+
+def rail_objects(model, nvids=RAIL_ALTITUDE_OF):
+    """(x, y, z, direction, nvid) of the map's rail objects of the VIDs `nvids`, in the map's order."""
+    return [(float(row["x"]), float(row["y"]), float(row["z"]), parse_int(row["direction"]), parse_int(row["nvid"]))
+            for row in model.get("objects", []) if parse_int(row["nvid"]) in nvids]
 
 
 # The rail kinds and how much lower their points stand than a plain rail's at the same z: the swamp
@@ -3648,13 +3841,15 @@ def every_rail(model):
 
 def check_track(path, objects_res=None, nvid=None):
     """map_tool.py check-track <map>: the track rules on every rail of a .map (or an unpacked
-    folder) - of every kind, or of the VID `nvid`. Returns the problems (printed by main)."""
+    folder) - of every kind, or of the VID `nvid` - with the network's answer (network_report: the
+    rails laid in the map's order, as loading lays them). Returns the problems (printed by main)."""
     if os.path.isdir(path):
         model = load_map(path)
     else:
         with open(path, "rb") as f:
             model = read_map(f.read(), object_info(objects_res or find_objects_res(path)))
-    return track_problems(every_rail(model) if nvid is None else map_rails(model, nvid))
+    objects = rail_objects(model, RAIL_ALTITUDE_OF if nvid is None else (nvid,))
+    return track_problems(None, network_report(objects))
 
 
 # A grid cell more than this below the track height has the rail above it: the track leaves it.

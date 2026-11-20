@@ -424,7 +424,9 @@ is not laid (the game allows 6): its ends are **red** and the status line says s
 track can look joined and not be. In the Track tool every end of track has a small **yellow** mark - a
 siding, a line beyond the edge - and a **red** one shows where the track looks joined but is not, or
 where trains can only turn round: an end a few px short of another rail, rails meeting at two heights or
-at an angle, a V (two rails from one point with nothing going on). The third status line counts them.
+at an angle, a V (two rails from one point with nothing going on), an end that only touches another
+rail's side. The marks ask the rail network the game builds when the map runs, so they tell where the
+trains go on, not only how the track looks. The third status line counts them.
 While you lay a line, the preview's end is **green** where the click joins the track and **orange** where it
 ends at a rail without joining it; the status line says why. **SNAP: ON** in the row (the default) lays
 such a click's last rails again so that its end meets a rail end nearby and joins it - the preview shows

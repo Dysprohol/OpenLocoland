@@ -8,7 +8,9 @@ generates cases - pairs of points for rail_candidates, tracks next to existing r
 plan_track (lattice steps with some invalid ones, branches from the rails' ends, hand-picked
 shapes, rails and ramps at other heights, the track's height given or not), segments for
 track_cells, rail objects for rail_of (every direction, ramps), the rail points of crowded
-joints for rail_point_links - and compares the answers. Then the tracks of SCENARIOS and CLUSTERS,
+joints for rail_point_links, pieces of track for track_report, rail objects laid in a random order on
+the network (src/LocoFix/rail_net.h against map_tool.py rail_network / network_report: each rail end's
+way on and the report; also every map's rails in the map's order) - and compares the answers. Then the tracks of SCENARIOS and CLUSTERS,
 each in its four mirror images and among denser track, laid as the editor's Track tool lays them
 (a click a rail, `lay`: only a point of more than 6 links is refused) and as map_tool.py track lays
 them, with the answers each must get; and every rail of the missions' maps and of the player's own
@@ -33,9 +35,9 @@ import map_tool  # noqa: E402
 def build_test_host():
     os.makedirs(OUT_DIR, exist_ok=True)
     source = os.path.join(HERE, "test_rail_rules.cpp")
-    header = os.path.join(REPO, "src", "LocoFix", "rail_rules.h")
-    if os.path.isfile(TEST_EXE) and os.path.getmtime(TEST_EXE) >= max(os.path.getmtime(source),
-                                                                        os.path.getmtime(header)):
+    headers = [os.path.join(REPO, "src", "LocoFix", h) for h in ("rail_rules.h", "rail_net.h")]
+    if os.path.isfile(TEST_EXE) and os.path.getmtime(TEST_EXE) >= max([os.path.getmtime(source)] +
+                                                                        [os.path.getmtime(h) for h in headers]):
         return
     bat = vcvars32()
     if not bat:
@@ -93,6 +95,24 @@ def model_report(rails, loose):
             v = min(value) if kind == "heights" else value if kind == "links" else 0
             out += f"{kind} {num(point[0])} {num(point[1])} {end[0]} {end[1]} {z} {v};"
     return out
+
+
+def report_text(report):
+    out = ""
+    for kind, point, end, z, value in report:
+        if kind == "twice":
+            out += f"twice {num(point[0])} {num(point[1])} {end} {z[0]} {z[1]} {value};"
+        else:
+            v = min(value) if kind == "heights" else value if kind == "links" else 0
+            out += f"{kind} {num(point[0])} {num(point[1])} {end[0]} {end[1]} {z} {v};"
+    return out
+
+
+def model_network(objects, loose):
+    """network_report of rail objects (x, y, z, direction, nvid) in their order, then each rail's ways."""
+    net, nodes = map_tool.rail_network(objects)
+    ways = "".join(f"{net.way(a, b)} {net.way(b, a)};" for a, b in nodes)
+    return report_text(map_tool.network_report(objects, loose)) + "|" + ways
 
 
 def model_cells(width, height, segments):
@@ -271,6 +291,29 @@ def generate(rng, count):
             if rails:
                 rails.append(rng.choice(rails))
         cases.append(("Q", rails, rng.random() < 0.5))
+    for _ in range(count // 8):
+        # rail objects laid in an order on the network (rail_net.h, rail_network): rails around a few joints,
+        # ending in the middle of others or a step beside their ends, rails twice, ramps, swamp and destroyed
+        # rails, other heights, a few px off the lattice - in a random order (the network depends on it)
+        objects = []
+        base = random_point(rng)
+        for _ in range(rng.randrange(2, 9)):
+            shape = rng.randrange(12)
+            x = round(base[0] + rng.randrange(-3, 4) * HX, 3)
+            y = round(base[1] + rng.randrange(-3, 4) * HY, 3)
+            roll = rng.random()
+            if roll < 0.1:
+                x += rng.choice((-1, 1)) * rng.choice((0.25, 0.5, 1, 1.5, 2, 2.5, 3, 5, 8))
+            elif roll < 0.2:
+                y += rng.choice((-1, 1)) * rng.choice((0.25, 0.5, 1, 1.5, 2, 2.5, 3, 5, 8))
+            direction = map_tool.RAIL_DIRECTION[shape]
+            if rng.random() < 0.15:
+                direction = (shape + rng.choice((12, 24))) * 256 // map_tool.RAIL_FRAMES
+            objects.append((x, y, float(rng.choice((66, 66, 66, 77, 55))), direction, rng.choice((610, 610, 610, 600, 611))))
+            if rng.random() < 0.1:
+                objects.append(objects[-1])
+        rng.shuffle(objects)
+        cases.append(("W", objects, rng.random() < 0.5))
     for _ in range(count - len(cases)):
         width, height = rng.randrange(1, 40), rng.randrange(1, 40)
         segments = []
@@ -500,8 +543,10 @@ def map_rail_cases():
         if not os.path.isfile(path):
             report.append(f"  {os.path.basename(path)}: not there, skipped")
             continue
-        rails = map_rails_in_order(map_tool.read_map(open(path, "rb").read(), info))
+        model = map_tool.read_map(open(path, "rb").read(), info)
+        rails = map_rails_in_order(model)
         cases.append(("Q", rails, True))
+        cases.append(("W", map_tool.rail_objects(model), True))
         cells = {}
         laid, strict, odd = 0, {}, 0
         refused = {}
@@ -555,6 +600,9 @@ def line_of(case):
     if case[0] == "Q":
         _k, rails, loose = case
         return f"Q {rails_text(rails)} {1 if loose else 0}"
+    if case[0] == "W":
+        _k, objects, loose = case
+        return f"W {len(objects)} " + " ".join(f"{x!r} {y!r} {z!r} {d} {n}" for x, y, z, d, n in objects) + f" {1 if loose else 0}"
     _k, width, height, segments = case
     return f"T {width} {height} {len(segments)} " + " ".join(f"{a[0]!r} {a[1]!r} {b[0]!r} {b[1]!r}"
                                                              for a, b in segments)
@@ -571,6 +619,8 @@ def model_of(case):
         return model_points(case[1], case[2])
     if case[0] == "Q":
         return model_report(case[1], case[2])
+    if case[0] == "W":
+        return model_network(case[1], case[2])
     return model_cells(case[1], case[2], case[3])
 
 
