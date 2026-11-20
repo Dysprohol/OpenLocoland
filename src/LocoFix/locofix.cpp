@@ -28,6 +28,7 @@ void install_factions();
 void install_red_lights();
 void install_fast_ftol();
 void install_layer10_lock();
+void install_light_fill();
 void install_mouse_coords();
 void install_depot_rows();
 void install_status_bar();
@@ -152,6 +153,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         install_red_lights();
         install_fast_ftol();
         install_layer10_lock();
+        install_light_fill();
         install_mouse_coords();
         install_depot_rows();
         install_status_bar();

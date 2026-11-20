@@ -162,6 +162,19 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
   `atoi`/`sscanf`/`itoa`/`String_Append`/`String_Assign`/`Log_Write`,
   and compares a reference model, the original and the C++ on 2000 random cases and edge
   cases (`python tools\test_script_value.py [cases]`).
+- Two menu commands of test mode compare pictures (`test.cpp`): `c40052` holds the game still - paused as
+  script `Pause(1)` pauses it (no object updates) and its clock stopped (the exe's `timeGetTime` gives the
+  same time until `c40052` again) - so every frame draws the same picture, except what is drawn by `rand()`
+  (rain, snow, an earthquake) and the lights: with an odd number of lights a frame the engine's two light
+  textures swap from one frame to the next (`g_lightBufferToggle`), and a light drawn through the P8 one has
+  256 greys, through the 16-bit one 32 - so a held frame comes in two kinds, a few levels apart where lights
+  shine. A paused level does not update the state bar, so its minimap has no dots then; `c40054` instead
+  only stops the clock - the objects are updated with no time going by, nothing moves, and what the update
+  draws (the minimap) is drawn every frame. `c40053` switches LocoFix's cheaper drawing (`perf.h`: the fixes
+  from 54 on) off and on again.
+  Shots after each step (the game's own) of a held level, both ways, compared pixel by pixel - each shot of
+  one way must equal a shot of the other - show that a change draws the same picture; a level running with
+  `c40053` every few seconds gives both ways' `profile:` lines under the same conditions.
 - Tests run the game with `LOCOFIX_TEST=1`: LocoFix then ignores the real mouse and takes
   mouse input only from the test (message `WM_APP+1`), so tests do not move the user's
   cursor. The test's cursor starts where the real cursor was when the game started
@@ -495,6 +508,38 @@ after the fixes). Less than that needs a renderer of our own instead of the engi
 software drawing and Direct3D 7 through dgVoodoo. dgVoodoo's `FastVideoMemoryAccess` breaks
 the ground (`Load Can't decode` and an exception when a map loads), and
 `DDLOCK_DISCARDCONTENTS` on the light textures made no difference.
+
+Measured again on 2026-11-20 (a weak laptop - i5-1145G7, Iris Xe, 1920x1080 full screen - made 18 fps on
+mission 13, 6 fps zoomed out, 32 fps on mission 1; its profile: `d3d` 23 ms, the locks 15.6 ms in 5 a
+frame, `other` 7-9 ms), in the test rig with the sampler (editor-ui.md "The frame and the profiler"). On
+mission 13 at 1920x1080 the main thread was a fifth in the lights' `Texture_DrawZ` (the driver under it), a
+fifth in `Surface_Lock`, an eighth in `Graphics_DrawLight` itself. What that showed, with experiments that
+left a part out:
+- a light cost 160 us to draw against 1.4 us for an ordinary textured draw, and nothing when its texture was
+  not locked again: the two scratch textures are taken in turn, so one is locked while the GPU still draws it,
+  and the draw after the fill waits for the GPU and uploads it. A texture of its own for each light: 0.4 ms
+  for the 34 draws of a frame instead of 5.5 (LocoFix fix 55; the fill itself is fix 54);
+- a lock of the back buffer after Direct3D drawing costs the same when only a small rectangle of it is locked
+  (the minimap's 400 x 300: 2.6 ms against 2.7 for the whole buffer) - the cost is the wait for the GPU, not
+  the copy; a lock with no Direct3D drawing since the last unlock costs nearly nothing (the minimap's rail
+  points right after layer 10's unlock: 0.03 ms). So only fewer waits help, not smaller locks;
+- `other` is mostly the minimap: its dots (`Graphics_PutPoint2x2`) lock the back buffer after the view's
+  highlight, a Direct3D quad, and that lock is not `Surface_Lock` (the engine calls the surface's `Lock`
+  itself): 2.6-2.8 ms a frame in the rig (mission 1: 2.4 of `other`'s 3.1 ms); the rest of `other` is the game
+  (scripts, the objects' updates, sound: under 1 ms). A minimap drawn without that lock (its pixels put on with
+  a colour-keyed Blt) took `other` from 3.4-4.7 to 0.9-1.0 ms, but it is not the same picture: without the
+  lock's trip through 16 bits the highlighted part of the minimap keeps the GPU's finer colours, 35 pixels
+  differed by up to 6 levels on mission 13 (in the game's screenshot and on the screen) - left out;
+- the game clock falls behind when a frame takes longer than 71 ms: `Game_Step` adds at most 71 ms of real
+  time a step (times the game speed), so below 14 fps the game itself runs slower - 6 fps gives x0.44. That
+  is the engine's own rule, and the original does the same at the same frame rate.
+In the rig (its virtual adapter: the GPU is the host's RTX 4070 Ti SUPER through the sandbox, the numbers
+are not the laptop's), mission 13, the old and the new code switched every 14 s in one run: 1280x1024 in a
+window 62 -> 97 fps; 1920x1080 full screen (the rig shows it at 32 fps, a frame per two of the display's
+refreshes) the frame's CPU time 26.2 -> 17.8 ms, `d3d` 11.9 -> 4.0 ms; zoomed out to the whole map
+(3072x2304) 15 -> 26.5 fps. What remains is the locks of the back buffer: the sprites' (needed: they blend
+with the ground Direct3D drew), layer 10's when a message is on the screen, the minimap's dots, each a wait
+for the GPU.
 
 Before drawing, the engine skips objects far from the screen centre, with a box sized for
 1024x768: objects (`World_DrawLayer`) within x +-1024 and y +-512, their shadows (the shadow

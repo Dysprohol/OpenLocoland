@@ -38,6 +38,7 @@ enum Counter {
     DRAWN_ALL,      // Draw called, every layer
     ED_ITERATED,    // objects the editor's for_each_object walked this frame
     LOCKS,          // Surface_Lock calls (the back and the depth buffer for software drawing)
+    LIGHTS,         // Graphics_DrawLight calls (the lights of colour-box VIDs, layer 8)
     COUNTERS
 };
 
@@ -67,5 +68,6 @@ struct Lap {
 };
 
 void frame_end();   // frame_limit.cpp, after the present and the wait
+void start_sampler();   // sampler.cpp: the main thread sampled (EditorProfile = 2), called on it
 
 }  // namespace prof

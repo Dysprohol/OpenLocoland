@@ -102,6 +102,26 @@ from 0.42 to 0.26). Up to 1024x768 it is the original. Falling snow (`Graphics_D
 flakes) wraps round the view and covers it whole; its flakes are not more on a bigger view, so the
 snow is thinner there (4.7 times at 2560x1440).
 
+**The lights** (`src/LocoFix/light_fill.cpp`, `light_textures.cpp`). A colour-box VID (class 0x80,
+`ColorVid`, layer 8: lamps, fires, glows) draws its light with `Graphics_DrawLight(x, y, z, sizeX, sizeY,
+colour)` (the object's screen position and height, the VID's box): nothing for a colour of 0 (`& 0xffffff`),
+else half-sizes of 3/4 of the box rounded down to a multiple of 4 and at most 0x200, nothing when the box is
+off the view; the scratch texture - the grey one or the rgb one, in turn (`g_lightBufferToggle` flips at
+every call, also for the lights it skips) - locked for a rectangle of one texel per 4 x 4 screen pixels (up
+to 256 x 256 texels from (0, 0)); per texel two depth samples, at the texel's corner and 3 px right and down,
+the lower height `v` of the two (`depth >> 3` - 128) against the light's: `d = (v - z)²/4 + (v - k + dy)²·9/4
++ dx²` (`k` = 2z/3 + 8, `dx`, `dy` the texel's offset from the middle), brightness `256 - d / (w·h/500)`
+clamped to 0..255, written as a byte into the P8 grey texture or as `grayColors[brightness]` into the 16-bit
+rgb one; a texel whose both samples are off the view keeps what the texture had. Then unlocked and drawn over
+the screen inset by one texel, blended `DESTCOLOR, ONE` (the screen times 1 + the light) at the light's depth,
+z-tested. So a light brightens the ground and the sprites in front of the light's height, more where they are
+low and near its middle, and the P8 and the 16-bit texture give it 256 and 32 levels of grey: with an odd
+number of light calls a frame, each light changes texture from one frame to the next and its brightness
+steps by a few levels with it (invisible in motion; it shows in pixel comparisons of a held frame).
+Its cost under dgVoodoo was mostly not the fill but the reuse of the two textures: one locked again while
+the GPU still draws it makes the next draw wait for the GPU and upload it (LocoFix fixes 54 and 55 in
+`changes.md`).
+
 Worth knowing when changing it: `Graphics_Init` always clears the flags 0x10 (Windows
 cursor drawn with GDI), 0x20 (software device) and 0x40 (triple buffering), so those paths
 are dead code. Effects 4 (`OPEN_WINDOW`) and 8 (`SCALE_WINDOW`) have no drawing code;

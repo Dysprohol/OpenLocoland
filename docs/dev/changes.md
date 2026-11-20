@@ -599,6 +599,25 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       stretch at the window's pixels and its own size; picking, drags and the tools on the map as before; the
       camera's margin past the map in map pixels; Run the level at the level's own zoom and the editor's zoom
       again after it,
+  54. the lights' fill (`light_fill.cpp`, engine.md "The lights"): `Graphics_DrawLight` fills a light's texture
+      texel by texel (one per 4 x 4 screen pixels, up to 128 x 128) and did per texel what is the same for the
+      whole light - four float-to-integer conversions of its position, eight comparisons with the view's edges -
+      and a division. The loop (0x41207b-0x412314) is C++ now: the view tests once per column and once per row
+      with the engine's own x87 instructions (the same rounding at any FPU precision), the position converted
+      once, no division where the brightness is 0 anyway; the same texels written, the same left alone. In the
+      test rig, mission 13 at 1920x1080 (35-52 lights a frame), the lights took 10.6 ms a frame against 13.2
+      with the engine's loop (the two switched in one run); a held frame is the same to the pixel both ways,
+  55. a texture of its own for each light (`light_textures.cpp`, engine.md "The lights"): the engine draws every
+      light through one of its two scratch textures, in turn, so under dgVoodoo the next light but one locks a
+      texture the GPU is still drawing, and the draw after the fill waits for the GPU and uploads it - 160 us a
+      light against 1.4 us for an ordinary textured draw. The engine still fills its own texture (so it keeps
+      the texels it always had, which a later light reuses where it writes nothing), then the filled rectangle
+      is copied into a texture of a pool - the same size, format and grey palette - and that one is drawn with
+      the same rectangle; the engine's texture is never drawn, so never uploaded. A pool texture is used once a
+      frame (64 of each kind; more lights take them again from the first). In the test rig, mission 13 at
+      1920x1080 (35-52 lights a frame), with 54: the lights 12.2 -> 2.2 ms a frame, `d3d` 14.1 -> 4.2 ms, the
+      frame's CPU time 28.8 -> 18.7 ms (part of the wait moves to the next lock of the back buffer, which then
+      waits for the GPU instead); a held frame is the same to the pixel both ways,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that

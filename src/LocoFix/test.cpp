@@ -26,6 +26,7 @@
 // scripts keep their volumes with SetReg only on the settings page).
 // Outside test mode nothing changes.
 #include "patch.h"
+#include "perf.h"
 #include <ddraw.h>
 
 namespace {
@@ -34,6 +35,7 @@ constexpr uintptr_t IAT_GetCursorPos = 0x4751e8;
 constexpr uintptr_t IAT_SetCursorPos = 0x47517c;
 constexpr uintptr_t IAT_PeekMessageA = 0x475198;
 constexpr uintptr_t IAT_RegisterClassA = 0x4751b8;
+constexpr uintptr_t IAT_timeGetTime = 0x4751f8;
 constexpr UINT WM_TEST_MOUSE = WM_APP + 1;
 constexpr uintptr_t G_SOUND = 0x5d3a54;               // g_sound: the sound object
 constexpr uintptr_t SET_SOUND_VOLUME = 0x444f90, SET_MUSIC_VOLUME = 0x444fc0;
@@ -53,6 +55,34 @@ void hold_silence() {
 }
 
 POINT g_cursor = {0, 0};   // screen coordinates
+
+// test_game.ps1's c40052: the game held still - paused as script Pause(1) pauses it (World_Pause: no
+// object updates) and its clock stopped (the exe's timeGetTime gives the same time until c40052
+// again), so every frame draws the same picture (what does not, draws by rand(): the rain, the snow,
+// an earthquake). c40053: LocoFix's cheaper drawing (perf.h) switched off and on - with c40052 the
+// same frame is taken both ways (the game's own screenshot, c40023) and compared pixel by pixel.
+// c40054 only stops the clock: the objects are updated with no time going by, so nothing moves, and what the
+// update draws (the state bar's minimap) is drawn every frame - its picture the same too.
+constexpr UINT TEST_FREEZE = 40052, TEST_PERF = 40053, TEST_CLOCK = 40054;
+constexpr uintptr_t G_WORLD = 0x4a9d38, WORLD_PAUSE = 0x41fc20, WORLD_RESUME = 0x41fc40;
+bool g_frozen = false;
+DWORD g_frozen_time = 0;
+
+DWORD WINAPI timeGetTime_test() { return g_frozen ? g_frozen_time : timeGetTime(); }
+
+void freeze() {
+    void* world = *reinterpret_cast<void**>(G_WORLD);
+    if (!world) return;
+    using World_t = void(__fastcall*)(void* world, void* edx);
+    if (!g_frozen) {
+        g_frozen_time = timeGetTime();
+        reinterpret_cast<World_t>(WORLD_PAUSE)(world, nullptr);
+    } else {
+        reinterpret_cast<World_t>(WORLD_RESUME)(world, nullptr);
+    }
+    g_frozen = !g_frozen;
+    patch::log("test: the game %s", g_frozen ? "held still (paused, clock stopped)" : "running again");
+}
 WNDPROC g_game_wndproc = nullptr;
 
 bool g_activated = false;
@@ -82,6 +112,21 @@ LRESULT CALLBACK test_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
         const LONG r = ChangeDisplaySettingsExA(nullptr, &mode, nullptr, CDS_FULLSCREEN, nullptr);
         patch::log("test: display mode 1280x720 (%ld), back in 1.5 s", r);
         SetTimer(window, FLIP_TIMER, 1500, nullptr);
+        return 0;
+    }
+    if (m == WM_COMMAND && LOWORD(w) == TEST_FREEZE) {
+        freeze();
+        return 0;
+    }
+    if (m == WM_COMMAND && LOWORD(w) == TEST_CLOCK) {
+        if (!g_frozen) g_frozen_time = timeGetTime();
+        g_frozen = !g_frozen;
+        patch::log("test: the clock %s", g_frozen ? "stopped" : "running again");
+        return 0;
+    }
+    if (m == WM_COMMAND && LOWORD(w) == TEST_PERF) {
+        perf::g_original = !perf::g_original;
+        patch::log("test: drawing by %s", perf::g_original ? "the engine's own code" : "LocoFix's cheaper code");
         return 0;
     }
     if (m == WM_TIMER && w == FLIP_TIMER) {
@@ -169,6 +214,7 @@ void install_test_mode() {
     replace_iat(IAT_SetCursorPos, reinterpret_cast<void*>(&virtual_SetCursorPos));
     replace_iat(IAT_PeekMessageA, reinterpret_cast<void*>(&PeekMessageA_test));
     replace_iat(IAT_RegisterClassA, reinterpret_cast<void*>(&RegisterClassA_test));
+    replace_iat(IAT_timeGetTime, reinterpret_cast<void*>(&timeGetTime_test));
     patch::log("test mode: mouse input from the test only, the game stays active behind other windows");
 
     if (!GetEnvironmentVariableA("LOCOFIX_QUIET", value, sizeof value) || value[0] != '1') return;

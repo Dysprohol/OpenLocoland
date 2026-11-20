@@ -273,7 +273,20 @@ locks, the depth copy, shadows, weather) and `Surface_Lock`; the overlay's parts
 panels), the present and the frame limiter's wait add their own, and the rest of the frame is
 "other". Every ~2 s `LocoFix.log` gets a `profile:` line: fps, avg/max ms of every part, the time in
 locks, the objects listed and drawn (and drawn only by the engine's "below the view" rule), the objects
-the editor walked, the locks a frame and the locks by part. What it found on The Factory (1889
+the editor walked, the locks a frame and the locks by part; then the time in `Graphics_DrawLight` and the
+lights a frame (`in lights`, `lights`: it is part of `d3d`) and the locks by the code that took them
+(`locks by caller`: the return address in the exe, how many a frame and their ms - in play 0x40F294 and
+0x40F2CE are the sprites' back and depth buffer, 0x40F39E the depth buffer again after the depth copy,
+0x40F613 and 0x40F64D the pair of layer 10). Locks the engine takes through the surface's vtable
+itself are not among them (the minimap's dots in `Graphics_PutPoint` / `Graphics_PutPoint2x2`; they
+fall into `other`). `EditorProfile` = 2 (or `LOCOFIX_PROFILE=2`) also starts the sampler
+(`src/LocoFix/sampler.cpp`): a thread of its own stops the main thread about every millisecond and notes
+where it is - its instruction pointer, the first return address into the exe on its stack (for the time
+spent in dgVoodoo or the driver: the engine's call that led there) and the view's width (to tell a zoom
+out apart) - into `logs\sampler.bin`, the modules into `logs\sampler.txt`; `tools\profile_samples.py
+<logs folder> [--from s] [--to s] [--view-over w] [--map LocoFix.map]` prints the shares (exe functions
+by `re/symbols.csv`, LocoFix's by a link map when one is given). Nothing is allocated, logged or loaded
+while the main thread is stopped. What it found on The Factory (1889
 objects, 17 push lines, 23 posts, 3 mines; 2026-11-06, Polish, a 2560 x 1440 screen): the editor ran
 at 42-55 fps at 1024 x 768 in a window and 23-33 fps at 1920 x 1080 in full screen (play: 55-58).
 The decals drawn as sprites were not the cost (layers 2-4 took 2.3-3.9 ms against 2.3 in play, where

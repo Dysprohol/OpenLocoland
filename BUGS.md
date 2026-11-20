@@ -338,7 +338,10 @@ Harmless log errors:
   every frame for its software sprites (through dgVoodoo a copy from the GPU and back) and
   fills a texture on the CPU for every light. LocoFix fixes 31 (`fast_ftol.cpp`) and 32
   (`layer10_lock.cpp`) take about a sixth off a frame at 2560x1440 (mission 13: 37-39 fps
-  -> 45); the rest belongs to the renderer's design (DEVELOPERS.md "Frame rate at high
+  -> 45); fixes 54 (`light_fill.cpp`) and 55 (`light_textures.cpp`) the lights' cost - each
+  light's texture was locked again while the GPU still drew it, and its draw waited for the GPU
+  (mission 13 in the test rig: 62 -> 97 fps in a 1280x1024 window, 15 -> 26.5 zoomed out to the
+  whole map); the rest belongs to the renderer's design (DEVELOPERS.md "Frame rate at high
   resolutions").
 - Dated logs left behind after every crash pile up (LocoFix keeps the 3 newest).
 - A player who had put dgVoodoo2 into the Steam folder of the game (for its resolutions) built
