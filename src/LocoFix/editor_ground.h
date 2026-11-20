@@ -62,7 +62,10 @@ bool ground_texture_sample(int texture, std::vector<uint16_t>& patch);
 void ground_stroke_begin();
 // Paints a texture into a circle of the picture (screen coordinates of the map: x, y - z) - `strength`
 // (0-1) of it a pass, the edge soft or hard; `restore` puts the original picture back there instead.
-void ground_paint(float x, float y, float radius, int texture, bool restore, float strength = 1, bool hard = false);
+// With the GRID (gw x gh cells) the texture is lit by the slope of the ground each pixel shows, as the
+// relief lights it.
+void ground_paint(float x, float y, float radius, int texture, bool restore, float strength = 1, bool hard = false,
+                  const short* grid = nullptr, int gw = 0, int gh = 0);
 // The texture painted at a screen point of the map (its index; BED_TEXTURE + a kind for a bed's band),
 // -1 where the picture is the original. A picture saved before is recognized by its pixels: a texture
 // laid at full strength is its sample at the pixel's place (mirrored every 128 px).
@@ -125,6 +128,14 @@ bool campaign_ground_image(const std::string& image);
 void ground_apply(const PaintPatch& patch, bool after);
 // The picture's height at a screen point of the map (0 outside).
 int ground_level_at(float x, float y);
+// Its height texel there as it is (1026 + 8 a level), -1 outside or when the picture is not read.
+int ground_height_at(float x, float y);
+// Test mode: the picture's height texels against the GRID (gw x gh) where the cells cx0..cx1, cy0..cy1
+// show - each column walked front to back as the relief walks it, a pixel the ground point of those
+// cells reaches compared with 1026 + 8 its level; the pixels more than 1.5 levels off (`worst`: the
+// biggest difference in levels, at the screen point wx, wy). -1 when the picture is not read.
+int ground_depth_check(const short* grid, int gw, int gh, int cx0, int cy0, int cx1, int cy1, int& pixels, float& worst,
+                       int& wx, int& wy);
 // Saving (editor.cpp save_map): whether the picture was painted and has to be written with the map;
 // the image file it is written as for the map file `map` (a game path) - <map's folder>\<name>.vid,
 // never a campaign ground's name; ground_write writes the picture into `file` a tile at a time (the

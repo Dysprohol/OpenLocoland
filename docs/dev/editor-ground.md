@@ -89,7 +89,38 @@ and the tester's "how do I change an object's height" had no answer either. Now:
   it, lowered ground may be hidden by the ground in front -, that point's texel from where the old
   heights showed it, lightened or darkened by the new slope against the old one (light from the upper
   left, half of it ambient: a steep face toward the viewer stays readable), and its height texel
-  raised by 8 a level. The heights between the cells' middles are interpolated (the engine stands an
+  raised by 8 a level. The old picture's rows are walked too (`shown`: the ground point each row
+  showed): a point's texel is the one of the two rows around its old screen row whose point is nearest
+  to it, its height texel moved from that point's level to its own new one - on a slope seen at a
+  grazing angle one row is several px of ground, levels apart, and at a crest the row just above shows
+  the ground behind it. A point the start picture did not show - hidden behind ground in front of it
+  that the stroke lowers: a hill flattened or smoothed away, the track's cutting through it, a second
+  lowering stroke in front of a first one's pit - has no texel there; it takes the colour of the
+  ground that hid it with that ground's light taken out and its own put in, and the height of its own
+  level (1026 + 8 a level). Until 2026-11-20 it kept the hiding ground's texel and height texel as
+  they were (and a seen point the nearer row's, raised by its own change): the uncovered ground stood
+  in the picture's depth as high as the ground that had hidden it, so rails and objects laid there
+  were drawn behind grass that looked flat - rails over a levelled or smoothed place partly gone (a
+  Discord report of 2026-11-15) -, and showed the hiding ground's shaded face as dark patches and
+  streaks (issue #20, 6 and 7). A point whose old row is off the picture - ground near the map's top
+  edge brought down (the picture begins at the screen row its first rows of ground show at, so the
+  map's first rows of ground had no texel of their own) or near the bottom edge raised - takes the
+  picture's rows mirrored at its edge, as a hidden point takes the hiding ground's: until 2026-11-20
+  the first or last row was repeated, vertical streaks along the edge (issue #20, 1; checked: a lower
+  stroke at the top edge of a new meadow, the streaks gone). Measured with the test step `Y` ("the picture's depth", every pixel
+  where the cells show against the GRID's ground seen there) on a new meadow in the test rig, the
+  same steps on the build before and after: a hill raised, a line of track laid across it, the hill
+  flattened from the track and smoothed - 811 pixels up to 22 levels off, now 0; a raise, a lower
+  beside it and a smooth, then a straight and a diagonal line across - 184, now 0; a line laid first,
+  hills raised on both sides, levelled from the track and smoothed (radius 7) - 46, now 0; a ramp of
+  the track with ground raised beside it, levelled and smoothed across, and a hill flattened into a
+  plateau with a line laid down into it, smoothed and levelled around - 68 and 1837 (up to 33 levels),
+  now 0; undo and redo gave each picture back as it was (the same numbers), the map saved and run
+  (Run the level) shows the same ground. A picture saved with such heights keeps them in its `.vid`:
+  a new stroke there draws from it. What still hides rails is the ground the GRID itself puts in
+  front of them: the cells of the track's ring keep their height under TRACK: NOT COVERED, so a line
+  laid through a hill and the hill flattened afterwards leaves the ring's ridges, about half the hill's
+  height, along the line, and the front one hides the rails behind it. The heights between the cells' middles are interpolated (the engine stands an
   object on its cell's value, the value at the middle). The walk counts the middles with an integer:
   it took each next middle as `8 * floor((y - 4.0001) / 8) + 4` in single precision, which from y
   2060 down the map rounds back to y itself - the walk stood still and the editor hung for good on the
@@ -903,7 +934,7 @@ rock and dark rock (l20), lava (l13), swamp (l06), lake bed (l15), and since 202
 lush grass (l04), tall grass, dry grass and flagstones (l09), autumn grass (l02), reeds (l06), dry scrub
 and scree (l12), bog (l08), cracked earth (l10), dry clay (l11), snowdrift (l16) -, laid mirrored, the
 brush's edge soft and grainy; [ and ] pick one (past one whose map is missing), + and - the brush
-(8-200 px), Shift puts the original picture back. New rows go at the end of the table: the Water tool's
+(8-200 px), Shift puts the original picture back. The texture is lit as the relief lights the ground each pixel shows (`ground_paint` with the GRID: the slope at the point of its screen row plus its height texel's level; 1 on flat ground, so a flat map paints as before): until 2026-11-20 it was laid as sampled, and a hill or a slope painted over lost its shading - the hill was gone from the picture though not from the GRID (issue #20, 10; checked on a new meadow: sand over a raised hill keeps the hill's light and shadow, a second hill beside it unpainted the same). The pipette's reading of a picture painted in another session matches a texture's sample within a step, so on a slope it may not name the texture there. New rows go at the end of the table: the Water tool's
 beds name rows 10-12 by their place. The 13 added were picked from all 20 grounds - every 128 px
 window scored for how even it is, the candidates looked at mirrored as the brush lays them, against
 the 12 and each other: plain surfaces only (no object, shadow, rail, road edge or lit hilltop in the

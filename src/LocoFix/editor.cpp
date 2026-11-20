@@ -125,6 +125,7 @@ bool resize_map(const std::string& map, int w, int h, std::string& error);   // 
 void edit_map_size(int& w, int& h);              // editor_edit.cpp
 int edit_outside(int w, int h, bool remove);     // editor_edit.cpp
 void edit_log_rail_points(float x, float y);
+void edit_log_heights(float x, float y, float r);   // editor_edit.cpp: test mode - the ground's and the rails' heights
 void edit_log_building_posts(const char* tag);   // editor_edit.cpp: test mode - every building's posts
 void test_cursor_to_middle(HWND window);   // test.cpp
 std::string editor_new_map_title();   // below: the new map's title until it is saved
@@ -182,6 +183,7 @@ constexpr int TEST_PANEL_ROW = 40051;   // test mode: WM_COPYDATA "n" or "=[k|]t
                                         // text or choice, or of the k-th (1st) whose text begins so
 constexpr int TEST_PANEL_ROWS = 40052;  // test mode: WM_COPYDATA - the factory panel's texts and choices into the log
 constexpr int TEST_POSTS = 40053;     // test mode: WM_COPYDATA "<tag>" - the factories', repair points' posts into the log
+constexpr int TEST_HEIGHTS = 40054;   // test mode: WM_COPYDATA "x y r" - the ground's and the rails' heights there into the log
 #if LOCOFIX_SAVE_TEST
 constexpr int TEST_VID_CHECK = 40090;   // the test build: c40090 reads and writes every ground image both ways (editor_newmap.cpp)
 #endif
@@ -1631,6 +1633,12 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
                 float x = 0, y = 0;
                 if (std::sscanf(path.c_str(), "%f %f", &x, &y) != 2 || !world()) return FALSE;
                 edit_log_rail_points(x, y);
+                return TRUE;
+            }
+            if (data->dwData == TEST_HEIGHTS) {   // "x y r": the ground's and the rails' heights there into the log
+                float x = 0, y = 0, r = 60;
+                if (std::sscanf(path.c_str(), "%f %f %f", &x, &y, &r) < 2 || !world()) return FALSE;
+                edit_log_heights(x, y, r);
                 return TRUE;
             }
             if (data->dwData == TEST_VIEW) {   // "x y": the top-left of the view

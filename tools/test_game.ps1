@@ -30,6 +30,9 @@
 #           middle of the game area, so the edge scrolling leaves the view there (editor test mode);
 #           P<nvid>[:<army>] picks that object of the palette to place (editor test mode);
 #           D<x>:<y> writes the rail points near that map point to LocoFix.log (editor test mode);
+#           Y<x>:<y>[:<r>] writes the GRID within r px (60) of that map point, where the ground's picture is not
+#           at its cells' level, the picture's depth against the GRID's ground seen at each pixel there, and
+#           each rail's level against the picture under it to LocoFix.log (editor test mode);
 #           B<tag> writes every factory's and repair point's lines and the posts near it to LocoFix.log (editor test mode);
 #           F<x>:<y> opens the panel of the factory at that map point (editor test mode);
 #           H writes the open factory panel's texts and choices with their boxes to LocoFix.log, and
@@ -522,6 +525,10 @@ if ($Steps) {
     } elseif ($vk -cmatch '^D(-?\d+):(-?\d+)$') {
       # editor test mode: the rail points near a map point into LocoFix.log
       "Rail points $($Matches[1]),$($Matches[2]): " + [W]::Command($game, 40041, "$($Matches[1]) $($Matches[2])")
+    } elseif ($vk -cmatch '^Y(-?\d+):(-?\d+)(?::(\d+))?$') {
+      # editor test mode: the ground's GRID, the picture's heights and the rails' levels near a map point into LocoFix.log
+      $r = if ($Matches[3]) { $Matches[3] } else { "60" }
+      "Heights $($Matches[1]),$($Matches[2]) r ${r}: " + [W]::Command($game, 40054, "$($Matches[1]) $($Matches[2]) $r")
     } elseif ($vk -cmatch '^([KU])(\d+)$') {
       # a key only pressed (K) or only let go (U), to hold Shift over a drag: K16,l..,U16
       $down = $Matches[1] -eq 'K'

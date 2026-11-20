@@ -5969,7 +5969,8 @@ void ground_dab(float sx, float sy, bool first) {
         return;
     }
     if (!g_gstroke.water) {
-        ground_paint(sx, sy, r, g_texture, g_gstroke.erase, g_paint_strength / static_cast<float>(MAX_STRENGTH), g_paint_hard);
+        ground_paint(sx, sy, r, g_texture, g_gstroke.erase, g_paint_strength / static_cast<float>(MAX_STRENGTH), g_paint_hard, grid(),
+                     grid_width(), grid_height());
         return;
     }
     const WaterKind& k = WATER_KINDS[g_gstroke.kind];
@@ -13209,6 +13210,68 @@ void edit_log_rail_points(float x, float y) {
                               g && !removed(g) ? ui_printf(" gun %d", at<int>(g, O_DIRECTION)).c_str() : "", car_dots_text(k).c_str());
         }
         patch::log("edit test: train of %u near %.0f,%.0f:%s", static_cast<unsigned>(train_of(f).size()), x, y, cars.c_str());
+    }
+}
+
+// Test mode (editor.cpp's WM_COPYDATA "Y"): the ground and the rails within `r` px of a map point into
+// LocoFix.log - the GRID's cells there, whether the picture's height (its D16 texel at the screen point
+// where a cell's middle shows) agrees with the cell, and each rail's line level against the picture's
+// height along its sleepers (the picture standing higher than the rail's own depth hides it).
+void edit_log_heights(float x, float y, float r) {
+    if (!grid()) return;
+    const int cx0 = (std::max)(0, static_cast<int>((x - r) / 8)), cx1 = (std::min)(grid_width() - 1, static_cast<int>((x + r) / 8));
+    const int cy0 = (std::max)(0, static_cast<int>((y - r) / 8)), cy1 = (std::min)(grid_height() - 1, static_cast<int>((y + r) / 8));
+    patch::log("edit test: heights near %.0f,%.0f r %.0f: cells %d..%d x %d..%d (the picture %s)", x, y, r, cx0, cx1, cy0, cy1,
+               ground_ready() ? "read" : "not read");
+    int off = 0, worst = 0, wx = 0, wy = 0;
+    for (int cy = cy0; cy <= cy1; ++cy) {
+        std::string row, pic;
+        for (int cx = cx0; cx <= cx1; ++cx) {
+            const int g = ground_cell(cx, cy);
+            row += ui_printf(" %d", g);
+            const int h = ground_height_at(cx * 8 + 4.0f, cy * 8 + 4.0f - g);
+            if (h < 0) continue;
+            const int d = static_cast<int>(std::lround((h - picture_height(g)) / 8.0));
+            pic += ui_printf(" %d", d);
+            if (d != 0) ++off;
+            if (std::abs(d) > std::abs(worst)) worst = d, wx = cx, wy = cy;
+        }
+        patch::log("edit test: grid row %d:%s", cy, row.c_str());
+        if (ground_ready()) patch::log("edit test: picture - grid row %d:%s", cy, pic.c_str());
+    }
+    patch::log("edit test: %d cells whose picture is not at their level, the worst %+d at cell %d,%d", off, worst, wx, wy);
+    int pixels = 0, sx = 0, sy = 0;
+    float most = 0;
+    const int wrong = ground_depth_check(grid(), grid_width(), grid_height(), cx0, cy0, cx1, cy1, pixels, most, sx, sy);
+    if (wrong >= 0)
+        patch::log("edit test: the picture's depth where these cells show: %d of %d pixels more than 1.5 levels off the GRID's "
+                   "ground seen there, the worst %+.1f at screen %d,%d", wrong, pixels, most, sx, sy);
+    for (const RailObject& o : map_rails()) {
+        const float ox = at<float>(o.object, O_X), oy = at<float>(o.object, O_Y), oz = at<float>(o.object, O_Z);
+        if (std::fabs(ox - x) > r || std::fabs(oy - y) > r) continue;
+        const int level = o.rail.z0 - 6;   // the line's level: its points stand at level + 6
+        const rail::Point a = rail::end_of(o.rail, 0), b = rail::end_of(o.rail, 1);
+        float lo = 1e9f, hi = -1e9f;
+        int above = 0, samples = 0;
+        for (int k = 0; k <= 16; ++k) {   // along the rail, the rows of its sleepers (7 px above its place) and round them
+            const float t = k / 16.0f, px = static_cast<float>(a.x + (b.x - a.x) * t), py = static_cast<float>(a.y + (b.y - a.y) * t);
+            const float pz = o.rail.z0 + (o.rail.z1 - o.rail.z0) * t - 6;
+            for (int dy = -10; dy <= -4; dy += 3) {
+                const int h = ground_height_at(px, py - pz + dy);
+                if (h < 0) continue;
+                const float l = (h - 1026) / 8.0f - (pz - level) - level;
+                lo = (std::min)(lo, l);
+                hi = (std::max)(hi, l);
+                ++samples;
+                if (l > 0.5f) ++above;
+            }
+        }
+        const int cx = static_cast<int>(ox / 8), cy = static_cast<int>(oy / 8);
+        patch::log("edit test: rail %.1f,%.1f z %.0f shape %d points %d/%d level %d cell %d,%d grid %d; the picture under its sleepers "
+                   "%+.1f..%+.1f levels from the line's, %d of %d samples above it",
+                   ox, oy, oz, o.rail.shape, o.rail.z0, o.rail.z1, level, cx, cy,
+                   cx >= 0 && cy >= 0 && cx < grid_width() && cy < grid_height() ? ground_cell(cx, cy) : -1, samples ? lo : 0,
+                   samples ? hi : 0, above, samples);
     }
 }
 

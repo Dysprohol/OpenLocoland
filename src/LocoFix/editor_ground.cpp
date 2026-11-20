@@ -609,8 +609,10 @@ template <typename F> void each_pixel(float x, float y, float radius, F f, bool 
 // and hides the ground behind it, ground lowered shows lower and may be hidden by the ground in front.
 // So a column of the picture is drawn front to back - the ground's world y from the bottom of the
 // screen up -, each pixel getting the first ground point that reaches it, and that point's texel is
-// where the old heights showed it. Between the cells' middles the heights are interpolated (the
-// engine stands an object on its cell's height, which is the value at the middle).
+// where the old heights showed it - or, for a point they did not show (hidden behind ground in front
+// that is now lower), the hiding ground's texel with its light taken out and the point's own height.
+// Between the cells' middles the heights are interpolated (the engine stands an object on its cell's
+// height, which is the value at the middle).
 
 struct Grid {
     const short* z;
@@ -793,13 +795,20 @@ void ground_stroke_begin() {
     g_x1 = -1;
 }
 
-void ground_paint(float x, float y, float radius, int texture, bool restore, float strength, bool hard) {
+void ground_paint(float x, float y, float radius, int texture, bool restore, float strength, bool hard, const short* grid, int gw,
+                  int gh) {
     read_textures();
     if (!g_ready || (!restore && (texture < 0 || texture >= static_cast<int>(g_textures.size()) || !g_textures[texture].sampled)))
         return;
+    const Grid ground{grid, gw, gh};
     each_pixel(x, y, radius, [&](int px, int py, size_t i, float w) {
         const float a = w * strength;
-        g_pixels[i] = blend(g_pixels[i], restore ? g_original_pixels[i] : sample(g_textures[texture], px, py), a);
+        uint16_t c = restore ? g_original_pixels[i] : sample(g_textures[texture], px, py);
+        // the texture lit as the relief lights the ground there (the point the pixel shows: its
+        // screen row plus its height texel's level): painted flat, a hill or a slope lost its shading
+        if (!restore && grid)
+            c = lit(c, ground.light(px + g_left + 0.5f, py + g_top + (g_heights[i] - 1026) / 8.0f));
+        g_pixels[i] = blend(g_pixels[i], c, a);
         if (restore) g_heights[i] = static_cast<uint16_t>(g_heights[i] + (g_original_heights[i] - g_heights[i]) * a);
         if (a >= 0.5f) g_textures_of[i] = restore ? NO_TEXTURE : static_cast<uint8_t>(texture);
     }, hard);
@@ -1019,16 +1028,41 @@ void ground_relief(const short* from, const short* to, int gw, int gh, int cx0, 
     // (in single precision, 8 * floor((ya - 4.0001f) / 8) + 4 gave ya itself from 2060 down the map -
     // ya - 4.0001f rounds to 8k there - and the walk stood still: the editor hung on a tall map, issue #12)
     const int m_start = static_cast<int>(std::floor((y_start - 5) / 8.0));
+    // the old ground's own walk of a column: the ground point each screen row showed (its y; the
+    // rows from s_lo to the lowest any point of the walk can reach)
+    const int o_lo = s_lo, o_hi = y_start - column_min + 1;
+    std::vector<float> shown(static_cast<size_t>((std::max)(1, o_hi - o_lo + 1)));
     int px0 = g_w, px1 = -1, py0 = g_h, py1 = -1;
     for (int x = cx0 * 8; x < (cx1 + 1) * 8; ++x) {
         const int px = static_cast<int>(std::floor(x - g_left));
         if (px < 0 || px >= g_w) continue;
         const float fx = x + 0.5f;
-        int top = s_hi + 1;   // the rows from here down are drawn
         // front to back by the stretches between the cells' middles (8 px, the height linear along
         // each): a stretch coming up the screen gives each row it reaches the ground point that
         // reaches it - a sample a row; one going down the screen (rising steeper than 1:1) is hidden
+        std::fill(shown.begin(), shown.end(), -1.0f);
+        {
+            int top = o_hi + 1;
+            float ya = static_cast<float>(y_start), sa = ya - f.at(fx, ya);
+            for (int m = m_start; ya > y_end; --m) {
+                const float yb = static_cast<float>((std::max)(y_end, 8 * m + 4)), sb = yb - f.at(fx, yb);
+                if (sb < sa) {
+                    const int first = (std::min)(top - 1, static_cast<int>(std::ceil(sa)) - 1);
+                    const int last = (std::max)(o_lo, static_cast<int>(std::ceil(sb)));
+                    for (int r = first; r >= last; --r) {
+                        shown[static_cast<size_t>(r - o_lo)] = ya - (sa - r) * (ya - yb) / (sa - sb);
+                        top = r;
+                    }
+                }
+                ya = yb;
+                sa = sb;
+            }
+        }
+        int top = s_hi + 1;   // the rows from here down are drawn
         float ya = static_cast<float>(y_start), za = t.at(fx, ya);
+        // the old ground's highest screen row in front of the walk's point: a point whose old row is
+        // below it was hidden in the stroke's start picture - that picture has no texel of it there
+        float old_top = ya - f.at(fx, ya);
         for (int m = m_start; ya > y_end && top > s_lo; --m) {
             const float yb = static_cast<float>((std::max)(y_end, 8 * m + 4)), zb = t.at(fx, yb);
             const float sa = ya - za, sb = yb - zb;
@@ -1038,11 +1072,49 @@ void ground_relief(const short* from, const short* to, int gw, int gh, int cx0, 
                 const int last = (std::max)(s_lo, static_cast<int>(std::ceil(sb)));
                 for (int r = first; r >= last; --r) {
                     const float y = ya - (sa - r) / k;
-                    const float zt = za + (zb - za) * (ya - y) / (ya - yb), zf = f.at(fx, y);
-                    const int src_row = static_cast<int>(std::floor(y - zf + 0.5f - g_top));
-                    const size_t src = static_cast<size_t>((std::max)(0, (std::min)(g_h - 1, src_row))) * g_w + px;
-                    const float light = std::fabs(zt - zf) < 0.01f ? 1.0f : t.light(fx, y) / f.light(fx, y);
-                    const int height = static_cast<int>(std::lround(g_stroke_heights[src] + 8 * (zt - zf)));
+                    const float zt = za + (zb - za) * (ya - y) / (ya - yb), zf = f.at(fx, y), s_old = y - zf;
+                    // its old row: of the two rows around it the one whose texel is of the ground
+                    // nearest to it (a row is the point whose screen row is that row exactly, so at a
+                    // crest the row above the crest's point shows the ground behind it)
+                    const int r0 = static_cast<int>(std::floor(s_old));
+                    const float y0 = r0 >= o_lo && r0 <= o_hi ? shown[static_cast<size_t>(r0 - o_lo)] : -1.0f;
+                    const float y1 = r0 + 1 >= o_lo && r0 + 1 <= o_hi ? shown[static_cast<size_t>(r0 + 1 - o_lo)] : -1.0f;
+                    int row = static_cast<int>(std::floor(s_old + 0.5f));
+                    if (y0 >= 0 || y1 >= 0) row = y1 >= 0 && (y0 < 0 || std::fabs(y1 - y) <= std::fabs(y0 - y)) ? r0 + 1 : r0;
+                    int src_row = static_cast<int>(std::floor(row - g_top));
+                    // off the picture (ground near the map's top edge brought down - the picture
+                    // begins at the screen row of its first rows -, or near the bottom edge raised):
+                    // no texel of its own; the picture's rows mirrored at its edge lend it one, as a
+                    // hidden point's (the first or last row repeated drew vertical streaks there)
+                    const bool off = src_row < 0 || src_row >= g_h;
+                    if (off) {
+                        src_row = (std::max)(0, (std::min)(g_h - 1, src_row < 0 ? -1 - src_row : 2 * g_h - 1 - src_row));
+                        row = static_cast<int>(std::lround(src_row + g_top));
+                    }
+                    const size_t src = static_cast<size_t>(src_row) * g_w + px;
+                    // the ground point that row showed (on a slope seen at a grazing angle a row is
+                    // several px of ground, its height levels apart from this point's)
+                    const float shown_y = row >= o_lo && row <= o_hi && shown[static_cast<size_t>(row - o_lo)] >= 0
+                                              ? shown[static_cast<size_t>(row - o_lo)]
+                                              : y;
+                    const float zs = f.at(fx, shown_y);
+                    float light;
+                    int height;
+                    if (!off && s_old <= old_top + 0.5f) {
+                        // seen in the start picture: its texel relit by the new slope, its height
+                        // texel moved from the shown point's level to the new one (a picture's own fine
+                        // relief kept)
+                        light = std::fabs(zt - zf) < 0.01f ? 1.0f : t.light(fx, y) / f.light(fx, shown_y);
+                        height = static_cast<int>(std::lround(g_stroke_heights[src] + 8 * (zt - zs)));
+                    } else {
+                        // hidden there (behind ground in front that the stroke brought down): the texel
+                        // at its old row is that ground's, so the colour is that one's with its light
+                        // taken out, and the height is this ground's own - the hiding ground's height
+                        // texel kept here stood over the rails and objects laid on this ground and hid
+                        // them, and showed as its shaded patches
+                        light = t.light(fx, y) / f.light(fx, shown_y);
+                        height = static_cast<int>(std::lround(1026 + 8 * zt));
+                    }
                     const int py = static_cast<int>(std::floor(r - g_top));
                     top = r;
                     if (py < 0 || py >= g_h) continue;
@@ -1054,6 +1126,7 @@ void ground_relief(const short* from, const short* to, int gw, int gh, int cx0, 
                     py1 = (std::max)(py1, py);
                 }
             }
+            old_top = (std::min)(old_top, yb - f.at(fx, yb));
             ya = yb;
             za = zb;
         }
@@ -1150,6 +1223,51 @@ int ground_level_at(float x, float y) {
     int px, py;
     if (!g_ready || !to_picture(x, y, px, py)) return 0;
     return (g_heights[static_cast<size_t>(py) * g_w + px] - 1026) / 8;
+}
+
+int ground_height_at(float x, float y) {
+    int px, py;
+    if (!g_ready || !to_picture(x, y, px, py)) return -1;
+    return g_heights[static_cast<size_t>(py) * g_w + px];
+}
+
+int ground_depth_check(const short* grid, int gw, int gh, int cx0, int cy0, int cx1, int cy1, int& pixels, float& worst,
+                       int& wx, int& wy) {
+    pixels = 0;
+    worst = 0;
+    wx = wy = 0;
+    if (!g_ready || !grid) return -1;
+    const Grid t{grid, gw, gh};
+    int off = 0;
+    for (int x = (std::max)(0, cx0) * 8; x < ((std::min)(gw - 1, cx1) + 1) * 8; ++x) {
+        const int px = static_cast<int>(std::floor(x - g_left));
+        if (px < 0 || px >= g_w) continue;
+        const float fx = x + 0.5f;
+        int top = 1 << 20;
+        float ya = static_cast<float>(gh * 8), za = t.at(fx, ya);
+        for (int m = gh - 1; ya > 0; --m) {
+            const float yb = static_cast<float>((std::max)(0, 8 * m + 4)), zb = t.at(fx, yb);
+            const float sa = ya - za, sb = yb - zb;
+            if (sb < sa) {
+                const int first = (std::min)(top - 1, static_cast<int>(std::ceil(sa)) - 1);
+                const int last = static_cast<int>(std::ceil(sb));
+                for (int r = first; r >= last; --r) {
+                    const float y = ya - (sa - r) * (ya - yb) / (sa - sb), z = za + (zb - za) * (ya - y) / (ya - yb);
+                    top = r;
+                    const int py = static_cast<int>(std::floor(r - g_top));
+                    if (y < cy0 * 8 || y >= (cy1 + 1) * 8 || py < 0 || py >= g_h) continue;
+                    ++pixels;
+                    const float d = (g_heights[static_cast<size_t>(py) * g_w + px] - (1026 + 8 * z)) / 8;
+                    if (std::fabs(d) <= 1.5f) continue;
+                    ++off;
+                    if (std::fabs(d) > std::fabs(worst)) worst = d, wx = x, wy = r;
+                }
+            }
+            ya = yb;
+            za = zb;
+        }
+    }
+    return off;
 }
 
 double ground_clock() {

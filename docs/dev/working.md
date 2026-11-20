@@ -107,7 +107,10 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
   cursor starts where the real one was, and at an edge the engine's edge scrolling moved the view
   away again until an `m` step brought it in), `D<x>:<y>` writes the rail points near a map point with
   their links to `LocoFix.log` (and a point's semaphore value, `sem n`: 4 + army closes it for that army; test mode; `V` takes negative points too, the editor's camera
-  goes past the map), `P<nvid>[:<army>]` picks that object of the palette to place, in that army (-1 or none: the missions'; test mode), `M<file>` sets the mission settings from a file instead of the dialog
+  goes past the map), `Y<x>:<y>[:<r>]` writes the GRID within r px (60) of a map point, the ground picture's
+  height texels against it - at each cell's middle, and at every pixel where those cells show against the
+  ground the GRID puts there ("the picture's depth ... n of m pixels more than 1.5 levels off": what the
+  relief must keep at 0) - and each rail's level against the picture under its sleepers (test mode), `P<nvid>[:<army>]` picks that object of the palette to place, in that army (-1 or none: the missions'; test mode), `M<file>` sets the mission settings from a file instead of the dialog
   (test mode; the format is in `editor_mission.cpp`), `N<name>:<line>[:<w>:<h>]` makes a new map as File >
   New would with the dialog's ground line (test mode), `Z<w>:<h>` resizes the map as File > Map size (test mode), `R<name>` renames the map and `X` deletes it (Rename or delete without the dialog, test mode), `^<code>` / `+<code>` press a key with
   Ctrl / Shift (`^90` = Ctrl+Z), `j<x>:<y>` / `J<x>:<y>` only press / only let go the left button there, `K<code>` / `U<code>` only press / only let go a key (`K16`
