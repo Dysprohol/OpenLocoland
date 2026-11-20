@@ -2,7 +2,7 @@ r"""Assembles the ready game from the Steam original and the repo contents.
 
     python tools\build.py [--target <folder>] [--steam <game folder in Steam>]
                           [--locofix <LocoFix.dll>] [--captured <folder>] [--dev] [--no-clean]
-                          [--skip-verify]
+                          [--skip-verify] [--language <code>]
 
 The default target is the folder Locoland next to the repository (..\Locoland).
 --locofix takes a prebuilt LocoFix.dll instead of compiling src\LocoFix (the installer,
@@ -10,7 +10,8 @@ tools/release.py), --captured keeps the language captures in another folder than
 --dev copies the developer helpers of game/ too (run_map.cmd, edit_map.cmd), which a build
 without it leaves out and removes from the target, --no-clean removes nothing (clean_up),
 --skip-verify goes on with a Steam.exe of another version and with Steam files our changes
-cannot be placed in (below).
+cannot be placed in (below), --language names the game's language (Setup's choice): the note of
+mods\textures (OWN_README) is written in it, in English without it.
 
 The Steam copy has to be the original: Steam.exe must be the Steam version of 2003-10-07 (its
 SHA-256, the exe LocoFix is made for) - a changed or replaced exe stops the build with a request
@@ -228,6 +229,9 @@ MAPS_NEW = "maps.new"                   # in game/: whole new maps (map_tool.py 
 EDITOR_DATA = "editor"                  # in game/: the editor's palette (patch_data.make_editor_palette)
 # the player's own textures for the editor's Paint tool: a folder of theirs, never in OWNED_DIRS
 OWN_TEXTURES = os.path.join("mods", "textures")
+# its note: the build's one file there (languages.textures_readme), written again by every build and
+# update; LocoFix skips it (editor_ground.cpp OWN_README), everything else in the folder is the player's
+OWN_README = "_README.txt"
 LOGO_PNG = os.path.join(REPO, "tools", "icon", "openlocoland_logo.png")   # the project's logo (just_Martin): the
                                         # intro's title board vid\481logo.vid (patch_data.make_logo_board) and Setup's header
 MAP_MODEL = {"map.json", "objects.tsv", "groups.txt", "grid.txt", "vids.tsv",
@@ -673,14 +677,16 @@ def build_as_is(steam, target, done, previous=(), clean=True):
 
 
 def build(steam, target, locofix=None, captured=None, progress=None, version=None, skip_verify=False, dev=False,
-          previous=(), clean=True):
+          previous=(), clean=True, language=None):
     """Assembles the game from `steam` into `target`. `locofix` is a prebuilt LocoFix.dll
     (None compiles src/LocoFix), `captured` the folder of language captures (None: captured/
     of the repository), `progress(fraction)` is told how far it is, `dev` copies DEV_FILES.
     `version` is a VERSIONS entry (or None to auto-detect); `skip_verify` bypasses exe checks.
     Then clean_up removes what earlier versions left (`previous`: the files the last install
     recorded), unless `clean` is False. Returns the files written, relative (sorted: the record
-    of this install). Stops with SystemExit and the reason when something is wrong."""
+    of this install). `language` is the game's language: mods\\textures\\_README.txt is written in its pack
+    (in English without it, or when the pack has no note). Stops with SystemExit and the reason when
+    something is wrong."""
     def done(fraction):
         if progress:
             progress(fraction)
@@ -854,9 +860,15 @@ def build(steam, target, locofix=None, captured=None, progress=None, version=Non
         print("vid: unknown images, no palette for the editor")
     # the ground painting's textures: where to sample them in the player's campaign grounds
     copy(os.path.join(game, EDITOR_DATA, "textures.tsv"), os.path.join(a.target, "editor", "textures.tsv"), copied)
-    # and the folder of the player's own (mods\textures, editor_ground.cpp), made empty for them to find:
-    # nothing of a build ever goes in, so neither the clean-up nor an update touches what they put there
+    # and the folder of the player's own (mods\textures, editor_ground.cpp), made for them to find with its
+    # note in the game's language: nothing else of a build ever goes in, so neither the clean-up nor an
+    # update touches what they put there
     os.makedirs(os.path.join(a.target, OWN_TEXTURES), exist_ok=True)
+    readme, pack = languages.textures_readme(language or "en")
+    if readme:
+        copied[0] += write(os.path.join(a.target, OWN_TEXTURES, OWN_README), readme)
+        if language and pack != language:
+            print(f"{os.path.join(OWN_TEXTURES, OWN_README)}: lang/{language} has no note of its own, the English one written")
     if not generate(copied, lambda help_vid, menu_vid: patch_data.make_editor_buttons(
             os.path.join(a.steam, "vid"), help_vid, menu_vid),
             os.path.join(vid, "942help.vid"), os.path.join(vid, "943menu.vid")):
@@ -922,8 +934,10 @@ def main():
     p.add_argument("--no-clean", action="store_true", help="remove nothing earlier versions left in the target")
     p.add_argument("--skip-verify", action="store_true",
                    help="go on with another Steam.exe and leave the Steam files our changes cannot be placed in as they are")
+    p.add_argument("--language", help="the game's language: the note of mods\\textures is written in it (default: English)")
     a = p.parse_args()
-    build(a.steam, a.target, a.locofix, a.captured, dev=a.dev, clean=not a.no_clean, skip_verify=a.skip_verify)
+    build(a.steam, a.target, a.locofix, a.captured, dev=a.dev, clean=not a.no_clean, skip_verify=a.skip_verify,
+          language=a.language)
 
 
 if __name__ == "__main__":

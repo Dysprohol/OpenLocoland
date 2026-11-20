@@ -1508,9 +1508,11 @@ def install(steam, target, choices, ver, progress=None, skip_verify=False, statu
     # the whole game into the work folder (nothing of the install is read or written meanwhile); the
     # clean-up of what earlier versions left runs on the install folder after the commit
     try:
+        # the game's language (the one chosen, or on an update the one kept): the note of mods\textures in it
         files = build.build(steam, staged, locofix=locofix, captured=CAPTURED, skip_verify=skip_verify,
                             progress=(lambda f: progress(0.95 * f)) if progress else None,
-                            clean=choices.get("clean", True))
+                            clean=choices.get("clean", True),
+                            language=choices.get("game_language") or saved_game_language())
         test_stop("built")
         if game_running(target):   # started while the game was being built
             sys.exit(TEXTS[choices["lang"]]["running"])

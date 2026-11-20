@@ -183,18 +183,40 @@ def left_to_base(code, captured, bases):
     return sorted(k for k in keys if k not in ours and len({v.get(k) for v in values}) > 1)
 
 
+def check_readme(code):
+    """The note of mods\\textures (languages.textures_readme, [textures_readme] of language.ini - read
+    in Notepad, not drawn by the game's fonts): every letter in the pack's code page. A key of the
+    English it lacks is only said: the note is then the English one."""
+    cp = codepage(code)
+    english, texts = languages.readme_texts("en"), languages.readme_texts(code)
+    problems = []
+    for key, value in texts.items():
+        try:
+            value.encode(f"cp{cp}")
+        except UnicodeEncodeError as e:
+            problems.append(f"language.ini [{languages.README_SECTION}] {key}: {value[e.start]!r} is not in code page {cp}")
+    missing = [key for key in english if not texts.get(key)]
+    if missing:
+        print(f"  language.ini [{languages.README_SECTION}] lacks {', '.join(missing)}: mods\\textures gets the English note")
+    for p in problems:
+        print("  " + p)
+    return not problems
+
+
 def check(code, captured, font_code=None):
     """A pack's texts against its fonts; a fan translation, which may be built on any captured
-    language (languages.build_base), against the fonts of each and for keys left to its base."""
+    language (languages.build_base), against the fonts of each and for keys left to its base; the
+    note of mods\\textures against its code page (check_readme)."""
     if font_code or not languages.fan_pack(code) or languages.needs_base(code):
-        return check_fonts(code, captured, font_code)
+        ok = check_fonts(code, captured, font_code)
+        return check_readme(code) and ok
     bases = [c for c in languages.FALLBACK_BASES if os.path.isdir(os.path.join(captured, c))]
     ok = all([check_fonts(code, captured, fonts, False) for fonts in font_codes(code, captured)])
     keys = left_to_base(code, captured, bases)
     if keys:
         print(f"  {len(keys)} key(s) of strings.ini left to the base differ between the captured languages "
               f"(set them in strings.override.ini), e.g. [{keys[0][0]}] {keys[0][1]}")
-    return ok and not keys
+    return check_readme(code) and ok and not keys
 
 
 def font_codes(code, captured, font_code=None):

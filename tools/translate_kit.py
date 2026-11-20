@@ -21,7 +21,8 @@ English). `--zip` also writes <folder>.zip.
 
 Scope: `--ours` = what we add to the game - the editor's help pages, our keys of
 strings.override.ini (the keys lang/en/game/strings.override.ini defines), POLIGON's (sandbox) and
-the template's texts, the launcher's labels (language.ini) and Setup's (installer.txt); `--game` =
+the template's texts, the launcher's labels and the note of the own textures' folder (language.ini)
+and Setup's (installer.txt); `--game` =
 the game's own texts - the missions' briefings, the menu pages, the other keys of strings.ini;
 `--all` both. The default: --all for a fan translation (base= another language in language.ini,
 Czech), --ours for a language Steam ships.
@@ -70,6 +71,9 @@ KIT_NOTES = {"readme.txt", "todo.txt"}
 NAMES = {"cs": "Czech", "de": "German", "en": "English", "hu": "Hungarian", "pl": "Polish",
          "pt": "Portuguese", "ru": "Russian"}
 SCOPES = ("ours", "game", "all")
+# the sections of language.ini a translator translates: the launcher's labels and the note build.py writes
+# into mods\textures (OWN_README)
+LAUNCHER_SECTIONS = ("launcher", "textures_readme")
 OURS_MAPS = ("sandbox", "template")   # our maps' texts (game/maps.new/<map>/)
 MAP_TEXT = re.compile(r"(brief\d*|win|loose|objectives|script\d+)\.txt", re.I)   # a map's texts
 WIDTHS = [("objectives.txt", 40, "objectives.txt (the mission's goals)"),
@@ -476,14 +480,14 @@ class Kit:
         path = os.path.join(self.pack, "language.ini")
         items = parse_keys(read(path).decode("utf-8-sig").replace("\r\n", "\n"))
         en_items = parse_keys(read(os.path.join(languages.LANG, "en", "language.ini")).decode("utf-8-sig").replace("\r\n", "\n"))
-        launcher = {it.bare for it in en_items if it.kind == "key" and it.bare[0] == "launcher"}
+        launcher = {it.bare for it in en_items if it.kind == "key" and it.bare[0] in LAUNCHER_SECTIONS}
         have = {it.bare for it in items if it.kind == "key"}
         if not any(it.kind == "section" and it.section.lower() == "launcher" for it in items) and launcher - have:
             items.append(Item("comment", "", 0))
         insert_missing(items, en_items, launcher - have)
         english = values_of(en_items)
         for it in items:
-            if it.kind == "key" and self.code != "en" and (it.bare[0] == "launcher" or it.bare == ("language", "name")):
+            if it.kind == "key" and self.code != "en" and (it.bare[0] in LAUNCHER_SECTIONS or it.bare == ("language", "name")):
                 it.english = english.get(it.bare)
         e = Entry("language.ini", "launcher", "launcher", "ours", path)
         e.items = items
@@ -972,7 +976,7 @@ def check_launcher(r, seq_k, seq_t):
     for (_, k), (_, t) in zip(seq_k, seq_t):
         if k.kind != "key" or t.value == k.value:
             continue
-        if k.bare[0] != "launcher" and k.bare != ("language", "name"):
+        if k.bare[0] not in LAUNCHER_SECTIONS and k.bare != ("language", "name"):
             r.problems.append(f"line {t.n}: [{t.section}] {t.key} is ours to set - leave it as it was ({k.value.strip()})")
             continue
         if k.new and k.english is not None and t.value == k.english:

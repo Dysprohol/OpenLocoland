@@ -268,16 +268,20 @@ edytor rysuje dłużej, więc działa wolniej. Test poziomu zaczyna się w powi�
 wraca twoje.
 
 **Własne tekstury** (pierwsza obsługa modów). Włóż obrazki do folderu `mods\textures\` w folderze gry
-(Setup zakłada go pusty), a **Malowanie terenu** ma je po teksturach gry, za **WLASNE:**, w kolejności
+(Setup go zakłada, z notką), a **Malowanie terenu** ma je po teksturach gry, za **WLASNE:**, w kolejności
 nazw plików; nazwą pod myszą i w wierszu stanu jest nazwa pliku. PNG, BMP albo JPEG, od 8 x 8 do
 1024 x 1024 pikseli, najwyżej 32 obrazki i razem 4 miliony pikseli (na przykład szesnaście po 512 x 512);
-kładą się lustrzanie, jak tekstury gry, więc każdy obrazek łączy się bez szwu (mały powtarza się częściej -
-128 x 128 do 256 x 256 to mniej więcej skala gry); przezroczystość nie jest brana pod uwagę. Edytor czyta
+mały powtarza się częściej - 128 x 128 do 256 x 256 to mniej więcej skala gry.
+Obrazek kładzie się obok siebie taki, jaki jest, każda kopia prosto (żeby teren nie miał szwów, użyj obrazka zrobionego do kafelkowania).
+**OBROT** (0, 90, 180, 270; także R i E) i **UKLADANIE** (**OBOK SIEBIE** albo **LUSTRZANIE**) w rzędzie ustawiają, jak kładzie się wybrana tekstura - także tekstury gry, które zaczynają lustrzanie, jak zawsze.
+Przezroczystość PNG jest zachowana: przezroczyste części zostawiają teren taki, jaki był, półprzezroczyste mieszają się z nim.
+Plik `_README.txt` w tym folderze, w języku twojej gry, mówi to wszystko; Setup zapisuje go od nowa przy każdej aktualizacji.
+Edytor czyta
 folder, gdy pierwszy raz potrzebuje tekstur, więc po dodaniu obrazków uruchom grę ponownie. Obrazek, którego
 nie może wziąć (uszkodzony, za mały, za duży, o jeden za dużo), pomija: rząd mówi **POMINIETE:** i ile
 (wiersz stanu też), a `logs\LocoFix.log` które i dlaczego. To, co namalujesz, trafia do obrazu terenu samej mapy, więc
 zapisana albo wyeksportowana mapa wygląda tak samo na każdym komputerze, bez twoich obrazków. Aktualizacje
-przez Setup nie ruszają tego folderu. Używaj tylko obrazków, do których masz prawo - własnych albo takich,
+przez Setup nie ruszają twoich obrazków w tym folderze. Używaj tylko obrazków, do których masz prawo - własnych albo takich,
 których licencja pozwala umieścić je w mapie, którą udostępniasz.
 
 **Podstawy edycji** (narzędzie Zaznacz, klawisz 1):
@@ -344,8 +348,8 @@ nową krawędzią - tor może biec jeszcze 300 px dalej, poza zasięgiem wzroku.
 
 **Malowanie terenu** z listwy: jego rząd przycisków nad paskiem ma tekstury (trawa, jasna trawa,
 ściółka, piasek, pustynia, śnieg, lód, skała, ciemna skała, lawa, bagno, dno jeziora, trawnik, bujna
-trawa, wysoka trawa, sucha trawa, jesienna trawa, trzcina, suche zarośla, torfowisko, kamienne płyty,
-spękana ziemia, sucha glina, rumowisko, zaspa - wzięte z map kampanii, każda podpisana nad sobą pod
+trawa, wysoka trawa, sucha trawa, jesienna trawa, suche zarośla, torfowisko, kamienne płyty,
+sucha glina, rumowisko, zaspa - wzięte z map kampanii, każda podpisana nad sobą pod
 myszą; potem twoje własne, jeśli jakieś dodałeś, zob. [własne tekstury](#5-edytor-map); `[` i `]` też je
 wybierają), **ROZMIAR** (8 - 200 px; także Ctrl+kółko), **SILA** (ile
 pokrywa jedno pociągnięcie: mniejsza pozwala mieszać tekstury) i **KRAWEDZ** miękką albo twardą. Maluj

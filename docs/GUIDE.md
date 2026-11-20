@@ -270,17 +270,21 @@ Zoomed out the editor draws more and runs slower. Run the level starts at the ga
 back you get yours again.
 
 **Your own textures** (the first mod support). Put pictures into the folder `mods\textures\` of the game
-folder (Setup makes it empty) and **Paint the ground** has them after the game's textures, behind
+folder (Setup makes it, with a note) and **Paint the ground** has them after the game's textures, behind
 **OWN:**, in the order of their file names; the name under the mouse and in the status line is the
 file's name. PNG, BMP or JPEG, from 8 x 8 to 1024 x 1024 pixels, at most 32 of them and 4 million
-pixels together (sixteen of 512 x 512, for example); they are laid
-mirrored, as the game's own textures are, so any picture tiles without a seam (a small one repeats more
-often - 128 x 128 to 256 x 256 is about the game's scale); transparency is not used. The editor reads the
+pixels together (sixteen of 512 x 512, for example); a small one repeats more often - 128 x 128 to
+256 x 256 is about the game's scale.
+A picture is laid side by side as it is, every copy upright (for a ground without seams use one made to tile).
+The row's **TURN** (0, 90, 180, 270; also R and E) and **LAYING** (**SIDE BY SIDE** or **MIRRORED**) set how the chosen texture is laid - the game's own textures too, which start mirrored as they always were.
+A PNG's transparency is kept: its transparent parts leave the ground as it was, half transparent ones blend with it.
+The folder's `_README.txt`, in your game's language, says all this; Setup writes it again at every update.
+The editor reads the
 folder when it first needs the textures, so start the game again after adding pictures. A picture it
 cannot take (broken, too small, too big, one too many) is left out: the row says **LEFT OUT:** and how
 many (so does the status line), `logs\LocoFix.log` which and why. What you paint goes into the map's own ground picture,
 so a saved or exported map shows it on any computer, without your pictures. Setup's updates do not
-touch the folder. Use only pictures you have the right to use - your own, or ones whose licence lets
+touch your pictures there. Use only pictures you have the right to use - your own, or ones whose licence lets
 you put them into a map you share.
 
 **The basic editing** (the Select tool, key 1):
@@ -350,7 +354,7 @@ out of sight.)
 
 The strip's **Paint the ground**: its row of buttons above the bar has the textures (grass, light
 grass, forest floor, sand, desert, snow, ice, rock, dark rock, lava, swamp, lake bed, lawn, lush grass,
-tall grass, dry grass, autumn grass, reeds, dry scrub, bog, flagstones, cracked earth, dry clay, scree,
+tall grass, dry grass, autumn grass, dry scrub, bog, flagstones, dry clay, scree,
 snowdrift - taken from the campaign's maps, each named above it under the mouse; then your own, if you
 added any, see [your own textures](#5-the-map-editor); `[` and `]` pick them too), **SIZE** (8 - 200 px; Ctrl+wheel too), **STRENGTH**
 (how much a pass covers: lower it to blend textures) and **EDGE** soft or hard. Paint by dragging

@@ -688,11 +688,12 @@ RAISE/LOWER, FLATTEN, SMOOTH, RAMP, ROUGH, SIZE - n +, STRENGTH - n +, EDGE SOFT
 MODE: TEXTURE / GRAVEL BED, then a swatch of each texture (its mean colour, the chosen one framed, its
 name right above it under the mouse as the strip's icons have theirs - since 2026-11-20; the player's
 own after them behind OWN:, see "Paint the ground"; `texture_groups` cuts them into groups no wider than
-the view, as even as they can be, so no row runs off it: the 25 of the game are 500 px, one group even at
+the view, as even as they can be, so no row runs off it: the 23 of the game are 460 px (25 and 500 px
+until 2026-11-20, when the checks below were made), one group even at
 640 x 480 or at three times on 2560 x 1440, and up to 32 own pictures may take two; the row's other
-groups go onto the rows above when they do not fit beside them - at 1024 x 768 MODE, the 25, OWN: with
+groups go onto the rows above when they do not fit beside them - at 1024 x 768 MODE, the textures, OWN: with
 two pictures and LEFT OUT: share a row, SIZE, STRENGTH and EDGE above; at 1920 x 1080 all of it is one
-row; at twice there MODE, the 25 and OWN: are one)
+row; at twice there MODE, the textures and OWN: are one)
 or KIND and WIDTH (GRAVEL BED, below; and UNDER THE WHOLE TRACK), SIZE, STRENGTH (a fifth to all of the texture a pass: `ground_paint`'s
 strength), EDGE (`weight` full to the edge). A group that does not fit
 beside the others goes into a row above (the window's or the screen's width). A click on a button
@@ -702,8 +703,8 @@ Paint and Water put the original back with it. Paint's pipette, Alt+click, reads
 the editor keeps the texture of each pixel it paints (a byte a pixel, `NO_TEXTURE` for the original;
 in each stroke's `PaintPatch` for undo, carried by the relief); a pixel it did not paint in this
 session is recognized by the picture itself - a texture laid at full strength is its sample at the
-pixel's place (mirrored every 128 px), so the texture whose sample 13 or more of the 25 pixels around
-match (within a step of each 565 channel) is the one there: a picture painted and saved before, or
+pixel's place (in any of the eight ways it can be laid: TURN and LAYING, below), so the texture whose
+sample 13 or more of the 25 pixels around match (within a step of each 565 channel) is the one there: a picture painted and saved before, or
 painted by `map_tool.py paint`, names its textures too. Checked in the game (English and Polish): the
 rows of both tools, HARD and STRENGTH set, the right button lowering, the wheel, a hill, a ramp from
 level 70 up to it (106), rough ground, the level taken with Alt+click and Flatten (also with Shift)
@@ -931,9 +932,9 @@ grounds, imageFlags 0x35) and the map's ground record points at it - never over 
 `editor\textures.tsv` (game/editor/: the map and the place, nothing of the pictures in the repository)
 - grass (l02), light grass (l15), forest floor (l07), sand (l11), desert (l10), snow (l18), ice (l16),
 rock and dark rock (l20), lava (l13), swamp (l06), lake bed (l15), and since 2026-11-20 lawn (l01),
-lush grass (l04), tall grass, dry grass and flagstones (l09), autumn grass (l02), reeds (l06), dry scrub
-and scree (l12), bog (l08), cracked earth (l10), dry clay (l11), snowdrift (l16) -, laid mirrored, the
-brush's edge soft and grainy; [ and ] pick one (past one whose map is missing), + and - the brush
+lush grass (l04), tall grass, dry grass and flagstones (l09), autumn grass (l02), dry scrub
+and scree (l12), bog (l08), dry clay (l11), snowdrift (l16) -, laid mirrored (at
+first: TURN and LAYING below), the brush's edge soft and grainy; [ and ] pick one (past one whose map is missing), + and - the brush
 (8-200 px), Shift puts the original picture back. The texture is lit as the relief lights the ground each pixel shows (`ground_paint` with the GRID: the slope at the point of its screen row plus its height texel's level; 1 on flat ground, so a flat map paints as before): until 2026-11-20 it was laid as sampled, and a hill or a slope painted over lost its shading - the hill was gone from the picture though not from the GRID (issue #20, 10; checked on a new meadow: sand over a raised hill keeps the hill's light and shadow, a second hill beside it unpainted the same). The pipette's reading of a picture painted in another session matches a texture's sample within a step, so on a slope it may not name the texture there. New rows go at the end of the table: the Water tool's
 beds name rows 10-12 by their place. The 13 added were picked from all 20 grounds - every 128 px
 window scored for how even it is, the candidates looked at mirrored as the brush lays them, against
@@ -947,17 +948,47 @@ wide), of paving (l01's plaza is crossed by its roads) or of a sandy shore: thos
 player's own textures. Checked in the game (Polish, 1024 x 768, POLIGON): each of the 13 picked in the
 row (its name above it), painted ("ground painted: Lawn, 81x81 px" ... in LocoFix.log) and named by
 Alt+click ("tekstura: Trawnik (pobrana z obrazu)" ...).
+Reviewed the same day, after reeds painted purple blobs in a mirrored pattern: every patch looked at
+mirrored 4 x 4 as the brush lays it and counted - the pixels far from its main colour or of another
+hue, the biggest clump of them, the strongest row or column stripe, how uneven its 16 px blocks are.
+Two are gone: reeds (l06 32, 512) had swamp water in its corners, and no 128 px window of l06's or
+l08's reeds is without water between the clumps; cracked earth (l10 928, 1248) was the edge of a
+desert road's embankment, and l10's cracked ground is only those edges (~40 px wide). Eight were
+moved to a clean place of the same ground: sand (l11 705, 1905 to 784, 880: a dune's dark shadow),
+desert (l10 620, 1310 to 1232, 896: a road's embankment and stones), ice (l16 2050, 520 to 2496, 720:
+the edge of the ice floe and the flat floor around it in the patch - now the frozen lake itself,
+plain blue), rock (l20 512, 64 to 176, 1184: a bush's green in a corner), lush grass (l04 464, 768
+to 1424, 688: a road in a corner), tall grass (l09 256, 1888 to 1344, 2144: the rims of two bushes),
+autumn grass (l02 1168, 656 to 309, 1300: clumps of green grass) and dry scrub (l12 800, 1408 to
+800, 1392: the ground's dark rows near the map's bottom edge). The lake bed keeps its place: the lake
+of l15 is narrow, so every window of it has the shallows' lighter rows at an edge (a faint band when
+mirrored), and its place gives the faintest. A picture painted with an old place of these eight is
+not named by the pipette any more (it compares with the sample at the pixel's place); it still
+shows as it was painted. Checked in the game (Polish, 1920 x 1080 full screen, POLIGON): a row of 23
+("ground: 23 textures"), each picked and painted ("ground painted: Dry scrub, 81x81 px" ...), the eight
+moved painted again with a 104 px brush - no blob or ring repeating in them - and, the map saved and
+loaded again, all 23 named by Alt+click from the picture ("texture: Sand (taken from the picture)" ...).
 **The player's own textures** (`editor_ground.cpp` `read_own_textures`, since 2026-11-20 - the first
 mod support): the pictures of the game folder's `mods\textures\` - PNG, BMP or JPEG (`.png`, `.bmp`,
-`.jpg`, `.jpeg`; read with Windows' own WIC, its first frame, transparency ignored), any size from
-8 x 8 to 1024 x 1024 px, laid mirrored at their own size as the game's patches are (so a picture that
-does not tile still meets itself without a seam; one made to tile shows mirrored) - come after the
-game's in the row, behind OWN: (`OptOwnTextures`), in the order of their file names (case ignored), each
-named by its file's name (with the extension, in the pack's code page). The folder is mods\ and not
+`.jpg`, `.jpeg`; read with Windows' own WIC, its first frame), any size from 8 x 8 to 1024 x 1024 px -
+come after the game's in the row, behind OWN: (`OptOwnTextures`), in the order of their file names
+(case ignored), each named by its file's name (with the extension, in the pack's code page). An own
+picture is laid side by side as it is at first - a plain repeat at its own size, every copy upright and
+the same way round, anchored to the map's picture, so strokes side by side continue one grid (until
+2026-11-20 it was mirrored as the game's are, and half the copies of a player's picture showed upside
+down or reversed); a seamless ground needs a picture made to tile, or LAYING: MIRRORED (below). A
+PNG's transparency is kept (`Texture::alpha`, when any pixel is not opaque; a BMP or a JPEG is opaque
+whatever its fourth byte holds): `ground_paint` multiplies the brush's weight and strength by the
+texel's alpha, so a transparent texel paints nothing - the ground stays as it was, to the pixel - and a
+half transparent one blends with it; such a pixel is not recorded as the texture's (the pipette may
+name nothing there), the pipette's match counts only a texture's opaque texels, and the swatch is the
+alpha-weighted mean. The folder is mods\ and not
 editor\ because `editor\` is one of the folders the build owns (`build.py` `OWNED_DIRS`: an update
 removes what it did not write there) and because mods\ is where later kinds of mods can go beside
-textures\; `build.py` makes it empty so a player finds it, and nothing of a build goes into it, so
-neither the clean-up nor an update touches it (release.md "Updating"). Left out, each with a line in
+textures\; `build.py` makes it with one file of its own, the note `_README.txt` (`OWN_README`, in the
+game's language, written again by every update: release.md "Updating"), which LocoFix skips without a
+word; nothing else of a build goes into it, so neither the clean-up nor an update touches the player's
+files. Left out, each with a line in
 LocoFix.log ("ground: mods\textures\broken.png left out: not a picture Windows can read") and their
 count in the row after the own swatches (LEFT OUT: n, `OptOwnSkipped`, its tip and click pointing to
 the log) and at the end of the Paint tool's status line (`StatusOwnSkipped` - cut off in a 1024 px
@@ -965,9 +996,9 @@ window, hence the row; no text of the packs may hold `\t`, which their reader ma
 "own pictures", not the folder's name): a picture Windows cannot read or
 whose pixels cannot be decoded, one under 8 or over 1024 px a side (its size read before its pixels,
 so a huge one costs nothing), a file over 32 MB, any after the first 32 by name, and one that would
-take the pictures past 4 million pixels together (8 MB: the editor shares the 32-bit game's memory with
-the map's picture); other files in the folder (a note) are left alone with a line, and its subfolders
-are not read. The folder is read
+take the pictures past 4 million pixels together (4 << 20, four of 1024 x 1024; 8 MB: the editor
+shares the 32-bit game's memory with the map's picture); other files in the folder (a WebP, a GIF) are
+left alone with a line and not counted, and its subfolders are not read. The folder is read
 once a game run, at the textures' first use, so pictures added while the game runs show after it
 starts again. Painting with one writes its pixels into the map's picture exactly as the game's
 textures do, so a saved map's `<name>.vid` - and its export - carries the painted ground and needs
@@ -980,13 +1011,43 @@ log named the two left out and the note, the row showed OWN: with two swatches a
 and English, 1024 x 768 and 1920 x 1080, the interface at 1 and 2); on POLIGON (Polish, 1024 x 768) [
 from the first texture went to noise.png, then checker.png, each painted with a click and a drag, lawn
 and snowdrift beside them, Alt+click naming all four; saved and exported: the saved `.vid`'s picture
-holds 11918 and 11748 pixels that are exactly the mirrored samples of noise.png and checker.png
-(`map_tool.py`'s reader); imported into a copy of the game without mods\ the picture is the saved one to
-the pixel and the editor shows the painted ground, Alt+click naming lawn and snowdrift from the picture
-and calling the own textures' ground the original; the same map in the copy with the pictures had them
-named from the picture alone. Setup (`release.py`'s, in a fresh box): installed, mods\textures there
-and empty; two pictures, a subfolder with one and a note put in; Setup again over it - all four files
-the same, nothing removed (install.log), the editor reading the two.
+holds the samples of noise.png and checker.png (`map_tool.py`'s reader); imported into a copy of the
+game without mods\ the picture is the saved one to the pixel and the editor shows the painted ground,
+Alt+click naming lawn and snowdrift from the picture and calling the own textures' ground the original;
+the same map in the copy with the pictures had them named from the picture alone. Checked again after
+the upright repeat, transparency and the note (POLIGON, Polish, 1024 x 768, hard edge, 56 px; every
+export read with `map_tool.py` `ground_picture` and compared with the samples computed as `texel` lays
+them): an arrow-and-F picture (64 x 96) painted with a drag and a click beside it - all 35191 pixels of
+the two strokes exactly the upright side-by-side repeat, one grid; a PNG of a soft-edged disc on a
+transparent ground (128 x 128) stamped across grass and light grass - of the 12460 transparent texels
+under the brush none changed, the 375 opaque ones exactly the texture's, the 1389 half transparent ones
+each between the ground's colour and the texture's, and Ctrl+Z gave back the picture before the stroke
+to the pixel; the same arrow picture as a 24-bit BMP and as a JPEG painted exactly (the JPEG decoded by
+WIC as by Pillow); a WebP in the folder left alone with a line, the note skipped without one, 4 own
+textures and no LEFT OUT. Setup (`release.py`'s, in a fresh box, with the language captures): installed in
+English and in Polish - the note in each language, byte for byte what `languages.textures_readme`
+makes; the four pictures, a subfolder with one of them and an edited note put into the Polish install,
+Setup again over it (an update, the language kept): the pictures and the subfolder untouched (the same
+SHA-256), the note written again (the one file it put in), and the installed editor reading the four
+with no LEFT OUT and no line about the note.
+**TURN and LAYING** (since 2026-11-20): while a texture is painted the row has TURN: 0 90 180 270
+(`OptTurn`; R and E turn it a quarter clockwise and back, `turn` -> `turn_texture` - in the Paint
+tool's TEXTURE mode they turn nothing else, not an object still selected) and LAYING: SIDE BY SIDE /
+MIRRORED (`OptLaying`), for every texture, the game's too (`texture_lay_groups`, `ground_texture_lay`).
+Each texture keeps its own setting while the game runs - not in the map, which keeps only the painted
+pixels -: a game texture starts at 0 and mirrored, the laying it always had (`texel` at TURN 0 and
+MIRRORED is the earlier code's, so nothing changes for anyone who does not touch it), an own picture
+at 0 and side by side. `texel` turns the picture (its sides swapped by a quarter turn), repeats the
+turned picture side by side or mirrored every w (h) px, and takes the texel by the map's picture's
+coordinates, so the repeat stays anchored for every turn. The Water tool's bed (rows 10-12,
+`ground_lower`) always lays its texture the starting way (`first_lay`), and File > New's grounds take
+the plain sample (`ground_texture_sample`), whatever the setting. The pipette tries all eight ways for
+every texture (on a lit slope it may still name nothing, as above). Checked in the game (the test rig,
+POLIGON, Polish, 1024 x 768, hard edge, 56 px): the arrow-and-F picture with each turn side by side and
+mirrored, and Grass with each turn side by side and 90-270 mirrored - every stroke exactly its laying
+(all its pixels against the computed samples; the next best way matched at most 86 %), the turns
+clockwise (the arrow up, right, down, left); saved, loaded again (the session's record gone) and
+Alt+click on each stroke: a_arrow.png and Grass named from the picture. Sand also with each turn side by side (seams where a plain repeat meets itself, as expected). A game texture left at its starting laying, painted with the same strokes by this build and by the build before the transparency, the upright repeat and these settings: the two exported pictures of Sand equal to the pixel (45066 pixels painted).
 **Water and lava** (W picks the kind) does what the authors did (MAP_RULES.md 2): it lowers the
 picture and the GRID under the brush to the bed (the level - 25, the shore sloping), paints the bed,
 adds the kind's tiles where missing on the 128 grid at the map's level of that kind, and when the

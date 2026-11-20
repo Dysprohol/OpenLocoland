@@ -49,11 +49,24 @@ bool ground_kept();
 void ground_take_kept();
 // The textures, read at the first use: the game's (game folder's editor\textures.tsv, sampled from the
 // campaign grounds), then the player's own pictures of mods\textures\ by name (PNG, BMP, JPEG, 8 to 1024
-// px a side, laid mirrored at their own size).
+// px a side, at their own size, laid as ground_texture_lay says; a PNG's transparent pixels paint nothing,
+// half transparent ones blend by their alpha).
 const std::vector<GroundTexture>& ground_textures();
 // How many pictures of mods\textures\ were left out (unreadable, too small or big, too many; LocoFix.log
 // says which and why).
 int ground_own_skipped();
+// How the Paint tool lays a texture: turned by `turn` quarters clockwise (0-3: 0, 90, 180, 270 degrees),
+// the turned picture repeated side by side (every copy the same way round) or mirrored (every other copy
+// flipped, so a picture that does not tile meets itself without a seam), anchored to the map's picture.
+// Each texture keeps its own while the game runs (never saved in the map, which keeps only the painted
+// pixels): a game texture starts at 0 and mirrored, as the game's are laid, an own picture at 0 and side
+// by side. The Water tool's bed and File > New's grounds always lay a texture its starting way.
+struct TextureLay {
+    int turn = 0;
+    bool mirrored = true;
+};
+TextureLay ground_texture_lay(int texture);
+void ground_set_texture_lay(int texture, TextureLay lay);
 // A texture's 128 x 128 sample (laid mirrored it tiles without seams); false when it is not available
 // or is one of the player's own (their sizes vary).
 bool ground_texture_sample(int texture, std::vector<uint16_t>& patch);
@@ -67,8 +80,10 @@ void ground_stroke_begin();
 void ground_paint(float x, float y, float radius, int texture, bool restore, float strength = 1, bool hard = false,
                   const short* grid = nullptr, int gw = 0, int gh = 0);
 // The texture painted at a screen point of the map (its index; BED_TEXTURE + a kind for a bed's band),
-// -1 where the picture is the original. A picture saved before is recognized by its pixels: a texture
-// laid at full strength is its sample at the pixel's place (mirrored every 128 px).
+// -1 where the picture is the original or a mix (an own picture's half transparent pixels). A picture
+// saved before is recognized by its pixels: a texture laid at full strength is its sample at the
+// pixel's place, in any of the eight ways it can be laid (ground_texture_lay; an own picture's opaque
+// pixels only).
 int ground_texture_at(float x, float y);
 // The gravel bed's band under the track: the four kinds of the missions' bed decals (VID 612 meadow,
 // 615 ice, 616 volcanic, 617 desert), the band's colours taken from the top of the decal itself

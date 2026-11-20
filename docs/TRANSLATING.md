@@ -60,7 +60,9 @@ player has them - "A capture of the pack's own language" below), `de`, `en`, `hu
    full_screen=...
    ```
    Copy the `[launcher]` keys from an existing pack (e.g. `lang/en/language.ini`); `unofficial=`
-   is the mark the launcher puts after a fan translation's name in this language.
+   is the mark the launcher puts after a fan translation's name in this language. The
+   `[textures_readme]` keys are the note Setup writes into `mods\textures\_README.txt` (one
+   paragraph a key, wrapped by the build, in the pack's code page); without them the note is English.
 3. Translate the files under `game/`, and delete the ones you do not translate - a file of the
    pack replaces the captured one, so a placeholder left in would be shown in the game.
 4. Check and build (see below).

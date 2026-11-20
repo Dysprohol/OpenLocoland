@@ -195,6 +195,46 @@ def pack_value(code, key, default=None):
     return ini.get("language", key, fallback=default)
 
 
+README_SECTION = "textures_readme"   # language.ini: the note of the player's own textures' folder (build.py OWN_README)
+README_WIDTH = 78
+
+
+def readme_texts(code):
+    """{key: text} of [textures_readme] in lang/<code>/language.ini, in its order (empty without it)."""
+    import configparser
+    ini = configparser.ConfigParser(interpolation=None)
+    ini.read(os.path.join(LANG, code, "language.ini"), encoding="utf-8-sig")
+    return dict(ini.items(README_SECTION)) if ini.has_section(README_SECTION) else {}
+
+
+def textures_readme(code):
+    """(the note of the player's own textures' folder, the pack it is in): pack `code`'s paragraphs of
+    [textures_readme] - one a key, in the English pack's order, the first a title -, each wrapped at
+    README_WIDTH columns, CRLF, in its code page. The English note when the pack lacks a key of the
+    English or a letter of its code page; (None, None) when the English pack has none either."""
+    import textwrap
+    english = readme_texts("en")
+    for pack in (code, "en"):
+        texts = readme_texts(pack)
+        if not english or any(not texts.get(key) for key in english):
+            continue
+        lines = []
+        for n, key in enumerate(english):
+            if n == 1:
+                lines += ["=" * len(lines[0]), ""]
+            elif n:
+                lines.append("")
+            # a size (1024 x 1024) or a number and its word (32 MB, 4 million) is not broken over two lines
+            glued = re.sub(r"\d+ x \d+|\d+ [^\s,.;:()]+",lambda m: m.group(0).replace(" ", "\0"), texts[key])
+            lines += [line.replace("\0", " ") for line in
+                      textwrap.wrap(glued, README_WIDTH, break_long_words=False, break_on_hyphens=False)]
+        try:
+            return ("\r\n".join(lines) + "\r\n").encode(f"cp{pack_value(pack, 'codepage', '1252').strip()}"), pack
+        except UnicodeEncodeError:
+            continue
+    return None, None
+
+
 def pack_base(code):
     """The language whose captured files pack `code` is meant to be built on: its own, or for a
     translation Steam does not ship the one `base=` names in [language] of its language.ini

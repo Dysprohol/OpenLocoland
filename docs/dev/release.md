@@ -254,8 +254,11 @@ its disc - see "Every edition before the tag".)
 leaves alone what it does not write, so the player keeps the high score tables (not
 overwritten once the game wrote them), the maps made in the editor (`maps\<name>\`, which the custom maps page finds by itself -
 `maps\custom.lst` is LocoFix's list of them, which the build no longer writes), the exported and imported maps, the
-player's own textures (`mods\textures\`: the build makes the folder and never writes into it, and `mods\`
-is not one of the clean-up's owned folders), and everything in the registry: the settings, the
+player's own textures (`mods\textures\`: the build makes the folder and writes only its note
+`_README.txt` there - in the game's language, Setup's choice or on an update the one kept
+(`languages.textures_readme`, `[textures_readme]` of the pack's `language.ini`, English when the pack
+has none) -, which every update writes again, an edited one too; `mods\` is not one of the clean-up's
+owned folders, so every other file there stays), and everything in the registry: the settings, the
 options as they were and the campaign progress (`Players`). The two maps of the release itself,
 `maps\sandbox` and `maps\template`, are written anew - a map edited in place there is lost, a map
 saved under a name of its own is not.

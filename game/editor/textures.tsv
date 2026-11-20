@@ -7,25 +7,23 @@ key	english	map	x	y
 TexGrass	Grass	l02	1696	1216
 TexLightGrass	Light grass	l15	2624	640
 TexForest	Forest floor	l07	1664	896
-TexSand	Sand	l11	705	1905
-TexDesert	Desert	l10	620	1310
+TexSand	Sand	l11	784	880
+TexDesert	Desert	l10	1232	896
 TexSnow	Snow	l18	1200	1000
-TexIce	Ice	l16	2050	520
-TexRock	Rock	l20	512	64
+TexIce	Ice	l16	2496	720
+TexRock	Rock	l20	176	1184
 TexDarkRock	Dark rock	l20	0	832
 TexLava	Lava	l13	2176	2112
 TexSwamp	Swamp	l06	1100	705
 TexLakeBed	Lake bed	l15	1920	1088
 TexLawn	Lawn	l01	864	352
-TexLushGrass	Lush grass	l04	464	768
-TexTallGrass	Tall grass	l09	256	1888
+TexLushGrass	Lush grass	l04	1424	688
+TexTallGrass	Tall grass	l09	1344	2144
 TexDryGrass	Dry grass	l09	2368	256
-TexAutumnGrass	Autumn grass	l02	1168	656
-TexReeds	Reeds	l06	32	512
-TexScrub	Dry scrub	l12	800	1408
+TexAutumnGrass	Autumn grass	l02	309	1300
+TexScrub	Dry scrub	l12	800	1392
 TexBog	Bog	l08	1248	2080
 TexFlagstones	Flagstones	l09	480	864
-TexCrackedEarth	Cracked earth	l10	928	1248
 TexClay	Dry clay	l11	2672	1344
 TexScree	Scree	l12	1536	320
 TexSnowdrift	Snowdrift	l16	2944	0

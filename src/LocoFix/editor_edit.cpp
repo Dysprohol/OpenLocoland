@@ -3064,6 +3064,8 @@ void roll_turn();
 extern bool g_random_turn;
 extern int g_random_direction;
 bool bed_brush();
+bool texture_turning();         // Paint tool: R / E turn the texture (texture_lay_groups, below)
+void turn_texture(int steps);
 
 // R, E, the wheel, Edit > Turn right / left and the panel's TURN, by what is turned (DEVELOPERS.md
 // "Editing objects", help page 15) - the preview of the object to place, else the selected object:
@@ -3073,8 +3075,13 @@ bool bed_brush();
 //    across to the trains of the other way), a car or a post to place; in the Push line tool the
 //    selected line,
 //  - a factory and a repair point are turned by their track (dragged along it), and so is a
-//    factory, repair point or crate to place; rails are not turned (the Track tool lays them again).
+//    factory, repair point or crate to place; rails are not turned (the Track tool lays them again),
+//  - in the Paint tool's TEXTURE mode the chosen texture's laying, a quarter turn (R right, E left).
 void turn(int steps) {
+    if (texture_turning()) {
+        turn_texture(steps);
+        return;
+    }
     if (tool() == Tool::PushLine) {
         push_change('R');
         return;
@@ -10459,6 +10466,52 @@ std::vector<OptionGroup> texture_groups() {
     return groups;
 }
 
+// How the chosen texture is laid (ground_texture_lay: each texture its own, kept while the game runs, not
+// in the map): TURN 0 / 90 / 180 / 270 degrees clockwise (R / E) and LAYING side by side or mirrored - a
+// game texture starts at 0 and mirrored (as the game lays it), an own picture at 0 and side by side.
+bool texture_turning() {
+    if (tool() != Tool::Paint || g_paint_bed) return false;
+    const std::vector<GroundTexture>& t = ground_textures();
+    return g_texture >= 0 && g_texture < static_cast<int>(t.size()) && t[g_texture].available;
+}
+
+void texture_lay_message() {
+    const TextureLay lay = ground_texture_lay(g_texture);
+    MESSAGE("MsgTextureLay", "texture %s: turned %d degrees (R / E), laid %s", ground_texture_name(g_texture), lay.turn * 90,
+            lay.mirrored ? ui_text("WordMirrored", "mirrored") : ui_text("WordSideBySide", "side by side"));
+}
+
+void turn_texture(int steps) {
+    TextureLay lay = ground_texture_lay(g_texture);
+    lay.turn = (lay.turn + steps % 4 + 4) & 3;
+    ground_set_texture_lay(g_texture, lay);
+    texture_lay_message();
+}
+
+std::vector<OptionGroup> texture_lay_groups() {
+    if (!texture_turning()) return {};
+    const TextureLay lay = ground_texture_lay(g_texture);
+    static const char* const DEGREES[] = {"0", "90", "180", "270"};
+    OptionGroup turn{option_label({"OptTurn", "TURN:"})};
+    for (int q = 0; q < 4; ++q)
+        turn.push_back(option_button({nullptr, DEGREES[q]}, lay.turn == q, [q] {
+            TextureLay l = ground_texture_lay(g_texture);
+            l.turn = q;
+            ground_set_texture_lay(g_texture, l);
+            texture_lay_message();
+        }));
+    auto laying = [](bool mirrored) {
+        return [mirrored] {
+            TextureLay l = ground_texture_lay(g_texture);
+            l.mirrored = mirrored;
+            ground_set_texture_lay(g_texture, l);
+            texture_lay_message();
+        };
+    };
+    return {turn, {option_label({"OptLaying", "LAYING:"}), option_button({"OptSideBySide", "SIDE BY SIDE"}, !lay.mirrored, laying(false)),
+                   option_button({"OptMirrored", "MIRRORED"}, lay.mirrored, laying(true))}};
+}
+
 std::vector<OptionGroup> option_groups() {
     std::vector<OptionGroup> groups;
     if (strip_tool()) {
@@ -10631,7 +10684,10 @@ std::vector<OptionGroup> option_groups() {
                               g_paint_bed = true;
                               MESSAGE("MsgBedMode", "paint: the gravel bed (%s) under the rails the brush goes over", bed_kind_name(g_bed_kind));
                           })});
-        if (!g_paint_bed) for (OptionGroup& g : texture_groups()) groups.push_back(std::move(g));
+        if (!g_paint_bed) {
+            for (OptionGroup& g : texture_groups()) groups.push_back(std::move(g));
+            for (OptionGroup& g : texture_lay_groups()) groups.push_back(std::move(g));
+        }
         if (g_paint_bed) {
             // the game's bed objects (the four beds as their pictures, the chosen one framed - the same
             // kind the Track tool's row and B give new track) or the band painted into the picture

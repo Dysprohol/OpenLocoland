@@ -70,6 +70,8 @@ struct Texture {
     int w = PATCH, h = PATCH;      // the sample's size: PATCH x PATCH of a campaign ground, a picture's own
     bool sampled = false;
     std::vector<uint16_t> patch;   // w x h
+    std::vector<uint8_t> alpha;    // w x h, a PNG's own with transparency; empty: opaque (every game texture)
+    TextureLay lay;                // how the Paint tool lays it (ground_texture_lay): 0 and mirrored, an own one side by side
 };
 
 std::vector<Texture> g_textures;
@@ -77,11 +79,14 @@ std::vector<GroundTexture> g_texture_infos;
 bool g_textures_read = false;
 
 // The player's own textures: the pictures of the game folder's mods\textures\ (PNG, BMP or JPEG, read
-// with Windows' own WIC), after the game's in the row, by name; each laid mirrored as the game's are,
-// whatever its size. A picture that cannot be read, is too small or too big, or would go past the
+// with Windows' own WIC), after the game's in the row, by name; each laid side by side as it is at first (a
+// plain repeat at its own size, every copy upright; the game's start mirrored - ground_texture_lay), a PNG's
+// transparency kept (a transparent pixel paints nothing, a half transparent one blends by its alpha; BMP
+// and JPEG are opaque). A picture that cannot be read, is too small or too big, or would go past the
 // count or the memory they may take all together is left out, with a line in LocoFix.log and the
 // count in the Paint tool's row and status line - never more than that.
 const wchar_t OWN_FOLDER[] = L"mods\\textures";
+const wchar_t OWN_README[] = L"_README.txt";   // the folder's note, build.py's OWN_README: skipped without a word
 constexpr int OWN_MIN = 8, OWN_MAX = 1024;           // px a side
 constexpr int OWN_COUNT = 32;                        // pictures at most
 constexpr size_t OWN_PIXELS = size_t(4) << 20;       // all of them together (8 MB at 2 bytes a pixel)
@@ -147,10 +152,11 @@ template <typename T> void release_com(T*& p) {
 }
 
 // A picture file as R5G6B5 pixels, row by row (WIC: PNG, BMP, JPEG - whatever Windows decodes; its
-// first frame, transparency ignored). False with the reason in `why`; the size is checked before the
-// pixels are decoded, so a huge picture costs nothing.
+// first frame), and a PNG's alpha in `alpha` when any pixel is not opaque (empty otherwise: a BMP or a
+// JPEG is taken as opaque whatever its fourth byte holds). False with the reason in `why`; the size is
+// checked before the pixels are decoded, so a huge picture costs nothing.
 bool decode_picture(IWICImagingFactory* wic, const std::wstring& path, int& w, int& h, std::vector<uint16_t>& pixels,
-                    std::string& why) {
+                    std::vector<uint8_t>& alpha, std::string& why) {
     IWICBitmapDecoder* decoder = nullptr;
     IWICBitmapFrameDecode* frame = nullptr;
     IWICFormatConverter* converter = nullptr;
@@ -178,10 +184,19 @@ bool decode_picture(IWICImagingFactory* wic, const std::wstring& path, int& w, i
             w = static_cast<int>(fw);
             h = static_cast<int>(fh);
             pixels.resize(static_cast<size_t>(fw) * fh);
+            GUID container{};
+            const bool png = SUCCEEDED(decoder->GetContainerFormat(&container)) && container == GUID_ContainerFormatPng;
+            bool opaque = true;
             for (size_t i = 0; i < pixels.size(); ++i) {
                 const uint8_t* p = &bgra[i * 4];
                 pixels[i] = static_cast<uint16_t>(((p[2] * 31 + 127) / 255) << 11 | ((p[1] * 63 + 127) / 255) << 5 |
                                                   (p[0] * 31 + 127) / 255);
+                if (p[3] != 255) opaque = false;
+            }
+            alpha.clear();
+            if (png && !opaque) {
+                alpha.resize(pixels.size());
+                for (size_t i = 0; i < alpha.size(); ++i) alpha[i] = bgra[i * 4 + 3];
             }
             ok = true;
         }
@@ -207,7 +222,7 @@ void read_own_textures() {
     if (find == INVALID_HANDLE_VALUE) return;   // no folder, or nothing in it
     std::vector<unsigned long long> sizes;
     do {
-        if (f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+        if ((f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || _wcsicmp(f.cFileName, OWN_README) == 0) continue;
         if (!picture_name(f.cFileName)) {
             patch::log("ground: mods\\textures\\%s is not a PNG, BMP or JPEG picture - left alone",
                        ui_narrow(f.cFileName).c_str());
@@ -248,7 +263,7 @@ void read_own_textures() {
             Texture t;
             std::string why;
             try {
-                if (!decode_picture(wic, std::wstring(OWN_FOLDER) + L"\\" + names[i], t.w, t.h, t.patch, why)) {
+                if (!decode_picture(wic, std::wstring(OWN_FOLDER) + L"\\" + names[i], t.w, t.h, t.patch, t.alpha, why)) {
                     skip(why);
                     continue;
                 }
@@ -262,19 +277,24 @@ void read_own_textures() {
                 continue;
             }
             pixels_used += t.patch.size();
-            uint64_t r = 0, g = 0, bl = 0;
-            for (uint16_t c : t.patch) {
-                r += c >> 11;
-                g += (c >> 5) & 63;
-                bl += c & 31;
+            // the swatch's colour: the average of what it paints (a pixel weighed by its alpha)
+            uint64_t r = 0, g = 0, bl = 0, n = 0;
+            for (size_t k = 0; k < t.patch.size(); ++k) {
+                const uint16_t c = t.patch[k];
+                const uint64_t a = t.alpha.empty() ? 1 : t.alpha[k];
+                r += (c >> 11) * a;
+                g += ((c >> 5) & 63) * a;
+                bl += (c & 31) * a;
+                n += a;
             }
-            const uint64_t n = t.patch.size();
-            t.info.mean = static_cast<uint16_t>(((r / n) << 11) | ((g / n) << 5) | (bl / n));
+            if (n) t.info.mean = static_cast<uint16_t>(((r / n) << 11) | ((g / n) << 5) | (bl / n));
             t.info.english = shown;   // its file's name
             t.info.own = t.info.available = t.sampled = true;
+            t.lay.mirrored = false;   // side by side at first, every copy upright
             g_textures.push_back(std::move(t));
             ++taken;
-            patch::log("ground: mods\\textures\\%s: %d x %d px", shown.c_str(), g_textures.back().w, g_textures.back().h);
+            patch::log("ground: mods\\textures\\%s: %d x %d px%s", shown.c_str(), g_textures.back().w, g_textures.back().h,
+                       g_textures.back().alpha.empty() ? "" : ", with transparency");
         }
     }
     release_com(wic);
@@ -351,13 +371,43 @@ void read_textures() {
                static_cast<unsigned>(g_textures.size() - game), g_own_skipped);
 }
 
-uint16_t sample(const Texture& t, int x, int y) {
-    // mirrored every w (h) px: no seams - for the game's 128 x 128, x & 255 folded at 128
-    const int pw = 2 * t.w, ph = 2 * t.h;
-    int u = (x % pw + pw) % pw, v = (y % ph + ph) % ph;
-    if (u >= t.w) u = pw - 1 - u;
-    if (v >= t.h) v = ph - 1 - v;
-    return t.patch[static_cast<size_t>(v) * t.w + u];
+// The texel a picture's pixel (x, y) takes when the texture is laid `lay` way: the picture's own coordinates
+// anchor the laying, so strokes side by side continue one grid, whatever the turn. The turned picture
+// (w x h, the sides swapped by a quarter turn) is repeated side by side, or mirrored every w (h) px - no
+// seams: for the game's 128 x 128 samples x & 255 folded at 128, at 0 the laying they always had.
+size_t texel(const Texture& t, int x, int y, TextureLay lay) {
+    const int turn = lay.turn & 3;
+    const int w = turn & 1 ? t.h : t.w, h = turn & 1 ? t.w : t.h;
+    int u, v;
+    if (lay.mirrored) {
+        const int pw = 2 * w, ph = 2 * h;
+        u = (x % pw + pw) % pw;
+        v = (y % ph + ph) % ph;
+        if (u >= w) u = pw - 1 - u;
+        if (v >= h) v = ph - 1 - v;
+    } else {
+        u = (x % w + w) % w;
+        v = (y % h + h) % h;
+    }
+    int sx = u, sy = v;   // the picture's pixel shown at (u, v) of its turned copy (clockwise turns)
+    if (turn == 1) sx = v, sy = t.h - 1 - u;
+    else if (turn == 2) sx = t.w - 1 - u, sy = t.h - 1 - v;
+    else if (turn == 3) sx = t.w - 1 - v, sy = u;
+    return static_cast<size_t>(sy) * t.w + sx;
+}
+
+uint16_t sample(const Texture& t, int x, int y, TextureLay lay) { return t.patch[texel(t, x, y, lay)]; }
+uint16_t sample(const Texture& t, int x, int y) { return sample(t, x, y, t.lay); }
+
+// The texture's alpha at a picture's pixel, 255 for an opaque one.
+int sample_alpha(const Texture& t, int x, int y, TextureLay lay) { return t.alpha.empty() ? 255 : t.alpha[texel(t, x, y, lay)]; }
+int sample_alpha(const Texture& t, int x, int y) { return sample_alpha(t, x, y, t.lay); }
+
+// The way a texture is laid at first (TextureLay's comment): the Water tool's bed always lays it so.
+TextureLay first_lay(const Texture& t) {
+    TextureLay lay;
+    lay.mirrored = !t.info.own;
+    return lay;
 }
 
 uint16_t blend(uint16_t a, uint16_t b, float t) {
@@ -776,6 +826,18 @@ int ground_own_skipped() {
     return g_own_skipped;
 }
 
+TextureLay ground_texture_lay(int texture) {
+    read_textures();
+    return texture >= 0 && texture < static_cast<int>(g_textures.size()) ? g_textures[texture].lay : TextureLay{};
+}
+
+void ground_set_texture_lay(int texture, TextureLay lay) {
+    read_textures();
+    if (texture < 0 || texture >= static_cast<int>(g_textures.size())) return;
+    lay.turn &= 3;
+    g_textures[texture].lay = lay;
+}
+
 bool ground_texture_sample(int texture, std::vector<uint16_t>& patch) {
     read_textures();
     if (texture < 0 || texture >= static_cast<int>(g_textures.size()) || !g_textures[texture].sampled ||
@@ -802,7 +864,13 @@ void ground_paint(float x, float y, float radius, int texture, bool restore, flo
         return;
     const Grid ground{grid, gw, gh};
     each_pixel(x, y, radius, [&](int px, int py, size_t i, float w) {
-        const float a = w * strength;
+        float a = w * strength;
+        // an own PNG's transparency: a transparent texel paints nothing (the ground stays as it was), a half
+        // transparent one blends by its alpha on top of the brush's edge and strength; such a pixel is not
+        // that texture's (the pipette may name nothing there)
+        const int alpha = restore ? 255 : sample_alpha(g_textures[texture], px, py);
+        if (alpha == 0) return;
+        if (alpha < 255) a *= alpha / 255.0f;
         uint16_t c = restore ? g_original_pixels[i] : sample(g_textures[texture], px, py);
         // the texture lit as the relief lights the ground there (the point the pixel shows: its
         // screen row plus its height texel's level): painted flat, a hill or a slope lost its shading
@@ -810,7 +878,7 @@ void ground_paint(float x, float y, float radius, int texture, bool restore, flo
             c = lit(c, ground.light(px + g_left + 0.5f, py + g_top + (g_heights[i] - 1026) / 8.0f));
         g_pixels[i] = blend(g_pixels[i], c, a);
         if (restore) g_heights[i] = static_cast<uint16_t>(g_heights[i] + (g_original_heights[i] - g_heights[i]) * a);
-        if (a >= 0.5f) g_textures_of[i] = restore ? NO_TEXTURE : static_cast<uint8_t>(texture);
+        if (a >= 0.5f) g_textures_of[i] = restore || alpha < 255 ? NO_TEXTURE : static_cast<uint8_t>(texture);
     }, hard);
 }
 
@@ -825,17 +893,23 @@ int ground_texture_at(float x, float y) {
     int best = -1, best_count = 12;   // of 25
     for (size_t k = 0; k < g_textures.size(); ++k) {
         if (!g_textures[k].sampled) continue;
-        int count = 0;
-        for (int yy = (std::max)(0, py - 2); yy <= (std::min)(g_h - 1, py + 2); ++yy)
-            for (int xx = (std::max)(0, px - 2); xx <= (std::min)(g_w - 1, px + 2); ++xx) {
-                const uint16_t a = g_pixels[static_cast<size_t>(yy) * g_w + xx], b = sample(g_textures[k], xx, yy);
-                if (std::abs((a >> 11) - (b >> 11)) <= 1 && std::abs(((a >> 5) & 63) - ((b >> 5) & 63)) <= 1 &&
-                    std::abs((a & 31) - (b & 31)) <= 1)
-                    ++count;
+        for (int way = 0; way < 8; ++way) {   // laid in any of the eight ways (ground_texture_lay): four turns, two layings
+            TextureLay lay;
+            lay.turn = way & 3;
+            lay.mirrored = way < 4;
+            int count = 0;
+            for (int yy = (std::max)(0, py - 2); yy <= (std::min)(g_h - 1, py + 2); ++yy)
+                for (int xx = (std::max)(0, px - 2); xx <= (std::min)(g_w - 1, px + 2); ++xx) {
+                    if (sample_alpha(g_textures[k], xx, yy, lay) < 255) continue;   // a pixel such a texel painted is not the texture's
+                    const uint16_t a = g_pixels[static_cast<size_t>(yy) * g_w + xx], b = sample(g_textures[k], xx, yy, lay);
+                    if (std::abs((a >> 11) - (b >> 11)) <= 1 && std::abs(((a >> 5) & 63) - ((b >> 5) & 63)) <= 1 &&
+                        std::abs((a & 31) - (b & 31)) <= 1)
+                        ++count;
+                }
+            if (count > best_count) {
+                best_count = count;
+                best = static_cast<int>(k);
             }
-        if (count > best_count) {
-            best_count = count;
-            best = static_cast<int>(k);
         }
     }
     return best;
@@ -995,7 +1069,7 @@ void ground_lower(float x, float y, float radius, int bed, int texture, bool res
         }
         const float lowered = g_heights[i] + (bed_height - g_heights[i]) * w;
         if (lowered < g_heights[i]) g_heights[i] = static_cast<uint16_t>(lowered);
-        if (tex) g_pixels[i] = blend(g_pixels[i], sample(g_textures[texture], px, py), w * 0.85f);
+        if (tex) g_pixels[i] = blend(g_pixels[i], sample(g_textures[texture], px, py, first_lay(g_textures[texture])), w * 0.85f);
         if (tex && w * 0.85f >= 0.5f) g_textures_of[i] = static_cast<uint8_t>(texture);
     });
 }
