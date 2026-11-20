@@ -8,7 +8,8 @@ r"""Says whether two builds are the same files apart from timestamps.
 - A DLL (any PE file) is compared with the fields a build stamps blanked: the header's time and
   checksum, the debug directory's times and its CodeView record (its GUID changes with every link).
   What still differs is named: the sections, the compilers and linker that made it (the Rich
-  header: a different toolset gives different code), the version resource, the imports.
+  header: a different toolset gives different code), the version resource, the imports, the names
+  MSVC gave anonymous namespaces (another source path or computer name: tools/build_locofix.py).
 - A Setup.exe (PyInstaller's one-file exe) is opened as its archive: every entry of the package
   (the payload, the Python runtime, the DLLs) and every module of its PYZ are compared by their
   unpacked contents, the exe before the archive (the bootloader with Setup's icon, manifest and
@@ -22,6 +23,7 @@ Needs pefile (tools/requirements.txt) and, for Setup.exe, PyInstaller (tools/req
 import argparse
 import hashlib
 import os
+import re
 import sys
 
 import pefile
@@ -119,7 +121,16 @@ def compare_pe(name, a, b):
     ia, ib = set(imports(pa)), set(imports(pb))
     if ia != ib:
         out.append(f"  imports only in the first: {sorted(ia - ib)[:10]}, only in the second: {sorted(ib - ia)[:10]}")
+    ha, hb = anonymous_namespaces(a), anonymous_namespaces(b)
+    if ha != hb:
+        out.append(f"  anonymous namespaces {' '.join(ha) or '-'} and {' '.join(hb) or '-'}: another source path or "
+                   "computer name at compiling (a build without tools/build_locofix.py's release settings)")
     return out
+
+
+def anonymous_namespaces(data):
+    """The names MSVC gave anonymous namespaces (?A0x<hash>), as far as a DLL keeps them (its RTTI names)."""
+    return sorted({m.decode() for m in re.findall(rb"\?A0x[0-9a-f]{8}", data)})
 
 
 def sha(data):

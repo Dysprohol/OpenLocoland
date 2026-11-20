@@ -57,18 +57,28 @@ by hand, with the files of a build that matched. The tools are the local release
 the Windows SDK 10.0.19041.0 of the Visual Studio 2019 Build Tools (the job installs them, the
 installer checked as signed by Microsoft; `LOCOFIX_MSVC` / `LOCOFIX_WINSDK`), Python 3.13.1 x64 and
 the packages pinned in `tools/requirements-release.txt` (change a version there in one commit, for
-both). Two things keep two builds of one commit the same: a release's `LocoFix.dll` is compiled
-from a copy of `src\LocoFix` at one fixed place, `C:\ProgramData\OpenLocoland\LocoFix-src` (MSVC
-names a file's anonymous namespace after its full path, and the names order the code; the copy is
-removed afterwards), and PyInstaller runs with `PYTHONHASHSEED=0` (else `base_library.zip` comes in
-another order). `tools\compare_builds.py <a> <b>` says whether two `LocoFix.dll` or two `Setup.exe`
-are the same files apart from timestamps (the PE header's time and checksum, the debug directory's
-times) and names what differs - the sections, the tools that made a DLL (its Rich header), the
-version resource, a payload file, a Python module - with the likely reason. Checked on
-2026-11-20: the job's commands, run in their order in two fresh clones of one commit (fresh venvs,
-the two pins set), gave two `LocoFix.dll` and two `Setup.exe` the same apart from timestamps - before
-the fixed place and the hash seed the DLLs' code differed and so did `base_library.zip`'s order -;
-that Setup installed in the rig (`-Job setup --auto`) and its game ran mission 1. A run on GitHub is
+both). Three things keep two builds of one commit the same, on one computer or two. MSVC names
+each file's anonymous namespace `?A0x<hash>`, the hash a CRC-32 of the computer's name followed by
+the file's full path in lower case, and the names order the code (two builds with other names
+differ in most of `.text`, `.data` and `.reloc`). So a release's `LocoFix.dll` is compiled from a
+copy of `src\LocoFix` at one fixed place, `C:\ProgramData\OpenLocoland\LocoFix-src` (removed
+afterwards), with the computer name the compiler sees set to `OPENLOCOLAND`: the variable
+`_CLUSTER_NETWORK_NAME_`, which Windows' `GetComputerName` answers with when it is set
+(`tools/build_locofix.py`, only in the release build's script); a GitHub runner has a new name for
+every run. And PyInstaller runs with `PYTHONHASHSEED=0` (else `base_library.zip` comes in another
+order). The output folder, the toolset's install folder, `TMP`, the user, the file times and the
+line endings do not change the DLL. `tools\compare_builds.py <a> <b>` says whether two
+`LocoFix.dll` or two `Setup.exe` are the same files apart from timestamps (the PE header's time and
+checksum, the debug directory's times) and names what differs - the sections, the tools that made a
+DLL (its Rich header), its anonymous namespaces' names, the version resource, a payload file, a
+Python module - with the likely reason. Checked on 2026-11-20: the job's commands, run in their
+order in two fresh clones of one commit (fresh venvs, the two pins set), gave two `LocoFix.dll` and
+two `Setup.exe` the same apart from timestamps - before the fixed place and the hash seed the DLLs'
+code differed and so did `base_library.zip`'s order -; that Setup installed in the rig (`-Job setup
+--auto`) and its game ran mission 1. The first run on GitHub (before the computer name was set)
+gave a DLL with other anonymous namespace names than the local build and differing code; with the
+name set, a local release build and the same build in the rig's Windows Sandbox (another computer
+name, user and output folder) gave the same `LocoFix.dll` apart from timestamps. A run on GitHub is
 compared with a local build of the same tag after the tag is pushed:
 
 ```bat

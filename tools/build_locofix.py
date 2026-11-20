@@ -16,10 +16,14 @@ LOCOFIX_MSVC=<14.29 ...> picks that MSVC toolset (the installation that has it; 
 (.github/workflows/release.yml) builds with the toolset and the SDK of the local releases, so the
 two DLLs can be compared (tools/compare_builds.py).
 
-A build with a version (a release's) compiles a copy of the sources at one fixed place, FIXED_SOURCES,
-the same on every machine: MSVC names each file's anonymous namespace after the full path of the
-file, the names order the code, and two copies of the repository in two folders (a local release
-and the release workflow's checkout) gave two different DLLs. The copy is removed afterwards.
+A build with a version (a release's) gives the same DLL on every machine. MSVC names each file's
+anonymous namespace ?A0x<hash>, the hash a CRC-32 of the computer's name followed by the file's full
+path in lower case, and the names order the code: two copies of the repository in two folders, or
+one folder on two computers (a local release and the release workflow's runner, whose name changes
+with every run), gave two different DLLs. So a release build compiles a copy of the sources at one
+fixed place, FIXED_SOURCES (removed afterwards), and runs the compiler with the computer name
+BUILD_HOST: Windows' GetComputerName answers with the variable _CLUSTER_NETWORK_NAME_ when it is set
+(meant for programs on a cluster), in the compiler as in any program it starts.
 """
 import contextlib
 import glob
@@ -39,6 +43,8 @@ DELAY_LOAD = " ".join(f"/DELAYLOAD:{d}" for d in ("winhttp.dll", "bcrypt.dll", "
 DEV_VERSION = "dev"   # patch.h's LOCOFIX_VERSION when none is given
 # where a release build compiles (the same path locally and in the release workflow; see above)
 FIXED_SOURCES = r"C:\ProgramData\OpenLocoland\LocoFix-src"
+# the computer name a release build's compiler sees (_CLUSTER_NETWORK_NAME_; see above)
+BUILD_HOST = "OPENLOCOLAND"
 LOCK_STALE = 1800   # seconds
 # the version resources' copyright line (LocoFix.dll and Setup.exe; installer.CREDIT in Setup's window)
 COPYRIGHT = "Copyright (C) 2026 Dysprohol and OpenLocoland contributors. Locoland is a trademark of its owners."
@@ -205,6 +211,8 @@ def compile_dll(bat, sources, out_dir, version):
     with open(script, "w", encoding="ascii") as f:
         f.write("@echo off\r\n")
         f.write(f'call "{bat}"{pins} >nul || exit /b 1\r\n')
+        if version:
+            f.write(f"set _CLUSTER_NETWORK_NAME_={BUILD_HOST}\r\n")
         f.write(f'cd /d "{sources}"\r\n')
         f.write(f'rc /nologo /fo "{out_dir}\\version.res" "{out_dir}\\version.rc" || exit /b 1\r\n')
         f.write(f'cl /nologo /O2 /MT /LD /EHsc /utf-8 /W4 /std:c++17 {define}{cpp} "{out_dir}\\version.res" '
