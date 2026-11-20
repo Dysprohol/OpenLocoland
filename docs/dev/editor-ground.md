@@ -654,7 +654,14 @@ ramp of Ctrl+wheel and PgUp / PgDn). While the Ground height, the Paint or the W
 panel's strip (VID 497) laid as long as the row, centred on the view, the menu font (VID 2; VID 7 lit
 for what is set and what is under the mouse, the set choice underlined). Ground height: the modes
 RAISE/LOWER, FLATTEN, SMOOTH, RAMP, ROUGH, SIZE - n +, STRENGTH - n +, EDGE SOFT / HARD; Paint: a
-MODE: TEXTURE / GRAVEL BED, then a swatch of each texture (its mean colour, the chosen one framed)
+MODE: TEXTURE / GRAVEL BED, then a swatch of each texture (its mean colour, the chosen one framed, its
+name right above it under the mouse as the strip's icons have theirs - since 2026-11-20; the player's
+own after them behind OWN:, see "Paint the ground"; `texture_groups` cuts them into groups no wider than
+the view, as even as they can be, so no row runs off it: the 25 of the game are 500 px, one group even at
+640 x 480 or at three times on 2560 x 1440, and up to 32 own pictures may take two; the row's other
+groups go onto the rows above when they do not fit beside them - at 1024 x 768 MODE, the 25, OWN: with
+two pictures and LEFT OUT: share a row, SIZE, STRENGTH and EDGE above; at 1920 x 1080 all of it is one
+row; at twice there MODE, the 25 and OWN: are one)
 or KIND and WIDTH (GRAVEL BED, below; and UNDER THE WHOLE TRACK), SIZE, STRENGTH (a fifth to all of the texture a pass: `ground_paint`'s
 strength), EDGE (`weight` full to the edge). A group that does not fit
 beside the others goes into a row above (the window's or the screen's width). A click on a button
@@ -892,9 +899,64 @@ grounds, imageFlags 0x35) and the map's ground record points at it - never over 
 **Paint the ground**: the textures are 128 x 128 patches of the player's campaign grounds named by
 `editor\textures.tsv` (game/editor/: the map and the place, nothing of the pictures in the repository)
 - grass (l02), light grass (l15), forest floor (l07), sand (l11), desert (l10), snow (l18), ice (l16),
-rock and dark rock (l20), lava (l13), swamp (l06), lake bed (l15) -, laid mirrored, the brush's edge
-soft and grainy; [ and ] pick one, + and - the brush (8-200 px), Shift puts the original picture
-back. **Water and lava** (W picks the kind) does what the authors did (MAP_RULES.md 2): it lowers the
+rock and dark rock (l20), lava (l13), swamp (l06), lake bed (l15), and since 2026-11-20 lawn (l01),
+lush grass (l04), tall grass, dry grass and flagstones (l09), autumn grass (l02), reeds (l06), dry scrub
+and scree (l12), bog (l08), cracked earth (l10), dry clay (l11), snowdrift (l16) -, laid mirrored, the
+brush's edge soft and grainy; [ and ] pick one (past one whose map is missing), + and - the brush
+(8-200 px), Shift puts the original picture back. New rows go at the end of the table: the Water tool's
+beds name rows 10-12 by their place. The 13 added were picked from all 20 grounds - every 128 px
+window scored for how even it is, the candidates looked at mirrored as the brush lays them, against
+the 12 and each other: plain surfaces only (no object, shadow, rail, road edge or lit hilltop in the
+patch), none a near copy of another (the mean colours apart and the grain different: l05's tall grass
+is l09's twin and l12's lighter ash the scree's, so only one of each is in; l14's "moss" is a forest
+canopy, left out). Every edition's
+`lNN.vid` is the same file (`tools/editions/*.tsv`), so the places hold for all. The grounds have no
+clean 128 px patch of brown earth or mud, of a gravel road (the dirt roads of l03-l05 are ~30 px
+wide), of paving (l01's plaza is crossed by its roads) or of a sandy shore: those are left to the
+player's own textures. Checked in the game (Polish, 1024 x 768, POLIGON): each of the 13 picked in the
+row (its name above it), painted ("ground painted: Lawn, 81x81 px" ... in LocoFix.log) and named by
+Alt+click ("tekstura: Trawnik (pobrana z obrazu)" ...).
+**The player's own textures** (`editor_ground.cpp` `read_own_textures`, since 2026-11-20 - the first
+mod support): the pictures of the game folder's `mods\textures\` - PNG, BMP or JPEG (`.png`, `.bmp`,
+`.jpg`, `.jpeg`; read with Windows' own WIC, its first frame, transparency ignored), any size from
+8 x 8 to 1024 x 1024 px, laid mirrored at their own size as the game's patches are (so a picture that
+does not tile still meets itself without a seam; one made to tile shows mirrored) - come after the
+game's in the row, behind OWN: (`OptOwnTextures`), in the order of their file names (case ignored), each
+named by its file's name (with the extension, in the pack's code page). The folder is mods\ and not
+editor\ because `editor\` is one of the folders the build owns (`build.py` `OWNED_DIRS`: an update
+removes what it did not write there) and because mods\ is where later kinds of mods can go beside
+textures\; `build.py` makes it empty so a player finds it, and nothing of a build goes into it, so
+neither the clean-up nor an update touches it (release.md "Updating"). Left out, each with a line in
+LocoFix.log ("ground: mods\textures\broken.png left out: not a picture Windows can read") and their
+count in the row after the own swatches (LEFT OUT: n, `OptOwnSkipped`, its tip and click pointing to
+the log) and at the end of the Paint tool's status line (`StatusOwnSkipped` - cut off in a 1024 px
+window, hence the row; no text of the packs may hold `\t`, which their reader makes a tab, so these say
+"own pictures", not the folder's name): a picture Windows cannot read or
+whose pixels cannot be decoded, one under 8 or over 1024 px a side (its size read before its pixels,
+so a huge one costs nothing), a file over 32 MB, any after the first 32 by name, and one that would
+take the pictures past 4 million pixels together (8 MB: the editor shares the 32-bit game's memory with
+the map's picture); other files in the folder (a note) are left alone with a line, and its subfolders
+are not read. The folder is read
+once a game run, at the textures' first use, so pictures added while the game runs show after it
+starts again. Painting with one writes its pixels into the map's picture exactly as the game's
+textures do, so a saved map's `<name>.vid` - and its export - carries the painted ground and needs
+nothing on another computer; the pipette names an own texture by its file's name, from the session's
+record or, for a picture saved before, by its pixels as the game's (where the picture is not there,
+nothing). File > New's empty maps are of the game's textures only (`ground_texture_sample` refuses an
+own one: its size varies). Checked in the game (the test rig, 2026-11-20): mods\textures with checker.png
+(64 x 64), noise.png (200 x 150), broken.png (random bytes), huge.png (2048 x 1024) and readme.txt - the
+log named the two left out and the note, the row showed OWN: with two swatches and LEFT OUT: 2 (Polish
+and English, 1024 x 768 and 1920 x 1080, the interface at 1 and 2); on POLIGON (Polish, 1024 x 768) [
+from the first texture went to noise.png, then checker.png, each painted with a click and a drag, lawn
+and snowdrift beside them, Alt+click naming all four; saved and exported: the saved `.vid`'s picture
+holds 11918 and 11748 pixels that are exactly the mirrored samples of noise.png and checker.png
+(`map_tool.py`'s reader); imported into a copy of the game without mods\ the picture is the saved one to
+the pixel and the editor shows the painted ground, Alt+click naming lawn and snowdrift from the picture
+and calling the own textures' ground the original; the same map in the copy with the pictures had them
+named from the picture alone. Setup (`release.py`'s, in a fresh box): installed, mods\textures there
+and empty; two pictures, a subfolder with one and a note put in; Setup again over it - all four files
+the same, nothing removed (install.log), the editor reading the two.
+**Water and lava** (W picks the kind) does what the authors did (MAP_RULES.md 2): it lowers the
 picture and the GRID under the brush to the bed (the level - 25, the shore sloping), paints the bed,
 adds the kind's tiles where missing on the 128 grid at the map's level of that kind, and when the
 stroke ends scatters its generators (water circles 504 and noise 510, swamp bubbles 206 and circles

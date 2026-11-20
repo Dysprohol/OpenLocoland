@@ -49,7 +49,7 @@ Folder gry jest samodzielny: są w nim twoje mapy, tabele wyników i logi. Profi
 wygrane misje, wyniki, ustawienia dźwięku) jest zapisany w rejestrze twojego użytkownika Windows,
 tak jak w oryginale.
 
-**Aktualizacja.** Uruchom nowszy `Setup.exe` i wciśnij **Aktualizuj**: znajdzie zainstalowaną grę i skopiuje tylko to, co się zmieniło. Twoje mapy (w `maps\` folderu gry) i twój profil zostają.
+**Aktualizacja.** Uruchom nowszy `Setup.exe` i wciśnij **Aktualizuj**: znajdzie zainstalowaną grę i skopiuje tylko to, co się zmieniło. Twoje mapy (w `maps\` folderu gry), twoje tekstury (w `mods\textures\`, zob. [własne tekstury](#5-edytor-map)) i twój profil zostają.
 
 Twoja wersja jest napisana drobnym drukiem w prawym dolnym rogu menu głównego (i w tytule okienka
 startowego oraz okna gry). Czy jest nowsza wersja, sprawdzisz przyciskiem **Sprawdź aktualizacje** w okienku startowym (zob.
@@ -83,7 +83,8 @@ Odznacz **przy starcie**, żeby wyłączyć samoczynne sprawdzanie; przycisk dal
 Setup nie łączy się z internetem: jego link **GitHub** tylko otwiera przeglądarkę, gdy go klikniesz.
 
 **Odinstalowanie.** Uruchom `Setup.exe` i wciśnij **Odinstaluj**: usuwa skróty i folder gry ze wszystkim, co w nim jest (OpenLocoland nie figuruje w „Aplikacjach” Windows). Gra ze Steama zostaje bez zmian. Jeśli chcesz zachować swoje
-mapy, skopiuj je najpierw (każda to folder w `maps\`, zob. [udostępnianie mapy](#13-zapis-eksport-i-udostępnianie)).
+mapy, skopiuj je najpierw (każda to folder w `maps\`, zob. [udostępnianie mapy](#13-zapis-eksport-i-udostępnianie)), a także
+swoje obrazki z `mods\textures\`.
 
 ## 2. Pierwsze uruchomienie
 
@@ -262,6 +263,19 @@ wielkość; wszystko na mapie - zaznaczanie, przeciąganie, narzędzia - działa
 edytor rysuje dłużej, więc działa wolniej. Test poziomu zaczyna się w powiększeniu samej gry, a po powrocie
 wraca twoje.
 
+**Własne tekstury** (pierwsza obsługa modów). Włóż obrazki do folderu `mods\textures\` w folderze gry
+(Setup zakłada go pusty), a **Malowanie terenu** ma je po teksturach gry, za **WLASNE:**, w kolejności
+nazw plików; nazwą pod myszą i w wierszu stanu jest nazwa pliku. PNG, BMP albo JPEG, od 8 x 8 do
+1024 x 1024 pikseli, najwyżej 32 obrazki i razem 4 miliony pikseli (na przykład szesnaście po 512 x 512);
+kładą się lustrzanie, jak tekstury gry, więc każdy obrazek łączy się bez szwu (mały powtarza się częściej -
+128 x 128 do 256 x 256 to mniej więcej skala gry); przezroczystość nie jest brana pod uwagę. Edytor czyta
+folder, gdy pierwszy raz potrzebuje tekstur, więc po dodaniu obrazków uruchom grę ponownie. Obrazek, którego
+nie może wziąć (uszkodzony, za mały, za duży, o jeden za dużo), pomija: rząd mówi **POMINIETE:** i ile
+(wiersz stanu też), a `logs\LocoFix.log` które i dlaczego. To, co namalujesz, trafia do obrazu terenu samej mapy, więc
+zapisana albo wyeksportowana mapa wygląda tak samo na każdym komputerze, bez twoich obrazków. Aktualizacje
+przez Setup nie ruszają tego folderu. Używaj tylko obrazków, do których masz prawo - własnych albo takich,
+których licencja pozwala umieścić je w mapie, którą udostępniasz.
+
 **Podstawy edycji** (narzędzie Zaznacz, klawisz 1):
 
 | Czynność | Jak |
@@ -325,8 +339,11 @@ nową krawędzią - tor może biec jeszcze 300 px dalej, poza zasięgiem wzroku.
 ### 2. Pomaluj teren
 
 **Malowanie terenu** z listwy: jego rząd przycisków nad paskiem ma tekstury (trawa, jasna trawa,
-ściółka, piasek, pustynia, śnieg, lód, skała, ciemna skała, lawa, bagno, dno jeziora - wzięte z map
-kampanii; `[` i `]` też je wybierają), **ROZMIAR** (8 - 200 px; także Ctrl+kółko), **SILA** (ile
+ściółka, piasek, pustynia, śnieg, lód, skała, ciemna skała, lawa, bagno, dno jeziora, trawnik, bujna
+trawa, wysoka trawa, sucha trawa, jesienna trawa, trzcina, suche zarośla, torfowisko, kamienne płyty,
+spękana ziemia, sucha glina, rumowisko, zaspa - wzięte z map kampanii, każda podpisana nad sobą pod
+myszą; potem twoje własne, jeśli jakieś dodałeś, zob. [własne tekstury](#5-edytor-map); `[` i `]` też je
+wybierają), **ROZMIAR** (8 - 200 px; także Ctrl+kółko), **SILA** (ile
 pokrywa jedno pociągnięcie: mniejsza pozwala mieszać tekstury) i **KRAWEDZ** miękką albo twardą. Maluj
 przeciągając lewym przyciskiem; prawy (albo Shift+przeciąganie) przywraca oryginalny obraz; Alt+klik
 pobiera teksturę spod kursora (także z obrazu pomalowanego i zapisanego wcześniej). Pociągnięcie zaczęte

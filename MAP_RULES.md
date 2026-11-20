@@ -61,7 +61,8 @@ the editor of the game (DEVELOPERS.md "Editor mode", `editor_edit.cpp`) applies 
   depth buffer): the campaign grounds hold **1026 + 8 a GRID level** (l06 and l13 at 0: 1025-1027,
   at 70: 1586, l15 at 144: 2181). Objects, water and fog are drawn against these depths, not the GRID.
 - **Ground painting [editor]:** the Paint tool paints the picture with textures sampled from the
-  player's campaign grounds (`editor\textures.tsv` names the 128 x 128 patch of each); a painted
+  player's campaign grounds (`editor\textures.tsv` names the 128 x 128 patch of each) or with the
+  player's own pictures (`mods\textures\`); the colours go into the picture itself, so a painted
   map gets its own `<name>.vid` when saved (a campaign terrain keeps pointing at the game's `lNN.vid`
   until it is painted). The heights are kept as they are.
 - **Water and lava** (l01, l05, l06-l09, l11-l13, l15-l17): animated tiles of 128 x 128 - light

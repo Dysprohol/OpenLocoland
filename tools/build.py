@@ -226,6 +226,8 @@ OBJECTS_OVERRIDE = "objects.override"   # in game/: changed values of objects.re
 MAPS_OVERRIDE = "maps.override"         # in game/: changed objects of maps (map_tool.py)
 MAPS_NEW = "maps.new"                   # in game/: whole new maps (map_tool.py new)
 EDITOR_DATA = "editor"                  # in game/: the editor's palette (patch_data.make_editor_palette)
+# the player's own textures for the editor's Paint tool: a folder of theirs, never in OWNED_DIRS
+OWN_TEXTURES = os.path.join("mods", "textures")
 LOGO_PNG = os.path.join(REPO, "tools", "icon", "openlocoland_logo.png")   # the project's logo (just_Martin): the
                                         # intro's title board vid\481logo.vid (patch_data.make_logo_board) and Setup's header
 MAP_MODEL = {"map.json", "objects.tsv", "groups.txt", "grid.txt", "vids.tsv",
@@ -852,6 +854,9 @@ def build(steam, target, locofix=None, captured=None, progress=None, version=Non
         print("vid: unknown images, no palette for the editor")
     # the ground painting's textures: where to sample them in the player's campaign grounds
     copy(os.path.join(game, EDITOR_DATA, "textures.tsv"), os.path.join(a.target, "editor", "textures.tsv"), copied)
+    # and the folder of the player's own (mods\textures, editor_ground.cpp), made empty for them to find:
+    # nothing of a build ever goes in, so neither the clean-up nor an update touches what they put there
+    os.makedirs(os.path.join(a.target, OWN_TEXTURES), exist_ok=True)
     if not generate(copied, lambda help_vid, menu_vid: patch_data.make_editor_buttons(
             os.path.join(a.steam, "vid"), help_vid, menu_vid),
             os.path.join(vid, "942help.vid"), os.path.join(vid, "943menu.vid")):

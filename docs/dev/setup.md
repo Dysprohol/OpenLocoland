@@ -64,7 +64,9 @@ date as its source, or the same content (Setup unpacks our files anew at every s
 dates are new each time); the patched and generated files (the patched scripts, `Locoland.exe`,
 `objects.res`, the editor's images, the new maps) are made in memory or a temporary folder and
 written only when they differ. An update with nothing new writes nothing but `logs\install.log`
-and `OpenLocoland.json`.
+and `OpenLocoland.json`. It also makes the empty folder `mods\textures\` (`OWN_TEXTURES`), where the
+player puts pictures of their own for the editor's Paint tool (editor-ground.md "Paint the ground");
+nothing of a build ever goes into `mods\`, so no build, update or clean-up takes anything from it.
 
 The Steam copy has to be the original. `build.py` (and so Setup) stops when `Steam.exe` is not
 the exe of 2003-10-07 that LocoFix is made for (its SHA-256 in `build.py`; the same exe for every

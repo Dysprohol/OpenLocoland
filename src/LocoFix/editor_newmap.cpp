@@ -1499,7 +1499,7 @@ INT_PTR CALLBACK new_map_proc(HWND dialog, UINT m, WPARAM w, LPARAM l) {
         SetDlgItemTextW(dialog, IDC_NAME, L"mymap");
         const std::vector<GroundTexture>& textures = ground_textures();
         for (size_t k = 0; k < textures.size(); ++k)
-            if (textures[k].available)
+            if (textures[k].available && !textures[k].own)   // the player's own pictures are for the Paint tool
                 add_ground(dialog,
                            ui_wide(ui_printf(ui_format("NewEmpty", "an empty map: %s"), ui_text(textures[k].key.c_str(), textures[k].english.c_str()))),
                            EMPTY + static_cast<int>(k));

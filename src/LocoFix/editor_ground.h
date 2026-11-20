@@ -20,9 +20,10 @@ struct PaintPatch {
 constexpr uint8_t NO_TEXTURE = 255;
 
 struct GroundTexture {
-    std::string key, english;
+    std::string key, english;   // the player's own: no key, `english` its file's name (in the pack's code page)
     uint16_t mean = 0;   // its average colour (R5G6B5), for the swatch
     bool available = false;
+    bool own = false;    // a picture of the game folder's mods\textures\ (after the game's)
 };
 
 // Makes the held level's ground paintable: its picture read from the image of the map file `map`,
@@ -46,9 +47,15 @@ void ground_reset();
 void ground_keep();
 bool ground_kept();
 void ground_take_kept();
-// The textures (game folder's editor\textures.tsv), sampled at the first use.
+// The textures, read at the first use: the game's (game folder's editor\textures.tsv, sampled from the
+// campaign grounds), then the player's own pictures of mods\textures\ by name (PNG, BMP, JPEG, 8 to 1024
+// px a side, laid mirrored at their own size).
 const std::vector<GroundTexture>& ground_textures();
-// A texture's 128 x 128 sample (laid mirrored it tiles without seams); false when it is not available.
+// How many pictures of mods\textures\ were left out (unreadable, too small or big, too many; LocoFix.log
+// says which and why).
+int ground_own_skipped();
+// A texture's 128 x 128 sample (laid mirrored it tiles without seams); false when it is not available
+// or is one of the player's own (their sizes vary).
 bool ground_texture_sample(int texture, std::vector<uint16_t>& patch);
 
 // A stroke: begin, any number of steps, end (the patch for the history, null when nothing changed).

@@ -13,8 +13,10 @@
 //
 // The textures come from the player's own campaign grounds (game folder: editor\textures.tsv names
 // a 128 x 128 patch of a maps\lNN\lNN.vid for each, laid mirrored so it tiles without seams); nothing
-// of the pictures is in the repository. A stroke keeps the rectangle it changed before and after
-// (PaintPatch, one step of the history). A map made on a campaign terrain keeps pointing at the
+// of the pictures is in the repository; after them come the player's own pictures of the folder
+// mods\textures (read_own_textures). A painted pixel is the texture's colour, so the map's own image
+// carries it and needs neither the campaign grounds nor the pictures on another computer. A stroke
+// keeps the rectangle it changed before and after (PaintPatch, one step of the history). A map made on a campaign terrain keeps pointing at the
 // player's lNN.vid until it is painted; then it gets <name>.vid of its own when saved.
 //
 // The relief: when the ground's heights (GRID) change, the picture is drawn again there for them
@@ -23,17 +25,23 @@
 // is hidden by it.
 #include "patch.h"
 #include "editor_ground.h"
+#include "editor_text.h"
 #include "rail_rules.h"
 
 #include <ddraw.h>
+#include <wincodec.h>
 #include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cwchar>
+#include <cwctype>
 #include <map>
 #include <new>
+
+#pragma comment(lib, "windowscodecs.lib")   // the GUIDs of WIC (the player's own textures); the DLL is COM's to load
 
 // editor_newmap.cpp
 std::string map_ground_image(const std::string& map);
@@ -59,13 +67,26 @@ struct Texture {
     GroundTexture info;
     std::string map;
     int x = 0, y = 0;
+    int w = PATCH, h = PATCH;      // the sample's size: PATCH x PATCH of a campaign ground, a picture's own
     bool sampled = false;
-    std::vector<uint16_t> patch;   // PATCH x PATCH
+    std::vector<uint16_t> patch;   // w x h
 };
 
 std::vector<Texture> g_textures;
 std::vector<GroundTexture> g_texture_infos;
 bool g_textures_read = false;
+
+// The player's own textures: the pictures of the game folder's mods\textures\ (PNG, BMP or JPEG, read
+// with Windows' own WIC), after the game's in the row, by name; each laid mirrored as the game's are,
+// whatever its size. A picture that cannot be read, is too small or too big, or would go past the
+// count or the memory they may take all together is left out, with a line in LocoFix.log and the
+// count in the Paint tool's row and status line - never more than that.
+const wchar_t OWN_FOLDER[] = L"mods\\textures";
+constexpr int OWN_MIN = 8, OWN_MAX = 1024;           // px a side
+constexpr int OWN_COUNT = 32;                        // pictures at most
+constexpr size_t OWN_PIXELS = size_t(4) << 20;       // all of them together (8 MB at 2 bytes a pixel)
+constexpr unsigned long long OWN_FILE = 32ull << 20; // a file's bytes at most
+int g_own_skipped = 0;
 
 // the picture
 bool g_ready = false, g_painted = false;
@@ -118,6 +139,146 @@ std::string read_text(const char* path) {
     if (!d.empty() && !ReadFile(f, &d[0], static_cast<DWORD>(d.size()), &got, nullptr)) d.clear();
     CloseHandle(f);
     return d;
+}
+
+template <typename T> void release_com(T*& p) {
+    if (p) p->Release();
+    p = nullptr;
+}
+
+// A picture file as R5G6B5 pixels, row by row (WIC: PNG, BMP, JPEG - whatever Windows decodes; its
+// first frame, transparency ignored). False with the reason in `why`; the size is checked before the
+// pixels are decoded, so a huge picture costs nothing.
+bool decode_picture(IWICImagingFactory* wic, const std::wstring& path, int& w, int& h, std::vector<uint16_t>& pixels,
+                    std::string& why) {
+    IWICBitmapDecoder* decoder = nullptr;
+    IWICBitmapFrameDecode* frame = nullptr;
+    IWICFormatConverter* converter = nullptr;
+    bool ok = false;
+    UINT fw = 0, fh = 0;
+    if (FAILED(wic->CreateDecoderFromFilename(path.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &decoder)))
+        why = "not a picture Windows can read";
+    else if (FAILED(decoder->GetFrame(0, &frame)) || FAILED(frame->GetSize(&fw, &fh)))
+        why = "broken: no picture in it";
+    else if (fw < static_cast<UINT>(OWN_MIN) || fh < static_cast<UINT>(OWN_MIN))
+        why = "smaller than " + std::to_string(OWN_MIN) + " x " + std::to_string(OWN_MIN) + " px (" + std::to_string(fw) + " x " +
+              std::to_string(fh) + ")";
+    else if (fw > static_cast<UINT>(OWN_MAX) || fh > static_cast<UINT>(OWN_MAX))
+        why = "bigger than " + std::to_string(OWN_MAX) + " x " + std::to_string(OWN_MAX) + " px (" + std::to_string(fw) + " x " +
+              std::to_string(fh) + ")";
+    else if (FAILED(wic->CreateFormatConverter(&converter)) ||
+             FAILED(converter->Initialize(frame, GUID_WICPixelFormat32bppBGRA, WICBitmapDitherTypeNone, nullptr, 0,
+                                          WICBitmapPaletteTypeCustom)))
+        why = "its colours cannot be read";
+    else {
+        std::vector<uint8_t> bgra(static_cast<size_t>(fw) * fh * 4);
+        if (FAILED(converter->CopyPixels(nullptr, fw * 4, static_cast<UINT>(bgra.size()), bgra.data()))) {
+            why = "broken: its pixels cannot be decoded";
+        } else {
+            w = static_cast<int>(fw);
+            h = static_cast<int>(fh);
+            pixels.resize(static_cast<size_t>(fw) * fh);
+            for (size_t i = 0; i < pixels.size(); ++i) {
+                const uint8_t* p = &bgra[i * 4];
+                pixels[i] = static_cast<uint16_t>(((p[2] * 31 + 127) / 255) << 11 | ((p[1] * 63 + 127) / 255) << 5 |
+                                                  (p[0] * 31 + 127) / 255);
+            }
+            ok = true;
+        }
+    }
+    release_com(converter);
+    release_com(frame);
+    release_com(decoder);
+    return ok;
+}
+
+bool picture_name(const std::wstring& name) {
+    const size_t dot = name.rfind(L'.');
+    if (dot == std::wstring::npos) return false;
+    std::wstring ext = name.substr(dot + 1);
+    for (wchar_t& c : ext) c = static_cast<wchar_t>(towlower(c));
+    return ext == L"png" || ext == L"bmp" || ext == L"jpg" || ext == L"jpeg";
+}
+
+void read_own_textures() {
+    std::vector<std::wstring> names;
+    WIN32_FIND_DATAW f;
+    HANDLE find = FindFirstFileW((std::wstring(OWN_FOLDER) + L"\\*").c_str(), &f);
+    if (find == INVALID_HANDLE_VALUE) return;   // no folder, or nothing in it
+    std::vector<unsigned long long> sizes;
+    do {
+        if (f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+        if (!picture_name(f.cFileName)) {
+            patch::log("ground: mods\\textures\\%s is not a PNG, BMP or JPEG picture - left alone",
+                       ui_narrow(f.cFileName).c_str());
+            continue;
+        }
+        names.push_back(f.cFileName);
+        sizes.push_back((static_cast<unsigned long long>(f.nFileSizeHigh) << 32) | f.nFileSizeLow);
+    } while (FindNextFileW(find, &f));
+    FindClose(find);
+    if (names.empty()) return;
+    std::vector<size_t> order(names.size());
+    for (size_t i = 0; i < order.size(); ++i) order[i] = i;
+    std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return _wcsicmp(names[a].c_str(), names[b].c_str()) < 0; });
+
+    const HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    IWICImagingFactory* wic = nullptr;
+    if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&wic)))) {
+        patch::log("ground: Windows' picture reader (WIC) is not available - the %u pictures of mods\\textures are left out",
+                   static_cast<unsigned>(names.size()));
+        g_own_skipped = static_cast<int>(names.size());
+    } else {
+        size_t pixels_used = 0;
+        int taken = 0;
+        for (size_t i : order) {
+            const std::string shown = ui_narrow(names[i]);
+            auto skip = [&](const std::string& why) {
+                patch::log("ground: mods\\textures\\%s left out: %s", shown.c_str(), why.c_str());
+                ++g_own_skipped;
+            };
+            if (taken >= OWN_COUNT || g_textures.size() >= BED_TEXTURE) {
+                skip("more than " + std::to_string(OWN_COUNT) + " pictures (the first ones by name are used)");
+                continue;
+            }
+            if (sizes[i] > OWN_FILE) {
+                skip("the file is bigger than " + std::to_string(OWN_FILE >> 20) + " MB");
+                continue;
+            }
+            Texture t;
+            std::string why;
+            try {
+                if (!decode_picture(wic, std::wstring(OWN_FOLDER) + L"\\" + names[i], t.w, t.h, t.patch, why)) {
+                    skip(why);
+                    continue;
+                }
+            } catch (const std::bad_alloc&) {
+                skip("not enough memory to read it");
+                continue;
+            }
+            if (pixels_used + t.patch.size() > OWN_PIXELS) {
+                skip("the pictures before it take all the room there is for them (" + std::to_string(OWN_PIXELS >> 20) +
+                     " million pixels together)");
+                continue;
+            }
+            pixels_used += t.patch.size();
+            uint64_t r = 0, g = 0, bl = 0;
+            for (uint16_t c : t.patch) {
+                r += c >> 11;
+                g += (c >> 5) & 63;
+                bl += c & 31;
+            }
+            const uint64_t n = t.patch.size();
+            t.info.mean = static_cast<uint16_t>(((r / n) << 11) | ((g / n) << 5) | (bl / n));
+            t.info.english = shown;   // its file's name
+            t.info.own = t.info.available = t.sampled = true;
+            g_textures.push_back(std::move(t));
+            ++taken;
+            patch::log("ground: mods\\textures\\%s: %d x %d px", shown.c_str(), g_textures.back().w, g_textures.back().h);
+        }
+    }
+    release_com(wic);
+    if (com == S_OK || com == S_FALSE) CoUninitialize();
 }
 
 void read_textures() {
@@ -182,15 +343,21 @@ void read_textures() {
             t.info.available = t.sampled = true;
         }
     }
+    const size_t game = g_textures.size();
+    read_own_textures();
     for (const Texture& t : g_textures) g_texture_infos.push_back(t.info);
-    patch::log("ground: %u textures", static_cast<unsigned>(g_textures.size()));
+    patch::log("ground: %u textures (%u of the game's, %u of mods\\textures, %d pictures there left out)",
+               static_cast<unsigned>(g_textures.size()), static_cast<unsigned>(game),
+               static_cast<unsigned>(g_textures.size() - game), g_own_skipped);
 }
 
 uint16_t sample(const Texture& t, int x, int y) {
-    int u = x & 255, v = y & 255;   // mirrored every 128 px: no seams
-    if (u >= PATCH) u = 255 - u;
-    if (v >= PATCH) v = 255 - v;
-    return t.patch[v * PATCH + u];
+    // mirrored every w (h) px: no seams - for the game's 128 x 128, x & 255 folded at 128
+    const int pw = 2 * t.w, ph = 2 * t.h;
+    int u = (x % pw + pw) % pw, v = (y % ph + ph) % ph;
+    if (u >= t.w) u = pw - 1 - u;
+    if (v >= t.h) v = ph - 1 - v;
+    return t.patch[static_cast<size_t>(v) * t.w + u];
 }
 
 uint16_t blend(uint16_t a, uint16_t b, float t) {
@@ -602,9 +769,16 @@ const std::vector<GroundTexture>& ground_textures() {
     return g_texture_infos;
 }
 
+int ground_own_skipped() {
+    read_textures();
+    return g_own_skipped;
+}
+
 bool ground_texture_sample(int texture, std::vector<uint16_t>& patch) {
     read_textures();
-    if (texture < 0 || texture >= static_cast<int>(g_textures.size()) || !g_textures[texture].sampled) return false;
+    if (texture < 0 || texture >= static_cast<int>(g_textures.size()) || !g_textures[texture].sampled ||
+        g_textures[texture].info.own)
+        return false;
     patch = g_textures[texture].patch;
     return true;
 }

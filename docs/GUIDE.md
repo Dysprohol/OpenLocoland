@@ -49,7 +49,7 @@ The game folder is self-contained: the maps you make, your high scores and the l
 Your profile (the player's name, the missions won, the scores, the sound settings) is kept in your
 Windows user's registry, as the original kept it.
 
-**Updating.** Run a newer `Setup.exe` and press **Update**: it finds the installed game and copies only what changed. Your own maps (in `maps\` of the game folder) and your profile are kept.
+**Updating.** Run a newer `Setup.exe` and press **Update**: it finds the installed game and copies only what changed. Your own maps (in `maps\` of the game folder), your own textures (in `mods\textures\`, see [your own textures](#5-the-map-editor)) and your profile are kept.
 
 The version you have is written small in the bottom right corner of the main menu (and in the
 title of the launcher and of the game's window). To find out whether there is a newer version, press **Check for updates** in the launcher (see
@@ -83,7 +83,8 @@ Untick **at start** to turn the automatic check off; the button still works when
 Setup does not go online: its **GitHub** link only opens your browser when you click it.
 
 **Uninstalling.** Run `Setup.exe` and press **Uninstall**: it removes the shortcuts and the game folder with everything in it (OpenLocoland is not listed in Windows "Apps"). The Steam game stays as it is. Copy your own maps somewhere first
-if you want to keep them (each one is a folder in `maps\`, see [sharing a map](#13-save-export-and-share)).
+if you want to keep them (each one is a folder in `maps\`, see [sharing a map](#13-save-export-and-share)), and your
+pictures of `mods\textures\`.
 
 ## 2. The first start
 
@@ -264,6 +265,20 @@ the status line keep their size; everything on the map - picking, dragging, the 
 Zoomed out the editor draws more and runs slower. Run the level starts at the game's own zoom, and coming
 back you get yours again.
 
+**Your own textures** (the first mod support). Put pictures into the folder `mods\textures\` of the game
+folder (Setup makes it empty) and **Paint the ground** has them after the game's textures, behind
+**OWN:**, in the order of their file names; the name under the mouse and in the status line is the
+file's name. PNG, BMP or JPEG, from 8 x 8 to 1024 x 1024 pixels, at most 32 of them and 4 million
+pixels together (sixteen of 512 x 512, for example); they are laid
+mirrored, as the game's own textures are, so any picture tiles without a seam (a small one repeats more
+often - 128 x 128 to 256 x 256 is about the game's scale); transparency is not used. The editor reads the
+folder when it first needs the textures, so start the game again after adding pictures. A picture it
+cannot take (broken, too small, too big, one too many) is left out: the row says **LEFT OUT:** and how
+many (so does the status line), `logs\LocoFix.log` which and why. What you paint goes into the map's own ground picture,
+so a saved or exported map shows it on any computer, without your pictures. Setup's updates do not
+touch the folder. Use only pictures you have the right to use - your own, or ones whose licence lets
+you put them into a map you share.
+
 **The basic editing** (the Select tool, key 1):
 
 | Action | How |
@@ -330,8 +345,10 @@ out of sight.)
 ### 2. Paint the ground
 
 The strip's **Paint the ground**: its row of buttons above the bar has the textures (grass, light
-grass, forest floor, sand, desert, snow, ice, rock, dark rock, lava, swamp, lake bed - taken from the
-campaign's maps; `[` and `]` pick them too), **SIZE** (8 - 200 px; Ctrl+wheel too), **STRENGTH**
+grass, forest floor, sand, desert, snow, ice, rock, dark rock, lava, swamp, lake bed, lawn, lush grass,
+tall grass, dry grass, autumn grass, reeds, dry scrub, bog, flagstones, cracked earth, dry clay, scree,
+snowdrift - taken from the campaign's maps, each named above it under the mouse; then your own, if you
+added any, see [your own textures](#5-the-map-editor); `[` and `]` pick them too), **SIZE** (8 - 200 px; Ctrl+wheel too), **STRENGTH**
 (how much a pass covers: lower it to blend textures) and **EDGE** soft or hard. Paint by dragging
 with the left button; the right button (or Shift+drag) puts the original picture back; Alt+click
 takes the texture under the cursor (also one of a picture painted and saved before). A stroke begun on

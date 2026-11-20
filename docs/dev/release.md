@@ -239,7 +239,9 @@ its disc - see "Every edition before the tag".)
 **Updating** is running a newer Setup over the install: `build.py` copies only what changed and
 leaves alone what it does not write, so the player keeps the high score tables (not
 overwritten once the game wrote them), the maps made in the editor (`maps\<name>\`, which the custom maps page finds by itself -
-`maps\custom.lst` is LocoFix's list of them, which the build no longer writes), the exported and imported maps, and everything in the registry: the settings, the
+`maps\custom.lst` is LocoFix's list of them, which the build no longer writes), the exported and imported maps, the
+player's own textures (`mods\textures\`: the build makes the folder and never writes into it, and `mods\`
+is not one of the clean-up's owned folders), and everything in the registry: the settings, the
 options as they were and the campaign progress (`Players`). The two maps of the release itself,
 `maps\sandbox` and `maps\template`, are written anew - a map edited in place there is lost, a map
 saved under a name of its own is not.

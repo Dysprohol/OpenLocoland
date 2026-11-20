@@ -6154,6 +6154,7 @@ const char* ground_texture_name(int i) {
     }
     const std::vector<GroundTexture>& t = ground_textures();
     if (i < 0 || i >= static_cast<int>(t.size())) return "?";
+    if (t[i].own) return t[i].english.c_str();   // the player's picture: its file's name
     return ui_text(t[i].key.c_str(), t[i].english.c_str());
 }
 
@@ -9520,7 +9521,7 @@ void draw_paint_tool() {
         fill(graphics(), nullptr, mx + r * std::cos(a) - 1.5f, my + r * std::sin(a) - 1.5f, mx + r * std::cos(a) + 1.5f,
              my + r * std::sin(a) + 1.5f, erase ? 0xe0ff4040 : 0xe0ffffff);
     }
-    char text[300];
+    char text[400];
     if (tool() == Tool::Paint && g_paint_bed) {
         draw_bed_reach(mx, my, r, erase);
         std::snprintf(text, sizeof text,
@@ -9540,6 +9541,13 @@ void draw_paint_tool() {
                       ui_format("StatusPaint", "Paint - TEXTURE: %s ([ ]), brush %d px (Ctrl+wheel), strength %d, edge %s - the right button puts the original back"),
                       ground_texture_name(g_texture), g_paint_radius, g_paint_strength,
                       g_paint_hard ? ui_text("WordHard", "hard") : ui_text("WordSoft", "soft"));
+        // pictures of mods\textures that could not be taken (also LEFT OUT in the row, which a narrow
+        // window shows when this line is cut). No "\t" in the packs' texts: their reader makes it a tab.
+        if (const int skipped = ground_own_skipped()) {
+            const size_t used = std::strlen(text);
+            std::snprintf(text + used, sizeof text - used, ui_format("StatusOwnSkipped", " - own pictures left out: %d (logs\\LocoFix.log)"),
+                          skipped);
+        }
     } else {
         const WaterKind& k = WATER_KINDS[g_water_kind];
         const int level = water.level(k.nvid);
@@ -10269,6 +10277,63 @@ OptionGroup strip_group() {
     return g;
 }
 
+// The Paint tool's textures: a swatch each (its mean colour, the chosen one framed, its name right above
+// it under the mouse as the strip's icons have theirs), cut into groups no wider than the view takes,
+// as even as they can be, so the layout puts each on a row of its own when they do not fit beside the
+// others, and no row runs off the view (the game's 25 are 500 px: one row even at 640 x 480 or at three
+// times on 2560 x 1440; up to 32 own pictures after them can take two). The player's own pictures
+// (mods\textures) follow in groups of their own, the first labelled OWN:, then LEFT OUT: n when any
+// picture there could not be taken.
+std::vector<OptionGroup> texture_groups() {
+    std::vector<OptionGroup> groups;
+    const std::vector<GroundTexture>& t = ground_textures();
+    std::vector<int> game, own;
+    for (int k = 0; k < static_cast<int>(t.size()); ++k)
+        if (t[k].available) (t[k].own ? own : game).push_back(k);
+    float cw = 8;
+    if (uint8_t* font = vid_by_number(CONTEXT_FONT_VID)) cw = at<float>(font, V_SIZE_X);
+    const Box v = ui_view();
+    const float room = (v.r - v.l) - 40 - 24;   // layout_options' room, less the strip's ends
+    auto add = [&](const std::vector<int>& shown, const OptionItem* label) {
+        if (shown.empty()) return;
+        const float label_w = label ? std::strlen(label->text.get()) * cw + cw : 0;   // option_width's
+        const int n = static_cast<int>(shown.size());
+        const int fit = (std::max)(1, static_cast<int>((room - label_w) / (SWATCH + 5)));
+        const int rows = (n + fit - 1) / fit, per = (n + rows - 1) / rows;
+        for (int r = 0; r < rows; ++r) {
+            OptionGroup g;
+            if (label && r == 0) g.push_back(*label);
+            for (int j = r * per; j < (std::min)(n, (r + 1) * per); ++j) {
+                const int k = shown[j];
+                OptionItem i;
+                i.swatch = k;
+                i.lit = g_texture == k;
+                i.button = true;
+                i.tip = ground_texture_name(k);
+                i.act = [k] {
+                    g_texture = k;
+                    MESSAGE("MsgTexture", "texture: %s", ground_texture_name(g_texture));
+                };
+                g.push_back(i);
+            }
+            groups.push_back(g);
+        }
+    };
+    add(game, nullptr);
+    const OptionItem label = option_label({"OptOwnTextures", "OWN:"});
+    add(own, &label);
+    if (const int skipped = ground_own_skipped()) {   // pictures of mods\textures that could not be taken
+        OptionItem i = option_button({nullptr, ""}, false, [skipped] {
+            MESSAGE("MsgOwnSkipped", "own pictures left out: %d - logs\\LocoFix.log says which and why", skipped);
+        });
+        i.value = ui_printf(ui_format("OptOwnSkipped", "LEFT OUT: %d"), skipped);
+        i.tip = ui_text("TipOwnSkipped", "own pictures that could not be taken - logs\\LocoFix.log says which and why");
+        if (own.empty()) groups.push_back({label, i});
+        else groups.push_back({i});
+    }
+    return groups;
+}
+
 std::vector<OptionGroup> option_groups() {
     std::vector<OptionGroup> groups;
     if (strip_tool()) {
@@ -10441,23 +10506,7 @@ std::vector<OptionGroup> option_groups() {
                               g_paint_bed = true;
                               MESSAGE("MsgBedMode", "paint: the gravel bed (%s) under the rails the brush goes over", bed_kind_name(g_bed_kind));
                           })});
-        if (!g_paint_bed) {
-            OptionGroup textures;
-            const std::vector<GroundTexture>& t = ground_textures();
-            for (int k = 0; k < static_cast<int>(t.size()); ++k) {
-                if (!t[k].available) continue;
-                OptionItem i;
-                i.swatch = k;
-                i.lit = g_texture == k;
-                i.button = true;
-                i.act = [k] {
-                    g_texture = k;
-                    MESSAGE("MsgTexture", "texture: %s", ground_texture_name(g_texture));
-                };
-                textures.push_back(i);
-            }
-            groups.push_back(textures);
-        }
+        if (!g_paint_bed) for (OptionGroup& g : texture_groups()) groups.push_back(std::move(g));
         if (g_paint_bed) {
             // the game's bed objects (the four beds as their pictures, the chosen one framed - the same
             // kind the Track tool's row and B give new track) or the band painted into the picture
@@ -12779,8 +12828,12 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             set_bed_kind((g_bed_kind + (w == VK_OEM_6 ? 1 : BED_KINDS - 1)) % BED_KINDS);
             MESSAGE("MsgBedKind", "gravel bed: %s (VID %d, also under new track)", bed_kind_name(g_bed_kind), BEDS[g_bed_kind]);
         } else if (tool() == Tool::Paint && (w == VK_OEM_4 || w == VK_OEM_6)) {
-            const int n = static_cast<int>(ground_textures().size());
-            if (n) g_texture = (g_texture + (w == VK_OEM_6 ? 1 : n - 1)) % n;
+            const std::vector<GroundTexture>& t = ground_textures();   // the row's order, past those not available
+            const int n = static_cast<int>(t.size());
+            for (int k = 0; k < n; ++k) {
+                g_texture = (g_texture + (w == VK_OEM_6 ? 1 : n - 1)) % n;
+                if (t[g_texture].available) break;
+            }
             MESSAGE("MsgTexture", "texture: %s", ground_texture_name(g_texture));
         } else if (tool() == Tool::Water && w == 'W') {
             g_water_kind = (g_water_kind + 1) % WATER_KIND_COUNT;
