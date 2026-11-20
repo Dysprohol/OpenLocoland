@@ -61,8 +61,11 @@ pobraniu przeglądarką. Link **GitHub** otwiera zamiast tego stronę wydań w p
 przycisk myszy kopiuje adres). **przy starcie** jest domyślnie włączone: okienko sprawdza przy
 otwarciu, najwyżej raz dziennie i bez żadnego okna - tylko w swojej linijce, która bez połączenia
 spokojnie mówi, że sprawdzanie pominięto; odznacz pole obok przycisku, żeby je wyłączyć (zapisuje się
-od razu). Nic nie jest pobierane ani instalowane bez twojego kliknięcia. Gdy przycisk nie może
-dosięgnąć GitHuba (brak internetu albo projekt się przeniósł), okienko mówi o tym i
+od razu). **Także wersje testowe** pod przyciskiem (domyślnie wyłączone) proponuje też wersje
+testowe - wydania publikowane przed wersją, żeby ją wypróbować; mają za numerem „(wersja testowa)”.
+Bez tego pola dostajesz tylko zwykłe wydania, a po zainstalowanej wersji testowej i tak zostanie ci
+zaproponowane jej zwykłe wydanie. Nic nie jest pobierane ani instalowane bez twojego kliknięcia.
+Gdy przycisk nie może dosięgnąć GitHuba (brak internetu albo projekt się przeniósł), okienko mówi o tym i
 podaje adres projektu z pliku `update.txt` w folderze gry - późniejszy Setup może ten plik zmienić,
 ty też.
 
@@ -71,7 +74,8 @@ Co robi:
 - pyta GitHuba (`https://api.github.com/repos/Dysprohol/OpenLocoland/releases/latest`), które wydanie
   jest najnowsze - gdy wciśniesz **Sprawdź aktualizacje**, a przy zaznaczonym **przy starcie** także
   przy otwarciu okienka startowego, najwyżej raz dziennie (gdy nie dostało odpowiedzi, próbuje znowu
-  przy następnym otwarciu);
+  przy następnym otwarciu); przy zaznaczonym **Także wersje testowe** pyta zamiast tego o listę wydań
+  (`.../releases?per_page=10`) i wysyła to samo;
 - zapytanie niesie tylko nazwę programu i wersję (np. `OpenLocoland/v0.2.12`) - żadnego imienia,
   identyfikatora ani nic o twoim komputerze czy grach; GitHub widzi twój adres IP, jak każda strona;
 - to, co znalazło - data i najnowsza wersja - zostaje w rejestrze Windows (linijka „Ostatnie

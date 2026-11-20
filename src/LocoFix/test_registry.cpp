@@ -3,7 +3,7 @@
 // The game's settings (the start window's ScreenX, ScreenY, BPP, Device, FullScreen, the window's
 // position; RegPath of Locoland.cfg), the scripts' player data (Players, moved there by
 // player_registry.cpp) and LocoFix's own settings (Language, FrameLimit, FpsCounter, Cheats,
-// UnlockMissions, UpdateCheckAtStart, MinimapSize, InterfaceScale, the editor's EditorHints, EditorScatter,
+// UnlockMissions, UpdateCheckAtStart, UpdatePrereleases, MinimapSize, InterfaceScale, the editor's EditorHints, EditorScatter,
 // EditorMusic, EditorProfile...) all live under HKCU\SOFTWARE\Gromada\Locoland. A scripted test run
 // (LOCOFIX_TEST=1, tools/test_game.ps1) used the same key as the player's own game on the same
 // computer, and the test scripts' "put the old values back" could undo what the player had just

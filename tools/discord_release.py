@@ -21,7 +21,9 @@ Two ways to use it:
 
 A release's message is its name, the lead of its notes (what stands before the first section),
 a "Full changelog info" link to the release on GitHub in place of the sections, the tag, the
-date and the files. Discord has no collapsible text, so the sections are not in the message;
+date and the files; a pre-release's opens with a line saying it is a test version, which the
+launcher offers only with its box "Include pre-releases" ticked (PRERELEASE_NOTE), and is orange
+with "GitHub pre-release" under it. Discord has no collapsible text, so the sections are not in the message;
 `--spoiler` puts them there under a spoiler, `--full` as they are.
 
 The webhook URL is a secret: it comes from DISCORD_WEBHOOK_URL (the repository secret in GitHub
@@ -151,16 +153,24 @@ def split_notes(body):
 
 LINK = "Full changelog info"
 
+# Above the notes of a pre-release: what it is, and that installed games are not told about it
+# unless the player asks (the launcher's box "Include pre-releases", src/LocoFix/update_check.cpp).
+PRERELEASE_NOTE = ("**Test version (pre-release)** - not the latest stable release. The launcher's "
+                   "**Check for updates** offers it only with **Include pre-releases** ticked (older "
+                   "launchers have no such box and never offer test versions); to try it, download "
+                   "its Setup.exe below.\n\n")
 
-def notes_text(body, url, mode):
+
+def notes_text(body, url, mode, reserve=0):
     """The notes as Discord shows them: the lead and a link to the whole notes in place of
-    their sections, the lead and the sections under a spoiler, or all of it."""
+    their sections, the lead and the sections under a spoiler, or all of it. `reserve`: the
+    characters of the description taken before the notes."""
     lead, rest = split_notes(body)
     if mode == "full":
         return body
     if mode == "link" or not rest:
         return f"{lead}\n\n[{LINK}]({url})" if lead else f"[{LINK}]({url})"
-    room = DESCRIPTION - len(lead) - 8                  # "\n\n||" and "||"
+    room = DESCRIPTION - reserve - len(lead) - 8        # "\n\n||" and "||"
     if len(rest) > room:
         part = rest[:room]
         boundary = part.rfind("\n\n")
@@ -186,11 +196,12 @@ def embed(release, repo, mode="link"):
 
     notes = clean_body(release.get("body") or "")
     color = ORANGE if release.get("prerelease") else (GREY if release.get("draft") else GREEN)
+    note = PRERELEASE_NOTE if release.get("prerelease") else ""
     result = {
         "author": {"name": repo},
         "title": title[:TITLE],
         "url": release["html_url"],
-        "description": notes_text(notes, release["html_url"], mode)[:DESCRIPTION],
+        "description": note + notes_text(notes, release["html_url"], mode, len(note))[:DESCRIPTION - len(note)],
         "color": color,
         "fields": fields,
         "footer": {"text": "GitHub release" if not release.get("prerelease") else "GitHub pre-release"},

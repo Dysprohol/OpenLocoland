@@ -424,7 +424,31 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       unreachable: a host that does not exist, a repository that does not exist (404) and an address
       that does not answer (the notice after 5.2 s), with the shipped `update.txt`, a replaced one
       (its notice, and its `link=` copied by the menu) and none (the built-in English); the box
-      ticked checks as the launcher opens, a click on it saves it,
+      ticked checks as the launcher opens, a click on it saves it; since v0.2.13-beta.1 a box under
+      the button, "Także wersje testowe" / "Include pre-releases" (`check_prereleases`; off by
+      default: `UpdatePrereleases`, DWORD, no value is off, saved as soon as it is clicked; disabled
+      while a check or a download runs, and a click puts a shown result back to the idle line, so no
+      Download of the other setting stays), asks for
+      `https://api.github.com/repos/Dysprohol/OpenLocoland/releases?per_page=10` instead and offers
+      the release with the highest version, pre-releases included and drafts left out; a release
+      marked a pre-release (or whose tag is one) is named with `update_prerelease`, "%1 (test
+      version)". The versions are compared by `update_version.h` (`tools\test_release_versions.py`):
+      a pre-release word after the numbers (`v0.2.13-beta.1`) makes a version older than the same
+      numbers without it and newer than the version before; the commits after a tag and `-dirty` are
+      left out as before; a bare commit hash, which used to read as a number when it began with a
+      digit, is no version now. With the box off nothing changes for a stable install, and a player on
+      a pre-release is offered the next release, never an older one. `LOCOFIX_UPDATE_TEST_LIST` gives
+      a test the list's answer beside `LOCOFIX_UPDATE_TEST`'s latest. Checked 2026-11-20 on the test
+      rig with DLLs built as v0.2.12, v0.2.13-beta.1 and v0.2.13-beta.1-2-gabc1234 against answers
+      written by hand (the latest v0.2.12 or v0.2.13; a list holding v0.2.13-beta.1 marked a
+      pre-release, or v0.2.13 over it): v0.2.12 with no value - the box unticked, "You have the latest
+      version"; ticked, "New version v0.2.13-beta.1 (test version)" with Download (all six
+      languages); a click on the box saved 1 and put the line back to "Last check", the button then
+      offered the beta; v0.2.13-beta.1 with the box off and the latest v0.2.12 - "the latest
+      version", no Download; with v0.2.13 out - offered with the box off and on, and to the build
+      after the beta tag; the beta with the box on and only the beta listed - "the latest version";
+      the launcher's row with the box in Polish, English and Russian looked at in its screenshots,
+      and missions 1, 2 and 8 loading after its OK,
   34. the neutrals and the pirates of an editor map (`factions.cpp`, MAP_RULES.md 6d): on a map
       whose script has `#define FACTIONS 1` (the editor writes it, read from `<map>.lgc` in the
       `Level_Load` wrapper of `frame_limit.cpp`) the army test of `Object_FindTarget` (0x449f7b ...

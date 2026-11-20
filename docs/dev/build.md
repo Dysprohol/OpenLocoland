@@ -65,8 +65,8 @@ redirects a normal user's writes there to the VirtualStore, so LocoFix moves tha
 LocoFix keeps its own settings next to them, chosen in the launcher: `Language`,
 `FrameLimit` (frames per second, default 60, 0 = no limit), `FpsCounter` (0/1) and the
 options `Cheats` and `UnlockMissions` (0/1, DWORD; "Quick start", `options.cpp`), and for the update
-check `UpdateCheckAtStart` (0/1, DWORD) and `UpdateLastCheck` (the date and the tag it found,
-`update_check.cpp`).
+check `UpdateCheckAtStart` (0/1, DWORD), `UpdatePrereleases` (0/1, DWORD; no value is 0: pre-releases
+are not offered) and `UpdateLastCheck` (the date and the tag it found, `update_check.cpp`).
 
 **Game logic in scripts.** Missions, AI, menus and end screens are in `maps\**\*.lgc` - a
 C-like language of its own, compiled to bytecode on every start. Engine functions available

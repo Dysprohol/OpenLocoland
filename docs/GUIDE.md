@@ -60,8 +60,11 @@ can update it - Windows may ask whether to run a downloaded program, as it does 
 download. The **GitHub** link opens the releases page in your browser instead (right-click it to
 copy the address). **at start** is on by default: the launcher checks as it opens, at most once a
 day and without a window - only its line, which says calmly when there is no connection; untick the
-box beside the button to turn it off (it is kept at once). Nothing is downloaded or installed
-without your click. When the button's check cannot reach GitHub (no
+box beside the button to turn it off (it is kept at once). **Include pre-releases** under the
+button (off by default) also offers test versions - releases published before a version to try it
+out, which say "(test version)" after their number; without it you are offered only the stable
+releases, and a test version you installed is followed by its stable release as usual. Nothing is
+downloaded or installed without your click. When the button's check cannot reach GitHub (no
 internet, or the project has moved) the launcher says so with the project's address, taken from
 `update.txt` in the game folder - a later Setup may change that file, and you may too.
 
@@ -69,7 +72,8 @@ internet, or the project has moved) the launcher says so with the project's addr
 - it asks GitHub (`https://api.github.com/repos/Dysprohol/OpenLocoland/releases/latest`) which
   release is the latest - when you press **Check for updates**, and with **at start** ticked when
   the launcher opens, at most once a day (when it got no answer, it tries again the next time the
-  launcher opens);
+  launcher opens); with **Include pre-releases** ticked it asks for the list of releases instead
+  (`.../releases?per_page=10`), and sends the same;
 - the request carries only the program's name and version (`OpenLocoland/v0.2.12`, for example) -
   no name, no ID, nothing about your computer or your games; GitHub sees your IP address, as any
   website does;

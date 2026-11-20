@@ -4,9 +4,16 @@
 //
 // The check asks GitHub's API for the latest release - WinHTTP in a thread of its own, the answer
 // awaited 5 s, so the launcher never waits - and reads its tag, its page and the Setup.exe it holds.
-// The tag is compared with LOCOFIX_VERSION by its numbers (v0.1.10 is newer than v0.1.9; a build
-// after a tag, v0.1.10-17-gcef9557, counts as that tag; "dev" has no numbers and is never offered
-// a download). A newer version shows with Download: Setup.exe goes into the Downloads folder (as
+// The tag is compared with LOCOFIX_VERSION by the rule of update_version.h (v0.1.10 is newer than
+// v0.1.9; v0.2.13-beta.1 is newer than v0.2.12 and older than v0.2.13; a build after a tag,
+// v0.1.10-17-gcef9557, counts as that tag; "dev" is no version and is never offered a download).
+// GitHub's latest release is never a pre-release or a draft. The box "Include pre-releases" under the
+// row (off by default: no value in the registry is off; UpdatePrereleases, DWORD, saved as soon as it
+// is clicked) asks for GitHub's list of releases instead (RELEASES_API_URL: the newest ten) and offers
+// the one with the highest version, pre-releases included, drafts never (update_version.h); the line
+// then says when the release it names is a pre-release ("v0.2.13-beta.1 (test version)"). With the
+// box off a player on a pre-release is offered the next release as anyone else, never an older one.
+// A newer version shows with Download: Setup.exe goes into the Downloads folder (as
 // a browser's download, with the internet zone mark; its size and SHA-256 are checked against the
 // release's), and then Run Setup starts it after a question and closes the game, so Setup can
 // update the install. Nothing is downloaded without a click: the check runs from the button or, with
@@ -20,9 +27,11 @@
 // English one built in here; a later Setup or the player can replace the file, and its link= line
 // is the address the link opens then. The last check's date and the version it found are kept in
 // the registry next to the other settings (UpdateLastCheck), the box as UpdateCheckAtStart (DWORD).
-// LOCOFIX_UPDATE_URL replaces the API's address (tests: an unreachable host). LOCOFIX_UPDATE_TEST=
-// <file.json> makes the check read that file instead of asking GitHub (an answer of the API saved, or
-// one written by hand with a higher tag_name), and its Setup.exe may then be a file:/// address,
+// LOCOFIX_UPDATE_URL replaces the API's address, the latest's or the list's (tests: an unreachable
+// host). LOCOFIX_UPDATE_TEST=<file.json> makes the check read that file instead of asking GitHub (an
+// answer of the API saved, or one written by hand with a higher tag_name; a release or a list of
+// them), and with the box ticked LOCOFIX_UPDATE_TEST_LIST=<file.json>, when it is set, stands for the
+// list (so one test has both answers); the release's Setup.exe may then be a file:/// address,
 // copied instead of downloaded with the same checks (size, SHA-256, the zone mark, the Downloads
 // folder): the whole flow - Download, Run Setup - against a Setup built by tools\release.py
 // (DEVELOPERS.md "Updates": the steps).
@@ -42,6 +51,7 @@
 // name pattern is unchanged. LOCOFIX_UPDATE_PREFER=zip|exe (only with LOCOFIX_UPDATE_TEST) overrides
 // the choice in a test.
 #include "patch.h"
+#include "update_version.h"
 #include "zip_read.h"
 #include <bcrypt.h>
 #include <shellapi.h>
@@ -67,7 +77,9 @@ constexpr uintptr_t IAT_DialogBoxParamA = 0x4751ac;
 constexpr char REG_KEY[] = "SOFTWARE\\Gromada\\Locoland";   // RegPath in Locoland.cfg
 constexpr char REG_AT_START[] = "UpdateCheckAtStart";
 constexpr char REG_LAST[] = "UpdateLastCheck";               // "<date> <tag>"
+constexpr char REG_PRERELEASES[] = "UpdatePrereleases";      // the box "Include pre-releases"
 constexpr wchar_t API_URL[] = L"https://api.github.com/repos/Dysprohol/OpenLocoland/releases/latest";
+constexpr wchar_t RELEASES_API_URL[] = L"https://api.github.com/repos/Dysprohol/OpenLocoland/releases?per_page=10";
 constexpr wchar_t RELEASES_URL[] = L"https://github.com/Dysprohol/OpenLocoland/releases";
 constexpr wchar_t DEFAULT_NOTICE[] = L"Cannot check for updates. Project page: github.com/Dysprohol/OpenLocoland";
 constexpr DWORD TIMEOUT_MS = 5000;
@@ -83,10 +95,13 @@ constexpr int ID_AT_START = 1131;
 constexpr int ID_LINK = 1132;
 constexpr int ID_STATUS = 1133;
 constexpr int ID_GET = 1134;
+constexpr int ID_PRERELEASES = 1135;
 constexpr int ID_MENU_OPEN = 1;
 constexpr int ID_MENU_COPY = 2;
 constexpr int ROW_Y = 222;        // dialog units: under the options' row (options.cpp, 208)
-constexpr int ROW_HEIGHT = 44;    // dialog units added to the launcher: the buttons and three lines
+constexpr int BOX_LINE = 15;      // the box "Include pre-releases", under the button
+constexpr int STATUS_LINE = 28;   // the result line and its button, under that box
+constexpr int ROW_HEIGHT = 56;    // dialog units added to the launcher: the buttons, the box and three lines
 constexpr UINT WM_UPDATE_DONE = WM_APP + 40;       // a check or a download ended: lParam its Result
 constexpr UINT WM_UPDATE_PROGRESS = WM_APP + 41;   // bytes downloaded (wParam) of (lParam)
 constexpr UINT_PTR TIMER_CHECK = 0x5C3C;   // the check's 5 s: WinHTTP's own timeouts let a connection
@@ -97,6 +112,7 @@ struct Release {
     std::string setup_url, setup_name;       // the Setup.exe asset's browser_download_url and name
     std::string digest;                      // its "sha256:<hex>", when GitHub gives one
     unsigned long long size = 0;             // its size in bytes
+    bool prerelease = false;                 // marked a pre-release on GitHub, or its tag is one
     std::string zip_url, zip_name, zip_digest;   // the same of the Setup.zip asset, when there is one
     unsigned long long zip_size = 0;
     bool use_zip = false;                    // the download takes the zip (PREFER_SETUP_ZIP)
@@ -121,6 +137,7 @@ std::wstring g_folder;                   // a zip's folder: Setup starts there, 
 unsigned long long g_done = 0, g_total = 0;
 volatile LONG g_cancel = 0;              // the dialog is gone or the download was cancelled
 bool g_at_start = true;                  // UpdateCheckAtStart: on unless the player turned it off
+bool g_prereleases = false;              // UpdatePrereleases: off unless the player turned it on
 bool g_auto = false;                     // the check under way or last done began as the launcher opened
 std::string g_last;                      // UpdateLastCheck
 DLGPROC g_launcher_proc = nullptr;
@@ -160,6 +177,11 @@ void read_settings() {
     if (RegQueryValueExA(key, REG_AT_START, nullptr, &type, reinterpret_cast<BYTE*>(&value), &size) == ERROR_SUCCESS &&
         type == REG_DWORD)
         g_at_start = value != 0;
+    // no value (every install before the box, a player who never ticked it) is off
+    size = sizeof value;
+    if (RegQueryValueExA(key, REG_PRERELEASES, nullptr, &type, reinterpret_cast<BYTE*>(&value), &size) == ERROR_SUCCESS &&
+        type == REG_DWORD)
+        g_prereleases = value != 0;
     char last[64] = {};
     size = sizeof last - 1;
     if (RegQueryValueExA(key, REG_LAST, nullptr, &type, reinterpret_cast<BYTE*>(last), &size) == ERROR_SUCCESS &&
@@ -207,35 +229,24 @@ std::wstring unreachable_notice() {
     return notice.empty() ? DEFAULT_NOTICE : notice;
 }
 
-// ---- versions ----
+// ---- versions (update_version.h) ----
 
-// The numbers of a version or a tag: "v0.1.10-17-gcef9557" -> 0, 1, 10; none for "dev".
-std::vector<int> version_numbers(const std::string& v) {
-    std::vector<int> numbers;
-    size_t i = !v.empty() && (v[0] == 'v' || v[0] == 'V') ? 1 : 0;
-    while (i < v.size() && v[i] >= '0' && v[i] <= '9') {
-        int n = 0;
-        while (i < v.size() && v[i] >= '0' && v[i] <= '9') n = n * 10 + (v[i++] - '0');
-        numbers.push_back(n);
-        if (i + 1 < v.size() && v[i] == '.' && v[i + 1] >= '0' && v[i + 1] <= '9') ++i;
-        else break;
-    }
-    return numbers;
-}
-
-// Like strcmp, by the numbers (a missing one counts as 0: 0.1 == 0.1.0).
-int compare_versions(const std::vector<int>& a, const std::vector<int>& b) {
-    for (size_t i = 0; i < a.size() || i < b.size(); ++i) {
-        const int x = i < a.size() ? a[i] : 0, y = i < b.size() ? b[i] : 0;
-        if (x != y) return x < y ? -1 : 1;
-    }
-    return 0;
-}
+using update_version::json_string;
+using update_version::json_value;
 
 // LOCOFIX_UPDATE_TEST's file, or an empty string.
 std::wstring update_test_file() {
     wchar_t value[1024] = {};
     return GetEnvironmentVariableW(L"LOCOFIX_UPDATE_TEST", value, 1024) ? value : L"";
+}
+
+// The file a test's check reads: with the box ticked LOCOFIX_UPDATE_TEST_LIST's when it is set, else
+// LOCOFIX_UPDATE_TEST's; empty when this is no test.
+std::wstring update_answer_file(bool prereleases) {
+    const std::wstring test = update_test_file();
+    wchar_t value[1024] = {};
+    if (!test.empty() && prereleases && GetEnvironmentVariableW(L"LOCOFIX_UPDATE_TEST_LIST", value, 1024)) return value;
+    return test;
 }
 
 // A file:/// address as a path: C:/a%20b/Setup.exe -> C:\a b\Setup.exe.
@@ -256,28 +267,6 @@ bool local_url(const std::string& url) { return url.compare(0, 8, "file:///") ==
 
 // ---- the release (GitHub's JSON, read as text: enough for its flat fields) ----
 
-// The position of the value of "key" at or after `from`, or npos.
-size_t json_value(const std::string& json, const char* key, size_t from) {
-    const std::string quoted = std::string("\"") + key + "\"";
-    for (size_t at = json.find(quoted, from); at != std::string::npos; at = json.find(quoted, at + 1)) {
-        size_t i = json.find_first_not_of(" \t\r\n", at + quoted.size());
-        if (i == std::string::npos || json[i] != ':') continue;
-        i = json.find_first_not_of(" \t\r\n", i + 1);
-        if (i != std::string::npos) return i;
-    }
-    return std::string::npos;
-}
-
-std::string json_string(const std::string& json, size_t at) {
-    std::string s;
-    if (at == std::string::npos || json[at] != '"') return s;
-    for (size_t i = at + 1; i < json.size() && json[i] != '"'; ++i) {
-        if (json[i] == '\\' && i + 1 < json.size()) ++i;   // \" \\ \/ (the fields read have no others)
-        s += json[i];
-    }
-    return s;
-}
-
 bool ends_with(const std::string& s, const char* end) {
     const size_t n = std::strlen(end);
     return s.size() >= n && _stricmp(s.c_str() + s.size() - n, end) == 0;
@@ -296,6 +285,7 @@ bool plain_name(const std::string& name) {
 bool parse_release(const std::string& json, Release& r) {
     r.tag = json_string(json, json_value(json, "tag_name", 0));
     if (r.tag.empty()) return false;
+    r.prerelease = update_version::json_true(json, "prerelease") || !update_version::parse(r.tag).pre.empty();
     // html_url is also the author's and every uploader's: the release's is the one with its tag
     for (size_t at = json_value(json, "html_url", 0); at != std::string::npos;
          at = json_value(json, "html_url", at)) {
@@ -344,6 +334,17 @@ bool parse_release(const std::string& json, Release& r) {
     const bool zip_first = test_prefer ? _wcsicmp(prefer, L"zip") == 0 : PREFER_SETUP_ZIP;
     r.use_zip = !r.zip_url.empty() && r.zip_size <= ZIP_MAX_DOWNLOAD && (zip_first || r.setup_url.empty());
     return true;
+}
+
+// GitHub's answer: one release (the latest) or a list of them (the box ticked), whose release offered
+// is update_version.h's newest_release.
+bool parse_answer(const std::string& json, Release& r) {
+    const std::vector<std::string> list = update_version::json_array_objects(json);
+    if (list.empty()) return parse_release(json, r);
+    const int k = update_version::newest_release(list);
+    patch::log("update check: %u releases listed, the newest %s", static_cast<unsigned>(list.size()),
+               k < 0 ? "- none (drafts only)" : json_string(list[k], json_value(list[k], "tag_name", 0)).c_str());
+    return k >= 0 && parse_release(list[k], r);
 }
 
 // ---- HTTP ----
@@ -428,6 +429,7 @@ struct Job {
     HWND dialog;
     Release release;   // a download's
     std::wstring path;
+    bool prereleases = false;   // a check's: the list of releases instead of the latest
 };
 
 void finish(HWND dialog, Result* result) {
@@ -438,21 +440,23 @@ DWORD WINAPI check_thread(void* parameter) {
     Job* job = static_cast<Job*>(parameter);
     Result* result = new Result;
     wchar_t custom[1024] = {};
-    const std::wstring url = GetEnvironmentVariableW(L"LOCOFIX_UPDATE_URL", custom, 1024) ? custom : API_URL;
+    const std::wstring url = GetEnvironmentVariableW(L"LOCOFIX_UPDATE_URL", custom, 1024) ? custom
+                             : job->prereleases ? RELEASES_API_URL : API_URL;
     Http h;
     DWORD status = 0;
     std::string json;
-    const std::wstring test = update_test_file();
+    const std::wstring test = update_answer_file(job->prereleases);
     if (!test.empty()) {   // the test's release (LOCOFIX_UPDATE_TEST)
         if (FILE* f = _wfopen(test.c_str(), L"rb")) {
             char buffer[4096];
             for (size_t n; (n = std::fread(buffer, 1, sizeof buffer, f)) > 0;) json.append(buffer, n);
             std::fclose(f);
             status = 200;
-            patch::log("update check: the test's release %ls (LOCOFIX_UPDATE_TEST), %u bytes", test.c_str(),
+            patch::log("update check: the test's answer %ls (%s), %u bytes", test.c_str(),
+                       test == update_test_file() ? "LOCOFIX_UPDATE_TEST" : "LOCOFIX_UPDATE_TEST_LIST",
                        static_cast<unsigned>(json.size()));
         } else {
-            patch::log("update check: LOCOFIX_UPDATE_TEST %ls cannot be read", test.c_str());
+            patch::log("update check: the test's answer %ls cannot be read", test.c_str());
         }
     } else if (http_get(h, url, L"Accept: application/vnd.github+json\r\n", status)) {
         if (status == 200)
@@ -463,7 +467,7 @@ DWORD WINAPI check_thread(void* parameter) {
         else
             patch::log("update check: HTTP %lu", status);
     }
-    result->ok = !json.empty() && parse_release(json, result->release);
+    result->ok = !json.empty() && parse_answer(json, result->release);
     if (status == 200 && !result->ok) patch::log("update check: no release in the answer");
     finish(job->dialog, result);
     delete job;
@@ -922,7 +926,8 @@ void place(HWND dialog, HWND control, int x, int width) {
     SetWindowPos(control, nullptr, x, r.top, width, r.bottom - r.top, SWP_NOZORDER);
 }
 
-// The check button as wide as its label (at least 86 dialog units) and the box after it.
+// The check button as wide as its label (at least 86 dialog units) and the box after it; the box
+// "Include pre-releases" under the button as wide as its label (up to the row's end).
 void fit_row(HWND dialog) {
     HWND check = GetDlgItem(dialog, ID_CHECK), box = GetDlgItem(dialog, ID_AT_START);
     const RECT row = dialog_rect(dialog, 7, 0, 86, 0), gap = dialog_rect(dialog, 0, 0, 4, 0);
@@ -931,6 +936,8 @@ void fit_row(HWND dialog) {
     place(dialog, check, row.left, width);
     const int x = row.left + width + gap.right;
     place(dialog, box, x, min(tick.right + text_width(box), static_cast<int>(link.left) - x));
+    HWND pre = GetDlgItem(dialog, ID_PRERELEASES);
+    place(dialog, pre, row.left, min(tick.right + text_width(pre), static_cast<int>(link.right) - row.left));
 }
 
 // The result line and the button beside it for the state, in the chosen language (also
@@ -938,7 +945,11 @@ void fit_row(HWND dialog) {
 void set_texts(HWND dialog) {
     if (!GetDlgItem(dialog, ID_STATUS)) return;
     fit_row(dialog);
-    const std::wstring version = widen(LOCOFIX_VERSION), tag = widen(g_release.tag);
+    const std::wstring version = widen(LOCOFIX_VERSION);
+    // the release a check found, said to be a test version when it is a pre-release
+    const std::wstring tag = g_release.prerelease
+                                 ? fill(launcher_text("update_prerelease", L"%1 (test version)"), widen(g_release.tag))
+                                 : widen(g_release.tag);
     std::wstring status, button;
     switch (g_state) {
     case State::idle:
@@ -998,6 +1009,8 @@ void set_texts(HWND dialog) {
     SetWindowPos(line, nullptr, 0, 0, right - r.left, r.bottom - r.top, SWP_NOMOVE | SWP_NOZORDER);
     SetWindowTextW(line, status.c_str());
     EnableWindow(GetDlgItem(dialog, ID_CHECK), g_state != State::checking && g_state != State::downloading);
+    // the box is not changed under a check or a download it began
+    EnableWindow(GetDlgItem(dialog, ID_PRERELEASES), g_state != State::checking && g_state != State::downloading);
 }
 
 void start_check(HWND dialog, bool automatic = false) {
@@ -1005,7 +1018,9 @@ void start_check(HWND dialog, bool automatic = false) {
     patch::log("update check: %s", automatic ? "as the launcher opens (at start)" : "the button");
     g_state = State::checking;
     set_texts(dialog);
-    if (!start_thread(check_thread, new Job{dialog, {}, {}})) {
+    patch::log("update check: %s", g_prereleases ? "the list of releases, pre-releases included (the box ticked)"
+                                                 : "the latest release");
+    if (!start_thread(check_thread, new Job{dialog, {}, {}, g_prereleases})) {
         g_state = State::unreachable;
         set_texts(dialog);
         return;
@@ -1019,9 +1034,13 @@ void checked(const Result& result) {
         return;
     }
     g_release = result.release;
-    const std::vector<int> mine = version_numbers(LOCOFIX_VERSION), latest = version_numbers(g_release.tag);
-    g_state = mine.empty() ? State::dev : compare_versions(latest, mine) > 0 ? State::newer : State::current;
-    patch::log("update check: the latest release is %s (%s%s%s), this build %s%s", g_release.tag.c_str(),
+    // newer only by update_version.h's rule: a tag that is no version is never offered
+    const update_version::Version mine = update_version::parse(LOCOFIX_VERSION),
+                                  latest = update_version::parse(g_release.tag);
+    g_state = !mine.valid ? State::dev
+              : latest.valid && update_version::compare(latest, mine) > 0 ? State::newer : State::current;
+    patch::log("update check: the latest release is %s%s (%s%s%s), this build %s%s", g_release.tag.c_str(),
+               g_release.prerelease ? " (a pre-release)" : "",
                g_release.setup_name.empty() ? "no Setup.exe" : g_release.setup_name.c_str(),
                g_release.zip_url.empty() ? "" : ", ", g_release.zip_url.empty() ? "" : g_release.zip_name.c_str(), LOCOFIX_VERSION,
                g_state == State::newer ? " - newer" : g_state == State::current ? " - up to date" : "");
@@ -1171,10 +1190,13 @@ void add_update_row(HWND dialog) {
     HWND link = add_control(dialog, L"STATIC", L"GitHub", SS_NOTIFY | SS_RIGHT | SS_NOPREFIX,
                             dialog_rect(dialog, 153, ROW_Y + 3, 27, 9), ID_LINK);
     SendMessageW(link, WM_SETFONT, reinterpret_cast<WPARAM>(g_link_font), FALSE);
-    add_control(dialog, L"STATIC", L"", SS_LEFT | SS_NOPREFIX, dialog_rect(dialog, 7, ROW_Y + 17, 173, 26),
+    HWND pre = add_control(dialog, L"BUTTON", L"Include pre-releases", WS_TABSTOP | BS_AUTOCHECKBOX,
+                           dialog_rect(dialog, 7, ROW_Y + BOX_LINE, 173, 10), ID_PRERELEASES);
+    SendMessageW(pre, BM_SETCHECK, g_prereleases ? BST_CHECKED : BST_UNCHECKED, 0);
+    add_control(dialog, L"STATIC", L"", SS_LEFT | SS_NOPREFIX, dialog_rect(dialog, 7, ROW_Y + STATUS_LINE + 1, 173, 26),
                 ID_STATUS);
-    add_control(dialog, L"BUTTON", L"", WS_TABSTOP | BS_PUSHBUTTON, dialog_rect(dialog, 124, ROW_Y + 16, 56, 13),
-                ID_GET);
+    add_control(dialog, L"BUTTON", L"", WS_TABSTOP | BS_PUSHBUTTON,
+                dialog_rect(dialog, 124, ROW_Y + STATUS_LINE, 56, 13), ID_GET);
     set_texts(dialog);
     if (!g_at_start) {
         patch::log("update check at start: off (the player's choice)");
@@ -1211,6 +1233,20 @@ INT_PTR CALLBACK launcher_proc(HWND dialog, UINT m, WPARAM w, LPARAM l) {
             const DWORD on = g_at_start;
             save_setting(REG_AT_START, REG_DWORD, &on, sizeof on);
             patch::log("update check at start: %s (saved)", g_at_start ? "on" : "off");
+            return TRUE;
+        }
+        if (LOWORD(w) == ID_PRERELEASES && HIWORD(w) == BN_CLICKED) {   // saved at once, as the box above
+            g_prereleases = IsDlgButtonChecked(dialog, ID_PRERELEASES) == BST_CHECKED;
+            const DWORD on = g_prereleases;
+            save_setting(REG_PRERELEASES, REG_DWORD, &on, sizeof on);
+            patch::log("update check, pre-releases included: %s (saved)", g_prereleases ? "on" : "off");
+            // a result of the other setting is not left on the line with its Download: the button checks anew
+            if (g_state == State::current || g_state == State::newer || g_state == State::dev ||
+                g_state == State::failed) {
+                g_state = State::idle;
+                g_release = Release{};
+                set_texts(dialog);
+            }
             return TRUE;
         }
         if (LOWORD(w) == ID_LINK && HIWORD(w) == STN_CLICKED) {
@@ -1311,5 +1347,6 @@ void install_update_check() {
     patch::write(IAT_DialogBoxParamA, &dialog_box, sizeof dialog_box);
     add_launcher_label(ID_CHECK, "check_updates");
     add_launcher_label(ID_AT_START, "check_at_start");
+    add_launcher_label(ID_PRERELEASES, "check_prereleases");
     add_launcher_relabel(&set_texts);
 }

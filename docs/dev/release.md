@@ -142,6 +142,20 @@ The launcher's update check (LocoFix fix 33) reads the release GitHub calls the 
 that is neither a draft nor a pre-release - so a release is found by it when its tag is
 `vX.Y.Z` (compared by the numbers) and its Setup is an asset whose name ends with `Setup.exe`.
 
+A **pre-release** (a test version before a release) gets a tag `vX.Y.Z-beta.N` (or `-rc.N`) and is
+published with "Set as a pre-release" ticked: GitHub's latest stays the last release, so no launcher
+offers it unless its player ticked "Include pre-releases" (from v0.2.13-beta.1 on; older launchers
+never see one) - that box reads GitHub's list of releases (the newest ten) and takes the highest
+version, drafts left out (`src/LocoFix/update_version.h`, which writes the rule down;
+`tools\test_release_versions.py` tests it). The rule: `v0.2.12 < v0.2.13-beta.1 < v0.2.13-beta.2 <
+v0.2.13-rc.1 < v0.2.13`, a build after a tag counts as that tag (`v0.2.13-beta.1-2-gabc` as
+`v0.2.13-beta.1`), so the release after a pre-release is offered to its players with the box or
+without it, and a player on a pre-release with the box off is never told an older release is newer.
+(Launchers up to v0.2.12 compared the numbers only and would read `v0.2.13-beta.1` as v0.2.13, but
+they ask only for the latest, which is never a pre-release.) The Discord announcement (`tools/discord_release.py`) opens a pre-release's
+message with a line saying it is a test version that the launcher offers only with that box ticked.
+Setup itself does not look for releases (its GitHub link opens the project's page).
+
 The icon of Setup.exe (the file and its window) is `tools/icon/openlocoland.ico`: a golden cog in the
 brass look of the game, our own drawing - `tools/make_icon.py` writes it as an SVG
 (`tools/icon/openlocoland.svg`), renders it with a headless Chrome or Edge and packs the Windows

@@ -34,7 +34,10 @@ under the frame limit - the launcher's choice counts from that start on, nothing
 release; a newer one than the running version is offered with its Setup.exe, downloaded into the
 Downloads folder and started on a click (LocoFix fix 33) - on the folder the game is installed in, as
 Setup started by itself opens on the existing install too; the box "przy starcie" / "at start" next to
-it (on by default; unticked, it stays off) checks as the launcher opens, at most once a day.
+it (on by default; unticked, it stays off) checks as the launcher opens, at most once a day. The box
+"Także wersje testowe" / "Include pre-releases" under the button (off by default) takes the newest
+release pre-releases included and names one "(test version)"; without it a player on a pre-release
+is offered the next release as anyone else (`update_version.h`: v0.2.12 < v0.2.13-beta.1 < v0.2.13).
 Nothing is updated by itself.
 
 **Developers** build the game from the repository instead. Requirements: the game installed
