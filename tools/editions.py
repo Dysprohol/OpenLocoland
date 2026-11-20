@@ -15,8 +15,8 @@ the game from it and, with --run, starts the game.
 A code is <language>-<source>: en-steam, de-steam, hu-steam, pl-steam, pt-steam, ru-steam (the
 depots: `download_depot 352130 3521NN` in the Steam console puts depot 3521NN into
 steamapps\content\app_352130\depot_3521NN), and for an edition from a disc cs-cd, pl-cd, it-cd,
-en-beta-demo... A new edition is one folder of the game's files (an install of the disc;
-`C:\Locoland Decomp\notes\diffs\<name>` by our convention) and `capture <code> <folder>`.
+en-beta-demo... A new edition is one folder of the game's files (an install of the disc,
+kept outside the repository) and `capture <code> <folder>`.
 
 The manifest tools/editions/<code>.tsv (in git: names, sizes and SHA-256 - nothing of the game)
 lists every file of the edition. The files themselves go to the local store editions/<code>/

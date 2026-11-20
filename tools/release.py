@@ -19,6 +19,8 @@ r"""Builds the release: build\release\Setup.exe, the installer of OpenLocoland.
    (version_resource: the version's numbers, "OpenLocoland Setup", the company "OpenLocoland" -
    the project, never a person) and its own manifest (MANIFEST: asInvoker, system DPI aware, long
    paths, the common controls), and no UPX (--noupx: a packed exe looks like what packers hide).
+   PyInstaller runs with PYTHONHASHSEED=0, so two builds of one commit are the same files apart
+   from timestamps (tools/compare_builds.py; the release workflow, .github/workflows/release.yml).
 5. with --zip (off by default) also the same Setup as one folder (PyInstaller --onedir: Setup.exe and
    its _internal\ folder, nothing unpacked into %TEMP% when it runs) packed into
    build\release\Setup.zip - Setup.exe at the zip's root, as the launcher's update check
@@ -27,7 +29,6 @@ r"""Builds the release: build\release\Setup.exe, the installer of OpenLocoland.
 """
 import argparse
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -121,11 +122,7 @@ MANIFEST = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 """
 
 
-def version_numbers(ver):
-    """The four numbers of a version resource: v0.2.11 -> (0, 2, 11, 0), v0.2.11-3-gabc1234 -> (0, 2, 11, 3)
-    (the commits after the tag); a version without a tag (a short hash) -> (0, 0, 0, 0)."""
-    m = re.match(r"v?(\d+)\.(\d+)\.(\d+)(?:-(\d+)-g)?", ver)
-    return tuple(int(n or 0) for n in m.groups()) if m else (0, 0, 0, 0)
+version_numbers = build_locofix.version_numbers   # the same numbers as LocoFix.dll's version resource
 
 
 def version_resource(ver, path):
@@ -135,8 +132,7 @@ def version_resource(ver, path):
                ("FileDescription", f"OpenLocoland {ver} Setup"),
                ("FileVersion", ver),
                ("InternalName", "Setup"),
-               ("LegalCopyright", "Copyright (C) 2026 Dysprohol and OpenLocoland contributors. "
-                                 "Locoland is a trademark of its owners."),   # installer.CREDIT in the window
+               ("LegalCopyright", build_locofix.COPYRIGHT),   # installer.CREDIT in the window
                ("OriginalFilename", f"OpenLocoland-{ver}-Setup.exe"),
                ("ProductName", "OpenLocoland Setup"),
                ("ProductVersion", ver),
@@ -187,7 +183,10 @@ def main():
                         "--name", "Setup", "--distpath", dist, "--workpath", workpath, "--specpath", workpath,
                         "--paths", tools, "--add-data", f"{PAYLOAD}{os.pathsep}.",
                         "--icon", icon, "--add-data", f"{icon}{os.pathsep}.",
-                        os.path.join(tools, "installer.py")], check=True)
+                        os.path.join(tools, "installer.py")], check=True,
+                       # a fixed hash seed: with a random one PyInstaller writes base_library.zip's entries
+                       # in another order each time (the release workflow's Setup is compared with a local one)
+                       env={**os.environ, "PYTHONHASHSEED": "0"})
     freeze("--onefile", OUT, work)
     setup = os.path.join(OUT, "Setup.exe")
     print(f"{setup}: {os.path.getsize(setup) / 1e6:.1f} MB, version {ver}")

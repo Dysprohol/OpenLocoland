@@ -1,0 +1,93 @@
+# Builds the release - LocoFix.dll and Setup.exe - from a pushed tag v* (or by hand, from the chosen
+# branch) the way tools/release.py builds it locally, and keeps the two files as the run's artifacts
+# with their SHA-256 in the run's summary. It publishes nothing: no release is made or changed, no
+# secret is used; the release on GitHub is still made by hand. tools/compare_builds.py compares the
+# artifacts with a local build of the same commit (docs/dev/release.md "Built by GitHub Actions").
+#
+# The same tools as the local releases: MSVC 14.29 with the Windows SDK 10.0.19041.0 (Visual Studio
+# 2019 Build Tools; LOCOFIX_MSVC / LOCOFIX_WINSDK in tools/build_locofix.py), Python 3.13.1 x64 and
+# the packages of tools/requirements-release.txt.
+name: Release build
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: LocoFix.dll and Setup.exe
+    runs-on: windows-2025
+    timeout-minutes: 90
+    env:
+      LOCOFIX_MSVC: "14.29"
+      LOCOFIX_WINSDK: "10.0.19041.0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          fetch-depth: 0          # the tags: the version is git describe --tags
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0   # v7.1.0
+        with:
+          python-version: "3.13.1"
+          architecture: x64
+
+      - name: Visual Studio 2019 Build Tools (MSVC 14.29, Windows SDK 10.0.19041)
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP "vs_buildtools.exe"
+          Invoke-WebRequest -Uri "https://aka.ms/vs/16/release/vs_buildtools.exe" -OutFile $installer
+          $signature = Get-AuthenticodeSignature $installer
+          if ($signature.Status -ne "Valid" -or $signature.SignerCertificate.Subject -notmatch "O=Microsoft Corporation") {
+            throw "vs_buildtools.exe: not signed by Microsoft ($($signature.Status))"
+          }
+          $arguments = @("--quiet", "--wait", "--norestart", "--nocache",
+                         "--installPath", "C:\BuildTools2019",
+                         "--add", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+                         "--add", "Microsoft.VisualStudio.Component.Windows10SDK.19041")
+          $process = Start-Process -FilePath $installer -ArgumentList $arguments -Wait -PassThru
+          if ($process.ExitCode -notin 0, 3010) { throw "Build Tools 2019: exit code $($process.ExitCode)" }
+          Get-ChildItem "C:\BuildTools2019\VC\Tools\MSVC" | ForEach-Object { "MSVC $($_.Name)" }
+
+      - name: Python packages (a venv of its own, as locally)
+        run: |
+          python -m venv .venv
+          .venv\Scripts\python -m pip install --disable-pip-version-check -r tools\requirements-release.txt
+
+      - name: Build (tools/release.py)
+        run: .venv\Scripts\python tools\release.py
+
+      - name: Check the version and write the build's facts
+        shell: pwsh
+        run: |
+          $version = (Get-Content build\release\payload\version.txt -Raw).Trim()
+          if ($env:GITHUB_REF_TYPE -eq "tag" -and $version -ne $env:GITHUB_REF_NAME) {
+            throw "the build's version $version is not the tag $env:GITHUB_REF_NAME"
+          }
+          "VERSION=$version" >> $env:GITHUB_ENV
+          $info = @("version: $version", "commit: $env:GITHUB_SHA", "runner image: $env:ImageOS $env:ImageVersion",
+                    "python: $(.venv\Scripts\python -c 'import sys; print(sys.version)')", "packages:")
+          $info += .venv\Scripts\python -m pip freeze --all
+          $info | Set-Content -Encoding utf8 build\release\build-info.txt
+          $files = "build\release\Setup.exe", "build\release\LocoFix\LocoFix.dll"
+          $summary = @("### OpenLocoland $version - release build (artifacts only, nothing published)", "",
+                       "| File | Bytes | SHA-256 |", "| --- | --- | --- |")
+          foreach ($f in $files) {
+            $item = Get-Item $f
+            $summary += "| $($item.Name) | $($item.Length) | ``$((Get-FileHash $f -Algorithm SHA256).Hash.ToLower())`` |"
+          }
+          $summary += "", "Compare with a local build: ``python tools\compare_builds.py <local> <artifact>``."
+          $summary | Add-Content -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v7.0.2
+        with:
+          name: OpenLocoland-${{ env.VERSION }}-release-build
+          path: |
+            build/release/Setup.exe
+            build/release/LocoFix/LocoFix.dll
+            build/release/build-info.txt
+          if-no-files-found: error

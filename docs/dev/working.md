@@ -518,6 +518,9 @@ pull request): the Python tools compile, `LocoFix.dll` builds with MSVC x86 (`bu
 the DLL is kept as the run's artifact) and `test_rail_rules.py` passes - there without the
 installed game's maps, which it skips. What needs the game stays local: `test_script_value.py`
 (Steam.exe), `check_lang.py` (the captured fonts), `test_missions.ps1` and `test_game.ps1`.
+The release build is a workflow of its own, `.github/workflows/release.yml` (a pushed tag `v*` or
+by hand): `LocoFix.dll` and `Setup.exe` as the run's artifacts, nothing published - see
+`release.md` "Built by GitHub Actions".
 
 All bugs found - fixed, confirmed, suspected, quirks scripts may rely on - are listed in
 `BUGS.md`. The rules a map has to follow - track, junctions, the ends of the main line,

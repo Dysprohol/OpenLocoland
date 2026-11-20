@@ -65,6 +65,23 @@ without your click. When the button's check cannot reach GitHub (no
 internet, or the project has moved) the launcher says so with the project's address, taken from
 `update.txt` in the game folder - a later Setup may change that file, and you may too.
 
+**Privacy.** The update check is the only part of OpenLocoland that goes online. What it does:
+- it asks GitHub (`https://api.github.com/repos/Dysprohol/OpenLocoland/releases/latest`) which
+  release is the latest - when you press **Check for updates**, and with **at start** ticked when
+  the launcher opens, at most once a day (when it got no answer, it tries again the next time the
+  launcher opens);
+- the request carries only the program's name and version (`OpenLocoland/v0.2.12`, for example) -
+  no name, no ID, nothing about your computer or your games; GitHub sees your IP address, as any
+  website does;
+- what it found - the date and the latest version - is kept in your Windows registry (the line
+  "Last check ..." under the button); nothing else is sent;
+- **Download** fetches the release's `Setup.exe` from GitHub into your Downloads folder and checks its
+  size and, when GitHub gives it, its SHA-256 against the release's; nothing is downloaded or
+  started without your click.
+
+Untick **at start** to turn the automatic check off; the button still works when you want it.
+Setup does not go online: its **GitHub** link only opens your browser when you click it.
+
 **Uninstalling.** Run `Setup.exe` and press **Uninstall**: it removes the shortcuts and the game folder with everything in it (OpenLocoland is not listed in Windows "Apps"). The Steam game stays as it is. Copy your own maps somewhere first
 if you want to keep them (each one is a folder in `maps\`, see [sharing a map](#13-save-export-and-share)).
 

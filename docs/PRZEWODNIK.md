@@ -66,6 +66,22 @@ dosięgnąć GitHuba (brak internetu albo projekt się przeniósł), okienko mó
 podaje adres projektu z pliku `update.txt` w folderze gry - późniejszy Setup może ten plik zmienić,
 ty też.
 
+**Prywatność.** Sprawdzanie aktualizacji to jedyna część OpenLocoland, która łączy się z internetem.
+Co robi:
+- pyta GitHuba (`https://api.github.com/repos/Dysprohol/OpenLocoland/releases/latest`), które wydanie
+  jest najnowsze - gdy wciśniesz **Sprawdź aktualizacje**, a przy zaznaczonym **przy starcie** także
+  przy otwarciu okienka startowego, najwyżej raz dziennie (gdy nie dostało odpowiedzi, próbuje znowu
+  przy następnym otwarciu);
+- zapytanie niesie tylko nazwę programu i wersję (np. `OpenLocoland/v0.2.12`) - żadnego imienia,
+  identyfikatora ani nic o twoim komputerze czy grach; GitHub widzi twój adres IP, jak każda strona;
+- to, co znalazło - data i najnowsza wersja - zostaje w rejestrze Windows (linijka „Ostatnie
+  sprawdzenie ...” pod przyciskiem); nic więcej nie jest wysyłane;
+- **Pobierz** ściąga z GitHuba `Setup.exe` wydania do folderu Pobrane i sprawdza jego rozmiar oraz,
+  gdy GitHub go podaje, SHA-256 z danymi wydania; nic nie jest pobierane ani uruchamiane bez twojego kliknięcia.
+
+Odznacz **przy starcie**, żeby wyłączyć samoczynne sprawdzanie; przycisk dalej działa, kiedy chcesz.
+Setup nie łączy się z internetem: jego link **GitHub** tylko otwiera przeglądarkę, gdy go klikniesz.
+
 **Odinstalowanie.** Uruchom `Setup.exe` i wciśnij **Odinstaluj**: usuwa skróty i folder gry ze wszystkim, co w nim jest (OpenLocoland nie figuruje w „Aplikacjach” Windows). Gra ze Steama zostaje bez zmian. Jeśli chcesz zachować swoje
 mapy, skopiuj je najpierw (każda to folder w `maps\`, zob. [udostępnianie mapy](#13-zapis-eksport-i-udostępnianie)).
 

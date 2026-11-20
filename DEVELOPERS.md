@@ -121,4 +121,4 @@ Paragraphs: The test rig; Zoom with the wheel; Frame rate at high resolutions; C
 
 Sections: "Release"; "Distribution"; "Next".
 
-Paragraphs: Every edition before the tag; What Setup does; Updating; A run stopped half way; The package's shape; Uninstalling; Checked; By hand; Rights holders; Working on one's own copy; What can be shared; What must not be shared; Published that way.
+Paragraphs: Built by GitHub Actions; Every edition before the tag; What Setup does; Updating; A run stopped half way; The package's shape; Uninstalling; Checked; By hand; Rights holders; Working on one's own copy; What can be shared; What must not be shared; Published that way.

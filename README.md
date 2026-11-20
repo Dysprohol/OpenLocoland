@@ -87,6 +87,14 @@ updates** in the launcher finds a newer release and downloads its `Setup.exe` fo
 player's guide tells the rest, the editor with a step-by-step first mission included:
 [GUIDE.md](docs/GUIDE.md) (English), [PRZEWODNIK.md](docs/PRZEWODNIK.md) (Polish).
 
+**Privacy.** The update check in the launcher is the only part of OpenLocoland that goes online.
+It asks GitHub (`api.github.com`) for the latest release when you press **Check for updates**, and
+on its own when the launcher opens, at most once a day. If it got no answer, it tries again the
+next time. The request carries the version you have and nothing about you; GitHub sees your IP
+address, as any website does. Untick **at start** to turn the automatic check off. A new
+`Setup.exe` is downloaded only when you press **Download**. Setup itself does not go online; its
+GitHub link only opens your browser when you click it.
+
 The map editor is still work in progress. Bugs and ideas are welcome in
 [Issues](https://github.com/Dysprohol/OpenLocoland/issues).
 

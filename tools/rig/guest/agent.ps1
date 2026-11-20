@@ -28,7 +28,7 @@
 #   C:\rig\io\agent\display-want.json / display-done.json   the display asked of the host / its answer
 #   C:\rig\io\agent\screen.png    the guest's screen, every few seconds while a job runs (to look in)
 #   C:\rig\io\agent\agent.log
-# -NoShutdown: end the agent without shutting the guest down (a nested test agent, guest\exp_nested.ps1)
+# -NoShutdown: end the agent without shutting the guest down (a nested test agent)
 param([string]$Io = "C:\rig\io", [switch]$NoShutdown)
 $ErrorActionPreference = "Continue"
 $Proto = 2

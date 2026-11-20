@@ -20,7 +20,13 @@ from their own Steam copy, as `build.py` does it for a developer.
    `LocoFix.log` ("LocoFix <version>"), in the launcher's caption and in the game window's title
    ("... - OpenLocoland <version>", `scaling_wndproc` at WM_CREATE; a `build.py` build says "dev"),
 2. LocoFix.dll is compiled with that version (`build_locofix.build(out_dir, version)`, the define
-   `LOCOFIX_VERSION`, into `build\release\LocoFix`) - the player gets it prebuilt,
+   `LOCOFIX_VERSION`, into `build\release\LocoFix`) - the player gets it prebuilt. It carries a
+   Windows version resource (`build_locofix.version_rc`, compiled with `rc.exe`; the file's
+   Properties > Details): ProductName and CompanyName "OpenLocoland" - the project, never a person -,
+   FileDescription "OpenLocoland fixes and map editor for Locoland", FileVersion and ProductVersion
+   the version, its numbers as Setup's (below; `build_locofix.version_numbers`), OriginalFilename
+   `LocoFix.dll` and Setup's copyright line (`build_locofix.COPYRIGHT`). A `build.py` build has no
+   version: "dev", 0.0.0.0,
 3. the payload (`build\release\payload`) has our files in the repository's layout: `game\`,
    `lang\` and `tools\` (only files git knows; the packs stay in the `lang/<code>/game/` layout
    and are assembled at install time, `lang\_template` is carried but not built),
@@ -40,6 +46,42 @@ from their own Steam copy, as `build.py` does it for a developer.
    controls - and system DPI awareness, so on a scaled screen the window is drawn sharp instead
    of stretched; the window's few sizes in pixels follow the scale, `Installer.px`); no UPX.
 
+**Built by GitHub Actions.** `.github/workflows/release.yml` builds the same two files from a
+pushed tag `v*` (or by hand, Actions > Release build > Run workflow, from a branch): it runs
+`tools\release.py` in a venv of its own and keeps `Setup.exe`, `LocoFix\LocoFix.dll` and
+`build-info.txt` (the version, the commit, the runner's image, Python and `pip freeze`) as the
+run's artifact `OpenLocoland-<version>-release-build`, their sizes and SHA-256 in the run's summary.
+A tag's build stops when its version is not the tag. It makes or changes no release and needs no
+secret (`permissions: contents: read`; the actions pinned to commits): the release is still made
+by hand, with the files of a build that matched. The tools are the local releases': MSVC 14.29 and
+the Windows SDK 10.0.19041.0 of the Visual Studio 2019 Build Tools (the job installs them, the
+installer checked as signed by Microsoft; `LOCOFIX_MSVC` / `LOCOFIX_WINSDK`), Python 3.13.1 x64 and
+the packages pinned in `tools/requirements-release.txt` (change a version there in one commit, for
+both). Two things keep two builds of one commit the same: a release's `LocoFix.dll` is compiled
+from a copy of `src\LocoFix` at one fixed place, `C:\ProgramData\OpenLocoland\LocoFix-src` (MSVC
+names a file's anonymous namespace after its full path, and the names order the code; the copy is
+removed afterwards), and PyInstaller runs with `PYTHONHASHSEED=0` (else `base_library.zip` comes in
+another order). `tools\compare_builds.py <a> <b>` says whether two `LocoFix.dll` or two `Setup.exe`
+are the same files apart from timestamps (the PE header's time and checksum, the debug directory's
+times) and names what differs - the sections, the tools that made a DLL (its Rich header), the
+version resource, a payload file, a Python module - with the likely reason. Checked on
+2026-11-20: the job's commands, run in their order in two fresh clones of one commit (fresh venvs,
+the two pins set), gave two `LocoFix.dll` and two `Setup.exe` the same apart from timestamps - before
+the fixed place and the hash seed the DLLs' code differed and so did `base_library.zip`'s order -;
+that Setup installed in the rig (`-Job setup --auto`) and its game ran mission 1. A run on GitHub is
+compared with a local build of the same tag after the tag is pushed:
+
+```bat
+.venv\Scripts\python tools\release.py
+gh run download <run id> -R Dysprohol/OpenLocoland -n OpenLocoland-<version>-release-build -D build\ci
+.venv\Scripts\python tools\compare_builds.py build\release\LocoFix\LocoFix.dll build\ci\LocoFix\LocoFix.dll
+.venv\Scripts\python tools\compare_builds.py build\release\Setup.exe build\ci\Setup.exe
+```
+
+For the same result locally, the venv has the pinned packages, Python is 3.13.1 and the DLL is
+built with the same toolset: `set LOCOFIX_MSVC=14.29` and `set LOCOFIX_WINSDK=10.0.19041.0` before
+`release.py` make sure of it on a machine with more than one Visual Studio.
+
 **Every edition before the tag.** `python tools\editions.py check --run` builds the game from
 every edition of it we know and starts each one (an hour or so for all of them); a release waits
 until its table has no FAILED, "no menu" or LOGIC. `tools/editions.py` is a developer's tool, not
@@ -55,7 +97,7 @@ English depot's scripts and data with Italian texts, and an exe of its own, wrap
 protection that ends it at once without the disc) and `en-beta-demo` (the English beta/demo disc:
 another exe; its `logo.lgc` and `constants.lgc` are the Russian depot's, which so has part of
 the scripts of that older build). A new edition is one folder of its files - an install of the
-disc, by our convention in `C:\Locoland Decomp\notes\diffs\<name>` - and `editions.py capture
+disc, kept in a folder outside the repository - and `editions.py capture
 <code> <folder>`; an installer's own files (`unins*`, logs) and a disc install's score tables
 (`hiscores`, the player's; the depots ship theirs) are left out, a file that cannot be read (the
 Italian CD's `CDPRO.BIN`, taken by the antivirus) is named and left out, and `refresh <code>

@@ -82,7 +82,13 @@ foreach ($sc in ($Scenarios -split ",")) {
       Wait-Report @($a, $f, $c)
     }
     "old" {
-      if (-not $OldRig) { $OldRig = Join-Path (($repo -split '\\\.claude\\')[0]) "tools\rig\rig.ps1" }
+      if (-not $OldRig) {
+        # the main checkout: a linked worktree's .git is a file that points into its .git\worktrees\<name>
+        $mainRepo = $repo; $dotGit = Join-Path $repo ".git"
+        if ((Test-Path -LiteralPath $dotGit -PathType Leaf) -and
+            ("$(Get-Content -LiteralPath $dotGit -TotalCount 1)" -match '^gitdir:\s*(.+?)[\\/]\.git[\\/]worktrees[\\/][^\\/]+\s*$')) { $mainRepo = [IO.Path]::GetFullPath($Matches[1]) }
+        $OldRig = Join-Path $mainRepo "tools\rig\rig.ps1"
+      }
       Say "older host script: $OldRig"
       $runs = @((Launch "old-game" "-Job game -Game '$b\game' -TestArgs $l01 }" $OldRig),
                 (Launch "new-beside" "-Job game -Game '$b\game2' -TestArgs $l01; Language = 'en' }"))

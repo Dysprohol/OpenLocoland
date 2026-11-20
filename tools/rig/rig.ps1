@@ -87,10 +87,15 @@ $ErrorActionPreference = "Stop"
 $rigDir = $PSScriptRoot
 $repo = Split-Path (Split-Path $rigDir)
 # The host folder mapped read-only as C:\host: the folder that holds the main checkout (and with it
-# every worktree under .claude\worktrees, every build folder, the test maps).
-$main = if ($repo -match '^(.*?)\\\.claude\\worktrees\\') { $Matches[1] } else { $repo }
-# who queues: the worktree this script is in (the agent takes turns between callers)
-$caller = if ($repo -match '\\\.claude\\worktrees\\([^\\]+)$') { $Matches[1] } else { "main" }
+# every worktree kept inside it, every build folder, the test maps). A linked worktree is known by
+# its .git, a file that points into the main checkout's .git\worktrees\<name>.
+# $caller - who queues: the worktree this script is in (the agent takes turns between callers).
+$main = $repo; $caller = "main"
+$dotGit = Join-Path $repo ".git"
+if ((Test-Path -LiteralPath $dotGit -PathType Leaf) -and
+    ("$(Get-Content -LiteralPath $dotGit -TotalCount 1)" -match '^gitdir:\s*(.+?)[\\/]\.git[\\/]worktrees[\\/][^\\/]+\s*$')) {
+  $main = [IO.Path]::GetFullPath($Matches[1]); $caller = Split-Path $repo -Leaf
+}
 $hostRoot = Split-Path $main
 $steam = "C:\Program Files (x86)\Steam\steamapps\common\Locoland"   # mapped read-only as C:\steam
 # The rig's own folder: the box's io folder (mapped read-write as C:\rig\io), its state, the last

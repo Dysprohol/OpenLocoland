@@ -1,2 +1,13 @@
 -r requirements.txt
+# The release's packages at the versions the local releases are built with: the same versions give the
+# same Setup.exe locally and in the release workflow (.github/workflows/release.yml; compared with
+# tools/compare_builds.py). Change them in one commit, for both.
 pyinstaller==6.22.3   # installer.keep_modules_in_memory reads its internals: tested with this version
+pyinstaller-hooks-contrib==2026.9
+altgraph==0.17.5
+packaging==26.3
+pefile==2024.8.26
+pillow==12.3.0
+capstone==5.0.9
+pywin32-ctypes==0.2.3
+setuptools==84.2.1
