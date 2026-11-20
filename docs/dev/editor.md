@@ -167,7 +167,23 @@ the editor (Play the map: `--return-editor`) also has a way straight back: the E
 THE EDITOR (`[strings]` `MenuBackToEditor`: WROC DO EDYTORA, ZURUCK ZUM EDITOR ...) - under the
 question, next to YES, EXIT TO MAIN MENU; a click on the row (the lamp or the text, tested by the
 screen point on the click's frame, as the custom page does) starts the game again in editor mode on
-the map. The script asks LocoFix two new externs (free in `export.lgc`, handled by the hook of
+the map. Since v0.2.13 the menu's first page - the one Esc opens, with the map's title, its briefing
+and CONTINUE GAME - has the row too, so the way back is one click from Esc; the click does what the exit
+page's does. Its place depends on the page (`EditorRowOnBriefing`): a briefing's page is printed from
+a file (the editor writes 44 letters a line, so do the missions), and when the page has at most 10
+lines (its file's lines, a longer one counted as more) the row is where the exit page has it, under
+the text; a longer page puts it at the right of the title's line, when the title (18 pixels a letter
+in its font, 8 the row's) leaves room for it, else at the right of the text box's bottom, under the
+page's thirteenth line - only a page of 14 lines with a long title would have its last line under the
+row. The places are from the page's middle, so the row moves and scales with the 1024 x 768 menu at
+every resolution and interface size; the click is tested on the row's own box (the lamp and the text's
+length). The keys of the menu are as they were (Enter and Space continue the game). Checked in Polish
+and English at 1024 x 768 and 1920 x 1080 (interface size 2): Run the level of the template (the row
+under its one line), mission 5 (13 lines, beside SZTORM), mission 16 (a long title, at the bottom) and
+mission 6 (10 lines, under them) - a click on the row held the level again, and the exit page's row and
+going from it back to the first page as before; Play the map of a saved map - the row on both pages and a
+click back to the editor on the map; mission 5 and POLIGON played without the editor - no row on either
+page. The script asks LocoFix two new externs (free in `export.lgc`, handled by the hook of
 `Script_CallExtern`): `PlayedFromEditor() 202` (1 in such a map, so a mission played from the menu
 shows no row) and `BackToEditor() 203`. Tried first the way back as it was - a map played from the
 editor, won (the template's `MAP_WIN_TEST`, VICTORY, CONTINUE), lost, and left through Esc - ABORT

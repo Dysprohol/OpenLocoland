@@ -4,20 +4,31 @@
  int curr_player=0;
 +#include "maps\script\optfields.lgc"   // LocoFix's own fields on the settings page (the minimap's size)
  int usermenu_created=0, levelmenu_created=0, creditsmenu_created=0,helpmenu_created=0,exitmenu_created=0,optionsmenu_created=0;
-@@ -75,2 +76,12 @@
+@@ -75,2 +76,23 @@
  int mouse_swap=0;
 +// The Esc menu of a map played from the editor (LocoFix's File > Play the map; src/LocoFix/restart.cpp,
-+// the numbers are free in export.lgc): its exit page has BACK TO THE EDITOR, a row like the custom
-+// maps page's - the lamp and the text -, which starts the game again in the editor on the map. While
-+// the level runs inside the editor's own game (Run the level, PlayedFromEditor() 2) the row closes the
-+// menu and the editor holds the level again.
++// the numbers are free in export.lgc): its first page (the briefing) and its exit page have BACK TO THE
++// EDITOR, a row like the custom maps page's - the lamp and the text -, which starts the game again in the
++// editor on the map. While the level runs inside the editor's own game (Run the level, PlayedFromEditor()
++// 2) the row closes the menu and the editor holds the level again.
 +extern PlayedFromEditor() 202;
 +extern BackToEditor() 203;
 +int menu_editor_lamp=0,menu_editor_text=0,menu_editor_how=0,menu_editor_hold=0;
++int menu_editor_x=0,menu_editor_y=0,menu_editor_w=0;
++// the row's places, from the page's middle (MAIN_X, MAIN_Y; the lamp's middle): under the text as on the
++// exit page; on the briefing, when its page is longer than EDITOR_ROW_LINES lines, at the right of the
++// title's line (when the title leaves room) or else at the right of the text box's bottom
 +#define EDITOR_ROW_X -150
 +#define EDITOR_ROW_Y 80
++#define EDITOR_ROW_LINES 10
++#define EDITOR_ROW_RIGHT 178
++#define EDITOR_ROW_HEAD_Y -95
++#define EDITOR_ROW_LOW_Y 106
++#define EDITOR_ROW_CHAR 8
++#define EDITOR_HEAD_CHAR 18
++#define EDITOR_BRIEF_COLS 44
  
-@@ -81,2 +92,17 @@
+@@ -81,2 +103,60 @@
    Y=yyy-(SCR_DEF_Y-SCRY)/2;
 +}
 +KillEditorRow()
@@ -25,7 +36,50 @@
 +  if(menu_editor_lamp){ Destroy(menu_editor_lamp); menu_editor_lamp=0;}
 +  if(menu_editor_text){ Destroy(menu_editor_text); menu_editor_text=0;}
 +}
-+// a click on the row (the lamp or its text) of the exit page
++EditorRowText()
++{
++  string back;
++  back=GetString("strings","MenuBackToEditor");
++  if(back=="") back="BACK TO THE EDITOR";
++  return back;
++}
++// the row with the lamp at x,y from the page's middle (X, Y set)
++EditorRowCreate(int x,int y,string back)
++{
++  menu_editor_x=x; menu_editor_y=y; menu_editor_w=16+strlen(back)*EDITOR_ROW_CHAR;
++  menu_editor_lamp=MenuCreate(472,0,X+x,Y+y,2230);
++  Action(menu_editor_lamp,act_menustandup,0,0);
++  menu_editor_text=PrintText(X+x+16,Y+y-6+2300,2300,back,2);
++}
++// the lines a page of the briefing takes: the file's lines, a long one as more
++EditorRowLines(string page)
++{
++  int f,n,k;
++  string s;
++  n=0;
++  f=FOpen(page);
++  while(!FEof(f))
++  {
++     s=FRead(f);
++     k=strlen(s);
++     if(k || !FEof(f)) n++;   // not the empty end after the last line's end
++     if(k>EDITOR_BRIEF_COLS) n=n+(k-1)/EDITOR_BRIEF_COLS;
++  }
++  FClose(f);
++  return n;
++}
++// the briefing's row: under a short page's text; else beside a title that leaves room; else at the bottom
++EditorRowOnBriefing(string page,string head)
++{
++  string back;
++  int x;
++  back=EditorRowText();
++  x=EDITOR_ROW_RIGHT-strlen(back)*EDITOR_ROW_CHAR-16;
++  if(EditorRowLines(page)<=EDITOR_ROW_LINES) EditorRowCreate(EDITOR_ROW_X,EDITOR_ROW_Y,back);
++  else if(BREIF_HEAD_X+strlen(head)*EDITOR_HEAD_CHAR+25<=x) EditorRowCreate(x,EDITOR_ROW_HEAD_Y,back);
++  else EditorRowCreate(x,EDITOR_ROW_LOW_Y,back);
++}
++// a click on the row (the lamp or its text)
 +EditorRowClicked()
 +{
 +  int x,y;
@@ -33,14 +87,14 @@
 +  GetRCX(MAIN_X);GetRCY(MAIN_Y);
 +  x=GetScreenInputX();
 +  y=GetScreenInputY();
-+  return x>=X+EDITOR_ROW_X-12 && x<X+EDITOR_ROW_X+240 && y>=Y+EDITOR_ROW_Y-12 && y<Y+EDITOR_ROW_Y+12;
++  return x>=X+menu_editor_x-12 && x<X+menu_editor_x+menu_editor_w+4 && y>=Y+menu_editor_y-12 && y<Y+menu_editor_y+12;
  }
-@@ -117,2 +143,4 @@
+@@ -117,2 +197,4 @@
  SetMenuState(int num){
-+  string back;
++  string page,head;
 +  KillEditorRow();
    if (menu_brief_text){ Destroy(menu_brief_text); menu_brief_text=0;}
-@@ -129,7 +157,19 @@
+@@ -129,9 +211,36 @@
        menu_prev=MenuCreate(475,0,X-151,Y+131,2230);
 +#ifdef BRIEF_LIST
 +    if(GetCountFromList(BRIEF_LIST)-1>curr_page)
@@ -60,29 +114,39 @@
      menu_brief_head=PrintText(X+BREIF_HEAD_X,Y+BREIF_HEAD_Y,BREIF_HEAD_Z,GetString("strings","MapHeader"+itoa(LEVEL+1)),3);
 +#endif
      menu_start=MenuCreate(477,0,X,Y+131,2230);
-@@ -177,2 +217,11 @@
+     menu_start_text=PrintTextAtCenter(X,Y+131+2300,2300,GetString("strings","MenuGame1Go"),2);
++    menu_editor_how=PlayedFromEditor();
++    if(menu_editor_how)
++    {
++#ifdef BRIEF_LIST
++      page=GetFileFromList(BRIEF_LIST);
++#else
++      page=GetFileFromList("maps\\l"+sprintf("%02i",LEVEL+1)+"\\brief.lst");
++#endif
++#ifdef BRIEF_HEADER
++      head=BRIEF_HEADER;
++#else
++      head=GetString("strings","MapHeader"+itoa(LEVEL+1));
++#endif
++      EditorRowOnBriefing(page,head);
++    }
+   }
+@@ -177,2 +286,4 @@
       menu_start_text=PrintTextAtCenter(X,Y+131+2300,2300,GetString("strings","MenuGame2Go"),2);
 +     menu_editor_how=PlayedFromEditor();
-+     if(menu_editor_how)
-+     {
-+        back=GetString("strings","MenuBackToEditor");
-+        if(back=="") back="BACK TO THE EDITOR";
-+        menu_editor_lamp=MenuCreate(472,0,X+EDITOR_ROW_X,Y+EDITOR_ROW_Y,2230);
-+        Action(menu_editor_lamp,act_menustandup,0,0);
-+        menu_editor_text=PrintText(X+EDITOR_ROW_X+16,Y+EDITOR_ROW_Y-6+2300,2300,back,2);
-+     }
++     if(menu_editor_how) EditorRowCreate(EDITOR_ROW_X,EDITOR_ROW_Y,EditorRowText());
    }
-@@ -275,2 +324,3 @@
+@@ -275,2 +386,3 @@
      Genocide(508);
 +    OptFieldsKill();
  
-@@ -301,2 +351,3 @@
+@@ -301,2 +413,3 @@
    MenuCreate(496,1,X+MENU_OPTIONS_SHIFT_X+72+99,Y+MENU_OPTIONS_SHIFT_Y+9,2220);
 +  OptFieldsCreate(X,Y,2220,2300);
    optionsmenu_created=1;
-@@ -480,2 +531,18 @@
+@@ -480,2 +593,18 @@
       }
-+     if(menu_state==5 && EditorRowClicked())
++     if((menu_state==0 || menu_state==5) && EditorRowClicked())
 +     {
 +        if(menu_editor_how==2)
 +        {
@@ -99,7 +163,7 @@
 +        return;
 +     }
       if((mvid==477 || GetKey()==VK_SPACE || GetKey()==VK_RETURN) && GetVid(477,VID_COUNT)>0) 
-@@ -492,3 +559,7 @@
+@@ -492,3 +621,7 @@
             Effect(eff_fade,0);
 +#ifdef CUSTOM_MAP
 +           Load(GetString("strings","MapsPath")+CUSTOM_MAP);
@@ -107,15 +171,15 @@
             Load(GetString("strings","MapsPath")+"maps\\l"+sprintf("%02i",LEVEL+1)+"\\l"+sprintf("%02i",LEVEL+1)+".map");
 +#endif
             return;
-@@ -535,2 +606,3 @@
+@@ -535,2 +668,3 @@
       }
 +     OptFieldsClick(mvid);
       if(mvid==495)
-@@ -616,2 +688,3 @@
+@@ -616,2 +750,3 @@
     if(menu_start_text){Destroy(menu_start_text);menu_start_text=0;}
 +   KillEditorRow();
     KillLevelMenu();
-@@ -626,2 +699,3 @@
+@@ -626,2 +761,3 @@
     ScrollLock(0);
 +   if(menu_editor_hold){ menu_editor_hold=0; BackToEditor(); }
  }

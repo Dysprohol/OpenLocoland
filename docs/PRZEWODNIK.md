@@ -743,7 +743,8 @@ nie, tak jak w grze - pociągi jeżdżą, działa strzelają, przyjeżdżają po
 nie pyta i nic się nie zapisuje: mapa działa z ukrytej kopii, więc pliki twojej mapy zostają, jakie
 były (wynik zdobyty w teście nie trafia na listę najlepszych). `Ctrl+R` wraca do edytora z mapą taką, jak przed
 uruchomieniem - niezapisane zmiany dalej niezapisane, `Ctrl+Z` cofa je jak przedtem -, tak samo menu gry
-pod `Esc` (WYJDZ Z GRY → WROC DO EDYTORA albo TAK) i koniec poziomu (wygrana albo przegrana).
+pod `Esc` (WROC DO EDYTORA na stronie, którą Esc otwiera, tej z odprawą, albo WYJDZ Z GRY → WROC DO
+EDYTORA albo TAK) i koniec poziomu (wygrana albo przegrana).
 
 ### 10. Ustawienia misji i teksty
 
@@ -786,8 +787,8 @@ fortyfikacji), a **przegrana**, gdy graczowi nie zostało żadnej jednostki ani 
 
 Menu → **ZAGRAJ ZAPISANA MAPE**: gra uruchamia się od nowa z twoją zapisaną mapą jako misją - odprawa w menu Esc,
 przybywające posiłki, atakujący wróg. Gdy się skończy, gra wraca do edytora na twoją mapę; żeby
-wrócić od razu, naciśnij Esc, przycisk wyjścia (WYJDZ Z GRY) i **WROC DO EDYTORA**. O niezapisane
-zmiany najpierw pyta.
+wrócić od razu, naciśnij Esc i kliknij **WROC DO EDYTORA** (na stronie z odprawą, a także na stronie
+przycisku wyjścia, WYJDZ Z GRY). O niezapisane zmiany najpierw pyta.
 
 ### 12. Zapisz
 

@@ -745,7 +745,8 @@ will in the game - the trains drive, the guns shoot, the arrivals come. Nothing 
 saved: the map runs from a hidden copy, so your map's files stay as they were (a high score made in the
 test is not kept). `Ctrl+R` brings the editor back with the map as you left it -
 the edits not saved still not saved, `Ctrl+Z` undoing them as before -, and so do the game's own `Esc`
-menu (ABORT GAME → BACK TO THE EDITOR or YES) and the end of the level (won or lost).
+menu (BACK TO THE EDITOR on the page Esc opens, the one with the briefing, or ABORT GAME → BACK TO THE
+EDITOR or YES) and the end of the level (won or lost).
 
 ### 10. Mission settings and texts
 
@@ -789,8 +790,8 @@ fort's guns), and **lost** when the player has no units left and no factory.
 
 Menu → **PLAY THE SAVED MAP**: the game starts again with your saved map as a mission - the briefing in the Esc
 menu, the reinforcement arriving, the enemy attacking. When it ends, the game comes back to the
-editor on your map; to go back at once, press Esc, the exit button (ABORT GAME) and **BACK TO THE
-EDITOR**. Unsaved changes are asked about first.
+editor on your map; to go back at once, press Esc and click **BACK TO THE EDITOR** (on the briefing's
+page, and on the exit button's page, ABORT GAME, too). Unsaved changes are asked about first.
 
 ### 12. Save
 
