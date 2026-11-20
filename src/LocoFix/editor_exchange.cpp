@@ -375,8 +375,9 @@ std::vector<PackageFile> exchange_renamed(const Package& p, const std::string& n
             data = replace_ci(replace_ci(data, old_double, new_double), old_single, new_single);
             data = replace_ci(data, new_double + p.name + ".", new_double + name + ".");
             data = replace_ci(data, new_single + p.name + ".", new_single + name + ".");
-            if (lower(file) == lower(name + ".lgc")) data = custom_map_retitled(data, p.name, name);   // a title that was the old name
         }
+        if (lower(file) == lower(name + ".lgc") && custom_map_named(name))
+            data = custom_map_retitled(data, name);   // one name: the title and the briefing's header are the map's name
         if (ext == ".map" && own_ground && !campaign_image(p.ground))
             data = map_with_ground_image(data, folder + (starts_with_ci(base_name(p.ground), p.name + ".")
                                                              ? name + base_name(p.ground).substr(p.name.size())

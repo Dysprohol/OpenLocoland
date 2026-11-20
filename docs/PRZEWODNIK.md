@@ -732,8 +732,9 @@ pod `Esc` (WYJDZ Z GRY → WROC DO EDYTORA albo TAK) i koniec poziomu (wygrana a
 
 Menu → **USTAWIENIA MISJI** (albo zębatka na listwie):
 
-- **Tytuł** na stronie własnych map i **nagłówek odprawy** (na początku nazwa mapy wielkimi
-  literami);
+- **Tytuł** na stronie własnych map i **nagłówek odprawy** - zawsze nazwa mapy wielkimi literami,
+  widoczne tutaj, ale nie zmienia się ich tutaj: żeby je zmienić, daj mapie inną nazwę (**ZMIEN NAZWE /
+  USUN** w Menu albo zapis pod inną nazwą);
 - **pieniądze na początku** - nowa mapa zaczyna z 0: daj graczowi trochę (np. 1000), inaczej fabryka
   niczego nie zbuduje; **pora dnia na początku** (dzień, wieczór, noc, ranek - potem płynie dalej,
   po 5 minut);
@@ -777,7 +778,8 @@ zmiany najpierw pyta.
 o nazwę - tak samo POLIGON i szablon, które aktualizacja by nadpisała (okno proponuje `poligon1`,
 `map1` ..., a jego tytuł mówi dlaczego). Menu → **ZAPISZ MAPE** (Alt+F2) pyta zawsze - żeby zapisać pod inną nazwą. Mapa zapisana jako
 `maps\<nazwa>\<nazwa>.map` zapisuje się ze skryptem i tekstami i pojawia na stronie **WLASNE MAPY**
-pod swoim tytułem. Otworzysz ją znowu przez **WCZYTAJ MAPE** (Alt+F3). Każdy zapis pokazuje na chwilę
+pod swoją nazwą wielkimi literami (dwie mapy, których nazwy dają ten sam tytuł, widać jako NAZWA i
+NAZWA 2). Otworzysz ją znowu przez **WCZYTAJ MAPE** (Alt+F3). Każdy zapis pokazuje na chwilę
 duże **ZAPISANO** z plikiem mapy na środku widoku, z kliknięciem menu.
 
 ### 13. Zapis, eksport i udostępnianie
@@ -792,7 +794,7 @@ znajomy wkłada go do `maps\` swojego folderu gry i mapa jest na stronie własny
 przemianowany w Eksploratorze też działa: gra sama zmienia nazwy plików w środku na nazwę folderu.
 
 **Zmiana nazwy i usuwanie:** Menu → **ZMIEN NAZWE / USUN** daje mapie nową nazwę (jej folder i pliki
-idą za nią, stary folder trafia do Kosza) albo ją usuwa (po pytaniu, do Kosza). Nazwa może mieć do 64
+idą za nią, tak samo tytuł na stronie własnych map i nagłówek odprawy, stary folder trafia do Kosza) albo ją usuwa (po pytaniu, do Kosza). Nazwa może mieć do 64
 liter angielskich, cyfr, spacji i znaków dozwolonych w nazwach plików Windows i nie może być folderem
 gry (`l01`-`l20`, `sandbox`, `template`, `script`, `outro`).
 

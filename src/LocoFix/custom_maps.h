@@ -14,10 +14,16 @@ bool custom_map_exists(const std::string& folder);
 // A folder of the game or of the editor (the campaign's lNN, script, outro, POLIGON, the template,
 // the scratch _new..., _run): never renamed, deleted or overwritten.
 bool game_map_folder(const std::string& folder);
-// A map's script under a new name: a title or briefing header that was the old name in capitals
-// becomes the new name's (editor_exchange.cpp renames every map this way).
-std::string custom_map_retitled(const std::string& script, const std::string& from, const std::string& to);
-// The title the page shows for it (its script's).
+// A custom map has one name: its folder's. Its title - on the page, the script's "// title:" and
+// BRIEF_HEADER - is that name in capitals (custom_map_name_title). Not for the game's folders:
+// POLIGON, the template and the campaign keep the titles of their scripts.
+bool custom_map_named(const std::string& folder);
+// The title of the name `name`: ASCII capitals without quotes, at most 24 characters.
+std::string custom_map_name_title(const std::string& name);
+// A map's script under the name `name`: its "// title:" and BRIEF_HEADER lines become the name's
+// title (editor_exchange.cpp renames and imports every map this way).
+std::string custom_map_retitled(const std::string& script, const std::string& name);
+// The title the page shows for it (its name's; POLIGON's from its script).
 std::string custom_map_title(const std::string& folder);
 // Looks through maps\ and writes maps\custom.lst for the menu (only when it changed).
 void custom_maps_list();

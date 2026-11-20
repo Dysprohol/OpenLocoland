@@ -246,9 +246,17 @@ chosen for the window (`interface_editor_scale`), and its mouse is the message's
 the interface by a map point convert it (`map_to_ui`): an object's panel beside the object and the mines'
 labels' test against the bar; the mines' labels and the socket numbers of an object's panel are drawn with
 the map then. The camera's margin past the map (camera.cpp, 300 px times the interface's size) is in map
-pixels, times `zoom_ratio()` (at the normal size 600 at 1/2, 150 at 2). Run the level loads its level at its own zoom; editor.cpp
-keeps the zoom and the view's middle (`zoom_editor_kept`) and asks for it again when the editor holds the map
-again (`zoom_editor_restore`, after the next frame). Load, New map and a level change reset it (the level's
+pixels, times `zoom_ratio()` (at the normal size 600 at 1/2, 150 at 2). Run the level loads its level at its own zoom,
+and the running level zooms with the plain wheel as a mission does (the game's own wheel, play's refusals: over the
+bar, in a menu, paused); editor.cpp keeps the editor's zoom and the view's middle (`zoom_editor_kept`) and asks for
+it again when the editor holds the map again (`zoom_editor_restore`, after the next frame). The editor's way of the
+wheel is taken only while a level is held (`editor_zoom` in zoom.cpp): the editor mode's flag (World flags 0x1) stays
+for the whole game, and until 2026-11-20 zoom.cpp chose the editor's way by that flag, so in a running level it
+waited for the editor's window procedure, which passes the wheel only while the level is held, and refused ("the
+level not held") - the wheel did nothing in Run the level. Checked in the rig (POLIGON, 1024 x 768): the editor at
+125 %, Ctrl+R, two notches in (125 %, the map point under the cursor kept), three out (89 %), two over the bar not
+taken ("over the interface"), the Esc menu and back still at 89 %, a notch in (100 %), Ctrl+R - the editor's 125 %
+back, its wheel zooming as before; a mission's wheel as before. Load, New map and a level change reset it (the level's
 load, as in play). The test mode's factory panel click (`G` / `T`) takes the interface's point as a window
 point under a zoom. Checked in the rig (2026-11-14, mission 13's map, 1920 x 1080, the interface at the normal
 size and twice): at 2/3, 1/2, the whole map (47 %), 1.5, 2 and 3 a house placed lands on the map point under the

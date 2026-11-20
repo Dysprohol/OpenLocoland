@@ -28,7 +28,8 @@
 // hiscores.txt, last when the list had it - the game writes that one); a text the language pack
 // has a copy of (the sandbox's, lang\<code>\maps\sandbox) is written to that copy. A map saved as
 // maps\<folder>\<folder>.map is on the custom maps page of the menu by itself (custom_maps.cpp),
-// with the "// title:" line as its title.
+// with its name as its title: the "// title:" line and BRIEF_HEADER are written as the name in
+// capitals on every save (one name; Mission settings shows them read-only).
 //
 // File > Mission settings... edits all of it in a Windows dialog (built in memory, Unicode, the
 // game in GDI mode as for the file dialogs - editor.cpp).
@@ -51,7 +52,6 @@
 std::vector<TrainPatrol> edit_train_patrols();   // editor_edit.cpp: the trains' patrols of the held level
 void edit_message_text(const char* key, const char* english);   // editor_edit.cpp: a message of the status line
 bool editor_unsaved_map(const std::string& map);   // editor.cpp: the editor's new map, not saved yet
-std::string editor_new_map_title();                // editor.cpp: its title until it is saved
 std::vector<UnitUnlock> edit_place_unlocks(std::vector<UnitUnlock>& unlocks);   // editor_edit.cpp: the factories' places now, the units to write
 std::string language_file(const std::string& path);   // language.cpp: the pack's copy of a file
 std::vector<int> edit_place_plans(std::vector<FactoryTrain>& plans);   // editor_edit.cpp: the plans' factories now, their armies
@@ -2603,6 +2603,19 @@ std::string folder_name(const std::string& map) {   // maps\<name>\<name>.map ->
     return slash == std::string::npos ? folder : folder.substr(slash + 1);
 }
 
+// The name of a custom map, maps\<name>\<name>.map, whose title and briefing header are that name
+// (custom_maps.h: one name); empty for POLIGON, the template, the campaign, the editor's scratch.
+std::string own_name(const std::string& map) {
+    const std::string name = folder_name(map);
+    if (!custom_map_named(name) || lstrcmpiA(map.substr(map.find_last_of('\\') + 1).c_str(), (name + ".map").c_str()) != 0)
+        return "";
+    return name;
+}
+
+// The title and the header follow the map's name: a custom map's, or the editor's new map's, which
+// gets one when it is saved - Mission settings shows them and does not edit them.
+bool titled_by_name() { return !own_name(g_map).empty() || editor_unsaved_map(g_map); }
+
 Mission read_mission(const Parsed& p, bool block, const std::string& map) {
     Mission m;
     auto get = [&](const char* name, const std::string& fallback) {
@@ -2678,6 +2691,7 @@ Mission read_mission(const Parsed& p, bool block, const std::string& map) {
     m.title = from_pack(title);
     auto header = p.defines.find("BRIEF_HEADER");
     m.header = header != p.defines.end() ? from_pack(unquote(header->second)) : m.title;
+    if (!own_name(map).empty()) m.title = m.header = from_pack(custom_map_name_title(own_name(map)));   // one name
     return m;
 }
 
@@ -3332,8 +3346,10 @@ std::string apply_fields(const Fields& f, Mission& n) {
         return out != INT_MIN;
     };
     std::string error, trains;
-    n.title = get(IDC_TITLE);
-    n.header = get(IDC_HEADER);
+    if (!titled_by_name()) {   // else the map's name, as they were
+        n.title = get(IDC_TITLE);
+        n.header = get(IDC_HEADER);
+    }
     if (!number(IDC_MONEY, n.money)) error = ui_text("ErrMoney", "Money: a number");
     int time = 1;
     if (number(IDC_TIME, time)) n.daytime = (std::max)(1, (std::min)(4, time));
@@ -3826,10 +3842,12 @@ bool mission_dialog(HWND owner, bool* open_arrivals, bool* open_plan) {
     // and the weather in a column on the right, each with its label in full words
     DialogTemplate t(ui_wtext("MissionTitle", "Mission settings").c_str(), 620, 330);
     const DWORD label = SS_LEFT;
+    // a custom map's title and header are its name (Rename changes them): shown, not edited
+    const DWORD named = titled_by_name() ? ES_READONLY : 0;
     t.item(STATIC, ui_wtext("MissionMapTitle", "Title on the custom maps page:").c_str(), -1, label, 8, 8, 150, 8);
-    t.item(EDIT, L"", IDC_TITLE, LINE, 160, 6, 252, 12);
+    t.item(EDIT, L"", IDC_TITLE, LINE | named, 160, 6, 252, 12);
     t.item(STATIC, ui_wtext("MissionHeader", "Briefing header:").c_str(), -1, label, 8, 26, 150, 8);
-    t.item(EDIT, L"", IDC_HEADER, LINE, 160, 24, 252, 12);
+    t.item(EDIT, L"", IDC_HEADER, LINE | named, 160, 24, 252, 12);
     const short cx = 424, cw = 188;   // the column on the right
     t.item(STATIC, ui_wtext("MissionMoney", "Money at the start:").c_str(), -1, label, cx, 8, 100, 8);
     t.item(EDIT, L"", IDC_MONEY, LINE | ES_NUMBER, cx + 104, 6, cw - 104, 12);
@@ -3947,25 +3965,19 @@ void mission_save(const std::string& map) {
     const Blocks b = find_blocks(lines);
     if (!b.found()) {
         patch::log("mission: %s has no editor blocks, its settings are not written", script.c_str());
+        if (!own_name(map).empty()) {   // only its title and header lines follow the map's name
+            const std::string retitled = custom_map_retitled(text, own_name(map));
+            if (retitled != text && write_file(script, retitled)) patch::log("mission: %s retitled after its name", script.c_str());
+        }
         g_managed = false;
         g_map = map;
         return;
     }
-    // a map saved from the template, POLIGON or the editor's new map keeps nothing of its name:
-    // "TEMPLATE", POLIGON's "POLIGON" or the new map's "NEW MAP" as the title (the custom maps page)
-    // or the briefing's header (the Esc menu's first page) becomes the map's own name
-    if (lstrcmpiA(folder_name(map).c_str(), "template") != 0 && lstrcmpiA(folder_name(map).c_str(), "sandbox") != 0 &&
-        !editor_unsaved_map(map)) {
-        const std::string unnamed = editor_unsaved_map(g_map) ? editor_new_map_title() : "";
-        const bool sandbox = lstrcmpiA(folder_name(g_map).c_str(), "sandbox") == 0;
-        auto placeholder = [&](const std::wstring& text, size_t length) {
-            const std::string a = ascii_upper(text, length);
-            return a == "TEMPLATE" || (sandbox && a == "POLIGON") || (!unnamed.empty() && a == unnamed);
-        };
-        const bool title = placeholder(g_mission.title, 24);
-        if (title) g_mission.title = from_pack(upper(folder_name(map)));
-        if (title || placeholder(g_mission.header, 32)) g_mission.header = g_mission.title;
-    }
+    // a custom map has one name: its title (the custom maps page) and the briefing's header (the Esc
+    // menu's first page) are its name in capitals, on every save - under a new name (Save as, the
+    // new map's first save) or its own (a map saved before with another title gets its name now).
+    // POLIGON, the template and the campaign keep their own; Run the level's copy keeps the map's.
+    if (!own_name(map).empty()) g_mission.title = g_mission.header = from_pack(custom_map_name_title(own_name(map)));
     // the blocks anew: each one's lines after its first marker up to its last (main()'s keep the
     // indentation of their marker); a map converted to arrivals gets their two blocks, the runner
     // after header.lgc's line and its call after TrainsTact();

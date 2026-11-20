@@ -469,8 +469,9 @@ the stretch: 0 nearest, 1 filtered, 2 by the zoom). The interface is drawn apart
 window's own pixels, so the bar, the minimap, the messages, the money plate, the tooltip and the cursor keep
 their size at every step and at every interface size; the world is stretched nearest-pixel at 3
 (exact big pixels) and filtered elsewhere. Border and arrow scrolling are as fast on the screen at every
-zoom. The wheel does nothing over the interface, in a menu, while paused, while the scripts hold the camera
-(an intro) and in the editor (its own: editor-ui.md "Zoom in the editor"); a menu keeps the zoom and looks as at zoom 1; a level change goes back to the
+zoom. The wheel does nothing over the interface, in a menu, while paused and while the scripts hold the camera
+(an intro); the editor's held level has its own (editor-ui.md "Zoom in the editor"), and a level the editor runs
+(Run the level) zooms as a mission does; a menu keeps the zoom and looks as at zoom 1; a level change goes back to the
 level's own zoom. At the level's own zoom nothing of it runs: the frame is the game's as before (checked
 against the build before it at 1920x1080: the bar's dumps the same, the interface's pixels the same, the
 frame rate not lower). The cost of a frame follows the logical pixels, plus the interface's pass (about

@@ -14,12 +14,15 @@ saved - the rest of the file, the mission's own code, stays as it is:
   (`PLAYER_REINFORCEMENT`, `player_reinforcement_train[]`), the enemy (`LIMIT_ATACKERS`, the
   patrol points `ATA_PATROLn_X1` ... `_Y2`, `start_trains*[]`, `level_queue_*[]`) and the other
   settings of the template (music, weather, the gammas, the AI timings) as they were read; a
-  `// title:` line keeps the map's title for the custom maps page,
+  `// title:` line keeps the map's title for the custom maps page - for a custom map, like
+  `BRIEF_HEADER`, its name in capitals, written so on every save (`formats.md` "Map files"),
 - `// <editor main>` ... `// </editor main>` in `main()`'s `iff(1)` block: the `SetPushLine`
   calls.
 
 File > Mission settings... (or the gear of the bar's strip) shows them in a Windows dialog -
-the title on the custom maps page, the briefing's header, money at the start (`SetMoney(0, MONEY)`
+the title on the custom maps page and the briefing's header (read-only for a custom map and the new
+map without a name: they are the map's name, which Rename changes; editable for POLIGON, the
+template and the campaign), money at the start (`SetMoney(0, MONEY)`
 of `initdefault.lgc`), the time of day at the start (`START_DAYNIGHT` 1-4: day, evening, night,
 morning; `daynight.lgc` then goes on, 5 minutes each), the weather (`RAIN_TYPE`: rain, snow, clouds,
 storm clouds, meteorites - `environmenttact.lgc` makes the last three) and how often (`RAIN`: 0
@@ -130,7 +133,9 @@ A line that would fail is refused with the engine's reason; the lines of a loade
 and logged too (`LocoFix.log`: "push line ... ok"). The lines are drawn over the track: green for
 push_flag 1, yellow for 0, light blue for the script's own lines, each with a bar across the track
 at its begin, a small arrow on every link pointing the way it runs and an arrowhead at its end, on a
-dark outline; the mouse over a line names it in a status line, in any tool: its begin and end and
+dark outline (in their colours whatever the tool draws before them: a light's preview left the
+device's specular light on and turned them white - see "Editing objects", the bar); the mouse over
+a line names it in a status line, in any tool: its begin and end and
 what it does (push_flag 1: the trains on it are pushed the way of the arrows and none may go
 against them; 0: none may go against them, none is pushed). A click on an end of a line selects it - its bar or arrow, in the
 Select tool too, where a line is an object like the others: it turns white, the status line names it

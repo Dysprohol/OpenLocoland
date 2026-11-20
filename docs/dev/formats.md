@@ -455,9 +455,18 @@ own, `<folder>.vid`; nothing else makes it one. The page lists every such folder
 `export.lgc`) in `ReadCustomList`, which writes `maps\custom.lst` anew when it changed - POLIGON
 first, then the maps in the order the list had them, then the new ones by name; a folder is written
 as spelled on disk and compared without case, so a map is never listed twice and a folder that is
-gone leaves the list. The title is the script's `// title:` line, else its `BRIEF_HEADER`, else the
-folder's name, in ASCII capitals (the menu's font, the same list in every pack; the briefing pages
-have no header of their own, so `brief.lst` gives none); two maps of one title show as TITLE, TITLE 2 ....
+gone leaves the list. A custom map has one name: its title is its folder's name in ASCII capitals
+(`clean_title`: no quotes or backslashes, at most 24 characters - the menu's font, the same list in
+every pack), and the editor writes the same into the script's `// title:` line and `BRIEF_HEADER` (the
+briefing's header, the Esc menu's first page) on every save of the map, under a new name or its own,
+on a rename and an import (`custom_map_retitled`); Mission settings shows the two read-only. Only
+POLIGON's title is read from its script (`// title:`, else `BRIEF_HEADER`); POLIGON, the template and
+the campaign keep the titles of their scripts. Two maps whose names give one title show as TITLE,
+TITLE 2 .... Before, the title was the script's alone, and a map saved under a name of its own kept
+the new map's default (the user's `small winter lake` and `SandStand` showed MYMAP and MYMAP 2,
+`Guarded Highground` NOVA MAPA): a save replaced only the placeholders TEMPLATE, POLIGON and the
+pack's NEW MAP, a rename only a title that was the old name, and Mission settings let the title
+differ from the name.
 While the page is open, `CustomMapsChanged()` (205: a change notification on `maps\` and its
 subfolders - a file or folder added, removed or renamed) makes the page again, so a folder copied in
 or deleted shows at once. Before a row's briefing, its edit icon or the briefing's start button,
@@ -478,7 +487,7 @@ folder without `<new>.map`), or a script whose `CUSTOM_MAP` names `maps\<old>\` 
 when the list is made, as an import under a new name does it (`exchange_read_folder` and
 `exchange_renamed` of `editor_exchange.cpp`): the files `<old>.*` renamed, the folder in the paths of
 the script, the lists and the texts, the ground record when its picture is one of the folder's files,
-and a title or briefing header that was the old name in capitals becomes the new one's - the new files
+and the title and briefing header become the new name's (whatever they were) - the new files
 written first, then the old names removed; a folder written to in the last 3 s (a copy under way) is
 looked at again 3 s later. So a map renamed or copied by hand, a package unzipped by hand and an
 imported one end the same (checked: a package imported as `point_2` and unzipped by hand as `point_4`,
@@ -499,7 +508,8 @@ campaign folder was saved there, off the page or over the campaign's files).
 and folder, its new name (`IDC_FILES_NAME` 1001, so `test_game.ps1`'s `Q` step types into it), the
 rule and Rename / Delete the map... / Cancel, for a map of its own (not a campaign map, POLIGON, the
 template or the new map without a name). Rename saves edits first (asked), copies the folder under the
-new name with every file renamed and its paths and title fixed (as above; the high scores come along),
+new name with every file renamed, its paths fixed and its title and briefing header the new name's
+(as above; the high scores come along),
 checks each file written, opens the copy and moves the old folder to the Recycle Bin once the copy is
 loaded; the map keeps its place in the list. A name that breaks the rule or is taken is refused with
 the reason, and the old folder stays as it was when anything fails. Delete asks, then the editor goes

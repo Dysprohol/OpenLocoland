@@ -184,7 +184,8 @@ mission played normally, a click on it -> the editor on the same map, `return` 1
 TO MAIN MENU -> the editor, `return` 1 too.
 
 A tester's way into a running map: Run the level (Ctrl+R) runs the level inside the editor's own game,
-with the game's interface and its Esc menu. The script is compiled when a level loads, so resuming the
+with the game's interface, its Esc menu and its zoom with the wheel (as a mission; the editor's zoom comes back
+with the editor: editor-ui.md "Zoom in the editor"). The script is compiled when a level loads, so resuming the
 held level would run the script of the load - without what the panels changed since (an arrival set in
 the Arrivals panel never came). So Run the level (the Menu panel's QUICK TEST, NO SAVE / TEST BEZ ZAPISU) writes the
 map and loads it again running, never asking and saving nothing: the map - the player's own, a
@@ -312,10 +313,14 @@ Save, Ctrl+S, a Yes to "Save the changes?" (of Load, New, Play, Back, Exit), Exp
 for the name in the save dialog, which opens in `maps\` with the first free `mapN` offered; a name
 typed straight into `maps\` becomes `maps\<name>\<name>.map` (a map already there is overwritten
 only after a question), the map's own folder with its ground image (`<name>.vid`), script and texts,
-and so on the custom maps page; a title or briefing header NEW MAP becomes the folder's name in
-capitals, as TEMPLATE does, and POLIGON's own "POLIGON" when POLIGON is saved under a name (checked:
-POLIGON and the template loaded and saved as `pp1` / `tt1` - PP1 and TT1 in the script's title,
-`BRIEF_HEADER` and `custom.lst`; POLIGON kept its title before). A map is not saved outside the game folder ("A map is saved in the maps
+and so on the custom maps page. A custom map has one name: every save of `maps\<name>\<name>.map` -
+under a new name or its own - writes the title (`// title:`, the custom maps page) and the briefing's
+header (`BRIEF_HEADER`) as the name in capitals (`custom_map_name_title`, `formats.md` "Map files"),
+whatever they were: NEW MAP, TEMPLATE, POLIGON, the New map dialog's `mymap`, a title typed before;
+Mission settings shows the two read-only (for the new map without a name too - it gets the name at its
+first save). POLIGON, the template and the campaign keep their own (checked before: POLIGON and the
+template saved as `pp1` / `tt1` - PP1 and TT1 in the script's title, `BRIEF_HEADER` and `custom.lst`).
+A map is not saved outside the game folder ("A map is saved in the maps
 folder of this game."): its script and texts are found by game paths, and not into a scratch
 folder (refused as Load refuses it). The file dialogs are `IFileOpenDialog` / `IFileSaveDialog`
 with `SetFolder`: the old `GetOpenFileNameW` opened in the folder it remembers for the program -

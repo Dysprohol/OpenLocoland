@@ -25,8 +25,11 @@ to the edges of the view, the first ten entries in the base's ten slots (where t
 its units, 41 px apart) and the others in the factory panel's strip (VID 497) a slot higher, the
 chosen one in the slot frame (VID 456) and a gold frame on its icon's edge, the one under the mouse
 a thin light one (the lit icons hide the slot frame; a lit icon draws its brightening as specular light,
-which the bar turns off after its icons - left on, every `Graphics_FillRect` after them came out
-white), each with its key in the factory panel's small
+`Texture_Draw` turns SPECULARENABLE on for it and leaves it on, and every `Graphics_FillRect` after
+it came out white - so every picture the editor draws through `Graphics_DrawVid` turns it off again
+after it, as `Graphics_DrawScene` does before the effects; a light does the same, and the glows of
+the oil derrick (631) and the wide chimneys (881) in the Place tool's preview turned every push line
+white until 2026-11-20), each with its key in the factory panel's small
 font (VID 8, right-aligned at the icon's lower edge as the panel's F-keys). The icons come from the
 state bar's atlas where it has one (VID 455: the cross 3, the factory 10, the wrench 2, the cannon
 36, the locomotive 11) and otherwise from the editor's own atlas (VID 939, `vid\939edit.vid`, made

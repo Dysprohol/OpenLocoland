@@ -8491,9 +8491,28 @@ struct Window {   // the overlay's part of a frame
 
 }  // namespace soft
 
+// A picture drawn with a gamma that brightens - a lit icon of the bar (set_army_gammas), a light (a
+// colour-box VID, layer 8: Graphics_DrawLight tints its texture with its colour) such as the glows of
+// the oil derrick (631) and the wide chimneys (881) in the Place tool's preview - goes to Texture_Draw
+// or Texture_DrawZ, which add the brightening as specular light and turn SPECULARENABLE (29) on for it
+// and leave it on. Graphics_FillRect and our filled shapes (draw_fill_vertices) are untextured quads
+// whose vertices' specular is white, so everything filled after such a picture came out white: the
+// rows' swatches after the bar's icons, every push line after a derrick's or wide chimneys' preview
+// (Danetry, 2026-11-16). In play the scene turns it off before the effects (Graphics_DrawScene); the
+// editor's pictures turn it off after them, through the engine's Graphics_SetRenderState, which caches
+// that state (flag 0x2000: no call to the device when it is off already).
+constexpr uintptr_t GRAPHICS_SET_RENDER_STATE = 0x40f050;
+using SetRenderState_t = void(__fastcall*)(void* graphics, void* edx, int state, unsigned value);
+void specular_off() {
+    if (void* g = graphics()) reinterpret_cast<SetRenderState_t>(GRAPHICS_SET_RENDER_STATE)(g, nullptr, 29, 0);
+}
+
 // Graphics_DrawVid draws at (x, y - z) of the view with the depth z.
 void draw_vid(uint8_t* v, int frame, float x, float y, float z) {
-    if (v && !soft::draw(v, frame, x, y, z)) reinterpret_cast<DrawVid_t>(DRAW_VID)(graphics(), nullptr, v, frame, x, y, z);
+    if (v && !soft::draw(v, frame, x, y, z)) {
+        reinterpret_cast<DrawVid_t>(DRAW_VID)(graphics(), nullptr, v, frame, x, y, z);
+        specular_off();
+    }
 }
 
 // In front of the scene, as Unit_Draw draws the health bars (depth about 1900).
@@ -9669,17 +9688,6 @@ void status_line(float x, float y, const char* text, int step = 5) {   // step: 
 }
 
 
-// The lit icons (a texture VID drawn with a gamma that brightens, set_army_gammas): Texture_DrawZ adds
-// the brightening as specular light and turns SPECULARENABLE (29) on for it, and Graphics_FillRect - an
-// untextured quad whose vertices' specular it leaves unset - drawn after them with it still on came
-// out white (the rows' swatches, the frames). The bar turns it off again after its icons, through the
-// engine's Graphics_SetRenderState, which caches that state (flag 0x2000).
-constexpr uintptr_t GRAPHICS_SET_RENDER_STATE = 0x40f050;
-using SetRenderState_t = void(__fastcall*)(void* graphics, void* edx, int state, unsigned value);
-void specular_off() {
-    if (void* g = graphics()) reinterpret_cast<SetRenderState_t>(GRAPHICS_SET_RENDER_STATE)(g, nullptr, 29, 0);
-}
-
 void draw_bar() {
     UiDrawing ui;
     const Box v = ui_view(), b = bar();
@@ -9727,7 +9735,6 @@ void draw_bar() {
             draw_text(FONT_TIPS, x - 18, ey - 6, label, false, 3);
         }
     }
-    specular_off();   // the lit icons' specular light goes with them (above)
     // the icons are lit green as the game's (set_army_gammas), which the slot frame does not stand out
     // against: the chosen entry gets a gold frame over its icon's edge, the one under the mouse a thin light one
     const auto frame = [](int i, float t, uint32_t color) {

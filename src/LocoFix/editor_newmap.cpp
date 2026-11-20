@@ -988,12 +988,9 @@ std::string make_map(const std::string& name, bool generated, const Terrain& ter
         RemoveDirectoryA(folder.c_str());
         return "";
     }
-    // the template's mission under the new name (the editor writes its blocks anew on a save)
-    const std::string upper = !title.empty() ? title : [&] {
-        std::string u = name;
-        for (char& c : u) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-        return u;
-    }();
+    // the template's mission under the new name (the editor writes its blocks anew on a save), its
+    // title the name's (custom_maps.h: one name)
+    const std::string upper = !title.empty() ? title : custom_map_name_title(name);
     std::string script = read_file(std::string(TEMPLATE_FOLDER) + "template.lgc");
     script = replace_all(script, "maps\\\\template\\\\template.map", "maps\\\\" + name + "\\\\" + name + ".map");
     script = replace_all(script, "maps\\\\template\\\\", "maps\\\\" + name + "\\\\");

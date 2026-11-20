@@ -734,8 +734,9 @@ menu (ABORT GAME → BACK TO THE EDITOR or YES) and the end of the level (won or
 
 Menu → **MISSION SETTINGS** (or the gear in the strip):
 
-- **Title** on the custom maps page and the **briefing's header** (at first the map's name in
-  capitals);
+- **Title** on the custom maps page and the **briefing's header** - always the map's name in capitals,
+  shown here but not changed here: to change them, give the map another name (**RENAME OR DELETE**
+  in the Menu, or save it under another name);
 - **Money at the start** - a new map starts with 0: give the player some (e.g. 1000), or the factory
   cannot build anything; the **time of day at the start** (day, evening, night, morning - then it
   goes on, 5 minutes each);
@@ -780,7 +781,7 @@ EDITOR**. Unsaved changes are asked about first.
 the name - and so do POLIGON and the template, which an update would overwrite (the dialog proposes
 `poligon1`, `map1` ... and its title says why). Menu → **SAVE MAP** (Alt+F2) always asks - to save under another name. A map saved as
 `maps\<name>\<name>.map` is written with its script and texts and appears on the **custom maps** page
-under its title. Open it again with **LOAD MAP** (Alt+F3). Every save shows a large **SAVED** with the
+under its name in capitals (two maps whose names give the same title show as NAME and NAME 2). Open it again with **LOAD MAP** (Alt+F3). Every save shows a large **SAVED** with the
 map's file in the middle of the view for a moment, with the menus' click.
 
 ### 13. Save, export and share
@@ -795,7 +796,8 @@ send the whole folder; they put it into `maps\` of their game folder and it is o
 page. A folder renamed in Explorer works too: the game renames the files inside after the folder.
 
 **Rename or delete:** Menu -> **RENAME OR DELETE** gives the map a new name (its folder and files
-follow, the old folder goes to the Recycle Bin) or deletes it (after a question, into the Recycle Bin).
+follow, so do its title on the custom maps page and its briefing's header, the old folder goes to the
+Recycle Bin) or deletes it (after a question, into the Recycle Bin).
 A name may have up to 64 English letters, digits, spaces and the signs Windows allows in file names,
 and must not be a folder of the game (`l01`-`l20`, `sandbox`, `template`, `script`, `outro`).
 

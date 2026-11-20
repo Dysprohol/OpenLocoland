@@ -1209,7 +1209,6 @@ bool import_package(HWND window, const std::string& zip_given, Import mode) {
         if (!map_name_problem(name).empty() && map_name_problem(name + "_2").empty()) name += "_2";   // a game folder's name
         if (!map_name_problem(name).empty()) name = "imported";
     }
-    const std::string title = p.title;
     bool overwrite = false;
     if (folder_exists(name)) {
         Import choice = mode;
@@ -1240,6 +1239,7 @@ bool import_package(HWND window, const std::string& zip_given, Import mode) {
         return false;
     }
     custom_maps_list();   // on the page as a folder copied by hand would be
+    const std::string title = custom_map_title(name);   // its name's (custom_maps.h: one name)
     patch::log("exchange: imported %s as %s (%s)%s", zip.c_str(), map.c_str(), title.c_str(),
                exchange_campaign_ground(p) ? ", on a campaign terrain" : ", with its own ground");
     bool open = !asks();

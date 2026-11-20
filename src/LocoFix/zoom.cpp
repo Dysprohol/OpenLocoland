@@ -30,8 +30,9 @@
 // The map editor (a level held, editor.cpp): its window procedure takes the wheel over the map and passes it in
 // (zoom_editor_wheel; which keys mean the zoom there and which its tools: WHEEL_ZOOM_KEYS / WHEEL_TOOL_KEYS in
 // editor_edit.cpp) - the same steps, caps and anchor; not while one of its panels is open or a drag or a stroke is
-// under way. Ctrl+0 puts the level's own zoom back (zoom_editor_reset). Run the level loads a level (its own zoom); coming
-// back, editor.cpp asks for the editor's zoom again (zoom_editor_restore). The editor's camera margin past the
+// under way. Ctrl+0 puts the level's own zoom back (zoom_editor_reset). Run the level loads a level (its own zoom),
+// which zooms with the game's own wheel as a mission does (editor_zoom: the editor's way only while a level is held);
+// coming back, editor.cpp asks for the editor's zoom again (zoom_editor_restore). The editor's camera margin past the
 // map is in map pixels, so camera.cpp takes it times zoom_ratio().
 //
 // A change is made between two frames, right after one is presented (frame_limit.cpp's wrapper of
@@ -221,12 +222,16 @@ void log_memory(double ms, double z) {
                (status.ullTotalVirtual - status.ullAvailVirtual) / mb, status.ullTotalVirtual / mb);
 }
 
+// The map editor's zoom: its level held (paused, its own scroll type; the wheel comes from its window procedure).
+// Editor mode with the level not held - Run the level, the menu's maps - zooms as play does, from the game's own
+// wheel: the mode's flag stays for the whole run of the game, so it does not tell the two apart.
+bool editor_zoom(uint8_t* w) { return (at<unsigned>(w, WORLD_FLAGS) & WORLD_EDITOR) && editor_level_held(); }
+
 // Why the wheel does not zoom now, or nullptr.
 const char* refused(uint8_t* w) {
     const unsigned flags = at<unsigned>(w, WORLD_FLAGS);
     if (!(flags & WORLD_ACTIVE)) return "the window is not active";
-    if (flags & WORLD_EDITOR) {   // the map editor (its level held: paused, its own scroll type)
-        if (!editor_level_held()) return "editor mode, the level not held";
+    if (editor_zoom(w)) {
         if (panel_open()) return "a panel of the editor is open";
         if (edit_busy()) return "a drag, a stroke or a pan is under way";
         if (flags & WORLD_LOADING) return "loading";
@@ -266,7 +271,7 @@ bool show_zoom(double z, double surface_z) {
         ClientToScreen(window, &screen);
         SendMessageA(window, WM_NCHITTEST, 0, MAKELPARAM(screen.x, screen.y));
     }
-    if (at<unsigned>(w, WORLD_FLAGS) & WORLD_EDITOR) edit_zoom_changed();
+    if (editor_zoom(w)) edit_zoom_changed();
     return true;
 }
 
@@ -458,7 +463,7 @@ void zoom_after_frame() {
     zoom_view_between_frames();
     glide();
     measure_frame();
-    const bool editor = (at<unsigned>(w, WORLD_FLAGS) & WORLD_EDITOR) != 0;
+    const bool editor = editor_zoom(w);
     if (editor) editor_after_frame(w);
     const int notches = editor ? g_editor_notches : at<int>(w, MOUSE_WHEEL);
     g_editor_notches = 0;

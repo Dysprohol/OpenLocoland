@@ -13,9 +13,10 @@
 //
 // The list is a cache: POLIGON first, then the maps in the order the list had them, then the new
 // ones by name; a folder is written as it is spelled on disk and compared without case, so a
-// folder is never listed twice. The title is read from the map's script - its "// title:" line,
-// else BRIEF_HEADER, else the folder's name in capitals - in ASCII capitals (the menu's font, the
-// same list in every language); two maps of the same title get " 2", " 3" ... on the page.
+// folder is never listed twice. A map has one name: its title is the folder's name in ASCII
+// capitals (the menu's font, the same list in every language), and the editor writes the same into
+// its script's "// title:" and BRIEF_HEADER on every save, rename and import - only POLIGON's is
+// read from its script. Two maps of the same title get " 2", " 3" ... on the page.
 //
 // A folder whose files or paths carry another name - renamed or copied by hand: maps\<new>\<old>.map,
 // or its script's CUSTOM_MAP naming maps\<old>\ - is brought in line as an import under a new name
@@ -227,8 +228,20 @@ std::string define_text(const std::string& script, const char* name) {
     return "";
 }
 
-// The map's title: the script's "// title:" line, else its BRIEF_HEADER, else the folder's name.
+bool game_folder(const std::string& f) {
+    return campaign_folder(f) || same(f, "script") || same(f, "outro") || same(f, "sandbox") || same(f, "template") ||
+           scratch_folder(f);
+}
+
+std::string name_title(const std::string& name) {
+    const std::string t = clean_title(name);
+    return t.empty() ? "MAP" : t;
+}
+
+// The map's title: a custom map's name in capitals; a folder of the game's (POLIGON) its script's
+// "// title:" line, else its BRIEF_HEADER, else the folder's name.
 std::string title_of(const std::string& folder) {
+    if (!game_folder(folder)) return name_title(folder);
     const std::string script = read_file(script_of(folder));
     for (const std::string& raw : lines_of(script)) {
         const std::string line = trim(raw);
@@ -264,26 +277,28 @@ std::string carried_name(const std::string& folder) {
 
 }  // namespace
 
-// The script's title and header that were the old name in capitals become the new one's (each
-// line keeps its own line end).
-std::string custom_map_retitled(const std::string& script, const std::string& from, const std::string& to) {
-    const std::string old_title = clean_title(from), new_title = clean_title(to);
-    if (old_title == new_title) return script;
+// The script's title and header become the name's, whatever they were (each line keeps its own
+// line end; a script without them stays without them).
+std::string custom_map_retitled(const std::string& script, const std::string& name) {
+    const std::string title = name_title(name);
     std::string out;
     for (size_t a = 0; a < script.size();) {
         size_t b = script.find('\n', a);
         b = b == std::string::npos ? script.size() : b + 1;
         const std::string raw = script.substr(a, b - a), t = trim(raw);
         const std::string eol = raw.substr(raw.find_last_not_of("\r\n") + 1);
-        if (t.compare(0, 9, "// title:") == 0 && clean_title(t.substr(9)) == old_title) out += "// title: " + new_title + eol;
-        else if (t.compare(0, 7, "#define") == 0 && trim(t.substr(7)).compare(0, 13, "BRIEF_HEADER ") == 0 &&
-                 clean_title(define_text(t, "BRIEF_HEADER")) == old_title)
-            out += "#define BRIEF_HEADER \"" + new_title + "\"" + eol;
+        if (t.compare(0, 9, "// title:") == 0) out += "// title: " + title + eol;
+        else if (t.compare(0, 7, "#define") == 0 && trim(t.substr(7)).compare(0, 13, "BRIEF_HEADER ") == 0)
+            out += "#define BRIEF_HEADER \"" + title + "\"" + eol;
         else out += raw;
         a = b;
     }
     return out;
 }
+
+bool custom_map_named(const std::string& folder) { return !folder.empty() && !game_folder(folder); }
+
+std::string custom_map_name_title(const std::string& name) { return name_title(name); }
 
 namespace {
 
@@ -426,10 +441,7 @@ bool custom_map_exists(const std::string& folder) {
 
 std::string custom_map_title(const std::string& folder) { return title_of(folder); }
 
-bool game_map_folder(const std::string& folder) {
-    return campaign_folder(folder) || same(folder, "script") || same(folder, "outro") || same(folder, "sandbox") ||
-           same(folder, "template") || scratch_folder(folder);
-}
+bool game_map_folder(const std::string& folder) { return game_folder(folder); }
 
 void custom_maps_list() {
     watch();
