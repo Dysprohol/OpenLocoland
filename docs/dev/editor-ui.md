@@ -256,7 +256,21 @@ waited for the editor's window procedure, which passes the wheel only while the 
 level not held") - the wheel did nothing in Run the level. Checked in the rig (POLIGON, 1024 x 768): the editor at
 125 %, Ctrl+R, two notches in (125 %, the map point under the cursor kept), three out (89 %), two over the bar not
 taken ("over the interface"), the Esc menu and back still at 89 %, a notch in (100 %), Ctrl+R - the editor's 125 %
-back, its wheel zooming as before; a mission's wheel as before. Load, New map and a level change reset it (the level's
+back, its wheel zooming as before; a mission's wheel as before. After that the plain wheel still zoomed no more
+in the editor once back from a run (the maintainer, 2026-11-20): the editor's tools know Ctrl, Shift and Alt by
+their own key messages besides the keyboard (a test posts its keys, which are not in the keyboard's state), and
+those come only while the level is held - Ctrl of the Ctrl+R that started the run was let go once the run's level
+was loading (the load is the next frame), so for the tools it stayed down and every plain notch was Ctrl+wheel,
+the tools'. Back by Ctrl+R its own Ctrl, let go after the load, put
+it right - the control's check came back that way; back by the Esc menu's BACK TO THE EDITOR (or a won or lost
+run) nothing did. Now the editor forgets the three keys when it holds a level and when a dialog closes, as it
+did after Alt+Tab (`keys_forget`, `edit_keys_forget`; a key still held is read from the keyboard), and the test
+log says "edit: wheel N: the tool's (Ctrl held)" for a notch the tools take. Checked in the rig (mission 13 in
+the editor, Ctrl let go seconds after R): before - back by the Esc menu, two notches and no step (back by Ctrl+R,
+the test's keys or the guest's own keyboard, Ctrl let go 0.1 - 0.3 s after R: zooming); now - back by
+the Esc menu zooming (1024 x 768, after a run zoomed and after one not), back by Ctrl+R (full screen 1920 x 1080,
+two runs in a row), with real keys (Ctrl+R with the guest's keyboard both ways), Ctrl+wheel the tools', Ctrl+0
+100 %; mission 5's wheel as before, the 20 missions load. Load, New map and a level change reset it (the level's
 load, as in play). The test mode's factory panel click (`G` / `T`) takes the interface's point as a window
 point under a zoom. Checked in the rig (2026-11-14, mission 13's map, 1920 x 1080, the interface at the normal
 size and twice): at 2/3, 1/2, the whole map (47 %), 1.5, 2 and 3 a house placed lands on the map point under the

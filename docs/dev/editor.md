@@ -227,7 +227,9 @@ the chosen object (found again by VID and place) and the tool as they were (the 
 TEST the tool returns to Select" - chosen the way a click chooses it, `choose_entry`, so the Place and Decals
 tools drop the selection found again, and the palette's entries without opening the palette; checked: a
 flower selected, the Factory chosen, a run and back - the Factory, and Del deleted nothing; a panel's entry, Train arrivals or Mission settings, is not a tool to go
-back to), and the undo history: before
+back to), Ctrl, Shift and Alt as the keyboard has them (`keys_forget`: Ctrl of the Ctrl+R that started the run,
+let go while the level was not held, stayed down for the editor's tools, so the plain wheel was the tools'
+Ctrl+wheel and zoomed no more after the Esc menu's way back - editor-ui.md "Zoom in the editor"), and the undo history: before
 the run the editor keeps it with every object of the level in the world's order and the rail points
 its cars stand on (their places and their links' other points); after the load held again
 (`edit_restore_history`) the new objects are matched by that order, VID and place (the save keeps the

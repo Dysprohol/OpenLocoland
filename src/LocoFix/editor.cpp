@@ -95,6 +95,7 @@ unsigned edit_history_steps();   // the steps of undo and redo
 void edit_drop_history();        // all of them gone (a save out of memory, asked)
 void edit_before_save();   // the cars standing backwards keep it over the save
 void edit_end_strokes(const char* why);   // editor_edit.cpp: a stroke of the brushes under way ends
+void edit_keys_forget();                  // ... Ctrl, Shift, Alt as the keyboard has them
 void edit_message_saved(const std::string& map);
 void panel_saved(const std::string& file);   // editor_panel.cpp: the SAVED notice
 void edit_message_line(const std::string& text);
@@ -207,7 +208,16 @@ bool g_test = false;
 bool g_test_ask = false;   // LOCOFIX_TEST_ASK=1: the questions are asked in test mode too (their screenshots)
 bool g_running = false;   // Options > Run the level
 bool g_held = false;      // the current level is held
-bool g_ctrl = false;      // Ctrl is down (its key messages)
+bool g_ctrl = false;      // Ctrl is down (its key messages; a test posts them, not in the keyboard's state)
+
+// Ctrl, Shift and Alt as the keyboard has them, here and in the editor's tools (editor_edit.cpp, above its
+// g_ctrl): a key let go while the level was not held (Ctrl of the Ctrl+R that started Run the level) stayed
+// down for the tools - the plain wheel was Ctrl+wheel, the tools', and did not zoom after the run; a key let
+// go in a dialog does not reach this window either. Forgotten when the level is held and a dialog closes.
+void keys_forget() {
+    g_ctrl = false;
+    edit_keys_forget();
+}
 WNDPROC g_game_wndproc = nullptr;
 RegisterClassA_t g_register_class = nullptr;
 std::string g_current;   // the map last loaded or saved here (the dialogs start with it)
@@ -271,6 +281,7 @@ bool current_format(const char* map) {
 void hold_level(uint8_t* w, bool hold) {
     g_held = hold;
     if (hold) {
+        keys_forget();   // let go while the level loaded or ran (Ctrl of Ctrl+R)
         reinterpret_cast<PauseResume_t>(WORLD_PAUSE)(w, nullptr);
         world_flags(w) |= SCRIPTS_OFF;
         // the scripts would set it (SetScrollType); a level starts with the screen edge only
@@ -422,6 +433,7 @@ public:
     }
     ~DialogScope() {
         g_in_dialog = false;
+        keys_forget();   // let go in the dialog
         update_cursor();
         if (graphics()) reinterpret_cast<GdiMode_t>(LEAVE_GDI_MODE)(graphics(), nullptr);
         SetCurrentDirectoryA(dir_);

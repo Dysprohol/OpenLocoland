@@ -1727,6 +1727,14 @@ bool mouse_on_options() { return on_options(static_cast<float>(ui_mouse().x), st
 int mouse_entry() { return bar_entry_at(static_cast<float>(ui_mouse().x), static_cast<float>(ui_mouse().y)); }
 POINT g_middle_down = {-1, -1};   // where the middle button went down (a click of it, not a drag)
 bool g_middle_held = false;        // the middle button down: the map is being panned (mouse_pan.cpp)
+// Ctrl, Shift and Alt: down by their own key messages (a test posts them, and posted keys are not in the
+// keyboard's state) or by the keyboard. The messages come here only while the level is held and no dialog
+// is open, so a key let go in between stayed down here: Ctrl of the Ctrl+R that started Run the level, let
+// go once its level was loading or running, and after the Esc menu's way back the plain wheel was the
+// tools' (Ctrl+wheel) and zoomed no more (2026-11-20; Ctrl+R back put it right only by its own Ctrl let go
+// after the load). A key let go in a dialog does not come here either. The editor forgets them when the
+// level is held again, a dialog closes or the game comes back from another window (edit_keys_forget); a
+// key still held is read from the keyboard.
 bool g_ctrl = false, g_shift = false;
 
 bool shift_down() { return g_shift || GetKeyState(VK_SHIFT) < 0; }
@@ -12465,6 +12473,10 @@ bool mouse_on_interface() {
 
 // ---- editor.cpp's side ----
 
+// Ctrl, Shift and Alt as the keyboard has them (above g_ctrl): the level held again, a dialog closed, the
+// game back from another window.
+void edit_keys_forget() { g_alt = g_ctrl = g_shift = false; }
+
 // A message of the editor window while the level is held; true when it was handled here.
 bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
     g_view_window = window;
@@ -12665,7 +12677,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         // the keys held when the game was left or came back were let go in another window: Alt stayed
         // down for the editor after Alt+Tab, and the next click in Ground height or Paint was the
         // pipette instead of a stroke (the keys still held are read from the keyboard)
-        g_alt = g_ctrl = g_shift = false;
+        edit_keys_forget();
         return false;
     case WM_RBUTTONDOWN:
         if (g_arrival_pick != ArrivalPick::None) {   // no point for the panel after all
@@ -12763,6 +12775,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             return true;
         }
         if (!shift_down() && keys != WHEEL_TOOL_KEYS) return true;
+        if (g_test) patch::log("edit: wheel %d: the tool's (%s held)", GET_WHEEL_DELTA_WPARAM(w) / WHEEL_DELTA, shift_down() ? "Shift" : "Ctrl");
         if (brush_tool())   // the brushes: the wheel sizes the brush, as + and - do
             brush_size(GET_WHEEL_DELTA_WPARAM(w) > 0 ? 1 : -1);
         else if (tool() == Tool::Track)   // the next rail climbs / falls a step, as PgUp / PgDn; nothing turns
