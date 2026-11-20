@@ -278,8 +278,17 @@ lights a frame (`in lights`, `lights`: it is part of `d3d`) and the locks by the
 (`locks by caller`: the return address in the exe, how many a frame and their ms - in play 0x40F294 and
 0x40F2CE are the sprites' back and depth buffer, 0x40F39E the depth buffer again after the depth copy,
 0x40F613 and 0x40F64D the pair of layer 10). Locks the engine takes through the surface's vtable
-itself are not among them (the minimap's dots in `Graphics_PutPoint` / `Graphics_PutPoint2x2`; they
-fall into `other`). `EditorProfile` = 2 (or `LOCOFIX_PROFILE=2`) also starts the sampler
+itself are not among them (the minimap's dots in `Graphics_PutPoint` / `Graphics_PutPoint2x2`; their
+time falls into `other`), so the line ends with every lock of the back and the depth buffer, counted
+where the surfaces' `Lock` and `Unlock` are guarded (`lost_surfaces.cpp`): `bb` the back buffer's locks
+a frame and their ms, the ms of its unlocks, `z` the same for the depth buffer, and `bb by caller` -
+a lock taken inside `Surface_Lock` under the address that called it, the others under the address
+after their own call (in play 0x405D5D the minimap's rail points, 0x405EA5 its dots; addresses outside
+the exe are LocoFix's). With dgVoodoo each back-buffer lock after Direct3D drawing is a wait for the
+GPU; the depth buffer's first lock of a frame (0x40F2CE, after the ground's height blits into it) costs
+time as well (1.7 ms a frame on mission 13 at 1920x1080 in the test rig, before fix 56). `in zcopy` is the
+time of `Graphics_CopyDepthToZBuffer`, the depth buffer's copy into the hardware z-buffer between the scene's two
+halves (part of `scene-rest`). `EditorProfile` = 2 (or `LOCOFIX_PROFILE=2`) also starts the sampler
 (`src/LocoFix/sampler.cpp`): a thread of its own stops the main thread about every millisecond and notes
 where it is - its instruction pointer, the first return address into the exe on its stack (for the time
 spent in dgVoodoo or the driver: the engine's call that led there) and the view's width (to tell a zoom

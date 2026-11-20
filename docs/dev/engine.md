@@ -30,6 +30,24 @@ per frame. Movies (`PlayMovie`) play through DirectShow in a 640x480 child windo
 game; while one plays the frame is not presented. Debug overlays use `Graphics_DrawLine` /
 `Graphics_DrawRect` (2x2 points in the back buffer) and `Graphics_Printf` (GDI text).
 
+**Locks under dgVoodoo.** The engine draws in 16-bit colour, but dgVoodoo draws the back buffer in 32-bit
+colour. A lock of the back buffer waits for the GPU to finish what was drawn and gives the CPU a 16-bit copy (each
+channel cut to its top 5 or 6 bits); at the unlock dgVoodoo puts back from that copy only around what the CPU
+changed: for every pixel whose value changed, the 2 x 2 block with that pixel at its bottom right - the pixel and
+its left, upper and upper-left neighbours - gets the copy's 16-bit colour (widened again by repeating the top
+bits); every other pixel keeps its finer colour, and a pixel written with the value it had changes nothing (found
+in held frames of mission 13 with test pixels written into the minimap's lock: single pixels, runs, a column, the
+same value written back). So what Direct3D drew after a frame's last lock is shown with finer colours than the
+16-bit picture, and the picture depends on where the locks are: a lock that is moved or left out changes the colour
+of a few pixels - those next to software-drawn pixels on a part Direct3D blended after the lock before. A lock in
+which nothing changes leaves the picture as it was. A Blt of the back buffer into a 16-bit surface (a texture or an
+off-screen surface in video memory) cuts the colour exactly as a lock's copy does, and a Blt back widens it as the
+unlock does, without waiting for the GPU (LocoFix fix 58 does the minimap's locks that way). Each lock after Direct3D
+drawing costs a wait for the GPU whatever its rectangle (the minimap's 400 x 300 lock as much as the whole
+buffer); a lock with no Direct3D drawing since the last unlock costs almost nothing. The depth buffer is a
+system-memory surface, but after a Blt into it (the ground's heights, `Graphics_Clear`'s depth fill) its next lock
+waits as well (LocoFix fix 56).
+
 **Lost surfaces** (`src/LocoFix/lost_surfaces.cpp`, `BUGS.md` F22). DirectDraw takes the surfaces
 away whenever a full-screen game is not the window in front - Alt+Tab, a window or a notification
 over it, the lock screen; in a window a display mode change does it - and dgVoodoo reports it as

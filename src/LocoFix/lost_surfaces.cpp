@@ -32,6 +32,7 @@
 // LocoFix.log says when the surfaces were lost, how many frames were skipped and when they
 // came back; error.log no longer fills with the failed frames' errors.
 #include "patch.h"
+#include "profile.h"
 
 void zoom_view_restored();   // zoom_view.cpp: a zoom's own surfaces made again after a loss
 
@@ -111,7 +112,9 @@ StandIn* stand_in_of(IDirectDrawSurface7* s, bool make) {
 HRESULT STDMETHODCALLTYPE guarded_lock(IDirectDrawSurface7* s, RECT* rect, DDSURFACEDESC2* desc, DWORD flags, HANDLE event) {
     const Table* t = table_of(s);
     if (!t) return DDERR_GENERIC;   // cannot happen: only guarded vtables point here
+    const int64_t began = prof::on() ? prof::now() : 0;
     const HRESULT hr = t->lock(s, rect, desc, flags, event);
+    if (began) prof::surface_lock(s, reinterpret_cast<uintptr_t>(_ReturnAddress()), prof::now() - began);
     if (SUCCEEDED(hr) || !desc || desc->dwSize < sizeof(DDSURFACEDESC2) || !from_game(_ReturnAddress())) return hr;
     DDSURFACEDESC2 d = {};
     d.dwSize = sizeof d;
@@ -148,7 +151,11 @@ HRESULT STDMETHODCALLTYPE guarded_unlock(IDirectDrawSurface7* s, RECT* rect) {
         return DD_OK;
     }
     const Table* t = table_of(s);
-    return t ? t->unlock(s, rect) : DDERR_GENERIC;
+    if (!t) return DDERR_GENERIC;
+    const int64_t began = prof::on() ? prof::now() : 0;
+    const HRESULT hr = t->unlock(s, rect);
+    if (began) prof::surface_unlock(s, prof::now() - began);
+    return hr;
 }
 
 void guard(void* surface) {

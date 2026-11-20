@@ -171,7 +171,8 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
   shine. A paused level does not update the state bar, so its minimap has no dots then; `c40054` instead
   only stops the clock - the objects are updated with no time going by, nothing moves, and what the update
   draws (the minimap) is drawn every frame. `c40053` switches LocoFix's cheaper drawing (`perf.h`: the fixes
-  from 54 on) off and on again.
+  from 54 on) off and on again, `c40056` only the fixes from 56 on (the locks of the picture), so a run can time
+  them apart from the lights' 54 and 55.
   Shots after each step (the game's own) of a held level, both ways, compared pixel by pixel - each shot of
   one way must equal a shot of the other - show that a change draws the same picture; a level running with
   `c40053` every few seconds gives both ways' `profile:` lines under the same conditions.
@@ -540,6 +541,28 @@ refreshes) the frame's CPU time 26.2 -> 17.8 ms, `d3d` 11.9 -> 4.0 ms; zoomed ou
 (3072x2304) 15 -> 26.5 fps. What remains is the locks of the back buffer: the sprites' (needed: they blend
 with the ground Direct3D drew), layer 10's when a message is on the screen, the minimap's dots, each a wait
 for the GPU.
+
+The second round (2026-11-20) took the waits out but one. The profiler now counts every lock of the back and the
+depth buffer, also those the engine takes through the surface itself, and showed in the rig on mission 13 at
+1920x1080 four waits for the GPU a frame - the sprites' lock (3.3 ms), layer 10's (2.1 ms: the objectives keep a
+message line on the screen), the minimap's dots after its highlight (2.2 ms) - and the depth buffer's first lock
+(1.6 ms: it waits for the ground's height Blts into it). Held frames with test pixels written into a lock showed
+what a lock does to the picture under dgVoodoo (engine.md "Locks under dgVoodoo"): only the 2 x 2 blocks around
+the pixels the CPU changed come back cut to 16 bits, the rest keeps dgVoodoo's 32-bit colour - why round 1's
+minimap overlay had 35 pixels off. So a lock can be done without the wait: the pixels drawn into memory of ours,
+then the GPU cuts exactly those blocks through a 16-bit texture and the pixels go on with a colour-keyed Blt.
+LocoFix fixes 56 (the depth buffer's fill and heights by the CPU), 57 (no layer 10 lock in a zoom's world pass),
+58 (the minimap's points) and 59 (the messages) leave one lock a frame in play, the sprites', and draw the same
+picture to the pixel (held frames both ways on missions 1, 3, 7, 13, 18, zoomed out and in the editor; screen
+captures, since the game's own screenshot is itself a lock and cuts everything to 16 bits). In the rig, all of
+LocoFix's drawing fixes against none, switched in one run: mission 13 at 1920x1080 the locks 7.6 -> 4.0 ms a
+frame and the frame's CPU part 25.6 -> 15.8 ms (with the lights of round 1); zoomed out to the whole map 15.2 ->
+28.4 fps, the locks 17.5 -> 6.7 ms; mission 1 (few lights) the locks 8.7 -> 3.4 ms, the CPU part 14.7 -> 9.8 ms.
+`c40056` switches only the fixes from 56 on, so the weak machine can show their part alone. What is left: the
+sprites' lock (they read the ground under them where they blend), the copy of the depth buffer into the
+hardware z-buffer (0.4 ms a frame on mission 13 at 1920x1080, 0.7 on mission 1, 1.5 zoomed out), and in the editor its own overlay's locks (6 a
+frame, 6 ms in the rig on mission 13). No readback at all would need the ground and the sprites put together in
+memory of ours and the picture uploaded once a frame - a renderer's work, not started.
 
 Before drawing, the engine skips objects far from the screen centre, with a box sized for
 1024x768: objects (`World_DrawLayer`) within x +-1024 and y +-512, their shadows (the shadow

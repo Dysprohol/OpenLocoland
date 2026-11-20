@@ -44,8 +44,35 @@
 // the corner by its own size; MenuNVidUnderCursor gives 464 for them, so the bar's clicks, the
 // cursor and the mouse tip treat them as the minimap. The dots are drawn as blocks of the
 // step's size at their own scaled place.
+//
+// The points without a wait for the GPU (perf.h; docs/dev/changes.md fix 58). The engine writes the rail points
+// and the dots straight into the back buffer: Graphics_PutPoint / Graphics_PutPoint2x2 lock it through the
+// surface (not Surface_Lock) when it is not locked, and leave it locked - the rail points, then the view's
+// highlight (a Direct3D quad, which unlocks first), then the dots, unlocked by Graphics_EndScene. Under dgVoodoo a
+// lock after Direct3D drawing waits for the GPU and reads the picture back; the dots' lock always follows the
+// highlight, the rail points' follows the bar's drawing when no message is on the screen - 2-3 ms each a frame in
+// the test rig. What such a lock leaves on the picture is dgVoodoo's: it draws in 32-bit colour and, at the unlock,
+// puts back from the 16-bit copy only around what the CPU changed - for every pixel whose value changed, the 2 x 2
+// block with that pixel at its bottom right (the pixel, its left, upper and upper-left neighbours) gets the 16-bit
+// colour of the copy; the rest keeps its finer colour (found in held frames: test pixels written into the dots'
+// lock; a pixel written with the value it had changes nothing). Here, at the level's own zoom and in 16-bit colour,
+// the points go into a buffer of ours - the same pixels by the engine's own tests and its 16-bit colour - and each
+// of the two batches (the rail points, put before the highlight; the dots, at the end of Minimap_Draw) is put on
+// the picture as that unlock would: the minimap's rectangle (and the column and row up-left of it) copied by the
+// GPU through a 16-bit texture (DirectDraw's Blt into a 16-bit surface cuts the colour as the lock's copy does),
+// copied back through a clip list of exactly those 2 x 2 blocks, then the points with a colour-keyed Blt (a key no
+// point has). The same picture, no lock, no wait. The one case it cannot know without reading the picture: a point
+// drawn in exactly the 16-bit colour already under it is no change for dgVoodoo (nothing put back around it), and
+// here its block gets the 16-bit colour - where that colour was finer (Direct3D blending after the last lock: the
+// view's highlight) a few pixels would differ by less than one step of 16-bit colour. When a surface of ours cannot
+// be made or a Blt fails, the batch is written the engine's way (its lock, left locked as the engine leaves it).
+// A zoom's interface pass (zoom_view.cpp) has its own overlay and is left as it is; so is a 32-bit picture, and a
+// picture already locked when the minimap starts.
 #include "patch.h"
+#include "perf.h"
+#include <ddraw.h>
 #include <cstdlib>
+#include <vector>
 
 int interface_scale();                 // interface_scale.cpp
 int interface_original_nvid(int nvid);
@@ -64,6 +91,7 @@ constexpr uintptr_t PUT_DOT = 0x405630;         // Minimap_PutDot
 constexpr uintptr_t PUT_BIG_DOT = 0x4056c0;     // Minimap_PutBigDot
 constexpr uintptr_t DRAW_BRIGHTEN = 0x405940;   // Minimap_Draw: call Graphics_BrightenRect (the view)
 constexpr uintptr_t BRIGHTEN_RECT = 0x412ba0;   // Graphics_BrightenRect
+constexpr uintptr_t MINIMAP_DRAW = 0x405800;    // Minimap_Draw
 constexpr uintptr_t GRAPHICS_PUT_POINT = 0x405cd0;
 constexpr uintptr_t GRAPHICS_PUT_POINT_2X2 = 0x405e70;
 constexpr uintptr_t MENU_NVID_UNDER_CURSOR = 0x4247f0;
@@ -159,6 +187,204 @@ Minimap* __fastcall place_over(Minimap* m, void*, uint8_t* frame) {
     return m;
 }
 
+// ---- the points without a lock (fix 58) ----
+
+struct Points {
+    bool on = false;                       // the points go here, not into the picture
+    int left = 0, top = 0, w = 0, h = 0;   // the minimap's rectangle
+    std::vector<uint16_t> color;
+    std::vector<uint8_t> set;
+    int count = 0;                         // pixels set in this batch
+};
+Points g_points;
+IDirectDrawSurface7* g_overlay = nullptr;   // system memory, the rectangle's size: the points
+IDirectDrawSurface7* g_cut = nullptr;       // a 16-bit texture: the picture's colour cut as a lock's copy cuts it
+IDirectDrawClipper* g_blocks = nullptr;     // the 2 x 2 blocks of a batch
+int g_overlay_w = 0, g_overlay_h = 0, g_cut_w = 0, g_cut_h = 0;
+bool g_failure_logged = false;
+
+// The engine's 16-bit colour of a point (Graphics_PutPoint: the shifts and masks of the 16-bit format).
+uint16_t color16(uint32_t color) {
+    const int green_shift = *reinterpret_cast<int*>(0x47a5e4), red_shift = *reinterpret_cast<int*>(0x47a5e0);
+    const uint32_t green_mask = *reinterpret_cast<uint32_t*>(0x47a5dc), red_mask = *reinterpret_cast<uint32_t*>(0x47a5d8);
+    return static_cast<uint16_t>(((color >> ((8 - green_shift) & 0x1f)) & green_mask) |
+                                 ((color >> ((16 - red_shift) & 0x1f)) & red_mask) | ((color >> 3) & 0x1f));
+}
+
+void set_pixel(int x, int y, uint16_t c) {
+    const int i = x - g_points.left, j = y - g_points.top;
+    if (i < 0 || j < 0 || i >= g_points.w || j >= g_points.h) return;   // put_block keeps them inside
+    const size_t k = static_cast<size_t>(j) * g_points.w + i;
+    g_points.color[k] = c;
+    g_points.set[k] = 1;
+    ++g_points.count;
+}
+
+int truncate(float f) { return static_cast<int>(static_cast<long long>(f)); }   // crt_ftol
+
+// Graphics_PutPoint's test and pixel: (x, y) inside the view (left, right, top, bottom at +0x220).
+void point(const float* view, float x, float y, uint32_t color) {
+    if (view[0] <= x && x < view[1] && view[2] <= y && y < view[3]) set_pixel(truncate(x), truncate(y), color16(color));
+}
+
+// Graphics_PutPoint2x2's: one pixel less at the right and the bottom edge.
+void point2x2(const float* view, float x, float y, uint32_t color) {
+    if (!(view[0] <= x) || !(view[2] <= y) || !(x < view[1] - 1.0f) || !(y < view[3] - 1.0f)) return;
+    const int px = truncate(x), py = truncate(y);
+    const uint16_t c = color16(color);
+    set_pixel(px, py, c);
+    set_pixel(px + 1, py, c);
+    set_pixel(px, py + 1, c);
+    set_pixel(px + 1, py + 1, c);
+}
+
+IDirectDraw7* ddraw_of(IDirectDrawSurface7* s) {
+    static const GUID IID_DD7 = {0x15e65ec0, 0x3b9c, 0x11d2, {0xb9, 0x2f, 0x00, 0x60, 0x97, 0x97, 0xea, 0x5b}};
+    IUnknown* unknown = nullptr;
+    if (FAILED(s->GetDDInterface(reinterpret_cast<void**>(&unknown))) || !unknown) return nullptr;
+    IDirectDraw7* dd = nullptr;
+    unknown->QueryInterface(IID_DD7, reinterpret_cast<void**>(&dd));
+    unknown->Release();
+    return dd;
+}
+
+// A surface of the back buffer's format, made again when the size changes; restored when lost.
+bool ensure_surface(IDirectDrawSurface7*& s, int& sw, int& sh, IDirectDrawSurface7* back, int w, int h, DWORD caps) {
+    if (s && sw == w && sh == h) return s->IsLost() != DDERR_SURFACELOST || SUCCEEDED(s->Restore());
+    if (s) s->Release();
+    s = nullptr;
+    IDirectDraw7* dd = ddraw_of(back);
+    if (!dd) return false;
+    DDSURFACEDESC2 desc = {};
+    desc.dwSize = sizeof desc;
+    desc.dwFlags = DDSD_CAPS | DDSD_WIDTH | DDSD_HEIGHT | DDSD_PIXELFORMAT;
+    desc.dwWidth = w;
+    desc.dwHeight = h;
+    desc.ddpfPixelFormat.dwSize = sizeof desc.ddpfPixelFormat;
+    back->GetPixelFormat(&desc.ddpfPixelFormat);
+    desc.ddsCaps.dwCaps = caps;
+    const HRESULT hr = desc.ddpfPixelFormat.dwRGBBitCount == 16 ? dd->CreateSurface(&desc, &s, nullptr) : E_FAIL;
+    if (!g_blocks && SUCCEEDED(hr)) dd->CreateClipper(0, &g_blocks, nullptr);
+    dd->Release();
+    if (FAILED(hr) || !s) {
+        s = nullptr;
+        if (!g_failure_logged) {
+            g_failure_logged = true;
+            patch::log("minimap: no %dx%d surface (%08X) - its points lock the picture as before", w, h, static_cast<unsigned>(hr));
+        }
+        return false;
+    }
+    sw = w;
+    sh = h;
+    return true;
+}
+
+void device_scene(uint8_t* g, int slot) {   // IDirect3DDevice7::BeginScene (5) / EndScene (6)
+    void* device = at<void*>(g, 0xbf4);
+    reinterpret_cast<HRESULT(__stdcall*)(void*)>((*reinterpret_cast<void***>(device))[slot])(device);
+}
+
+// The batch as dgVoodoo's unlock leaves it, by the GPU (see the top). False: the points are not on the picture.
+bool put_by_gpu(uint8_t* g, IDirectDrawSurface7* back) {
+    const int w = g_points.w, h = g_points.h;
+    const int bw = w + 1, bh = h + 1, bl = g_points.left - 1, bt = g_points.top - 1;   // the blocks' area
+    if (bl < 0 || bt < 0) return false;
+    if (!ensure_surface(g_overlay, g_overlay_w, g_overlay_h, back, w, h, DDSCAPS_OFFSCREENPLAIN | DDSCAPS_SYSTEMMEMORY) ||
+        !ensure_surface(g_cut, g_cut_w, g_cut_h, back, bw, bh, DDSCAPS_TEXTURE | DDSCAPS_VIDEOMEMORY) || !g_blocks)
+        return false;
+    // the blocks: a set pixel (i, j) of the rectangle marks (i - 1 .. i, j - 1 .. j) of it, (i .. i + 1, j .. j + 1) here
+    static std::vector<uint8_t> mask;
+    mask.assign(static_cast<size_t>(bw) * bh, 0);
+    static uint8_t used[0x10000 / 8];
+    std::memset(used, 0, sizeof used);
+    for (int j = 0; j < h; ++j)
+        for (int i = 0; i < w; ++i) {
+            const size_t k = static_cast<size_t>(j) * w + i;
+            if (!g_points.set[k]) continue;
+            uint8_t* m = &mask[static_cast<size_t>(j) * bw + i];
+            m[0] = m[1] = m[bw] = m[bw + 1] = 1;
+            used[g_points.color[k] >> 3] |= static_cast<uint8_t>(1 << (g_points.color[k] & 7));
+        }
+    static std::vector<uint8_t> region;
+    region.assign(sizeof(RGNDATAHEADER), 0);
+    DWORD rects = 0;
+    for (int j = 0; j < bh; ++j)
+        for (int i = 0; i < bw;) {
+            if (!mask[static_cast<size_t>(j) * bw + i]) {
+                ++i;
+                continue;
+            }
+            int e = i;
+            while (e < bw && mask[static_cast<size_t>(j) * bw + e]) ++e;
+            const RECT r = {bl + i, bt + j, bl + e, bt + j + 1};
+            const auto* b = reinterpret_cast<const uint8_t*>(&r);
+            region.insert(region.end(), b, b + sizeof r);
+            ++rects;
+            i = e;
+        }
+    auto* rgn = reinterpret_cast<RGNDATA*>(region.data());
+    rgn->rdh.dwSize = sizeof(RGNDATAHEADER);
+    rgn->rdh.iType = RDH_RECTANGLES;
+    rgn->rdh.nCount = rects;
+    rgn->rdh.nRgnSize = rects * sizeof(RECT);
+    rgn->rdh.rcBound = {bl, bt, bl + bw, bt + bh};
+    uint16_t key = 0xF81F;   // magenta, unless a point has it
+    while (used[key >> 3] & (1 << (key & 7))) ++key;
+    DDSURFACEDESC2 d = {};
+    d.dwSize = sizeof d;
+    if (FAILED(g_overlay->Lock(nullptr, &d, DDLOCK_WAIT | DDLOCK_WRITEONLY, nullptr))) return false;
+    for (int j = 0; j < h; ++j) {
+        auto* row = reinterpret_cast<uint16_t*>(static_cast<uint8_t*>(d.lpSurface) + j * d.lPitch);
+        for (int i = 0; i < w; ++i) {
+            const size_t k = static_cast<size_t>(j) * w + i;
+            row[i] = g_points.set[k] ? g_points.color[k] : key;
+        }
+    }
+    g_overlay->Unlock(nullptr);
+    DDCOLORKEY ck = {key, key};
+    RECT area = {bl, bt, bl + bw, bt + bh}, cut = {0, 0, bw, bh};
+    RECT to = {g_points.left, g_points.top, g_points.left + w, g_points.top + h}, from = {0, 0, w, h};
+    if (FAILED(g_overlay->SetColorKey(DDCKEY_SRCBLT, &ck)) || FAILED(g_blocks->SetClipList(rgn, 0))) return false;
+    device_scene(g, 6);
+    bool ok = SUCCEEDED(g_cut->Blt(&cut, back, &area, DDBLT_WAIT, nullptr));
+    if (ok && SUCCEEDED(back->SetClipper(g_blocks))) {
+        ok = SUCCEEDED(back->Blt(&area, g_cut, &cut, DDBLT_WAIT, nullptr));
+        back->SetClipper(nullptr);
+    } else {
+        ok = false;
+    }
+    // the points themselves (if this fails after the blocks went back, the engine's way below writes them over
+    // the same 16-bit colours)
+    if (ok) ok = SUCCEEDED(back->Blt(&to, g_overlay, &from, DDBLT_KEYSRC | DDBLT_WAIT, nullptr));
+    device_scene(g, 5);
+    return ok;
+}
+
+// The batch onto the picture: by the GPU, else as the engine does it (its lock, left locked).
+void put_points() {
+    if (!g_points.count) return;
+    uint8_t* g = graphics();
+    auto* back = at<IDirectDrawSurface7*>(g, 0xc04);
+    if (!at<void*>(g, 0x208) && !put_by_gpu(g, back)) {
+        DDSURFACEDESC2 d = {};
+        d.dwSize = sizeof d;
+        if (SUCCEEDED(back->Lock(nullptr, &d, 0, nullptr))) {   // Graphics_PutPoint's lock
+            at<void*>(g, 0x208) = d.lpSurface;
+            at<int>(g, 0x214) = d.lPitch / 2;
+        }
+    }
+    if (auto* bits = at<uint16_t*>(g, 0x208)) {   // the engine's way: into the locked picture
+        const int pitch = at<int>(g, 0x214);
+        for (int j = 0; j < g_points.h; ++j)
+            for (int i = 0; i < g_points.w; ++i) {
+                const size_t k = static_cast<size_t>(j) * g_points.w + i;
+                if (g_points.set[k]) bits[static_cast<size_t>(g_points.top + j) * pitch + g_points.left + i] = g_points.color[k];
+            }
+    }
+    std::fill(g_points.set.begin(), g_points.set.end(), static_cast<uint8_t>(0));
+    g_points.count = 0;
+}
+
 // ---- the dots ----
 
 using PutPoint_t = void(__fastcall*)(void* g, void* edx, float x, float y, uint32_t color);
@@ -173,6 +399,17 @@ void put_block(const Minimap* m, float x, float y, int w, int h, uint32_t color)
     if (x0 < left) x0 = left;
     if (y0 < top) y0 = top;
     void* g = graphics();
+    if (g_points.on) {   // into our buffer, by the engine's own tests
+        const float* view = reinterpret_cast<const float*>(static_cast<uint8_t*>(g) + 0x220);
+        if (w % 2 == 0 && h % 2 == 0) {
+            for (int j = 0; j < h; j += 2)
+                for (int i = 0; i < w; i += 2) point2x2(view, static_cast<float>(x0 + i), static_cast<float>(y0 + j), color);
+        } else {
+            for (int j = 0; j < h; ++j)
+                for (int i = 0; i < w; ++i) point(view, static_cast<float>(x0 + i), static_cast<float>(y0 + j), color);
+        }
+        return;
+    }
     if (w % 2 == 0 && h % 2 == 0) {
         const auto put = reinterpret_cast<PutPoint_t>(GRAPHICS_PUT_POINT_2X2);
         for (int j = 0; j < h; j += 2)
@@ -245,7 +482,33 @@ void __fastcall brighten_view(void* g, void*, const Minimap* m, float, float, fl
     fit(l, r, m->left, m->width, HIGHLIGHT_MIN_W * g_size);
     fit(t, b, m->top, m->height, HIGHLIGHT_MIN_H * g_size);
     if (zoom_view_defer_brighten(l, t, r, b, color)) return;   // a zoom's pass: after the dots reach the picture
+    if (g_points.on) put_points();   // the rail points before the highlight, as the engine has them
     reinterpret_cast<Brighten_t>(BRIGHTEN_RECT)(g, nullptr, l, t, r, b, color);
+}
+
+// Minimap_Draw: its points into our buffer (fix 58).
+using MinimapDraw_t = void(__fastcall*)(Minimap* m, void* edx);
+MinimapDraw_t g_minimap_draw = nullptr;
+void __fastcall minimap_draw(Minimap* m, void* edx) {
+    float vw, vh;
+    uint8_t* g = graphics();
+    if (perf::off(58) || !g || (at<uint32_t>(g, 0) & 2) || at<void*>(g, 0x208) || zoom_view_world_view(vw, vh) ||
+        !(m->width >= 1 && m->height >= 1 && m->width <= 4096 && m->height <= 4096))
+        return g_minimap_draw(m, edx);
+    g_points.left = static_cast<int>(m->left);
+    g_points.top = static_cast<int>(m->top);
+    g_points.w = static_cast<int>(m->width);
+    g_points.h = static_cast<int>(m->height);
+    const size_t n = static_cast<size_t>(g_points.w) * g_points.h;
+    if (g_points.color.size() != n) {
+        g_points.color.assign(n, 0);
+        g_points.set.assign(n, 0);
+    }
+    g_points.count = 0;
+    g_points.on = true;
+    g_minimap_draw(m, edx);
+    put_points();   // the dots
+    g_points.on = false;
 }
 
 // At the call in Minimap_Draw: ecx = g_graphics, the five arguments pushed, ebp = the Minimap.
@@ -358,6 +621,10 @@ void install_minimap() {
     patch::redirect(MENU_NVID_UNDER_CURSOR, nvid_start, sizeof nvid_start,
                     reinterpret_cast<void*>(&menu_nvid_under_cursor), "MenuNVidUnderCursor");
     patch::write_call(DRAW_BRIGHTEN, nullptr, 0, reinterpret_cast<void*>(&brighten_call), 5);
+    // sub esp,0xc / push ebx / push ebp / mov ebp,ecx
+    const uint8_t draw_start[] = {0x83, 0xEC, 0x0C, 0x53, 0x55, 0x8B, 0xE9};
+    g_minimap_draw = reinterpret_cast<MinimapDraw_t>(
+        patch::hook(MINIMAP_DRAW, draw_start, sizeof draw_start, reinterpret_cast<void*>(&minimap_draw), "Minimap_Draw"));
     g_installed = true;
     if (chosen_size() > 0) patch::log("minimap: size %d chosen on the settings page", chosen_size());
 }

@@ -67,6 +67,11 @@ struct Lap {
     }
 };
 
+// lost_surfaces.cpp's guard of the surfaces' Lock / Unlock: every lock of the back and the depth buffer, also
+// those the engine takes through the surface itself (the minimap's points), with its time and the code that took it.
+void surface_lock(void* surface, uintptr_t caller, int64_t ticks);
+void surface_unlock(void* surface, int64_t ticks);
+
 void frame_end();   // frame_limit.cpp, after the present and the wait
 void start_sampler();   // sampler.cpp: the main thread sampled (EditorProfile = 2), called on it
 

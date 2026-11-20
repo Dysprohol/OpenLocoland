@@ -62,8 +62,9 @@ POINT g_cursor = {0, 0};   // screen coordinates
 // an earthquake). c40053: LocoFix's cheaper drawing (perf.h) switched off and on - with c40052 the
 // same frame is taken both ways (the game's own screenshot, c40023) and compared pixel by pixel.
 // c40054 only stops the clock: the objects are updated with no time going by, so nothing moves, and what the
-// update draws (the state bar's minimap) is drawn every frame - its picture the same too.
-constexpr UINT TEST_FREEZE = 40052, TEST_PERF = 40053, TEST_CLOCK = 40054;
+// update draws (the state bar's minimap) is drawn every frame - its picture the same too. c40056 switches only the
+// fixes from 56 on (the locks of the picture; perf.h), so their part of a frame can be timed apart from the lights'.
+constexpr UINT TEST_FREEZE = 40052, TEST_PERF = 40053, TEST_CLOCK = 40054, TEST_PERF_LOCKS = 40056;
 constexpr uintptr_t G_WORLD = 0x4a9d38, WORLD_PAUSE = 0x41fc20, WORLD_RESUME = 0x41fc40;
 bool g_frozen = false;
 DWORD g_frozen_time = 0;
@@ -122,6 +123,11 @@ LRESULT CALLBACK test_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
         if (!g_frozen) g_frozen_time = timeGetTime();
         g_frozen = !g_frozen;
         patch::log("test: the clock %s", g_frozen ? "stopped" : "running again");
+        return 0;
+    }
+    if (m == WM_COMMAND && LOWORD(w) == TEST_PERF_LOCKS) {
+        perf::g_locks_original = !perf::g_locks_original;
+        patch::log("test: the locks of the picture by %s", perf::g_locks_original ? "the engine's own code" : "LocoFix's cheaper code");
         return 0;
     }
     if (m == WM_COMMAND && LOWORD(w) == TEST_PERF) {

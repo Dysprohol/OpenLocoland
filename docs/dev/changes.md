@@ -618,6 +618,58 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       1920x1080 (35-52 lights a frame), with 54: the lights 12.2 -> 2.2 ms a frame, `d3d` 14.1 -> 4.2 ms, the
       frame's CPU time 28.8 -> 18.7 ms (part of the wait moves to the next lock of the back buffer, which then
       waits for the GPU instead); a held frame is the same to the pixel both ways,
+  56. the depth buffer's fill and the ground's heights by the CPU (`depth_blits.cpp`): the ground's tiles with
+      heights (imageFlags 4 - the missions' grounds; seen on missions 1, 3, 7, 13 and 18) are put into the
+      system-memory depth buffer with a DirectDraw Blt each (`Graphics_BlitToDepthBuffer`), and `Graphics_Clear`
+      fills it with the empty depth 0x3ff (a depth-fill Blt) whenever the view is not all map - zoomed out to the
+      whole map, a camera past an edge. Under dgVoodoo the first lock of the depth buffer after those Blts (for
+      the software sprites) waits for them and copies the buffer back. The same fill and the same rectangles are
+      now written by the CPU into the locked depth buffer, clipped by its clipper's rectangles as the Blt was, and
+      it stays locked for the sprites as the engine's lock would leave it; anything else (a stretch, a
+      rectangle outside the texture, no clip list) goes the engine's way. In the test rig, mission 13, the two
+      switched in one run: at 1920x1080 the depth lock 1.69 -> 0.03 ms a frame, the ground 1.0 -> 1.6 ms (the
+      copies), so about 1.1 ms less; zoomed out to the whole map (3072x2304) the lock 4.8 -> 0.1 ms, the ground
+      1.0 -> 2.2 ms; missions 1, 3, 7 and 18 at 1920x1080 the lock 1.5-1.7 -> 0.03 ms. Held frames are the same
+      to the pixel both ways (missions 13 at 1920x1080 and zoomed out, 1, 3, 7, 18),
+  57. no layer 10 lock in a zoom view's world pass (`layer10_lock.cpp`): zoomed in or out, the world is drawn in
+      one pass without the interface's objects and the interface in a second pass into an overlay of ours
+      (`zoom_view.cpp`); the messages are interface objects, so in the world pass layer 10 draws nothing, but
+      fix 32 saw objects in it and kept the engine's lock of the back and the depth buffer - a wait for the GPU
+      and nothing else. An object the zoom's filter leaves out of the pass now counts as none. A lock in which
+      nothing changes leaves the picture as it was (engine.md "Locks under dgVoodoo").
+      Mission 13 zoomed out to the whole map in the test rig: that lock 5.7 -> 0 ms a frame; a held frame is
+      the same to the pixel both ways,
+  58. the minimap's points without a lock of the picture (`minimap.cpp`): the engine writes the rail points and
+      the dots into the back buffer, locking it through the surface - the dots' lock always after the view's
+      highlight (a Direct3D quad), the rail points' after the bar's drawing when no message is on the screen;
+      each such lock is a wait for the GPU. The points now go into a buffer of ours (the same pixels by the
+      engine's tests and its 16-bit colour), and each batch - the rail points before the highlight, the dots at
+      the end - is put on the picture as dgVoodoo's unlock leaves it (engine.md "Locks under dgVoodoo"): the
+      minimap's rectangle copied by the GPU through a 16-bit texture and back through a clip list of the 2 x 2
+      blocks up-left of every point, then the points with a colour-keyed Blt. Round 1 tried the overlay alone and
+      found 35 pixels in the view's highlight a few levels off - those blocks. A point drawn in exactly the 16-bit
+      colour already under it would be no change to dgVoodoo, and here its block would get the 16-bit colour: where
+      the colour under it was finer (the view's highlight), up to 4 pixels by less than one 16-bit step - not seen
+      in any comparison. If a surface of ours cannot be made or a Blt fails, the batch goes the engine's way.
+      Mission 13 at 1920x1080 in the test rig, switched in one run: the minimap's locks 2.0 -> 0 ms a frame,
+      `other` 3.3 -> 1.8 ms; a held frame with the minimap drawn (c40054) is the same to the pixel both ways
+      (screen captures, not the game's own 16-bit screenshot),
+  59. the messages without a lock of the picture (`layer10_lock.cpp`): with a message line on the screen (the
+      missions' objectives keep one there) `Graphics_DrawScene` locks the back buffer for layer 10 after the
+      Direct3D layers 5-9 - a wait for the GPU every frame. Layer 10 holds the message lines and the scripts'
+      texts: Text objects whose font is a 16-bit software sprite, written letter by letter with no blending. It
+      is now drawn into memory of ours twice (filled with two different values, against the real depth buffer),
+      so every pixel it draws is known exactly; only the rows the letters touched are read (the memory's writes
+      are watched). The pixels go on the picture as dgVoodoo's unlock would leave them, the same way as fix 58.
+      Anything else in layer 10 (another kind of object, a text that switches to another VID or reads a script
+      variable when drawn, a font that is no 16-bit sprite or blends, a cursor drawn there) keeps the engine's
+      lock; so does a failure of a surface or a Blt. The same exception as 58: a letter drawn in exactly the
+      16-bit colour already under it, on a part Direct3D drew with finer colour after the sprites' lock, would
+      leave up to 4 pixels less than one 16-bit step off - not seen in any comparison. With 57 and 58 a frame in
+      play now has one lock of the back buffer, the sprites'. Mission 13 at 1920x1080 in the test rig, switched
+      in one run: the back buffer's locks 7.3 -> 3.9 ms a frame (4 -> 1), `other` 3.6 -> 1.5 ms; held frames with
+      the minimap drawn are the same to the pixel both ways on missions 13, 7 (fog), 1 and 3 and on mission 18
+      (night) but for a white spark that moves from frame to frame even in a held level (screen captures),
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that

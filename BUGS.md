@@ -341,8 +341,11 @@ Harmless log errors:
   -> 45); fixes 54 (`light_fill.cpp`) and 55 (`light_textures.cpp`) the lights' cost - each
   light's texture was locked again while the GPU still drew it, and its draw waited for the GPU
   (mission 13 in the test rig: 62 -> 97 fps in a 1280x1024 window, 15 -> 26.5 zoomed out to the
-  whole map); the rest belongs to the renderer's design (DEVELOPERS.md "Frame rate at high
-  resolutions").
+  whole map); fixes 56-59 (`depth_blits.cpp`, `layer10_lock.cpp`, `minimap.cpp`) all but one of the
+  waits for the GPU that the locks of the picture cost - the depth buffer's after the ground's Blts,
+  layer 10's for the messages, the minimap's for its points - with the same picture to the pixel (the
+  test rig: the locks 7.6 -> 4.0 ms a frame on mission 13 at 1920x1080, 8.7 -> 3.4 on mission 1);
+  the rest belongs to the renderer's design (DEVELOPERS.md "Frame rate at high resolutions").
 - Dated logs left behind after every crash pile up (LocoFix keeps the 3 newest).
 - A player who had put dgVoodoo2 into the Steam folder of the game (for its resolutions) built
   with Setup from it, and the game crashed at the start; after verifying the game files in Steam
