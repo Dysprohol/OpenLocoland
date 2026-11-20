@@ -48,6 +48,7 @@ std::vector<int> edit_factory_items(void* o);
 void edit_factory_change(void* factory, const std::vector<int>& items, const FactoryState& before, const UiText& what);
 void edit_commit_factories(const UiText& what, const FactoryState& before);
 void edit_pick_queue_point(void* factory, int train);
+void* edit_factory_exit_car(void* factory, int cars);   // the runner's PlanExit on the held level
 // editor_panel.cpp
 bool panel_on_previous(POINT m);   // the arrow at the bottom left of the button bar
 void panel_frame(int picture_vid, const char* title);
@@ -491,6 +492,31 @@ std::string ai_limit() {
     return "";
 }
 
+// Ours, the neutrals' and the pirates': a car of the map standing on the factory's exit - where the
+// longest of its trains comes out (the runner's PlanExit) - holds its plan until it leaves; said on the
+// list's spare row, the whole of it in the status line. Looked for again every 250 ms at most (a walk of
+// the map's objects), at once for another factory or another longest train.
+void exit_taken() {
+    static void* factory = nullptr;
+    static int cars = -1;
+    static DWORD when = 0;
+    static bool taken = false;
+    int longest = 0;
+    for (int i : entries()) longest = (std::max)(longest, static_cast<int>(queue()[i].cars.size()));
+    const DWORD now = GetTickCount();
+    if (factory != g_factory || cars != longest || now - when > 250) {
+        taken = edit_factory_exit_car(g_factory, longest) != nullptr;
+        factory = g_factory, cars = longest, when = now;
+    }
+    if (!taken) return;
+    const float x = g_px + LEFT, y = row_y(ROW_SPARE);
+    put(x, y, fit(ui_text("PlanExitTaken", "! A TRAIN ON ITS EXIT: THE PLAN WAITS"), x, y));
+    g_rows.tip(x - 2, y - ROW / 2, right_end(), y + ROW / 2,
+               ui_text("TipPlanExitTaken", "A train stands where this factory's trains come out - on its push line or past its end as far "
+                                           "as its longest train reaches: the plan builds nothing until it has left"),
+               true);
+}
+
 // ---- the list ----
 
 void open_entry(int i) {
@@ -532,6 +558,7 @@ void draw_plan_list() {
         y += 2 * ROW;
     }
     if (enemy()) put(g_px + LEFT, row_y(ROW_SPARE), fit(ai_limit(), g_px + LEFT, row_y(ROW_SPARE)));   // empty until reached
+    else if (n > 0) exit_taken();   // a train on the factory's exit (only then, so the page's texts keep their numbers)
     line_under(ROW_LINE);
     // + NEW, COPY n, DELETE n (the entry opened last), AI... at the left, the pages at the right
     y = row_y(ROW_ACTIONS);

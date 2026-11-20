@@ -13706,6 +13706,41 @@ void edit_object_place(void* o, int& x, int& y) {
     y = static_cast<int>(std::lround(at<float>(o, O_Y)));
 }
 
+// The runner's PlanExit on the held level (editor_mission.cpp, the factories' plans; the same numbers):
+// a car standing on the exit of `factory` that a train of `cars` cars comes out of, null for none. The
+// exit is the factory's own push line - the editor's line whose begin is within 75 px of the factory's
+// screen point and whose end is not nearer (the runner's FactoryLine) - from its begin, behind the
+// factory's place, to `cars` x 48 px past its end, 20 px to either side; without such a line the
+// factory's place, 48 px round it. The panel says so: the plan waits while a car stands there.
+void* edit_factory_exit_car(void* factory, int cars) {
+    uint8_t* f = static_cast<uint8_t*>(factory);
+    if (!f || removed(f)) return nullptr;
+    constexpr int WIDE = 20, CAR = 48;
+    const int x = static_cast<int>(at<float>(f, O_X)), y = static_cast<int>(at<float>(f, O_Y)) - static_cast<int>(at<float>(f, O_Z));
+    int line = -1, best = 999999;
+    const std::vector<PushLine>& lines = mission_push_lines();
+    for (int i = 0; i < static_cast<int>(lines.size()); ++i) {
+        const int dx = x - lines[i].bx, dy = y - lines[i].by, d = dx * dx + dy * dy;
+        if (std::abs(dx) > 75 || std::abs(dy) > 75 || d > 5625 || d >= best) continue;
+        const int ex = x - lines[i].ex, ey = y - lines[i].ey;
+        if (std::abs(ex) > 100 || std::abs(ey) > 100 || ex * ex + ey * ey > d) best = d, line = i;
+    }
+    for (uint8_t* c : all_cars()) {
+        const int cx = static_cast<int>(at<float>(c, O_X)), cy = static_cast<int>(at<float>(c, O_Y));
+        if (line < 0) {
+            if (std::hypot(static_cast<float>(cx) - at<float>(f, O_X), static_cast<float>(cy) - at<float>(f, O_Y)) <= CAR) return c;
+            continue;
+        }
+        const PushLine& l = lines[line];
+        const int vx = l.ex - l.bx, vy = l.ey - l.by;
+        const int len = (std::max)(1, static_cast<int>(std::sqrt(static_cast<double>(vx * vx + vy * vy))));
+        const int reach = len + CAR * cars, dx = cx - l.bx, dy = cy - static_cast<int>(at<float>(c, O_Z)) - l.by;
+        const int a = (dx * vx + dy * vy) / len, s = (dx * vy - dy * vx) / len;
+        if (a >= -WIDE && a <= reach && s >= -WIDE && s <= WIDE) return c;
+    }
+    return nullptr;
+}
+
 std::vector<int> edit_factory_items(void* o) {
     std::vector<int> out;
     for (short n : state_of(static_cast<uint8_t*>(o)).items) out.push_back(n);

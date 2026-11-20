@@ -602,8 +602,9 @@ rules):
   cars' first two swapped so that `BuildTrain` makes the planned train, and never a type ending in
   5. Ours, the neutrals' and the pirates' factory gets `AddCommand(f, ACT_BUILD_UNIT, v)` car by
   car, each when the factory is free and its army has the price (a car the money does not cover
-  would be left out), whatever its build list; one entry at a time, and not while a train stands at
-  the factory's door (its cars would join it). An arrival's cars are made one at a time too: cars made
+  would be left out), whatever its build list; one entry at a time, and not while a train stands on
+  the factory's exit - its own push line or past its end as far as the new train reaches (its cars
+  would be deleted at the door or join that train; `PlanExit`, `plan_wait[]`). An arrival's cars are made one at a time too: cars made
   on one rail point at once push each other out of their order. The AI's knobs: `LIMIT_ATACKERS`, `RENEW_TIMEOUT`,
   `start_trains_renew`, `start_trains_random_task`, `FIRSTATTACKTIME`, `FIRSTCONTACTTIME`,
   `CLEVER_ATTACK` (`SetCleverEnemyAttack`) and `STG_DESTROY_TIME` (read only by mission 2's own code).

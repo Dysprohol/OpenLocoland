@@ -568,7 +568,11 @@ trains than n, not before a time), **REPEAT** (once, n times or without end, eve
 THE LAST IS MADE** or after **ITS LOSS**) and **THEN** (the enemy's attacks, guards a point
 or patrols; the others' stay, drive to a point or patrol). A train of yours, the neutrals' or the
 pirates' is built car by car when the factory is free and its side has the money for the next car (the
-price under each), whatever the factory's list; the enemy builds one at a time while fewer of its trains
+price under each), whatever the factory's list, and only while no train stands on the factory's **exit** -
+its exit line, or just past the line's end where the new train comes out (the list then says **A TRAIN ON
+ITS EXIT: THE PLAN WAITS**); trains parked beside the factory do not hold it. A map saved before v0.2.13
+keeps its old script, which waited while any train stood near the factory, until it is saved again in the
+editor. The enemy builds one at a time while fewer of its trains
 attack than **AI...** allows. **AI...** has the authors' other settings of the enemy, a line on each:
 whether a lost start train is built again and after how long, the start trains' raids, when raids begin
 and how long they last, the clever attack, and whether its guns fire at neutral trains (**NEUTRAL

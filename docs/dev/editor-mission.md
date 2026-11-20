@@ -727,9 +727,38 @@ push line moves it until its last car is past the line's end, as `OrderTry` wait
 push line -, 30 s at most (`- not whole` in the
 log when cars are missing then); a patrol starts from its first point once a car of it is within 40 px
 (`PlanOnPoint`, `MissionAt`); an entry runs only while its factory stands and has its army, one entry at a time in a
-factory and not while a train stands within 250 px of it - at its door or on its spur (seen in play: two entries started together
-mixed their cars, 5,20 and 5,25 came as 5,25,5,20, and the cars of the next train joined one that
-stayed at the door). Every
+factory (seen in play: two entries started together mixed their cars, 5,20 and 5,25 came as 5,25,5,20)
+and not while a car stands on the factory's exit (`PlanExit`). The exit is where the new cars go:
+`Depo_ReleaseUnit` makes each one at the factory's place and deletes what stands there, and the push line
+pushes them along until the last one is past its end, coupling them to a train of their army they touch
+(the cars of the next train joined one that stayed at the door) and pushing another army's along
+(engine.md "How the cars follow"). So the runner takes the factory's own line (`FactoryLine`: the
+editor's line whose begin is within 75 px of the factory and whose end is not nearer - the rule
+`CaptureLine` uses for a factory too) from its begin, behind the place, to its end and on past it along
+its direction by 48 px a car of the entry's train, 20 px to either side, and waits while a car of any
+army (not a dying one) has its screen point there; a factory without a line of its own waits while a
+car is within 48 px of its place, where the cars are made on one another. Until 2026-11 it waited while
+any train stood within 250 px of the factory, so a factory with trains parked beside it - not on its
+spur - never built (the maintainer's Capture The Gear: the pirates' and the neutrals' factory stayed idle
+with cars standing 165-216 px from them, off the spur). The wait is logged once, when it begins
+(`ARRIVAL F<n> wave w waits at t s: a train on the factory's exit (VID v army a at x,y)`, `plan_wait[]`:
+its start + 1), and the `ordered` line after it adds `- it waited for its exit from t s`. The rule is
+in the runner, which the editor writes anew at every save (the block "// <editor arrivals>"): a map
+saved before keeps the 250 px rule until it is saved again in the editor (Run the level writes its copy
+with the new runner already). Checked on the rig (2026-11-20, copies of Capture The Gear): as the map
+was saved (the old runner) the pirates' and the neutrals' factory ordered nothing in 100 s while the
+enemy's queued its wave at 60 s; saved again in the editor and run, both ordered at 31 s and built
+5,20,20 at 136 s, the enemy's as before (queued 60 s, taken 62 s), and the pirates' next entry waited 4 s
+while the train just built was leaving its line's end; with a pirate locomotive placed on the pirates'
+spur (its push line pushed it to the line's end) the pirates' first entry waited from 30 s, the
+neutrals' was ordered at 30 s and built at 135 s, and after the test copy's own code sent the
+locomotive away at 100 s the pirates' was ordered at 102 s and built 5,20,20 at 207 s, its next entry
+ordered at 211 s. The panel says it of the held level: on the list of ours, the neutrals' or the
+pirates' factory, while a car of the map stands on that exit for the longest of its entries
+(`edit_factory_exit_car`, the same numbers), the spare row reads `! A TRAIN ON ITS EXIT: THE PLAN
+WAITS` with the whole reason in the status line - only then, so the page's texts keep their numbers
+(checked: with that locomotive placed, the pirates' list showed it under its 4th entry, the neutrals'
+list nothing). Every
 wave is in `error.log`: the enemy's `ARRIVAL F<n> wave w queued ... cars <planned, as built>`,
 `taken ... slot k`, `built ... made <the cars from the first one>` or `lost` (the AI dropped it);
 the others' `ordered ... cars` and `built ... army a made` or `lost` (the factory gone); an

@@ -566,8 +566,12 @@ wagony po kolei - lokomotywa gdziekolwiek -, **+ WAGON**, **SZABLON...** pociąg
 warunek, np. gracz ma mniej pociągów niż n, nie przed czasem), **POWTORZ** (raz, n razy albo bez końca,
 co tyle - **PO ZROBIENIU OSTATNIEGO** albo **PO STRACIE**) i **POTEM** (wroga atakuje, pilnuje punktu albo patroluje; pozostałych stoi, jedzie
 do punktu albo patroluje). Pociąg twój, neutralnych albo piratów powstaje wagon po wagonie, gdy fabryka
-jest wolna, a jego strona ma pieniądze na następny wagon (cena pod każdym), niezależnie od listy fabryki;
-wróg buduje po jednym, gdy atakuje mniej jego pociągów, niż pozwala **AI...**. **AI...** ma pozostałe
+jest wolna, a jego strona ma pieniądze na następny wagon (cena pod każdym), niezależnie od listy fabryki,
+i tylko wtedy, gdy na **wyjeździe** fabryki nie stoi żaden pociąg - na jej linii wyjazdowej albo tuż za
+końcem linii, tam gdzie wyjedzie nowy pociąg (lista mówi wtedy **POCIAG NA JEJ WYJEZDZIE: PLAN CZEKA**);
+pociągi zaparkowane obok fabryki jej nie wstrzymują. Mapa zapisana przed v0.2.13 ma swój stary skrypt,
+który czekał, gdy jakikolwiek pociąg stał blisko fabryki, dopóki nie zapisze się jej znowu w edytorze.
+Wróg buduje po jednym, gdy atakuje mniej jego pociągów, niż pozwala **AI...**. **AI...** ma pozostałe
 ustawienia wroga od autorów, każde z linijką opisu: czy stracony pociąg startowy jest budowany na nowo i
 po jakim czasie, wypady pociągów startowych, od kiedy są wypady i ile trwają, mądry atak oraz to, czy
 jego działa strzelają do pociągów neutralnych (**POCIAGI NEUTR.: STRZELA DO NICH** albo **GDY OBERWIE**). Wszystko poza

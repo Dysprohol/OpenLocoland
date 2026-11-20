@@ -151,6 +151,7 @@ int plan_unit[]={0};
 int plan_loco[]={0};
 int plan_lost[]={0};
 int plan_fires[]={0};
+int plan_wait[]={0};
 int price_vid[]={0};
 int price_of[]={0};
 // </editor>
@@ -647,9 +648,11 @@ PlanPrice(int v)
 // A train of ours, the neutrals' or the pirates' factory (plan_fx, plan_fy, while it is plan_army's):
 // the runner orders the factory to build it car by car (AddCommand, as the AI's BuildTrain does, in
 // the train's order), a car once the factory is free and the army has its price - a car the money
-// does not cover would be left out -, then gives the train its order (plan_task -1 none, -2 drive
-// to plan_to, -3 drive there, then to and fro to plan_to2) once it is whole and stands: pushed off
-// the factory's push line, which moves it until its last car is past the line's end (30 s at most).
+// does not cover would be left out; a wave starts only while no train stands on the factory's exit
+// (PlanExit, plan_wait: when its wait began + 1, logged once) -, then gives the train its order
+// (plan_task -1 none, -2 drive to plan_to, -3 drive there, then to and fro to plan_to2) once it is
+// whole and stands: pushed off the factory's push line, which moves it until its last car is past the
+// line's end (30 s at most).
 PlanFactory(int i)
 {
   int f;
@@ -756,9 +759,122 @@ PlanOnPoint(int i)
   plan_unit[i]=0;
   return 1;
 }
+// FactoryLine(f): the factory's own push line (its index + 1), 0 for none, by the shape the editor gives
+// it: it begins at the dead end behind the factory - the editor looks for it within 40 px of a point 22
+// px behind the middle, so within 75 px of the middle here (rail and ground heights apart too) - and
+// goes away from it: the nearest such begin. A push line's points are the screen's (y less the height,
+// as SetPushLine takes them), so the factory is taken at its own (y - z). CaptureLine uses it too.
+FactoryLine(int f)
+{
+  int i,x,y,dx,dy,ex,ey,d,best,found;
+  x=GetX(f);
+  y=GetY(f)-GetZ(f);
+  found=0;
+  best=999999;
+#ifdef PUSH_LINES
+  for( i=0; i<PUSH_LINES; i++ )
+  {
+    dx=x-push_bx[i];
+    dy=y-push_by[i];
+    if( dx>=-75 && dx<=75 && dy>=-75 && dy<=75 )
+    {
+      d=dx*dx+dy*dy;
+      if( d<=5625 && d<best )
+      {
+        ex=x-push_ex[i];
+        ey=y-push_ey[i];
+        if( ex<-100 || ex>100 || ey<-100 || ey>100 || ex*ex+ey*ey>d )
+        {
+          best=d;
+          found=i+1;
+        }
+      }
+    }
+  }
+#endif
+  return found;
+}
+// PlanRoot(a): the whole square root of a (a >= 0).
+PlanRoot(int a)
+{
+  int r,k;
+  if( a<2 )
+    return a;
+  r=a;
+  k=(r+1)/2;
+  while( k<r )
+  {
+    r=k;
+    k=(k+a/k)/2;
+  }
+  return r;
+}
+// PlanExit(i,f): a car standing on the exit of factory f that entry i's train would come out of, 0 for
+// none. The factory makes each car at its place - Depo_ReleaseUnit deletes what stands there - and its
+// push line pushes the cars along it until the last one is past its end, coupling them to a train of
+// their army that they touch and pushing another army's along: the exit is the factory's own line
+// (FactoryLine) from its begin, behind the place, to its end and on past it, along the line's
+// direction, as far as the new train reaches (48 px a car), EXIT_WIDE px to either side - a car of any
+// army whose screen point is there (a dying one is not). Without a line of its own the cars are made
+// on one another at the place: a car within 48 px of it. A train standing anywhere else near the
+// factory does not stop it (until 2026-11 a train within 250 px of it did, so a factory with trains
+// parked beside it never built).
+#define EXIT_WIDE 20
+#define EXIT_HIGH 400
+PlanExit(int i,int f)
+{
+  int k,n,u,bx,by,vx,vy,l,reach,ex,ey,x0,y0,x1,y1,dx,dy,a,c,found;
+  k=FactoryLine(f);
+  if( !k )
+    return FindNearestSprite(GETSPRITE_CLASS+B_ENGINE,GetX(f),GetY(f),48);
+  found=0;
+#ifdef PUSH_LINES
+  arr_gettype(temp_array,plan_type[i]);
+  n=0;
+  while( n<ARR_LENGTH && temp_array[n] )
+    n++;
+  bx=push_bx[k-1];
+  by=push_by[k-1];
+  vx=push_ex[k-1]-bx;
+  vy=push_ey[k-1]-by;
+  l=PlanRoot(vx*vx+vy*vy);
+  if( l<1 )
+    l=1;
+  reach=l+48*n;
+  ex=bx+vx*reach/l;
+  ey=by+vy*reach/l;
+  x0=bx;
+  x1=ex;
+  if( ex<bx )
+  {
+    x0=ex;
+    x1=bx;
+  }
+  y0=by;
+  y1=ey;
+  if( ey<by )
+  {
+    y0=ey;
+    y1=by;
+  }
+  for( u=FirstInBox(x0-EXIT_WIDE,y0-EXIT_WIDE,x1+EXIT_WIDE,y1+EXIT_WIDE+EXIT_HIGH); u; u=NextInBox() )
+    if( !found && GetVid(GetUnitVid(u),VID_CLASS)==B_ENGINE )
+      if( GetAnimation(u)<ANI_DEATH )
+      {
+        dx=GetX(u)-bx;
+        dy=GetY(u)-GetZ(u)-by;
+        a=(dx*vx+dy*vy)/l;
+        c=(dx*vy-dy*vx)/l;
+        if( a>=-EXIT_WIDE && a<=reach && c>=-EXIT_WIDE && c<=EXIT_WIDE )
+          found=u;
+      }
+#endif
+  return found;
+}
 PlanTry(int i,int t)
 {
-  int go,n,f;
+  int go,n,f,u;
+  string s;
   if( plan_times[i] && plan_done[i]>=plan_times[i] )
     return 0;
   if( plan_when[i]==3 && !plan_done[i] )   // a train of the map: it is the first wave
@@ -789,15 +905,27 @@ PlanTry(int i,int t)
     for( n=0; n<PLANS; n++ )   // one entry at a time in a factory
       if( plan_state[n]>=3 && plan_slot[n]==f )
         return 0;
-    if( FindNearestSprite(GETSPRITE_CLASS+B_ENGINE,GetX(f),GetY(f),250) )   // a train at its door or on its spur: the cars would join it
+    u=PlanExit(i,f);
+    if( u )   // a train on its exit: the cars would be deleted or join it (logged once, when the wait begins)
+    {
+      if( !plan_wait[i] )
+      {
+        plan_wait[i]=t+1;
+        Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i]+1)+" waits at "+itoa(t)+" s: a train on the factory's exit (VID "+itoa(GetUnitVid(u))+" army "+itoa(Action(u,act_getarmy,0,0))+" at "+itoa(GetX(u))+","+itoa(GetY(u)-GetZ(u))+")");
+      }
       return 0;
+    }
     plan_slot[i]=f;
     plan_base[i]=strlen(GetCommands(f));
     plan_next[i]=0;
     plan_state[i]=3;
     plan_lost[i]=0;
     MissionTypeCars(plan_type[i],0);
-    Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i]+1)+" ordered at "+itoa(t)+" s army "+itoa(plan_army[i])+" task "+itoa(plan_task[i])+" cars "+mission_cars);
+    s="";
+    if( plan_wait[i] )
+      s=" - it waited for its exit from "+itoa(plan_wait[i]-1)+" s";
+    plan_wait[i]=0;
+    Log("ARRIVAL F"+itoa(i+1)+" wave "+itoa(plan_done[i]+1)+" ordered at "+itoa(t)+" s army "+itoa(plan_army[i])+" task "+itoa(plan_task[i])+" cars "+mission_cars+s);
     return 1;
   }
   n=plan_queued;
@@ -873,9 +1001,7 @@ FactoryTact(int t)
 #define CAPTURE_HIGH 400
 int capture_b[64];
 // CaptureLine(b): the building's own line (its index + 1), 0 for none, by the shape the editor gives it.
-// A factory's begins at the dead end behind it - the editor looks for it within 40 px of a point 22 px
-// behind the middle, so within 75 px of the middle here (rail and ground heights apart too) - and goes
-// away from it: the nearest such begin. A repair point's follows the track each way from it until it has
+// A factory's is FactoryLine's (the plans above). A repair point's follows the track each way from it until it has
 // gone 120 px, so a rail more (up to about 87 px) may end it: it begins within 240 px, its chord (begin to
 // end) is at most 480 px and the building lies along the chord within 90 px of it - on a track that curves
 // within those 120-210 px (a radius of 250 px puts the building about 80 px off the chord), or on rails
@@ -885,6 +1011,8 @@ CaptureLine(int b)
 {
   int i,v,x,y,dx,dy,ex,ey,vx,vy,s,l,t,d,best,found;
   v=GetUnitVid(b);
+  if( v==102 )
+    return FactoryLine(b);
   x=GetX(b);
   y=GetY(b)-GetZ(b);
   found=0;
@@ -897,16 +1025,6 @@ CaptureLine(int b)
     if( dx>=-240 && dx<=240 && dy>=-240 && dy<=240 )
     {
       d=dx*dx+dy*dy;
-      if( v==102 && d<=5625 && d<best )
-      {
-        ex=x-push_ex[i];
-        ey=y-push_ey[i];
-        if( ex<-100 || ex>100 || ey<-100 || ey>100 || ex*ex+ey*ey>d )
-        {
-          best=d;
-          found=i+1;
-        }
-      }
       if( v==104 )
       {
         vx=push_ex[i]-push_bx[i];
