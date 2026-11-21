@@ -59,6 +59,14 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
   army 2 and 3 named the wrong armies, `BUGS.md` F29, GitHub issue #10), so the capture handler
   hands the dead gun sockets over with the building and the guns rebuilt there are the new owner's,
   not the pirates'.
+- Maps made in the editor: a train that another army takes - the player's locomotive coupled to the
+  wagons of an enemy train whose locomotive is gone, or a repair point taking towed wagons over - loses
+  the order the editor gave it (an AREA watch, hunt, guard, target, drive or patrol, the AI's post or
+  patrol, the patrol of an arrival or of a factory's plan on its way): the runner of the editor's
+  arrivals block logs `ORDER n task t: the train is now army a's - order dropped`, frees the AI's slot
+  that held it and gives it nothing more, so the player's train does only what the player orders. It
+  used to drive the player's train back to the order's place and at the order's "foes". A map gets the
+  new runner when it is saved again in the editor (editor-mission.md "A captured train loses its order").
 - The strategic map of the menu has a second page with the custom maps (every map folder of
   `maps\`, POLIGON first: "Map files") and the map editor entry (`game/maps/menu.lgc.patch`; "The custom
   maps page" above).

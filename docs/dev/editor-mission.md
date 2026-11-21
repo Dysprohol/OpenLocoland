@@ -478,6 +478,50 @@ turning 310 px away caused nothing in 70 s; with CHASES and the roles swapped (t
 1437,1375 at 100 s once the train was gone. In the editor: AREA... and a click on the grass set the area
 on 1550,930, the ring there and the dotted line from the train.
 
+**A captured train loses its order** (2026-11-21, the maintainer's report: trains that had a guard or patrol
+order in the editor kept it after the player captured them). How the player takes an enemy train is the
+engine's (the original's exploit, kept): its locomotive destroyed, the player's locomotive couples to its
+wagons (`Train_HandleContact`: both trains' commands are cleared, attacks on the wagons are called off,
+the script event `EnemyLinked` frees the AI's slot - the wagons stay the enemy's) and tows them; a repair
+point the player's train passes takes the towed wagons over (`Building_UpdateWorkshop`, army 0 from then
+on). The runner never looked at the army: an AREA, hunt or guard order (`OrderArea`) went on ordering the
+order's first car - and so the player's whole train - with `ACT_ATTACK` and `ACT_MOVE`, and chose its
+"foes" by the first car's army. Reproduced on a POLIGON copy (the enemy's 25,10,25 on the bottom line
+watching 500 px round its place; a test script destroyed its locomotive and other wagon at 8 s, made a
+locomotive of the player's 284 px west and gave it `ACT_LINK_ENGINE` to the wagon, then at 15 s the
+player's order to drive to 674,950 past the player's repair point): coupled at 12 s, driving west at 112
+px/s, then `ORDER 1 area: back to its place 1437,1375 at 22 s` turned the player's train round and `ORDER
+1 area: attacks VID 5 army 0 at 28 s` - its own locomotive - left it standing at 954,1375 with
+`COM_ENGINE_ATTACK` to the end of the run (113 s); the maintainer's SandStand log has the same lines
+(`back to its place 1913,172 at 891 s from 1384,300`, then `attacks VID 90 army 1` once the repair point
+had made the wagon his). Now the runner keeps, for each order, the army of its train when it is found
+(`order_army`, a new array the save writes as zeros like `order_unit`; a train built again gets its
+entry's army, `PlanReorder`), and once a second, for every order not yet done or watching (states 1-5,
+2 included: a drive, a patrol, the AI's post or patrol), `OrderKept` asks `MissionOwner` which army has
+the train now - that of a locomotive (VID 5, 10, 97) of another army in it, else the first car's own.
+When it is another army's, the order is dropped for good (`order_state` 6; taken back later, the train is
+not ordered again) and `MissionDrop` frees the AI's slot that holds the train (as `EnemyLinked` does) and
+takes back a drive, patrol or attack command it still has (`ACT_STOP`; the coupling has cleared it
+already, so in play it stops nothing). The log says it once: `ORDER n task t: the train is now army a's -
+order dropped at s s at x,y, its command c`. A patrol of an arrival or of a factory's plan still on its
+way to its first point (`ArrivalOnPoint`, `PlanOnPoint`) is dropped the same way (`ARRIVAL n: its train is
+now army a's - its patrol dropped`, `ARRIVAL Fn: ...`) instead of being given `PatrolEngine` there. Not
+touched: how a train is captured (the coupling, the repair point), a train the order keeps (its own army's
+locomotive, e.g. the AI's linker), and a train already patrolling between its points (the engine's
+`COM_ENGINE_PATROL` goes with the destroyed locomotive and the coupling: seen as command 0 after it). A
+`REBUILT` train of the map dropped before `PlanAdopt` took it is adopted all the same (state 6 counts),
+so its loss is seen and it is built again. Checked in play on the same POLIGON copy: dropped at 11 s
+(`its command 0`), the player's order taken at 15 s, the train drove through the repair point (the wagon
+army 0 at 28 s) and stood at its goal 674,939 to the end, no runner line after the drop; a runner patrol
+(-3) and an AI patrol (`ATA_PATROL0`) of the east line's 20,5,20 captured the same way - dropped at 23 s
+(command 0, the AI's slot already free), the player's drive taken, the trains the same as with the old
+runner apart from the drop's line; the orders not captured (the bottom line's AI patrol, the AREA train
+untouched) logged and moved as before. The maintainer's SandStand loaded in the editor, saved and run (Run
+the level), with the editor before and after the change: the script of the run's copy grew from 134088 to
+135834 bytes of code (the new runner, written at the save as before), and the 9 orders, the plans and the
+arrival logged the same lines at the same seconds for 90 s. A map gets the new runner when it is saved
+again in the editor; one not saved again keeps its old runner and the old behaviour.
+
 **The armies' fight rules** (2026-11-05, the same request: every side keeps its own ways by default and can
 be set otherwise). `factions.cpp` reads `#define FACTIONS_PEACEFUL <mask>` beside FACTIONS (bit n army n,
 4 - the neutrals - without it; only the neutrals' and pirates' bits count: ours and the enemy always fight

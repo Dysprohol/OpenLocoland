@@ -661,6 +661,8 @@ panelu Przyjazdy nie wybierzesz **PRZESTAW NA PRZYJAZDY**):
   strefę) albo **SCIGA** (za celem, aż zginie, potem na swoje miejsce). Zaznaczony pociąg pokazuje swoją
   strefę jako okrąg i kropkowaną linię od siebie do jej środka. Wrogi - według zasad mapy: neutralni nie
   zaczynają walki.
+- Pociąg, który przejmie inna strona (w grze: jego lokomotywa zniszczona, twoja lokomotywa sprzęga się
+  z jego wagonami), traci rozkaz na dobre - potem robi tylko to, co każe mu nowa strona.
 - **CEL: WSKAZ...** i kliknięcie jednostki albo budynku innej armii (fortyfikacja: jedno z jej dział) -
   pociąg atakuje go po starcie poziomu zamiast innego rozkazu; pociąg wroga przechodzi potem do swojego
   AI, pozostałe stają. **START: OD RAZU** albo **PO n S** wstrzymuje rozkaz do tego czasu; `-` `+` zmieniają go o 10 s,

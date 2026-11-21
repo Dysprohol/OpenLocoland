@@ -665,6 +665,8 @@ only, until **CONVERT TO ARRIVALS** in the Arrivals panel):
   240 px out of the area) or **CHASES** (after the target until it is gone, then back to its place).
   The selected train shows its area as a ring and a dotted line from the train to its middle. Hostile
   means by the map's rules: the neutrals start no fight.
+- A train that another side takes (in play: its locomotive destroyed, your locomotive couples to its
+  wagons) loses its order for good - it then does only what its new side tells it.
 - **TARGET: PICK...** and a click on a unit or building of another army (a fort: one of its guns) -
   the train attacks it when the level starts, in place of its other order; the enemy's train then goes
   to its AI, the others' stay. **STARTS: AT ONCE** or **AFTER n S** holds the order until then; `-` `+` change it by 10 s, with
