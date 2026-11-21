@@ -510,6 +510,9 @@ rules):
   bit set; new neutral units get it) or NEVER (clear: it does not answer either).
 - **The pirates fight every side**: their guns and trains fire at ours, the enemy and the neutrals,
   and everyone fires at them. A unit that becomes a pirate's gets the bit.
+- **For the player the pirates are an enemy**, whichever way they fight: black on the minimap, the
+  enemy's cursors over them (attack, far attack, out of reach) and a right click with a train attacks
+  them; their repair point repairs no one of ours (DEVELOPERS.md "The pirates for the player").
 - Checked in play (sandbox track, test maps of the `factions` branch): a neutral fort's missile tower
   beside the player's train fired nothing for 80 s, then the train was told to attack it - the
   towers answered at once, the train destroyed that one and the fort's other tower shot the train

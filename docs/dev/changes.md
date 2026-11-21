@@ -455,7 +455,13 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       0x449ff3) jumps to `may_target`, and the two `ACT_DAMAGE` calls of an explosion
       (`Object_Action` 15, 0x447e9c and 0x447eb0) first call `note_hit`: a neutral hit by an army,
       and every armed neutral that sees it, answer that army - and only it - to the end of the level,
-      and that army may fire at them; the pirates may fire at the neutrals. On any other map
+      and that army may fire at them; the pirates may fire at the neutrals. The player's mouse takes
+      the pirates as the enemy (`enemy_test` in place of the four `and eax,0xc00 / cmp eax,0x400` of
+      `Player_HandleMouse` 0x431914 and 0x431a17 and `Player_HandleInput` 0x4320b9 and 0x432120: the
+      attack cursor and order, no repairs at their repair point, their hidden objects not under the
+      cursor, no answer to a click) and the minimap draws them black (`minimap.cpp`, the loads of the
+      colour of armies 2 and 3 at 0x405bd9 and 0x405c08) - editor-mission.md "The pirates for the
+      player". On any other map
       `may_target` is the engine's test and nothing is noted, so the missions play as before,
   35. the red lights for chosen armies (`red_lights.cpp`, MAP_RULES.md 5): on a map whose script has
       `#define PASS_RED_LIGHTS <mask>` (bit n: army n; the editor writes it from any train's panel - every

@@ -694,8 +694,9 @@ the status line: in play such a train drives up to the line and stops.
 neutral gun, fort or train, it and the neutrals that see it answer that side only - to the end of the
 mission, and that side may fire at them then. The pirates (army 3) fight every side, and every side
 fights them. A neutral's or a pirate's panel changes that for its whole army: **IN A FIGHT: ANSWERS
-ATTACKERS** (the neutrals' way) or **ALL SIDES** (the pirates' way). The campaign's missions keep the
-game's old rules. A neutral factory becomes yours where the campaign's missions take theirs: when one of
+ATTACKERS** (the neutrals' way) or **ALL SIDES** (the pirates' way). For you the pirates are an enemy
+in both ways: black on the minimap, the attack cursor over them, and a right click with a train attacks
+them. The campaign's missions keep the game's old rules. A neutral factory becomes yours where the campaign's missions take theirs: when one of
 your trains comes to its light, at the end of its exit line where trains coming in stop - within about
 90 px of the light, so a train passing that near takes it too, as in the missions (or within about 100
 px of the building); a neutral repair point when your train enters its line or comes near it. Only your

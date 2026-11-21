@@ -493,6 +493,28 @@ neutral train guarding 400 px of the bottom line with the neutrals on ALL SIDES 
 train 337 px from its post at 2 s, followed it east and came back at 53 s (`factions: ... peaceful armies
 mask 0`); with the default it stayed on its post the whole run (mask 4).
 
+**The pirates for the player** (2026-11-21, the maintainer's decision): on a map with FACTIONS the pirates
+look and handle like an enemy. The minimap draws them black (`minimap.cpp`, at Minimap_Draw's two loads of
+the colour it gives armies 2 and 3 - yellow - for their trains, buildings and factories; what is drawn stays
+the engine's, so their other armed units are not shown, as for the neutrals). The player's mouse takes them
+as the enemy (`factions.cpp`, `enemy_test`): the engine's four tests of army 1 - Player_HandleMouse's attack
+test (an object of spriteType above 2: the attack cursor 5, far 6, out of reach 12, no ammo 1; the right
+click attacks, ACT 0x20) and its repair point test (the enemy's repair point is a target, not a place to be
+repaired at), Player_HandleInput's hidden objects (the enemy's mines are never under the cursor) and its
+click (ACT 9, the answer of a clicked unit, not sent to the enemy) - take army 3 too. The pirates that answer
+only whoever attacks them are attacked by the right click as well (the hit gives them their grudge), so they
+get the attack cursor too. The money crates of an editor map are army 3 but are never under the cursor (the
+engine's pick takes no crate) and the minimap does not draw them: nothing changes for them. The neutrals keep
+the engine's tests (their trains can be attacked by a right click, their buildings captured), and so does a
+map without FACTIONS - the campaign, where army 3 is the crates and the reinforcements' point locomotive.
+Checked on the rig on a POLIGON copy with our mortar train, a pirate train, the pirates' factory and repair
+point, the neutrals' factory and repair point and the enemy's fort: the minimap the old build's but for the
+pirates' 42 pixels, yellow to black; over a pirate the attack cursor (5 near, 6 far; the old build's move
+cursor 2, and over their repair point its repair cursor 4), and a right click made the pirate the train's
+goal (command 28, its hp falling) in both fight modes - the old build moved there (command 23); the enemy's
+towers and the neutrals' repair point (capture, 15) as before, and the same map without FACTIONS as before.
+Mission 17's crates: the same cursor (2), click (a move) and minimap dots in both builds.
+
 **What a row does, and click-and-hold** (2026-11-05; `editor_rows.cpp` `PanelRows::tip` / `hold_area`,
 `ContextRow.tip` and `LABEL_TIPS` of `editor_edit.cpp`, `ROW_TIPS` of `editor_arrivals.cpp` and
 `editor_factory.cpp`). The status line at the top names what the row under the mouse does - every row of an

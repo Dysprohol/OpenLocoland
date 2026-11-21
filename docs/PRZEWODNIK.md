@@ -690,8 +690,9 @@ wiersza ROZKAZY w wierszu stanu: w grze taki pociąg dojeżdża do linii i staje
 działo, fortyfikację albo pociąg, ono i neutralni, którzy to widzą, odpowiadają tylko tej stronie - do
 końca misji, a ona może wtedy strzelać do nich. Piraci (armia 3) walczą ze wszystkimi stronami, a
 wszyscy z nimi. Panel jednostki neutralnych albo piratów zmienia to dla całej jej armii: **W WALCE:
-ODPOWIADA NAPASTNIKOM** (zwyczaj neutralnych) albo **WSZYSCY** (zwyczaj piratów). Misje kampanii mają
-dawne zasady gry. Neutralną fabrykę przejmujesz tam, gdzie przejmują ją misje kampanii: gdy twój pociąg
+ODPOWIADA NAPASTNIKOM** (zwyczaj neutralnych) albo **WSZYSCY** (zwyczaj piratów). Dla ciebie piraci
+są wrogiem w obu przypadkach: czarni na minimapie, nad nimi kursor ataku, a prawy klik z pociągiem ich
+atakuje. Misje kampanii mają dawne zasady gry. Neutralną fabrykę przejmujesz tam, gdzie przejmują ją misje kampanii: gdy twój pociąg
 dojedzie do jej świateł, na końcu jej linii wyjazdowej, gdzie zatrzymują się wjeżdżające pociągi - na
 mniej więcej 90 px od nich, więc przejmuje ją też pociąg przejeżdżający tak blisko, jak w misjach (albo
 na mniej więcej 100 px od budynku); neutralny punkt naprawczy - gdy twój pociąg wjedzie na jego linię

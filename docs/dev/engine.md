@@ -577,7 +577,15 @@ the panel to the train or to the factory build list. `Player_CanSelect` lets onl
 ("CanSelectEnemy" on screen) - objects of other armies. The flagman is saved in the PLAY record
 (`Player_Save`/`Player_Load`). The object under the cursor is `Player+0x24`
 (`World_GetSelectedUnit`, picked every frame by `Player_HandleInput`), its name for the tooltip
-comes from `Player_GetUnitName` (section `[Units]` of `strings.ini`).
+comes from `Player_GetUnitName` (section `[Units]` of `strings.ini`; the same for every army). With a
+train as the flagman, `Player_HandleMouse` picks the cursor (`Cursor_SetCursor`, the types of
+`g_cursorNames`) and the right click's order by that object and its army: an object of the enemy (army 1)
+or a neutral train, of spriteType above 2, gets the attack cursor (5, far 6, out of reach 12, no ammo 1, an
+unarmed train's clash 3) and is attacked (ACT 0x20 / 0x97); a repair point not of the enemy repairs (4); a
+building or factory of the neutrals, or a fort or mine (VID 162, 165) of any army with no cannon or rocket
+tower within 150 px, gets the capture cursor (15, the click a move there; `Object_HasTowerNearby`); the rest
+of the map is a move (2). The enemy's hidden objects (its mines) are never under the cursor. On an editor
+map LocoFix takes the pirates as the enemy in these tests (editor-mission.md "The pirates for the player").
 
 **The state bar** is a row of objects on layer 2000, created by `Player_ShowStateBar` (vtable slot 7)
 and hidden by `Player_HideStateBar` (slot 8). The order in which they are created fixes what each one
@@ -601,7 +609,10 @@ frame `Player_UpdateStateBar` takes the rectangle inside the frame (`Minimap_Pla
 `Minimap_Draw` writes into the locked back buffer every rail point as one pixel (`Minimap_PutPoint`,
 grey), in editor mode the terrain objects too, the units as 2 x 2 dots (`Minimap_PutDot`) and the
 buildings and factories as 4 x 4 (`Minimap_PutBigDot`), each scaled by `mapWidth` / `mapHeight`
-into the rectangle, and brightens the view (`Graphics_BrightenRect`, a Direct3D quad that
+into the rectangle - by army: ours (trains, armed units, buildings, factories; planes and balloons in a
+colour of their own) green, the enemy's the same kinds red, armies 2 and 3 only their trains, buildings and
+factories, yellow (the money crates, army 3 in the campaign, are not drawn; on an editor map LocoFix draws
+army 3, the pirates, black: editor-mission.md "The pirates for the player"), and brightens the view (`Graphics_BrightenRect`, a Direct3D quad that
 multiplies the screen by 1.8: the rails in it turn white). The menu item under the cursor being VID
 464 (`MenuNVidUnderCursor`) makes a left click move the camera there (`Minimap_Click`,
 `SetPosition` mode 2; holding the button and dragging does not scroll, in the original either), a right click an order to that
