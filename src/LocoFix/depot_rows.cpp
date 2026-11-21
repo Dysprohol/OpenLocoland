@@ -38,6 +38,7 @@ void interface_copy_colours(int scale);
 uint8_t* interface_vid(int nvid, int scale);
 void* zoom_view_layout_begin();                 // zoom_view.cpp: the window's layout under a zoom
 void zoom_view_layout_end(void* token);
+void factory_log_panel(int step);               // factory_log.cpp
 
 #include <cstdio>
 
@@ -296,7 +297,9 @@ void __fastcall handle_panel_action(void* player, void* edx, int object, int* in
             if (army != 3) return;   // empty slot or the depot cannot build it
         }
     }
+    factory_log_panel(1);   // a build asked for meanwhile is the panel's (factory_log.cpp)
     g_handle_panel_action(player, edx, object, index);
+    factory_log_panel(-1);
 }
 
 }  // namespace

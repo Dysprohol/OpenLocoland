@@ -32,6 +32,7 @@ void install_depth_blits();
 void install_light_fill();
 void install_mouse_coords();
 void install_depot_rows();
+void install_factory_log();
 void install_status_bar();
 void install_minimap();
 void install_rain();
@@ -158,6 +159,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         install_light_fill();
         install_mouse_coords();
         install_depot_rows();
+        install_factory_log();
         install_status_bar();
         install_minimap();
         install_rain();

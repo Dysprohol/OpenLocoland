@@ -542,7 +542,12 @@ enemy wagons brought by a locomotive of another army.
 car appears at the factory (objects in the way are deleted), gets the factory's train number and
 flag 0x1; the cars of one queue form a train that is pushed out along the factory's push line.
 When it leaves the line the cars lose flag 0x1, the locomotives are registered with the player
-and the last car of the queue sends TrainCreated.
+and the last car of the queue sends TrainCreated. Every VID a factory queues (`Depo_AddToQueue`,
+called only by `Depo_Action` for ACT_BUILD_UNIT: the player's panel calls it at once from
+`Player_HandlePanelAction`, a script's `AddCommand` / `Action` through the factory's commands),
+refuses, replaces (`Depo_ReplaceInQueue`, the panel) and releases (`Depo_ReleaseUnit`) is written
+to `LocoFix.log` by `factory_log.cpp` (changes.md 62), e.g. `factory: army 1 at 643,1100 queued VID
+35 (queue 1/10) at 10 s - a command`.
 
 **The balloon** (B_BALLOON, `Balloon_*` 0x401000-0x401920, struct `Balloon`) is the airship an
 airship cart carries - the cart is an `Engine` (VID 35) whose `vid->link` is the balloon's VID.

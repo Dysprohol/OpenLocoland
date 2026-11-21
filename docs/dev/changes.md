@@ -734,6 +734,17 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       the pixel both ways with the Select tool, the Menu and Help panels, a help page, the Track tool's rows and the
       Factory and Repair point tools' previews (where a part blinks or a status line changes by itself between two
       shots, the same part differs between two shots of the same way),
+  62. every factory's builds in `LocoFix.log` (`factory_log.cpp`, engine.md "Factories"): `Depo_AddToQueue`
+      (0x404dd0), `Depo_ReplaceInQueue` (0x404fd0) and `Depo_ReleaseUnit` (0x405290) are hooked only to log, one
+      line per unit queued, refused, replaced, released or not released - `factory: army 1 at 643,1100 queued
+      VID 35 (queue 1/10) at 10 s - a command`, `factory: army 0 at 319,1035 queued VID 5 (queue 1/10) at 15 s -
+      the player's panel`, `factory: army 1 at 643,1100 released VID 35 (queue 0/10) at 46 s` -, so a log shows
+      who built what; nothing the engine does changes. "the player's panel" is a build asked for while
+      `Player_HandlePanelAction` runs (a click or a hotkey there), "a command" any other (a script's AI, the
+      editor's runner, a mission). A refusal or a failed release that repeats within 5 s is logged once.
+      Checked in the test rig: POLIGON's player factory with F1 twice (two lines "the player's panel", the
+      release 34 s later), an editor map's enemy plan (35, 5, 35, then 90, each queued as the one before was
+      released, "a command"), mission 18's enemy AI (80, 5, 80 from 1 s); the 20 missions pass,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
