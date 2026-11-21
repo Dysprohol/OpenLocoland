@@ -458,8 +458,8 @@ post) and went back to the post each time it left (19, 49, 77 s); with CHASES it
 GUARD and clashed with it). GUARD (-7) goes to the point and holds it; AREA (-5) does not move: the area
 (`order_radius` round `order_to`) can be anywhere - in the editor a click off the track takes the ground
 point under it (`map_point`), near a track the rail point as before - and the train watches it from its
-own place, where it stands when it gets the order (after a pushing line, or where a rebuilt train is
-made): `order_home_x/y`, two arrays of the runner the save writes (zeros, filled by `OrderTry`; the hunt's
+own place, where it stands when it first gets the order (after a pushing line; a train built again
+drives back to the lost one's place, "Rebuilt when lost"): `order_home_x/y`, two arrays of the runner the save writes (zeros, filled by `OrderTry`; the hunt's
 place is its start, the guard's its point). Once a second `OrderArea` takes the nearest hostile train
 within the radius + 120 px of the area's centre - one coming near is taken before it is in - and lets it go
 at the radius + 240 px (RETURNS; the second margin so that it does not turn back and forth at the edge),
@@ -851,7 +851,21 @@ as one more plan entry of `plan_when` 3 (`WHEN_LOST_TRAIN`, never in the panel's
 its order's number: `PlanAdopt` takes the train `OrdersFind` found as the entry's first wave, and a lost one
 is built again with the same cars and order - the enemy's through the AI's queue as any enemy entry, the
 others' car by car in the factory of its army nearest to the train at the save (`rebuild_factory`), driving
-to where the lost one stood when it patrolled. Read back, such an entry gives its order its REBUILT value
+to where the lost one stood when it patrolled. `PlanAdopt` takes the map's train once its order has been
+given (`order_state` 2 and up: a drive, a patrol or the AI's task 2, a target 3, an AREA watch, hunt or guard
+4 and 5) or once the train is lost or dropped (2, 6: another army took it - lost); until 2026-11-21 it took
+only states 2 and 6, and a train with an AREA watch, a hunt or a guard is in 4 or 5 for as long as it lives,
+so such a train was never adopted: its loss was not watched and it was never built again. A train built
+again for one of those orders first drives to the lost one's own place (`order_home`, which `OrderTry` fills
+only while it is 0, so the first train's place stays) and watches, hunts or guards from there: `ORDER n task
+t train 1 watches x,y radius r chase c from its place x,y (built again at x,y, drives there)`. Checked in play on POLIGON copies saved by the editor (each train's every car destroyed by a
+test script at 20 s, REBUILT ONCE 10 s): the enemy's 25,10,25 watching 500 px from 1437,1375 - with the old
+runner adopted only when it was lost (`watched: 0`) and never built again in 280 s; with the new one adopted
+at 0 s, lost at 20 s, queued at 30 s, built at 167 s in the enemy factory and back on 1423,1375 at 230 s,
+watching; a neutral 20,5,20 guarding 1810,1000 (the player's factory made the neutrals') and the same train
+hunting from 1810,1128 - the old runner never again, the new one ordered at 30 s, built at 134 s, at its
+point 1810,1005 and its place 1802,1080 at 170-175 s; the enemy's drive (state 2) the same with both runners
+(lost 20 s, built 167 s, at its goal 1139,1375 from 225 s). Read back, such an entry gives its order its REBUILT value
 (`read_orders`) and is left out of the factory's plan. The train built again gets the IT FIRES of the one it replaces (since v0.2.12, GitHub issue #13): `PlanAdopt` keeps whether a car of the map's train fires on its own (`plan_fires`, behave bit 1, `PlanFires`), and `PlanMade` sets or clears the bit on every car of the new one (`PlanFire`) - a factory gives its army's usual one, so a pirate train set to ONLY WHEN TOLD came back firing on its own. Checked on a POLIGON copy (a pirate train 10,20 with its gun ONLY WHEN TOLD, REBUILT ONCE 5 s, the pirates' factory; its locomotive destroyed at 15 s): the old runner's new gun had behave 1, the new runner's 0. The player's factory and trains are the player's:
 none of it is offered for army 0. A pirate train needed a locomotive 10: a VID 5 of army 3 is the authors'
 reinforcement marker, which `ReinforcementInit` takes away at the start (seen: `ORDER 1 ... train 0`) - since

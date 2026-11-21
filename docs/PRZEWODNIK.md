@@ -670,7 +670,8 @@ panelu Przyjazdy nie wybierzesz **PRZESTAW NA PRZYJAZDY**):
 - **ODBUDOWA: NIE / RAZ / 3 RAZY / ZAWSZE** i **ODBUDOWA ZA** (sekundy po stracie), dla pociągu wroga,
   neutralnych albo piratów z rozkazem: gdy jego lokomotywa zostanie zniszczona albo przejęta, AI wroga
   (w pierwszej wolnej fabryce) albo najbliższa fabryka jego armii buduje ten sam pociąg i daje mu ten
-  sam rozkaz. Nie dla twoich pociągów. Pociąg piratów potrzebuje lokomotywy 10: piracką lokomotywę 5
+  sam rozkaz (pociąg, który pilnował obszaru, polował albo strzegł punktu, najpierw wraca tam, gdzie stał
+  stracony). Nie dla twoich pociągów. Pociąg piratów potrzebuje lokomotywy 10: piracką lokomotywę 5
   skrypty zabierają na starcie (oznacza posiłki).
 - **NA CZERWONYM: STAJE** (jak każdy pociąg) albo **JEDZIE** - wtedy każdy pociąg tej armii może jechać
   linią jednokierunkową pod prąd, tam gdzie twoje pociągi i pociągi wroga są zatrzymywane (wyjazd z

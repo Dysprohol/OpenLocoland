@@ -67,6 +67,12 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
   that held it and gives it nothing more, so the player's train does only what the player orders. It
   used to drive the player's train back to the order's place and at the order's "foes". A map gets the
   new runner when it is saved again in the editor (editor-mission.md "A captured train loses its order").
+- Maps made in the editor: a train of the map with an AREA watch, a hunt or a guard and REBUILT WHEN LOST
+  is built again when it is lost, as a train with a drive or a patrol always was; the runner never took
+  such a train as its plan entry's first train (it looked only for an order in the state of a drive or a
+  patrol), so its loss went unseen. The train built again goes back to the lost one's place and watches,
+  hunts or guards from there. A map gets the new runner when it is saved again in the editor
+  (editor-mission.md "Rebuilt when lost").
 - The strategic map of the menu has a second page with the custom maps (every map folder of
   `maps\`, POLIGON first: "Map files") and the map editor entry (`game/maps/menu.lgc.patch`; "The custom
   maps page" above).

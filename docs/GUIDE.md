@@ -674,7 +674,8 @@ only, until **CONVERT TO ARRIVALS** in the Arrivals panel):
 - **REBUILT: NO / ONCE / 3 TIMES / ALWAYS** and **REBUILT IN** (seconds after the loss), for an enemy,
   neutral or pirate train with an order: when its locomotive is destroyed or taken, the enemy's AI (in
   its first free factory) or the nearest factory of its army builds the same train again and gives it
-  the same order. Not for your own trains. A pirate train needs the locomotive 10: the scripts take a
+  the same order (a train that watched an area, hunted or guarded first goes back to where the lost one
+  stood). Not for your own trains. A pirate train needs the locomotive 10: the scripts take a
   pirate locomotive 5 away at the start (it marks the reinforcement).
 - **AT RED LIGHTS: STOPS** (as every train) or **DRIVES ON** - then every train of that army may run
   along a one-way line against its arrow, where your and the enemy's trains are held (the level's exit
