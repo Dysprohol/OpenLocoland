@@ -28,6 +28,21 @@
 //    NEVER) never fires on its own.
 // A map without FACTIONS runs the original test exactly (may_target's last lines) and records no
 // grudges.
+//
+// The player's mouse. Player_HandleMouse picks the cursor and the right click's order by the army of
+// the object under the cursor: an object of the enemy (army 1) - or a train of the neutrals - of
+// spriteType above 2 (not the crates and decorations) gets the attack cursor (5, far 6, out of
+// reach 12, no ammo 1, an unarmed train's clash 3) and the right click attacks it (ACT 0x20, the
+// clash 0x97); a repair point (VID 104) of any army but the enemy's is a place to be repaired at
+// (cursor 4, a move there). Player_HandleInput does not take a hidden object of the enemy (VID flag
+// 0x20000: the mines) as the one under the cursor, and a click on an object of the enemy does not
+// send it ACT 9 (the click it answers). The four tests are `and eax,0xc00 / cmp eax,0x400`; on a map
+// with FACTIONS army 3 - the pirates, who fight every side - passes them as the enemy
+// (enemy_test), so the player sees and handles the pirates as an enemy: the same cursors and
+// orders, the attack cursor exactly where the right click attacks. The pirates that answer only
+// whoever attacks them (FACTIONS_PEACEFUL) are attacked by a right click as well (the hit gives
+// them the grudge above), so they get the attack cursor too. The neutrals and every army of a map
+// without FACTIONS keep the engine's tests.
 #include "patch.h"
 
 #include <cstdint>
@@ -198,6 +213,30 @@ __declspec(naked) void hit_whole() {
     }
 }
 
+// The player's tests of the enemy, `and eax,0xc00 / cmp eax,0x400` (eax the object's flags): the same
+// flags for the jumps after it, with the pirates of a FACTIONS map as the enemy. eax is the army's
+// bits after it, as there (0x400 for the pirates; only the tests use it).
+constexpr uintptr_t ENEMY_TESTS[] = {
+    0x431914,   // Player_HandleMouse: a repair point not of the enemy repairs
+    0x431a17,   // Player_HandleMouse: the enemy's object, or the neutrals' train, is attacked
+    0x4320b9,   // Player_HandleInput: the enemy's hidden object is not under the cursor
+    0x432120,   // Player_HandleInput: a click on the enemy's object does not send it ACT 9
+};
+
+__declspec(naked) void enemy_test() {
+    __asm {
+        and eax, 0xc00
+        cmp eax, 0xc00
+        jne compare
+        cmp byte ptr [g_on], 0
+        je compare
+        mov eax, 0x400
+    compare:
+        cmp eax, 0x400
+        ret
+    }
+}
+
 // The value of `#define FACTIONS_PEACEFUL <n>` of the map's script, `fallback` without it.
 unsigned script_peaceful(const char* map, unsigned fallback) {
     std::string path = map ? map : "";
@@ -265,4 +304,13 @@ void install_factions() {
     patch::write_call(ARMY_TEST, nullptr, 0, reinterpret_cast<void*>(&army_test), 5, true);   // the rest is never reached
     patch::write_call(HIT_RADIUS, nullptr, 0, reinterpret_cast<void*>(&hit_radius), sizeof radius, false);
     patch::write_call(HIT_WHOLE, nullptr, 0, reinterpret_cast<void*>(&hit_whole), sizeof whole, false);
+
+    // and eax,0xc00 / cmp eax,0x400
+    const uint8_t enemy[] = {0x25, 0x00, 0x0C, 0x00, 0x00, 0x3D, 0x00, 0x04, 0x00, 0x00};
+    for (uintptr_t a : ENEMY_TESTS)
+        if (!patch::check(a, enemy, sizeof enemy)) {
+            patch::log("skipped the pirates as the player's enemy: unexpected bytes at %08X", static_cast<unsigned>(a));
+            return;
+        }
+    for (uintptr_t a : ENEMY_TESTS) patch::write_call(a, nullptr, 0, reinterpret_cast<void*>(&enemy_test), sizeof enemy, false);
 }

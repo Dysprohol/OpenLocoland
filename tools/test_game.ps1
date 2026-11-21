@@ -13,7 +13,8 @@
 #           d<x>:<y>-<x>:<y> drag with the middle button, s<x>:<y>:<n> turn the mouse
 #           wheel by n notches there (> 0 up), w - print the engine's mouse
 #           state (position, buttons, camera, menu item under the cursor) and the state bar
-#           (panel, objects, depot list icons, the depot's queue), t - print the tooltip
+#           (panel, objects, depot list icons, the depot's queue), the cursor's type, the object
+#           under the cursor and the flagman's goal and command, t - print the tooltip
 #           under the cursor (to check that a hover hit the wanted menu item); after @ the
 #           seconds to wait, e.g. "k371:489@5,13@20"; "@30?<regex>" waits up to 30 s until
 #           the game's logs match the regex instead (e.g. a mission's map and script
@@ -459,6 +460,14 @@ if ($Steps) {
       "Bar objects: " + ($some -join " ")
       $fm = if ($flagman -ne 0) { "{0}@{1},{2}" -f [W]::Rd($p.Id, [long][W]::Rd($p.Id, $flagman + 0x1c) + 4), [int](& $g $flagman 0x30), [int](& $g $flagman 0x34) } else { "-" }
       "Bar: panel={0} objects={1} icon80={2} icon102={3} queue={4} flagman={5}" -f (([W]::Rd($p.Id, $player + 0x2c)) -band 0xffef), $count, (& $pos 80), (& $pos 102), $queue, $fm
+      # the cursor's type (g_cursor 0x4a9d44, its animation +0x48: the type of Cursor_SetCursor, the names in
+      # g_cursorNames), the object under the cursor (Player+0x24) as VID/army/hp, and the flagman's goal (+0x3c) and
+      # command (flags bits 2-6)
+      $obj = { param($o) if ($o -ne 0) { "{0}/{1}/{2}@{3},{4}" -f [W]::Rd($p.Id, [long][W]::Rd($p.Id, $o + 0x1c) + 4), ((([W]::Rd($p.Id, $o + 0x28)) -shr 10) -band 3), [W]::Rd($p.Id, $o + 0x54), [int](& $g $o 0x30), [int](& $g $o 0x34) } else { "-" } }
+      $under = [long][W]::Rd($p.Id, $player + 0x24)
+      $goal = if ($flagman -ne 0) { & $obj ([long][W]::Rd($p.Id, $flagman + 0x3c)) } else { "-" }
+      $command = if ($flagman -ne 0) { (([W]::Rd($p.Id, $flagman + 0x28)) -shr 2) -band 0x1f } else { "-" }
+      "Cursor: type={0} under={1} flagman goal={2} command={3}" -f [W]::Rd($p.Id, [long][W]::Rd($p.Id, 0x4a9d44) + 0x48), (& $obj $under), $goal, $command
     } elseif ($vk -eq 't') {
       # the tooltip under the virtual cursor: MouseTip_Update 0x4257f0 keeps the current
       # tip text in the String at 0x4a9d58, so a test can check that a hover hit the
