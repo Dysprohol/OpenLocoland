@@ -765,6 +765,17 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       only a-z, so a name's letters with marks stayed small - Czech "LáVOVý šTěRK (VID 294)", a Russian name in
       small Cyrillic letters; now "LÁVOVÝ ŠTĚRK (VID 294)". Checked in the test rig with the Czech, Russian,
       Polish and English packs; the 20 missions pass,
+  65. the player's sound and music volumes in a game that does not start at the main menu
+      (`sound_volumes.cpp`, `BUGS.md` F33, editor.md "Starting it and going back"): only the main menu's
+      script sets the volumes saved in the Players key, so the editor, Run the level, a map played from the
+      editor and the editor after the way back played everything at full volume until a volume was touched
+      on the settings page. Before the first level of any game loads, LocoFix reads `sound` and `music`
+      and sets them as the menu does (a missing value 29, one outside 0-29 14, the volume `v * 100 / 29`,
+      through `SetSoundVolume` and `SetMusicVolume`); a game that starts at the menu gets the same values
+      from it again, so nothing changes there. `LocoFix.log` says the volumes before every level load.
+      Checked in the test rig, old and new LocoFix, sound 11 and music 20 saved (37 and 68): every editor
+      path and the way back at 100 before, at 37 and 68 now; mission 1 from the main menu 37 and 68 both
+      ways; the 20 missions pass.
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that

@@ -166,6 +166,17 @@ is unknown ("Unknown extern" in the log) and the entry does nothing. Checked thr
 in the editor; File > Back to the menu -> the main menu) and from a script (a mission calling
 `StartEditorMode` -> the editor on the sandbox; edits, File > Save, File > Play the map -> the
 saved map playing with its interface).
+None of these games passes through the main menu, and the main menu's script is the only place
+that sets the player's sound and music volumes (the Players key's `sound` and `music`, `BUGS.md`
+F33): the editor, its Run the level and every map loaded in it, a map played from it and the editor
+after the way back played at full volume until the player touched a volume on the settings page (two
+players' reports on v0.2.13-beta.2). LocoFix now sets both the menu's way before the first level of
+any game loads (`sound_volumes.cpp`); `LocoFix.log` says the engine's volumes before every level
+load ("sound volumes at the load of ..."). Checked in the test rig with sound 11 and music 20 saved (the
+engine's 37 and 68), old and new LocoFix: the editor on the template, Run the level and back, mission 1
+loaded, Ctrl+R and back - old 100 and the music "not set" (100) at every load, new 37 and 68; Play the map
+of mission 1 and, in the played game, the Esc menu's BACK TO THE EDITOR - the played game and the editor
+after it old 100, new 37 and 68; mission 1 started from the main menu - 37 and 68 with both.
 
 **Back to the editor** (`restart.cpp`, `game/maps/script/menutact.lgc.patch`). A map played from
 the editor (Play the map: `--return-editor`) also has a way straight back: the Esc menu's exit page
