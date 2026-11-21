@@ -46,7 +46,10 @@ page (`language.ini`), and the menus, file dialogs and message boxes are the W f
 (`ui_modify_menu`, `ui_message_box` ...), so every pack's letters show whatever the system's code
 page; `UiText`
 keeps a key with its English text for a reason found now and shown later (why a factory cannot go
-there, why a rail does not fit). In a value `\n` is a new line and `\t` a tab, and a value
+there, why a rail does not fit). `ui_upper` puts a pack's text in capitals in the pack's code page,
+the letters with marks too (an object panel's title, the custom maps page's texts) - `std::toupper` knows
+only a-z, and the title read "LáVOVý šTěRK" in Czech; a title the script and the map's files keep in
+ASCII (`ascii_upper`, the custom maps' `clean_title`) is made otherwise. In a value `\n` is a new line and `\t` a tab, and a value
 starting or ending with a space is quoted. The lookup calls the game's own import of
 `GetPrivateProfileStringA`, which `language.cpp` points at `lang\<code>\strings.ini`, with the
 game folder's `strings.ini` (the String at 0x4a9d34 that the game uses is not a plain pointer

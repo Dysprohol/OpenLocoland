@@ -760,6 +760,11 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       name (`script: object 0x... (VID n at x,y) was deleted while variable fruit held it - it reads 0 now`,
       the first 20 objects of a run). What a script sees changes only there: such a variable reads 0 instead
       of freed memory, as a unit's always did,
+  64. the title of the editor's object panel in capitals in the pack's code page (`ui_upper`, editor-ui.md
+      "The texts of the editor"): the title was made capitals byte by byte with `std::toupper`, which changes
+      only a-z, so a name's letters with marks stayed small - Czech "LáVOVý šTěRK (VID 294)", a Russian name in
+      small Cyrillic letters; now "LÁVOVÝ ŠTĚRK (VID 294)". Checked in the test rig with the Czech, Russian,
+      Polish and English packs; the 20 missions pass,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
