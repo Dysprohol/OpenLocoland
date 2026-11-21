@@ -44,6 +44,7 @@ void factions_level_loading(const char* map);  // factions.cpp
 void red_lights_level_loading(const char* map);  // red_lights.cpp
 const char* custom_maps_level_guard(const char* map);   // custom_maps.cpp: a map that is not there - the menu
 void zoom_after_frame();   // zoom.cpp: the wheel's zoom changes the screen between two frames
+void sound_volumes_level_loading(const char* map);   // sound_volumes.cpp
 
 namespace {
 
@@ -172,6 +173,7 @@ int __fastcall LevelLoad_measured(void* world, void* edx, const char* name) {
     factions_level_loading(map);
     red_lights_level_loading(map);
     editor_level_loading(world);
+    sound_volumes_level_loading(map);
     const int result = g_level_load(world, edx, map);
     test_map_check(world);
     editor_level_loaded(world);
