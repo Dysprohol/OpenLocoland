@@ -81,7 +81,7 @@ Paragraphs: Locks under dgVoodoo; Lost surfaces; The fog buffer; The rain; The l
 
 Sections: "Editor mode".
 
-Paragraphs: The level is held; The menu; Saving; Starting it and going back; Back to the editor; Hints under the cursor; Music while editing; The map the editor starts on; A level change resets the editor.
+Paragraphs: The level is held; The menu; Saving; Starting it and going back; Back to the editor; Hints under the cursor; Music while editing; The map the editor starts on; Scratch folders of one game; A level change resets the editor.
 
 ### [editor-objects.md](docs/dev/editor-objects.md) (~22 KB)
 

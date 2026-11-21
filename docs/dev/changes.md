@@ -301,7 +301,9 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       never renamed to `tmp_del!.map` (in the current directory, and left there when the
       save failed), another spelling of its name no longer truncates it before its OBJ chunk
       is copied, and a failed save keeps the old file; a level whose VIDs come from a map file
-      that is gone is not saved; the ground the engine makes itself does not make it copy OBJ;
+      that is gone is not saved (but the editor's Run the level copy held again, whose OBJ is
+      taken from the map it was written from - "Saving" in `editor.md`); the ground the engine
+      makes itself does not make it copy OBJ;
       `ResFile_CopyChunk` is rewritten to copy record by record (it appended 16 bytes of the
       next chunk to the OBJ record on every save); and HEAD gets the time 0 instead of the
       game time, so a map saved twice gives the same file,

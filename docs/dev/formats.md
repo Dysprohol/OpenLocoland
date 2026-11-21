@@ -450,7 +450,7 @@ into `maps\menu.map` after a run of the sandbox (the flag 2 read from the regist
 `<folder>.map` - with its script `<folder>.lgc`, its texts, `brief.lst` and, with a picture of its
 own, `<folder>.vid`; nothing else makes it one. The page lists every such folder, however it came
 (saved in the editor, imported, copied in by hand, renamed in Explorer), but the campaign's `lNN`,
-`script`, `outro`, the template and the editor's scratch (`_new*`, `_run`, a folder marked with
+`script`, `outro`, the template and the editor's scratch (`_new*`, `_run` and `_run2` ..., a folder marked with
 `editor_new.txt`): the menu's script calls LocoFix's `ListCustomMaps()` (extern 204, free in
 `export.lgc`) in `ReadCustomList`, which writes `maps\custom.lst` anew when it changed - POLIGON
 first, then the maps in the order the list had them, then the new ones by name; a folder is written
@@ -497,7 +497,7 @@ The names (`map_name_problem`, the one rule for File > New, the save dialog, Ren
 64 characters (the paths stay far below MAX_PATH), printable ASCII (the script and the list keep the
 name as bytes, which another code page reads as other letters), none of Windows' `\ / : * ? " < > |`,
 no space at either end and no dot at the end, not a device name (CON, NUL, COM1 ...), not a folder of
-the game (`lNN`, `script`, `outro`, `sandbox`, `template`, `_new...`, `_run`). Capitals, spaces,
+the game (`lNN`, `script`, `outro`, `sandbox`, `template`, `_new...`, `_run`, `_run2` ...). Capitals, spaces,
 dots and signs are fine: a folder with a space was checked in the engine (its script, texts,
 briefing and the page). Before, a name was small letters, digits and `_`, at most 24 - none of it
 needed. Every map the editor saves is `maps\<name>\<name>.map`, whatever folder the save dialog was

@@ -51,7 +51,7 @@ Options (0xFFFF) never had a popup. In editor mode LocoFix handles them in a win
 front of the game's:
 
 - File > Load... (Alt+F3): a Windows open dialog in `maps\` with no name proposed (a map of the
-  scratch folders `maps\_new*\` and `maps\_run\` is refused with "This is the editor's scratch
+  scratch folders `maps\_new*\` and `maps\_run\` (`_run2` ...) is refused with "This is the editor's scratch
   folder - choose a map in another folder.", `ScratchFolder`); the map is
   then loaded the way script `Load()` does it (`World.nextLevelFile` and flags 0x40, loaded by
   `Game_Step`) and held,
@@ -136,7 +136,13 @@ rectangles - it offers to clear them and try again (`SaveDropHistory`). A file t
 (in use, read-only, a disk full) is said in a box too (`SaveNotWritten`); before, a picture that
 could not be written was only logged. Run the level writes its
 copy (`maps\_run\`) the same way; File > Map size writes the resized map and its new picture as
-`.saving` files and puts them in place the same way (`resize_map_file`).
+`.saving` files and puts them in place the same way (`resize_map_file`). After Run the level the
+level held is the copy, so a save takes OBJ from the copy's file; when that file is gone (removed
+by hand, or by another game as v0.2.13-beta.1 let it - "Scratch folders of one game" below), the
+map the copy was written from stands in for it (`editor_obj_source`; its OBJ is the copy's: the copy
+took it from there, and a painted ground is written and pointed at by the save itself), so the save
+works; before, it stopped with "The map was not saved: the map file it was loaded from is missing."
+(a player's report on v0.2.13-beta.1). Any other level whose map file is gone is still not saved.
 
 **Starting it and going back** (`src/LocoFix/restart.cpp`). The mode is fixed for a run, so the
 menu starts the editor by starting the game again: "EDYTOR MAP" on the custom maps page calls
@@ -208,7 +214,8 @@ map and loads it again running, never asking and saving nothing: the map - the p
 campaign map, POLIGON or the template, the start's new map without a name - is written with its script
 (its editor blocks anew; a script without them as it is), ground and texts into a hidden copy,
 `maps\_run\` (marked as `maps\_new\` is, written for every run, removed when the editor leaves the map
-and swept at the next start), which runs; only a campaign map, POLIGON or the template without edits
+and swept at the next start; the game's own - `_run2` ... while another game running from the same
+folder has `_run`, "Scratch folders of one game" below), which runs; only a campaign map, POLIGON or the template without edits
 runs from its own file, which is not written either. Until v0.2.9 a map of the player's own was written
 in place, as a save writes it - the button says NO SAVE, and a quick test of an edit the player did not
 want kept saved it all the same; since, its files (`.map`, `.lgc`, `.vid`, the texts) are not touched by a
@@ -350,13 +357,42 @@ Exit, the window closed ("the new map maps\_new left unsaved - removed" in `Loco
 and Export ask for the name first, as a save does, so the played game never runs from the scratch
 folder (the next start's sweep could remove it under that game) and a package never holds it; a marked
 folder left behind (the game was ended) is removed at the next start of the editor, but the folder of
-the map it opens. The template stays as it was: it can be loaded, and every new map takes its script and texts
+the map it opens and the folders of another game that still runs ("Scratch folders of one game"). The template stays as it was: it can be loaded, and every new map takes its script and texts
 from it. Checked in the game
 (in a window, `--test-map` on the template): `maps\_new\_new.map` made, hidden, nothing added to
 `custom.lst`; a hill raised, a fort placed, Ctrl+S -> the Save map dialog in the game's own `maps\`
 with `map1.map` offered, "edtest2" typed -> `maps\edtest2\edtest2.map` with its `.vid`, script and
 texts, "edtest2 / EDTEST2" on the custom maps page, the script titled EDTEST2; a second Ctrl+S saved
 without a dialog; the game closed -> `maps\_new` removed.
+
+**Scratch folders of one game** (`editor.cpp`, "several games can run from one folder"). Two games can
+run from one game folder at once (two windows of the editor, or a game started twice), and they share
+`maps\`. Until v0.2.13-beta.1 the scratch folders had fixed names and every game took them as its own:
+a second game's start swept the first one's `maps\_run\` away (the sweep of folders "left behind"), a
+second game's Run the level wrote its own map over the copy the first one held, and its exit removed
+the folder - so the first game's save after Run the level stopped with "The map was not saved: the map
+file it was loaded from is missing." (a player's report on v0.2.13-beta.1, with logs of several games
+started at about the same time), or, after the other game's run, would have taken that map's ground,
+and its way back from a run would have loaded the other map. Now a scratch folder is one game's own: the
+game keeps its mark `editor_new.txt` open, shared for reading only (no delete sharing), for as long as
+the folder is its (made at the start, at a run, or a level of a marked folder loaded), and lets it go
+when it removes the folder. Another game sees such a mark as held - it cannot be opened for deleting,
+`ERROR_SHARING_VIOLATION` - and leaves the folder alone ("maps\_run is another game's (it runs) - left as
+it is" in `LocoFix.log`); Windows closes the mark when its game ends however it ends, so a folder left by
+a crash or a killed game is free again and swept as before. Run the level takes `maps\_run\_run.map`, or
+`maps\_run2\_run2.map` ... while another running game has `_run` (a folder of a game that ended is cleared
+and taken); the start's new map took `_new2` ... before already, when `_new` was there. The custom maps
+page and the names' rule count `_run2` ... as scratch with `_run` (`formats.md` "Map files"). And a save
+of the copy held again no longer depends on the copy's file ("Saving" above). Checked in the rig, two
+games from one folder (a `-Job script` of the rig, in English at 1024 x 768): A made a new map
+snek, ran it and came back; B started in the editor, ran its new map and closed; then A saved. With
+v0.2.13-beta.1's DLL B's start removed `maps\_run` ("the run's copy maps\_run left - removed"), B ran
+from a new `maps\_run` and removed it at its exit, and A's save and a run after it failed ("its VIDs come
+from maps\_run\_run.map, which is not there", the message box). With the fix B's start left `maps\_run`,
+B ran from `maps\_run2`, A saved snek (99292 bytes, as a save without the second game) and loaded, ran and
+saved it again; both games removed their own folders at their ends. With A alone and the copy's `.map`
+deleted while held: before, the same message; now "maps\_run\_run.map is gone - OBJ from
+maps\snek\snek.map" and the save written, the same file as a normal save but for the objects' ids.
 
 **A level change resets the editor** (`editor_level_loading` -> `edit_reset`, `editor_level_loaded`).
 Every level that loads - File > Load, New, Import, Map size, StartEditorMode, a mission picked in the
