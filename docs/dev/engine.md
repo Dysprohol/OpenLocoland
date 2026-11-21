@@ -180,7 +180,19 @@ frames go above them. So functions are not reentrant (a recursive call overwrite
 parameters); names declared inside `{ }` go out of scope at the closing brace, their slots
 stay. The whole script state is the stack: demos record it after loading the
 level and restore it on playback. Flags: 1 string, 2 int, 4 array, 8 initialised, 0x10
-object reference (cleared when the object is deleted), 0x20 pointer, 0x40 not initialised.
+object reference, 0x20 pointer, 0x40 not initialised.
+An object value (0x10, a GameObject pointer - what the scripts call a unit) is no reference:
+the object's `refCount` does not count it, and `Destroy` (the object's `Delete(1)`) frees the
+memory at once, as an object's death does when its death animation ends (`Object_Update`). So
+the engine clears the values instead: `Script_ObjectDeleted` sets every value of the stack that
+holds the deleted object to the int 0, and `GetX(0)`, `Destroy(0)` and the other externs do
+nothing with 0. In the original it ran only through `World_ObjectDeleted`, which units, regions and
+menu frames call when they are deleted, and other objects only when something else still held them
+(a goal, a command); a plain object - a building or decoration, a sprite - that only a script held
+stayed in its variable after it was freed, and the next `GetX` read freed memory and the next
+`Destroy` crashed. LocoFix (`script_refs.cpp`, `BUGS.md` F32) runs it after every object's
+destructor, so a variable reads 0 once its object is gone, whatever the object - the same as the
+original did for units.
 Strings convert to numbers with `atoi` (or hex for "0x..."), + of two strings concatenates,
 == and != compare strings by text, division by zero gives 0xfffffff.
 

@@ -751,6 +751,15 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       Checked in the test rig: POLIGON's player factory with F1 twice (two lines "the player's panel", the
       release 34 s later), an editor map's enemy plan (35, 5, 35, then 90, each queued as the one before was
       released, "a command"), mission 18's enemy AI (80, 5, 80 from 1 s); the 20 missions pass,
+  63. a script's variable reads 0 once its object is gone, for every object (`script_refs.cpp`, `BUGS.md` F32,
+      engine.md "Values and variables"): the engine cleared the script values holding a deleted object only
+      for units, regions, menu frames and objects something else still held, so a decoration or a sprite that
+      only a script held stayed in its variable after it was freed - `GetX`/`GetY` read freed memory and the
+      next `Destroy` crashed. After every object's destructor the engine's own clearing (`Script_ObjectDeleted`)
+      now runs for it; one of the script's own variables cleared only so gets a `LocoFix.log` line with its
+      name (`script: object 0x... (VID n at x,y) was deleted while variable fruit held it - it reads 0 now`,
+      the first 20 objects of a run). What a script sees changes only there: such a variable reads 0 instead
+      of freed memory, as a unit's always did,
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
