@@ -68,6 +68,12 @@
 // be made or a Blt fails, the batch is written the engine's way (its lock, left locked as the engine leaves it).
 // A zoom's interface pass (zoom_view.cpp) has its own overlay and is left as it is; so is a 32-bit picture, and a
 // picture already locked when the minimap starts.
+//
+// The pirates black. Minimap_Draw colours the dots by army: ours (0x4a95e0), the enemy's (0x4a95d4, its planes and
+// balloons 0x4a95c8) and one colour for armies 2 and 3 (0x4a95a0, only their trains, buildings and factories). On
+// a map of the editor (FACTIONS, factions.cpp) army 3 is the pirates, who fight every side: their dots are black
+// there (pirate_color, at the two loads of the colour of armies 2 and 3); what is drawn of them stays the engine's.
+// In the campaign army 3 is the money crates and the reinforcements' point locomotive: the engine's colour.
 #include "patch.h"
 #include "perf.h"
 #include <ddraw.h>
@@ -80,6 +86,7 @@ int interface_scale_for_window();
 bool zoom_view_world_view(float& w, float& h);   // zoom_view.cpp: the world's view while drawn in its second pass
 bool zoom_view_defer_brighten(float l, float t, float r, float b, uint32_t color);
 double zoom_view_room();
+bool factions_pirates();   // factions.cpp
 
 namespace {
 
@@ -522,6 +529,59 @@ __declspec(naked) void brighten_call() {
     }
 }
 
+// ---- the pirates' colour ----
+
+constexpr uintptr_t OTHER_ARMY_COLOR = 0x4a95a0;   // the dots of armies 2 and 3
+constexpr uintptr_t DRAW_OTHER_TRAIN = 0x405bd9;   // mov ecx,[0x4a95a0] (a train)
+constexpr uintptr_t DRAW_OTHER_BUILDING = 0x405c08;   // mov edx,[0x4a95a0] (a building or factory)
+constexpr uint32_t PIRATES_COLOR = 0xff000000;     // black
+
+// The colour of a dot of army 2 or 3 (`o` the object, Minimap_Draw's esi).
+uint32_t __cdecl other_army_color(const uint8_t* o) {
+    if (factions_pirates() && ((at<uint32_t>(const_cast<uint8_t*>(o), 0x28) >> 10) & 3) == 3) return PIRATES_COLOR;
+    return *reinterpret_cast<const uint32_t*>(OTHER_ARMY_COLOR);
+}
+
+// In place of the two loads: the colour into ecx or edx, every other register kept.
+__declspec(naked) void other_army_color_ecx() {
+    __asm {
+        push eax
+        push edx
+        push esi
+        call other_army_color
+        add esp, 4
+        mov ecx, eax
+        pop edx
+        pop eax
+        ret
+    }
+}
+
+__declspec(naked) void other_army_color_edx() {
+    __asm {
+        push eax
+        push ecx
+        push esi
+        call other_army_color
+        add esp, 4
+        mov edx, eax
+        pop ecx
+        pop eax
+        ret
+    }
+}
+
+void install_pirates_color() {
+    const uint8_t train[] = {0x8B, 0x0D, 0xA0, 0x95, 0x4A, 0x00};
+    const uint8_t building[] = {0x8B, 0x15, 0xA0, 0x95, 0x4A, 0x00};
+    if (!patch::check(DRAW_OTHER_TRAIN, train, sizeof train) || !patch::check(DRAW_OTHER_BUILDING, building, sizeof building)) {
+        patch::log("skipped the pirates' minimap colour: unexpected bytes");
+        return;
+    }
+    patch::write_call(DRAW_OTHER_TRAIN, nullptr, 0, reinterpret_cast<void*>(&other_army_color_ecx), sizeof train);
+    patch::write_call(DRAW_OTHER_BUILDING, nullptr, 0, reinterpret_cast<void*>(&other_army_color_edx), sizeof building);
+}
+
 // ---- the menu item under the cursor ----
 
 int __fastcall menu_nvid_under_cursor(uint8_t* menu) {
@@ -625,6 +685,7 @@ void install_minimap() {
     const uint8_t draw_start[] = {0x83, 0xEC, 0x0C, 0x53, 0x55, 0x8B, 0xE9};
     g_minimap_draw = reinterpret_cast<MinimapDraw_t>(
         patch::hook(MINIMAP_DRAW, draw_start, sizeof draw_start, reinterpret_cast<void*>(&minimap_draw), "Minimap_Draw"));
+    install_pirates_color();
     g_installed = true;
     if (chosen_size() > 0) patch::log("minimap: size %d chosen on the settings page", chosen_size());
 }

@@ -232,6 +232,10 @@ bool script_has_factions(const char* map) {
 
 }  // namespace
 
+// Whether army 3 of this level is the editor's pirates (FACTIONS): minimap.cpp draws them black.
+// In the campaign army 3 is the money crates and the reinforcements' point locomotive.
+bool factions_pirates() { return g_on; }
+
 // frame_limit.cpp's Level_Load wrapper, before a level loads.
 void factions_level_loading(const char* map) {
     g_grudges.clear();
