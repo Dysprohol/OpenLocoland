@@ -569,7 +569,8 @@ PlanFire(int u,int f)
   }
 }
 // PlanReorder(i,u): a train of the map built again (plan_order) gets its order again from the order's
-// runner, wherever it is; the enemy's train of an order that is not the AI's leaves the AI.
+// runner, wherever it is (an area's, hunt's or guard's drives to the lost one's place first, OrderTry);
+// the enemy's train of an order that is not the AI's leaves the AI.
 PlanReorder(int i,int u)
 {
   int o,k;
@@ -626,8 +627,8 @@ PlanAdopt(int i,int t)
   o=plan_order[i]-1;
   if( o<0 || o>=ORDERS )
     return 0;
-  if( order_state[o]!=2 && order_state[o]!=6 )   // given, or dropped already (another army has it: lost)
-    return 0;
+  if( order_state[o]<2 )   // once its order is given (2; a target 3, an area, hunt or guard 4, 5) or
+    return 0;              // the train is lost or dropped (6: another army has it - lost)
   plan_done[i]=1;
   plan_last[i]=t;
   plan_since[i]=t;
@@ -1192,6 +1193,7 @@ OrdersFind()
 OrderTry(int i,int t)
 {
   int u,k;
+  string s;
   u=order_unit[i];
   if( !GetUnitVid(u) )
   {
@@ -1209,23 +1211,33 @@ OrderTry(int i,int t)
   }
   if( order_task[i]<=-5 && order_task[i]>=-7 )   // watches an area (-5), hunts (-6), guards its point (-7)
   {
-    order_home_x[i]=GetX(u);   // its own place: where it stands now (-5, -6), its point (-7)
-    order_home_y[i]=GetY(u);
-    if( order_task[i]==-6 )   // hunting: the whole map round where it starts
+    k=0;
+    if( order_home_x[i] || order_home_y[i] )   // a train built again (PlanReorder): the lost one's place
+      k=1;
+    if( !k )
     {
-      order_to_x[i]=GetX(u);
-      order_to_y[i]=GetY(u);
-      order_to_z[i]=0;
+      order_home_x[i]=GetX(u);   // its own place: where it stands now (-5, -6), its point (-7)
+      order_home_y[i]=GetY(u);
+      if( order_task[i]==-6 )   // hunting: the whole map round where it starts
+      {
+        order_to_x[i]=GetX(u);
+        order_to_y[i]=GetY(u);
+        order_to_z[i]=0;
+      }
+      if( order_task[i]==-7 )   // guarding its point
+      {
+        order_home_x[i]=order_to_x[i];
+        order_home_y[i]=order_to_y[i]+order_to_z[i];
+      }
     }
-    if( order_task[i]==-7 )   // guarding its point: it drives there
-    {
-      order_home_x[i]=order_to_x[i];
-      order_home_y[i]=order_to_y[i]+order_to_z[i];
+    s="";
+    if( k || order_task[i]==-7 )   // it drives there: the guard to its point, one built again home
       Action(u,ACT_MOVE,order_home_x[i],order_home_y[i]);
-    }
+    if( k )
+      s=" (built again at "+itoa(GetX(u))+","+itoa(GetY(u))+", drives there)";
     order_state[i]=4;
     order_target[i]=0;
-    Log("ORDER "+itoa(i+1)+" task "+itoa(order_task[i])+" train 1 watches "+itoa(order_to_x[i])+","+itoa(order_to_y[i])+" radius "+itoa(order_radius[i])+" chase "+itoa(order_chase[i])+" from its place "+itoa(order_home_x[i])+","+itoa(order_home_y[i])+" at "+itoa(t)+" s");
+    Log("ORDER "+itoa(i+1)+" task "+itoa(order_task[i])+" train 1 watches "+itoa(order_to_x[i])+","+itoa(order_to_y[i])+" radius "+itoa(order_radius[i])+" chase "+itoa(order_chase[i])+" from its place "+itoa(order_home_x[i])+","+itoa(order_home_y[i])+s+" at "+itoa(t)+" s");
     return 1;
   }
   if( order_task[i]==-4 )   // attack an object; the enemy's train goes to the AI once it is gone
