@@ -16,7 +16,9 @@
 // Here every save goes to "<target>.saving" next to the target - never the name of the loaded
 // map, so the rename to tmp_del!.map is never reached and OBJ is copied from the untouched
 // loaded map - and replaces the target only when that file was written (MoveFileEx). When the
-// level has VIDs of its own and the map they come from is gone, nothing is saved. The
+// level has VIDs of its own and the map they come from is gone, nothing is saved - but for the
+// editor's Run the level copy held again, whose OBJ is the map's it was written from: that map is
+// World.levelFile for the save then (editor_obj_source). The
 // self-made ground loses its level flag 0x200 for the save, so it does not make Level_Save
 // copy OBJ.
 //
@@ -37,6 +39,7 @@
 #include "patch.h"
 
 void editor_feed_sound(bool on);   // editor.cpp: the music goes on while a message box is open
+std::string editor_obj_source(const std::string& level);   // editor.cpp: the map a run's copy stands for
 
 namespace {
 
@@ -140,7 +143,10 @@ void __fastcall LevelSave_safe(uint8_t* world, void* edx, char* name) {
         if (self_made_ground(v)) self_made = v;
         else copies_obj = true;
     }
-    if (copies_obj && !(level && exists(level))) {
+    // Run the level's copy held again that is gone (removed by hand, or by another game before
+    // v0.2.13): its OBJ was the map's it was written from, which stands in for it
+    const std::string stand_in = copies_obj && level && !exists(level) ? editor_obj_source(level) : "";
+    if (copies_obj && !(level && exists(level)) && !(!stand_in.empty() && exists(stand_in))) {
         patch::log("level save: %s not saved - its VIDs come from %s, which is not there", target.c_str(),
                    level ? level : "(no map)");
         editor_feed_sound(true);
@@ -155,7 +161,19 @@ void __fastcall LevelSave_safe(uint8_t* world, void* edx, char* name) {
     char* temp_name = game_string(temp);
     if (!temp_name) return;
     if (self_made) image_flags(self_made) &= ~LEVEL_VID;
+    // the stand-in as World.levelFile for the save (Level_Save copies OBJ from that file), then back
+    char*& level_file = *reinterpret_cast<char**>(world + WORLD_LEVEL_FILE);
+    char* const kept_level = level_file;
+    char* const stand_in_name = !stand_in.empty() && !exists(level) ? game_string(stand_in) : nullptr;
+    if (stand_in_name) {
+        patch::log("level save: %s is gone - OBJ from %s, the map it is a copy of", level, stand_in.c_str());
+        level_file = stand_in_name;
+    }
     g_level_save(world, edx, temp_name);   // frees temp_name
+    if (stand_in_name) {
+        free_game_string(level_file);
+        level_file = kept_level;
+    }
     if (self_made) image_flags(self_made) |= LEVEL_VID;
 
     if (!exists(temp)) {   // ResFile_Create failed; the game has shown "Can't open file"

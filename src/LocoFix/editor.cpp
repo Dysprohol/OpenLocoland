@@ -326,13 +326,13 @@ void stop_music() {
 // first and loaded again, running. Back (Ctrl+R, BACK TO THE EDITOR in the Esc menu, or the level
 // ending: won, lost, ABORT GAME) loads it again, held - the state of the run does not stay. A map
 // that is not written in place - a campaign map, POLIGON or the template, and the start's new map,
-// which has no name yet - runs from a copy in a hidden scratch folder, maps\_run\ (marked as the new
+// which has no name yet - runs from a copy in a hidden scratch folder of this game's own, maps\_run\
+// (_run2, _run3 ... while another game running from the same folder has that one; marked as the new
 // map's, so it is never on the custom maps page and goes with the map); back, the copy is held again
 // with the editor on the original map: its name, its edits not saved, the history.
-constexpr const char* RUN_FOLDER = "maps\\_run";
-constexpr const char* RUN_MAP = "maps\\_run\\_run.map";
+std::string g_run_folder;   // maps\_run<n> of this game (empty until a run picks it)
 std::string g_run_map;   // the map that runs (game path)
-std::string g_run_origin;   // the map the copy in maps\_run\ stands for (empty: the map runs from its own file)
+std::string g_run_origin;   // the map the copy in g_run_folder stands for (empty: the map runs from its own file)
 bool g_run_dirty = false;   // the copy holds edits not saved
 bool g_run_back = false;   // the next load is the way back: the view and the chosen object as they were
 bool g_save_on_back = false, g_close_on_back = false;   // the edits of the copy to be saved once it is held again
@@ -486,21 +486,83 @@ bool auto_folder(const std::string& folder) {
     return !folder.empty() && GetFileAttributesA((folder + "\\" + AUTO_MARK).c_str()) != INVALID_FILE_ATTRIBUTES;
 }
 
-// A scratch folder of maps\ made hidden and marked (`text` says what it is to whoever finds it).
-bool mark_folder(const std::string& folder, const char* text) {
-    CreateDirectoryA(folder.c_str(), nullptr);
-    SetFileAttributesA(folder.c_str(), FILE_ATTRIBUTE_HIDDEN);
-    HANDLE mark = CreateFileA((folder + "\\" + AUTO_MARK).c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, 0, nullptr);
-    if (mark == INVALID_HANDLE_VALUE) return false;
-    DWORD written = 0;
-    WriteFile(mark, text, static_cast<DWORD>(std::strlen(text)), &written, nullptr);
-    CloseHandle(mark);
+// Several games can run from one folder at once (two windows of the editor), and they share maps\.
+// So a scratch folder is one game's own: the game keeps its mark open - shared for reading only, so
+// it cannot be deleted - for as long as the folder is its, and another game's sweep, run or new map
+// leaves it alone (`held_elsewhere`). Windows closes the mark when the game ends, however it ends, so
+// a folder left by a crash is free again. Before, the folders had fixed names and every game took
+// them: a second game's start swept the first one's maps\_run\ away (its save after Run the level
+// then failed: "the map file it was loaded from is missing"), and a second game's run wrote over the
+// copy the first one held (its save took the other map's ground, its way back loaded the other map).
+std::vector<std::pair<std::string, HANDLE>> g_owned;   // this game's scratch folders (lower case) and their open marks
+
+bool run_folder_name(const std::string& folder) {   // maps\_run, maps\_run2 ... (a game path)
+    const std::string lower = lower_path(folder);
+    if (lower.compare(0, 9, "maps\\_run") != 0) return false;
+    for (size_t i = 9; i < lower.size(); ++i)
+        if (!std::isdigit(static_cast<unsigned char>(lower[i]))) return false;
     return true;
 }
 
-// A marked folder of maps\ with its files (the editor made them all; it has no subfolders).
+bool owned(const std::string& folder) {
+    for (const auto& o : g_owned)
+        if (o.first == lower_path(folder)) return true;
+    return false;
+}
+
+void let_go(const std::string& folder) {
+    for (size_t i = 0; i < g_owned.size(); ++i)
+        if (g_owned[i].first == lower_path(folder)) {
+            CloseHandle(g_owned[i].second);
+            g_owned.erase(g_owned.begin() + static_cast<std::ptrdiff_t>(i));
+            return;
+        }
+}
+
+// The mark is held open by another game that runs (it does not share deleting).
+bool held_elsewhere(const std::string& folder) {
+    if (owned(folder)) return false;
+    HANDLE probe = CreateFileA((folder + "\\" + AUTO_MARK).c_str(), DELETE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                               nullptr, OPEN_EXISTING, 0, nullptr);
+    if (probe != INVALID_HANDLE_VALUE) {
+        CloseHandle(probe);
+        return false;
+    }
+    return GetLastError() == ERROR_SHARING_VIOLATION;
+}
+
+// A scratch folder of maps\ made hidden and marked as this game's (`text` says what it is to whoever
+// finds it; nullptr: the mark of a folder already marked is taken as it is). False when it could not
+// be marked, or another game that runs has it.
+bool mark_folder(const std::string& folder, const char* text) {
+    if (owned(folder)) return true;
+    CreateDirectoryA(folder.c_str(), nullptr);
+    SetFileAttributesA(folder.c_str(), FILE_ATTRIBUTE_HIDDEN);
+    HANDLE mark = CreateFileA((folder + "\\" + AUTO_MARK).c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr,
+                              text ? OPEN_ALWAYS : OPEN_EXISTING, 0, nullptr);
+    if (mark == INVALID_HANDLE_VALUE) {
+        if (GetLastError() == ERROR_SHARING_VIOLATION) patch::log("editor: %s is another game's (it runs)", folder.c_str());
+        return false;
+    }
+    if (text) {
+        DWORD written = 0;
+        WriteFile(mark, text, static_cast<DWORD>(std::strlen(text)), &written, nullptr);
+        SetEndOfFile(mark);
+    }
+    g_owned.push_back({lower_path(folder), mark});
+    return true;
+}
+
+// A marked folder of maps\ with its files (the editor made them all; it has no subfolders) - not
+// another running game's.
 void remove_auto_folder(const std::string& folder) {
     if (!auto_folder(folder)) return;
+    if (owned(folder)) {
+        let_go(folder);
+    } else if (held_elsewhere(folder)) {
+        patch::log("editor: %s is another game's (it runs) - left as it is", folder.c_str());
+        return;
+    }
     WIN32_FIND_DATAA f;
     HANDLE find = FindFirstFileA((folder + "\\*").c_str(), &f);
     if (find != INVALID_HANDLE_VALUE) {
@@ -510,11 +572,12 @@ void remove_auto_folder(const std::string& folder) {
         FindClose(find);
     }
     const bool removed = RemoveDirectoryA(folder.c_str()) != 0;
-    patch::log(lower_path(folder) == lower_path(RUN_FOLDER) ? "editor: the run's copy %s left - %s" : "editor: the new map %s left unsaved - %s",
+    patch::log(run_folder_name(folder) ? "editor: the run's copy %s left - %s" : "editor: the new map %s left unsaved - %s",
                folder.c_str(), removed ? "removed" : "could not be removed");
 }
 
-// The marked folders of maps\ left behind (but `keep`, the folder of the map being opened).
+// The marked folders of maps\ left behind (but `keep`, the folder of the map being opened, and the
+// folders of other games that run).
 void sweep_auto_folders(const std::string& keep) {
     WIN32_FIND_DATAA f;
     HANDLE find = FindFirstFileA("maps\\*", &f);
@@ -552,7 +615,7 @@ void leave_map(const std::string& next) {
         if (!auto_folder(folder_of(map))) continue;
         if (!next.empty() && to == lower_path(folder_of(map))) continue;
         // the map stays while its copy runs or is held again
-        if (to == lower_path(RUN_FOLDER) && lower_path(map) == lower_path(game_path(current_map()))) continue;
+        if (!g_run_folder.empty() && to == lower_path(g_run_folder) && lower_path(map) == lower_path(game_path(current_map()))) continue;
         remove_auto_folder(folder_of(map));
     }
 }
@@ -837,7 +900,7 @@ std::string release_reason(const std::string& map) {
 // them and a map chosen in one is refused.
 bool scratch_folder(const std::string& folder) {
     const std::string lower = lower_path(folder);
-    return lower.compare(0, 9, "maps\\_new") == 0 || lower == lower_path(RUN_FOLDER) || auto_folder(folder);
+    return lower.compare(0, 9, "maps\\_new") == 0 || run_folder_name(folder) || auto_folder(folder);
 }
 
 bool game_folder_map(const std::string& map);
@@ -971,6 +1034,31 @@ bool save_current(HWND window) {
 bool game_folder_map(const std::string& map);
 bool asks();
 
+// The file of Run the level's copy in this game's own folder, marked (empty when none could be had):
+// maps\_run\_run.map, or maps\_run2\_run2.map ... while another game that runs has the first; a folder
+// left by a game that ended is cleared and taken.
+std::string run_copy_map() {
+    if (g_run_folder.empty() || !owned(g_run_folder)) {
+        g_run_folder.clear();
+        for (int n = 1; n < 100 && g_run_folder.empty(); ++n) {
+            const std::string folder = n == 1 ? "maps\\_run" : "maps\\_run" + std::to_string(n);
+            if (GetFileAttributesA(folder.c_str()) != INVALID_FILE_ATTRIBUTES) {
+                if (!auto_folder(folder) || held_elsewhere(folder)) continue;   // not the editor's, or another game's
+                remove_auto_folder(folder);
+            }
+            if (mark_folder(folder, "Run the level's copy of the map the editor runs; written again for every run and removed "
+                                    "with this folder when the editor leaves the map. While the game that made it runs, it is "
+                                    "that game's.\r\n"))
+                g_run_folder = folder;
+        }
+        if (g_run_folder.empty()) {
+            patch::log("editor: no folder maps\\_run... for the run's copy could be had");
+            return "";
+        }
+    }
+    return g_run_folder + "\\" + g_run_folder.substr(5) + ".map";
+}
+
 bool run_level(HWND window) {
     if (!g_held) return false;
     const std::string map = game_path(current_map());
@@ -979,20 +1067,21 @@ bool run_level(HWND window) {
     // own map with edits or held again from its copy after a run; only a game's own map without edits
     // runs from its own file, which is not written either
     const bool copy = !game_folder_map(map) || edit_dirty() || lower_path(game_path(level_file())) != lower_path(map);
-    const std::string run = copy ? RUN_MAP : map;
+    const std::string run = copy ? run_copy_map() : map;
     // the copy written as a save writes it, without asking - also when nothing changed, so the script
     // has the runner and the panels' settings of this version (an older map's script is brought up to
     // date in the copy)
     if (copy) {
         // the copy's script is the map's own, its editor blocks written anew (a script without them
         // runs as it is); the high scores page stays in its briefing
-        bool written = mark_folder(RUN_FOLDER, "Run the level's copy of the map the editor runs; written again for every run and "
-                                               "removed with this folder when the editor leaves the map.\r\n");
-        DeleteFileA(script_of(run).c_str());
-        CopyFileA(script_of(map).c_str(), script_of(run).c_str(), FALSE);
-        const std::string scores = folder_of(map) + "\\hiscores.txt";
-        if (GetFileAttributesA(scores.c_str()) != INVALID_FILE_ATTRIBUTES)
-            CopyFileA(scores.c_str(), (std::string(RUN_FOLDER) + "\\hiscores.txt").c_str(), FALSE);
+        bool written = !run.empty();
+        if (written) {
+            DeleteFileA(script_of(run).c_str());
+            CopyFileA(script_of(map).c_str(), script_of(run).c_str(), FALSE);
+            const std::string scores = folder_of(map) + "\\hiscores.txt";
+            if (GetFileAttributesA(scores.c_str()) != INVALID_FILE_ATTRIBUTES)
+                CopyFileA(scores.c_str(), (g_run_folder + "\\hiscores.txt").c_str(), FALSE);
+        }
         written = written && save_map(run);
         g_current = map;   // the editor stays on its map (save_map took the copy's name)
         if (!written) {
@@ -1681,6 +1770,14 @@ void editor_load_map(const std::string& map) { load_map(map); }
 // new empty map ("the map the editor starts on").
 std::string editor_start_map(const std::string& map) { return start_map(map); }
 
+// level_save.cpp: the map whose OBJ chunk (the level's own VIDs) stands in for the loaded level's
+// file when that file is gone - Run the level's copy held again stands for the map it was written
+// from, with that map's OBJ; empty for any other level.
+std::string editor_obj_source(const std::string& level) {
+    if (!g_enabled || g_running || g_run_origin.empty() || lower_path(game_path(level)) != lower_path(g_run_map)) return "";
+    return g_run_origin;
+}
+
 // frame_limit.cpp's Level_Load wrapper: a held level is let go for the load (the flags would
 // otherwise carry the old level's pause time over) and the new one is held once it is loaded.
 void editor_level_loading(void* w) {
@@ -1715,6 +1812,8 @@ void editor_level_loaded(void* w) {
         // picked in the game's menus, StartEditorMode); the new map of the start keeps its scratch path,
         // Run the level's copy held again the map it stands for (below)
         g_current = game_path(map);
+        // a level of a scratch folder is this game's from now on (a start on a new map left marked)
+        if (auto_folder(folder_of(g_current))) mark_folder(folder_of(g_current), nullptr);
         mission_load(game_path(map));
         hold_level(world, true);
         const std::string lost = missing_ground();

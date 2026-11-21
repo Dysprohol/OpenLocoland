@@ -104,6 +104,14 @@ bool starts_with_ci(const std::string& s, const std::string& prefix) {
     return s.size() >= prefix.size() && same(s.substr(0, prefix.size()), prefix);
 }
 
+// Run the level's copy: _run, or _run2, _run3 ... of another game running from the same folder (editor.cpp)
+bool run_folder(const std::string& f) {
+    if (!starts_with_ci(f, "_run")) return false;
+    for (size_t i = 4; i < f.size(); ++i)
+        if (!std::isdigit(static_cast<unsigned char>(f[i]))) return false;
+    return true;
+}
+
 std::string trim(const std::string& s) {
     const size_t a = s.find_first_not_of(" \t\r\n");
     if (a == std::string::npos) return "";
@@ -168,7 +176,7 @@ bool campaign_folder(const std::string& f) {
 }
 
 bool scratch_folder(const std::string& f) {
-    return starts_with_ci(f, "_new") || same(f, "_run") || exists("maps\\" + f + "\\" + SCRATCH_MARK);
+    return starts_with_ci(f, "_new") || run_folder(f) || exists("maps\\" + f + "\\" + SCRATCH_MARK);
 }
 
 // The characters of a name: Windows' rules and ASCII. Empty when they are fine.
@@ -424,7 +432,7 @@ std::string map_name_problem(const std::string& name) {
     const char* chars = name_chars_problem(name);
     if (*chars) return chars;
     if (campaign_folder(name) || same(name, "script") || same(name, "outro") || same(name, "sandbox") || same(name, "template") ||
-        starts_with_ci(name, "_new") || same(name, "_run"))
+        starts_with_ci(name, "_new") || run_folder(name))
         return ui_text("NameGame", "This is the name of a folder of the game (the campaign's l01-l20, script, outro, sandbox, "
                                    "template) or of the editor's scratch (_new..., _run).");
     return "";
