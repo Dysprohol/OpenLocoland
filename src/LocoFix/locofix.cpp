@@ -50,6 +50,7 @@ void install_script_random();
 void install_script_log();
 void install_script_value();
 void install_world_script();
+void install_script_refs();
 void install_player_registry();
 void install_level_save();
 void install_editor();
@@ -167,6 +168,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         install_script_log();
         install_script_value();
         install_world_script();
+        install_script_refs();
         install_player_registry();
         install_mouse_pan();
         // Screen scaling hooks RegisterClassA after test mode and calls test mode's
