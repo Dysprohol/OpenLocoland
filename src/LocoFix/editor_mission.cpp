@@ -140,7 +140,7 @@ std::string trim(const std::string& s) {
     return s.substr(a, s.find_last_not_of(" \t\r\n") - a + 1);
 }
 
-std::string upper(std::string s) {
+std::string upper(std::string s) {   // ASCII only: the script's names (ATT_...) and a folder's name; a pack's text: ui_upper
     for (char& c : s) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
     return s;
 }

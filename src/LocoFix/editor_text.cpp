@@ -142,6 +142,38 @@ std::string ui_narrow(const std::wstring& text) {
     return out;
 }
 
+std::string ui_upper(const std::string& text) {
+    const UINT cp = ui_codepage();
+    CPINFO info = {};
+    if (!GetCPInfo(cp, &info) || info.MaxCharSize != 1) {   // not a code page of one byte a letter: the whole text
+        std::wstring w = ui_wide(text);
+        if (!w.empty()) CharUpperBuffW(&w[0], static_cast<DWORD>(w.size()));
+        return ui_narrow(w);
+    }
+    // a table of the code page's 256 bytes, made once: the capital's byte where the code page has it
+    static UINT table_cp = 0;
+    static char table[256];
+    if (table_cp != cp) {
+        for (int b = 0; b < 256; ++b) {
+            table[b] = static_cast<char>(b);
+            const char one = static_cast<char>(b);
+            wchar_t w = 0;
+            if (MultiByteToWideChar(cp, MB_ERR_INVALID_CHARS, &one, 1, &w, 1) != 1) continue;
+            const wchar_t was = w;
+            CharUpperBuffW(&w, 1);
+            if (w == was) continue;
+            char big[4];
+            BOOL lost = FALSE;
+            if (WideCharToMultiByte(cp, WC_NO_BEST_FIT_CHARS, &w, 1, big, sizeof big, nullptr, &lost) == 1 && !lost)
+                table[b] = big[0];
+        }
+        table_cp = cp;
+    }
+    std::string out = text;
+    for (char& c : out) c = table[static_cast<unsigned char>(c)];
+    return out;
+}
+
 BOOL ui_modify_menu(HMENU menu, UINT position, UINT flags, UINT_PTR id, const char* text) {
     const std::wstring w = text ? ui_wide(text) : L"";
     return ModifyMenuW(menu, position, flags, id, text ? w.c_str() : nullptr);

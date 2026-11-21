@@ -12104,8 +12104,8 @@ void draw_context() {
     } else {
         std::snprintf(title, sizeof title, "%s", ui_text("CtxLineTitle", "PUSH LINE"));
     }
-    // Convert title to uppercase for visual consistency
-    for (char* p = title; *p; ++p) *p = static_cast<char>(std::toupper(static_cast<unsigned char>(*p)));
+    // the title in capitals, in the pack's code page (Czech "Lávový štěrk" -> "LÁVOVÝ ŠTĚRK")
+    std::snprintf(title, sizeof title, "%s", ui_upper(title).c_str());
     for (size_t r = 0; r <= rows.size(); ++r) {   // the title's row, then the rows
         const float ry = y + r * CONTEXT_ROW;
         draw_screen(VID_STRIP, 0, x + CONTEXT_WIDTH / 2, ry + CONTEXT_ROW / 2, CONTEXT_STEP);

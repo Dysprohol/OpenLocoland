@@ -25,6 +25,11 @@ std::wstring ui_wide(const std::string& text);
 std::string ui_narrow(const std::wstring& text);   // back to the pack's code page
 unsigned ui_codepage();
 
+// A pack's text in capitals, in the pack's code page: the letters with marks too (Czech á -> Á,
+// Polish ł -> Ł, Russian я -> Я), which std::toupper leaves small (it knows only a-z). A letter
+// whose capital the code page does not have (ß) stays as it is; every other byte is kept.
+std::string ui_upper(const std::string& text);
+
 // Menus and message boxes with a pack's text, through the W functions, so the text shows right
 // whatever the system's code page (a Russian pack on a Polish Windows).
 BOOL ui_modify_menu(HMENU menu, UINT position, UINT flags, UINT_PTR id, const char* text);

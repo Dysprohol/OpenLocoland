@@ -421,9 +421,7 @@ std::string pop_text(uint8_t* world) {
 }
 
 std::string menu_text(const char* text) {   // capitals in the pack's code page: the menu's fonts have no small letters
-    std::wstring w = ui_wide(text);
-    if (!w.empty()) CharUpperBuffW(&w[0], static_cast<DWORD>(w.size()));
-    return ui_narrow(w);
+    return ui_upper(text);
 }
 
 }  // namespace
