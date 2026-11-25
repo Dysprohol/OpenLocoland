@@ -33,7 +33,7 @@ foreach ($m in $Missions) {
   $map = "maps\l$nr\l$nr.map"
   $started = Get-Date
   $loadedPattern = "maps\\l$nr\\l$nr\.map.*LoadScript::ByteCode"
-  $out = & (Join-Path $PSScriptRoot "test_game.ps1") -Wait 15 -Exe (Join-Path $game "Locoland.exe") -ClickOk 1 -SetFull 0 `
+  $out = & (Join-Path $PSScriptRoot "test_game.ps1") -Wait 60 -Exe (Join-Path $game "Locoland.exe") -ClickOk 1 -SetFull 0 `
     -Map $map -WaitFor $loadedPattern -LogWait $Wait -Shot $shot -LastShotOnly 2>&1 | Out-String
   # The game writes logs\error<date> <time>.log and renames it to error.log on a normal exit; a
   # killed game leaves the dated one and error.log is from an earlier run. So the log of this
