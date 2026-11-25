@@ -130,7 +130,7 @@ map "Vulcanic Uprising": before v0.2.12 the order of laying the track chose the 
   posts that stood as its lights (`post_owners`: its building's when it was the building's rule line, or
   the line's own) move to the places its new way gives (`line_posts`: red at the end, green at a begin
   that is joined on), a missing one is made and one too many deleted; a line without lights gets none,
-  and a line a post owns (a light's L line, a pair's) leaves its post as it is. So a factory's exit is
+  and a post's own line (a light's L line, a pair's - not a building's) leaves its post as it is. So a factory's exit is
   dragged from the branch the editor chose onto the other one at the switch, and its red light with it.
 - *A line through a building is its line.* A factory's or repair point's own line is its rule line (the
   one `building_line` gives it where it stands, as before) or else a line through it: one that leaves the
@@ -139,8 +139,11 @@ map "Vulcanic Uprising": before v0.2.12 the order of laying the track chose the 
   (`building_dot`: its leg's point within 40 px) anywhere on its way - drawn by hand or with an end
   moved; on a line through several buildings the first met from its begin. A building has one line: its
   rule line first, else the first line through it in the editor's order (which a save keeps). A line of
-  two buildings' rule (one standing on the other's place) is neither's, and a post's own line stays the
-  post's, as before. The 2026-11-14 rule holds: a building's move, turn or deletion takes only its rule
+  two buildings' rule (one standing on the other's place) is neither's, as before. A line through a
+  building is the building's even when a post stands at its end as if it owned it (`owns`): a factory's
+  exit with its red light at the end has that shape - POLIGON's own line, and every exit whose end was
+  dragged with its light - so the building comes first, as for a rule line, and that post has no line of
+  its own. The 2026-11-14 rule holds: a building's move, turn or deletion takes only its rule
   line and the lights of it - a line drawn or changed by the map maker is never erased by a building, its
   lights stay with it -, and a building moved or placed where a line runs through it keeps that line
   (`MsgBuildingLineThrough`) instead of getting a second one. Turning a repair point round (R) turns only

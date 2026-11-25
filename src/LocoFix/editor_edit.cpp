@@ -7558,8 +7558,11 @@ int rule_line_index(uint8_t* o) { return rule_line_index(o, mission_push_lines()
 //    whose end was moved; on a line through several buildings the first one met from its begin,
 // unless its panel says BUILDING'S: NO (PushLine::no_building, kept in the script). A building has one line:
 // its rule line first, else the first line through it (the editor's order, which a save keeps). A line of
-// two buildings' rule (one standing on the other's place) is neither's, as before, and a post's own line
-// (a light's L line, a pair's) stays the post's. What a line through a building does not change: the
+// two buildings' rule (one standing on the other's place) is neither's, as before. A line through a building
+// is the building's even when a post stands at its end as if it owned it (owns): a factory's exit with its
+// red light at the end has that shape - POLIGON's own, and every exit whose end was dragged with its light -,
+// so the building comes first, as for a rule line, and the post has no line of its own (own_line leaves the
+// buildings' lines out). What a line through a building does not change: the
 // building's move, turn or deletion takes only its rule line (and the lights of it) - a line drawn or
 // changed by the map maker is never erased by a building (the rule of 2026-11-14), its lights stay with
 // it - and a building moved or placed where a line runs through it keeps that line and gets no second one.
@@ -7585,11 +7588,10 @@ bool owns(uint8_t* o, const PushLine& l);   // posts, below
 // The building each of `lines` (the editor's, or a copy of them) is the own line of, null for none, as above.
 std::vector<uint8_t*> line_buildings_now(const std::vector<PushLine>& lines) {
     std::vector<uint8_t*> out(lines.size(), nullptr);
-    std::vector<uint8_t*> buildings, posts;
+    std::vector<uint8_t*> buildings;
     for_each_object([&](uint8_t* o) {
         if (removed(o)) return;
         if (nvid_of(o) == VID_DEPOT || nvid_of(o) == VID_WORKSHOP) buildings.push_back(o);
-        else if (nvid_of(o) == VID_SEMAPHORE) posts.push_back(o);
     });
     std::sort(buildings.begin(), buildings.end(), [](uint8_t* a, uint8_t* b) {   // ties by place, not the objects' order
         return at<float>(a, O_X) != at<float>(b, O_X) ? at<float>(a, O_X) < at<float>(b, O_X) : at<float>(a, O_Y) < at<float>(b, O_Y);
@@ -7609,7 +7611,6 @@ std::vector<uint8_t*> line_buildings_now(const std::vector<PushLine>& lines) {
         if (out[i] || lines[i].no_building || rules.count(static_cast<int>(i))) continue;
         const Trace t = trace(lines[i]);
         if (t.error || t.path.size() < 2) continue;
-        if (std::any_of(posts.begin(), posts.end(), [&](uint8_t* p) { return owns(p, lines[i]); })) continue;
         size_t best = SIZE_MAX;
         uint8_t* found = nullptr;
         for (size_t k = 0; k < buildings.size(); ++k) {
@@ -7631,11 +7632,11 @@ std::vector<uint8_t*> line_buildings_now(const std::vector<PushLine>& lines) {
     return out;
 }
 
-// The same, kept while the rail network, the lines, the buildings and the posts stay as they are: the
-// overlay asks it for every line and post every frame, and an edit asks it for every post (own_line) - each
-// answer a search of every line's way and every post's rail point. A scope of RailMemo of its own keeps
-// those searches; the answer is kept by the network's signature and a hash of the lines and of the
-// buildings' and posts' places, directions and colours, so any change of them is answered afresh.
+// The same, kept while the rail network, the lines and the buildings stay as they are: the overlay asks it
+// for every line and post every frame, and an edit asks it for every post (own_line) - each answer a search
+// of every line's way. A scope of RailMemo of its own keeps those searches; the answer is kept by the
+// network's signature and a hash of the lines and of the buildings' places and directions, so any change of
+// them is answered afresh.
 std::vector<uint8_t*> line_buildings(const std::vector<PushLine>& lines) {
     const RailMemo memo;
     uint64_t h = 1469598103934665603ull;
@@ -7643,7 +7644,7 @@ std::vector<uint8_t*> line_buildings(const std::vector<PushLine>& lines) {
     for (const PushLine& l : lines)
         for (int v : {l.bx, l.by, l.ex, l.ey, l.flag, l.no_building}) mix(static_cast<uint32_t>(v));
     for_each_object([&](uint8_t* o) {
-        if (removed(o) || (nvid_of(o) != VID_DEPOT && nvid_of(o) != VID_WORKSHOP && nvid_of(o) != VID_SEMAPHORE)) return;
+        if (removed(o) || (nvid_of(o) != VID_DEPOT && nvid_of(o) != VID_WORKSHOP)) return;
         mix(reinterpret_cast<uintptr_t>(o));
         uint32_t bits[2];
         std::memcpy(&bits[0], o + O_X, 4);
@@ -7651,7 +7652,6 @@ std::vector<uint8_t*> line_buildings(const std::vector<PushLine>& lines) {
         mix(bits[0]);
         mix(bits[1]);
         mix(static_cast<uint32_t>(at<int>(o, O_DIRECTION)));
-        mix(red(o) ? 1u : 0u);
     });
     static std::map<std::pair<uint64_t, uint64_t>, std::vector<uint8_t*>> kept;   // (rails, lines and objects) -> answer
     const auto key = std::make_pair(g_rail_memo.signature, h);
@@ -8566,8 +8566,9 @@ void move_line(int index, const PushLine& was, const PushLine& now, const UiText
     const std::vector<PushLine> lines_before = lines;
     const PostOwners owners = post_owners();
     std::vector<uint8_t*> lights;
-    bool post_line = false;
-    for_each_object([&](uint8_t* p) {
+    bool post_line = false;   // a post's own line (not a building's, whose red light at its end has that shape too)
+    if (!building_lines().count(index))
+        for_each_object([&](uint8_t* p) {
         if (!post_line && !removed(p) && nvid_of(p) == VID_SEMAPHORE && owns(p, was)) post_line = true;
     });
     if (!post_line) {
