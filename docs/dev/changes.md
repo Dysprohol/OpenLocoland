@@ -801,7 +801,32 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       left (`m:ss`, by the runner's own clock); the mouse tip over such an icon adds it in words
       (`[Editor] PlayFactoryLimit`, `PlayFactoryUnlock`). A list with no limit and no later unit - every
       campaign mission - looks as before. Every language pack's copy of the price's font (VID 8) gets `/`
-      and `:` (`lang/<code>/fonts/font-unitnumbersonscreen.png`, build.md "The Czech letters").
+      and `:` (`lang/<code>/fonts/font-unitnumbersonscreen.png`, build.md "The Czech letters"),
+  68. an infantry robot dies in lava (`lava_robots.cpp`, editor-ground.md "Sheets of water and lava"): the lava
+      of a map is a sheet of the lava's tiles (VID 293) at one level, shown wherever the ground is lower, and the
+      engine let a unit walk through it as over any ground (its only lava rule turns the explosions over a lava
+      region into the explosion on lava, 528). Now the infantry robot (VID 70, which the paratrooper 84 becomes
+      when it lands) dies when it stands below the level of a lava tile covering its place: ACT_DAMAGE of all its
+      hp (the game's own death, its kill counted, its explosion 332) and the explosion on lava (528) at the
+      lava's level on its place - checked after `Unit_Move` (0x44c640), its step in every update of the world.
+      A robot on the shore, beside the lava or over a sheet below the ground (hidden there) is not touched, nor
+      any other unit; the water stays as it was (the scripts' own rule of missions 11, 16 and 17, `WATER_Z`).
+      `LocoFix.log` names the first 20 robots of a run (`lava: infantry robot (army 1) at 512,221, z 70 - in the
+      lava at 72 (tile at 576,192): it dies`). Checked in the test rig on a copy of POLIGON (flat, ground 70) with a
+      sheet of 10 lava tiles at 72 over the ground and one of 5 at 65 under it, seven robots sent across by the
+      script: the old build - the three sent through the lava walked through it and out on the far side; this
+      one - the three died at its edge (x 512) with the explosion on lava, the two sent to 5 px before the edge
+      and the two over the hidden sheet walked on as before, the 15 tiles all there to the end. (A sheet only 2
+      levels over the ground is sometimes not drawn for a moment in both builds - the tiles' depth against the
+      ground's, as found with the Region tool's sheets),
+  69. a civil robot is told when the house it walks to is deleted (`robot_walk.cpp`, `BUGS.md` F35): its walk
+      to a house kept the house in its command stack without a reference, the engine told nobody of a house
+      deleted while nobody held one, and the robot read the freed house at the end of its walk - a crash once
+      that memory was used again. When one of the 16 houses civil robots walk to is deleted, every object
+      whose command stack holds a walk to it is told through its own `OnObjectDeleted`, as the engine's round
+      would; the robot strolls on. Checked in the test rig with a script destroying a house every 2 s among 30
+      civil robots: the old build crashed at 0x4378d4 within two minutes, this one ran 13 minutes (330 houses,
+      more than 20 of them walked to) without an exception; the 20 missions pass.
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
