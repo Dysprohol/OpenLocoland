@@ -1412,6 +1412,29 @@ int pick_class(uint8_t* o, float x, float y) {
     return c == B_RAIL ? 2 : 1;
 }
 
+// A flat light spot (a glow: VID flag 0x800, size z at most 1 - 311, 365, 555, 361 ...) is not pickable over
+// its whole box, or it would take the clicks on the ground round every lantern (pickable). Where nothing
+// else is under the point, the glow whose middle is within GLOW_PICK px of it is picked: so a light laid by
+// hand can be selected, moved and deleted again (paulevs, 2026-11-25: lights could not be removed).
+constexpr float GLOW_PICK = 16;
+uint8_t* pick_glow(float x, float y) {
+    uint8_t* best = nullptr;
+    float best_d = GLOW_PICK * GLOW_PICK;
+    for_each_object([&](uint8_t* o) {
+        uint8_t* v = vid_of(o);
+        if (!v || removed(o) || at<uint8_t*>(o, O_UPLINK)) return;
+        const uint32_t type = at<uint32_t>(v, V_SPRITE_TYPE);
+        if (!(at<uint32_t>(v, V_FLAGS) & VID_SCREEN) || (type & (U_MENU | U_CANNON | U_SPRITE)) || at<float>(v, V_SIZE_Z) > 1) return;
+        const Box b = box_of(o);
+        const float dx = x - (b.l + b.r) / 2, dy = y - (b.t + b.b) / 2, d = dx * dx + dy * dy;
+        if (d <= best_d) {
+            best = o;
+            best_d = d;
+        }
+    });
+    return best;
+}
+
 // The object at a point of the map (screen coordinates plus the camera), by class (pick_class): a
 // car or unit before any other object, those before the rails, a region's inside last; within a class
 // the smallest box that holds the point. A gun in a socket is its host's part (its panel sets the gun).
@@ -1437,6 +1460,7 @@ uint8_t* pick(float x, float y) {
             best_class = k;
         }
     });
+    if (!best) best = pick_glow(x, y);
     if (!best) return nullptr;
     if (uint8_t* host = host_of(best)) return host;
     return best;
