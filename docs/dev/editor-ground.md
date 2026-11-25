@@ -1290,3 +1290,8 @@ a copy of POLIGON (flat, ground 70): LAVA dragged over 300 x 200 px - 6 tiles at
 the Ground height tool's right button - lava in it; Shift+drag took 3 tiles, undone; saved: the 6 tiles
 293 at 69 on the 128 grid and the 751 at 70; loaded again - only the pits show lava; THE WHOLE MAP on a
 new sheet: 191 tiles under the ground.
+In the game the lava kills an infantry robot (VID 70) that walks into it, wherever its tiles come from
+(the missions' sheets, this tool's, the Water and lava tool's): one standing below the level of a lava tile that
+covers its place dies with the game's death and the explosion on lava (LocoFix `lava_robots.cpp`, changes.md 66);
+a sheet kept under the ground is harmless there, as it is hidden. The water stays as it was: only the scripts of
+missions 11, 16 and 17 harm units below their `WATER_Z`.

@@ -364,7 +364,9 @@ się razem z mapą.
 **Woda i lawa** z listwy: w rzędzie **RODZAJ** (jasna woda, ciemna woda, bagno, bagno 2, lawa; `W` je przełącza) i **ROZMIAR**; przeciągaj, żeby ją położyć. Przeciągnięcie jednym rodzajem po drugim podmienia go w całych kwadratach 128 px - jeden rodzaj na kwadrat, tak gra rysuje wodę -; kwadraty, które pociągnięcie podmieni, są obrysowane, zanim zaczniesz malować. Prawy przycisk albo Shift zabiera każdą wodę. Obniża teren
 w nieckę z brzegiem, kładzie powierzchnię wody i dodaje jej efekty (kręgi na wodzie, bąble, wybuchy
 lawy) oraz region, w którym wybuchy rozpryskują wodę. Shift+przeciąganie ją usuwa. Jeden rodzaj
-wody ma na mapie jeden poziom, tak jak w misjach.
+wody ma na mapie jeden poziom, tak jak w misjach. Robot piechoty, który wejdzie w lawę - poniżej
+jej poziomu tam, gdzie lawa przykrywa teren - ginie; woda nikomu nie szkodzi, chyba że skrypt mapy
+tak postanowi (misje 11, 16 i 17).
 
 Drugi sposób to **Region jasnej wody** (Wszystkie obiekty, temat **Efekty**): prostokąt wody o prostych
 brzegach, bez brzegu terenu i bez efektów - sadzawka, zalana łąka albo dalsza część tafli jeziora.
