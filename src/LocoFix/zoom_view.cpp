@@ -16,8 +16,9 @@
 // - The world pass is Graphics_DrawScene as it is, without the interface's objects; Graphics_DrawEffects runs its
 //   timing there but draws nothing (the scroll effect moves the camera there, at the zoom's screen).
 // - After Direct3D's EndScene (screen_scaling.cpp's scale_frame) the logical picture is stretched into the
-//   window-sized back buffer - a nearest-pixel Blt at whole zooms (3: exact big pixels), else a Blt into a
-//   texture drawn as one linear-filtered quad (checked to the pixel at zoom 1: no shift) - and the interface's
+//   window-sized back buffer - a nearest-pixel Blt at whole zooms (2, 3: exact big pixels), else a Blt into a
+//   texture drawn as one linear-filtered quad (checked to the pixel at zoom 1: no shift), zoomed in through the
+//   picture enlarged k times first ("the sharp stretch") - and the interface's
 //   pass draws layers 2-10 again with only the interface's objects, at the window's size, then the minimap's
 //   inside (Minimap_Draw: the engine calls it in the update, after the frame's drawing - held for this pass),
 //   then the screen effects over everything (the fades cover the bar, as in the original).
@@ -565,16 +566,64 @@ float g_brighten[4] = {};
 uint32_t g_brighten_color = 0;
 using Brighten_t = void(__fastcall*)(void* g, void* edx, float l, float t, float r, float b, uint32_t color);
 
-// The filtered stretch: `source` of `from` copied into the texture (outside a scene), drawn as one quad.
-bool upload_filtered(IDirectDrawSurface7* from, const RECT& source) {
+// THE SHARP STRETCH. Between whole zooms a plain linear stretch blends every map pixel with its neighbours over a
+// window pixel or more - the whole picture looks soft (issue #22) - and a nearest one gives pixels of uneven size
+// that crawl as the map scrolls. So zoomed in the picture is first enlarged k times pixel by pixel (a Blt into the
+// texture: nearest, as dgVoodoo's Blts are with Bilinear2DOperations off) and that is drawn filtered down to the
+// zoom: every map pixel is a sharp block of the zoom's size, only its edges blended, over at most half a window
+// pixel (z / k <= 0.5: k = ceil(2z), within SHARP_SIDE and SHARP_TEXELS). Zoomed out (z < 1) the plain filtered
+// stretch stays. The texture is made bigger only when a step is reached, not in a glide's frames (a glide takes the k
+// that fits the texture it has, down to the plain stretch); if it cannot be made, the plain stretch. (dgVoodoo tells
+// the game its textures go up to 2048 x 2048, but makes and draws bigger ones - the whole-map view's 3072 x 2304
+// texture has been drawn so since the zoom came.)
+constexpr int SHARP_SIDE = 8192;
+constexpr double SHARP_TEXELS = 4096.0 * 3072.0;   // the most texels of the enlarged picture (25 MB at 16 bits)
+int g_sharp = 1;          // the k this view's stretch wants (1: the plain filtered one)
+bool g_sharp_grow = false;   // the texture may be made bigger for it (a step reached), once
+
+// The k of zoom z for a view of w x h (1: the plain filtered stretch).
+int sharp_scale(double z, int w, int h) {
+    if (z <= 1.0 + 1e-6) return 1;
+    int k = static_cast<int>(std::ceil(2.0 * z - 1e-6));
+    while (k > 1 && (k * w > SHARP_SIDE || k * h > SHARP_SIDE || static_cast<double>(k) * w * k * h > SHARP_TEXELS))
+        --k;
+    return k;
+}
+
+// The texture at least w x h, for the sharp stretch: false (the texture as it was) when it cannot be made.
+bool grow_texture(IDirectDrawSurface7* like, int w, int h) {
+    if (g_texture && g_texture_w >= w && g_texture_h >= h) return true;
+    IDirectDrawSurface7* t = make_surface(like, (std::max)(w, g_texture_w), (std::max)(h, g_texture_h),
+                                          DDSCAPS_TEXTURE | DDSCAPS_VIDEOMEMORY);
+    if (!t) return false;
+    if (g_texture) g_texture->Release();
+    g_texture = t;
+    g_texture_w = (std::max)(w, g_texture_w);
+    g_texture_h = (std::max)(h, g_texture_h);
+    return true;
+}
+
+// The filtered stretch: `source` of `from` copied into the texture (outside a scene) - enlarged k times for the sharp
+// stretch -, drawn as one quad.
+bool upload_filtered(IDirectDrawSurface7* from, const RECT& source, int& k) {
     const int w = source.right - source.left, h = source.bottom - source.top;
-    if (!ensure_texture(from, (std::max)(w, g_surface_w), (std::max)(h, g_surface_h))) return false;
-    RECT to = {0, 0, w, h};
+    k = g_sharp;
+    if (k > 1 && g_sharp_grow) {
+        g_sharp_grow = false;
+        if (!grow_texture(from, k * w, k * h)) {
+            patch::log("zoom: no %dx%d texture for the sharp stretch - the plain one", k * w, k * h);
+            g_sharp = k = 1;
+        }
+    }
+    while (k > 1 && !(g_texture && g_texture_w >= k * w && g_texture_h >= k * h)) --k;
+    if (k == 1 && !ensure_texture(from, (std::max)(w, g_surface_w), (std::max)(h, g_surface_h))) return false;
+    if (g_texture->IsLost() == DDERR_SURFACELOST) g_texture->Restore();
+    RECT to = {0, 0, k * w, k * h};
     return SUCCEEDED(g_texture->Blt(&to, from, const_cast<RECT*>(&source), DDBLT_WAIT, nullptr));
 }
 
-bool draw_filtered(uint8_t* g, const RECT& source, const RECT& target) {
-    const int w = source.right - source.left, h = source.bottom - source.top;
+bool draw_filtered(uint8_t* g, const RECT& source, const RECT& target, int k) {
+    const int w = (source.right - source.left) * k, h = (source.bottom - source.top) * k;
     struct Vertex { float x, y, z, rhw, u, v; };
     const float u = static_cast<float>(w) / g_texture_w, v = static_cast<float>(h) / g_texture_h;
     const float l = target.left - 0.5f, t = target.top - 0.5f, r = target.right - 0.5f, b = target.bottom - 0.5f;
@@ -825,7 +874,8 @@ bool zoom_view_present(uint8_t* g, IDirectDrawSurface7* back_buffer, IDirectDraw
     if (!ensure_overlay(picture, W, H)) return false;
     unlock_all(g);
     IDirectDrawSurface7* ours[3] = {field(g, BACK), field(g, ZBUF), field(g, DEPTH)};
-    const bool uploaded = g_filtered && upload_filtered(back_buffer, source);
+    int k = 1;
+    const bool uploaded = g_filtered && upload_filtered(back_buffer, source, k);
     if (!screen_set_render_target(g, game[0])) return false;
     field(g, BACK) = game[0];
     field(g, ZBUF) = game[1];
@@ -836,7 +886,7 @@ bool zoom_view_present(uint8_t* g, IDirectDrawSurface7* back_buffer, IDirectDraw
     screen_set_screen(g, W, H);
     if (!uploaded) picture->Blt(const_cast<RECT*>(&target), back_buffer, const_cast<RECT*>(&source), DDBLT_WAIT, nullptr);
     begin_scene(g);
-    if (uploaded && !draw_filtered(g, source, target)) {
+    if (uploaded && !draw_filtered(g, source, target, k)) {
         end_scene(g);
         picture->Blt(const_cast<RECT*>(&target), back_buffer, const_cast<RECT*>(&source), DDBLT_WAIT, nullptr);
         begin_scene(g);
@@ -974,6 +1024,8 @@ bool zoom_view_apply(double z, double surface_z) {
         g_target = target;
         const bool whole = std::fabs(z - std::round(z)) < 1e-6 && z >= 1.0;   // 2, 3: exact big pixels
         g_filtered = g_filter_setting == 1 || (g_filter_setting == 2 && !whole);
+        g_sharp = g_filtered && g_filter_setting == 2 ? sharp_scale(z, w, h) : 1;
+        g_sharp_grow = g_sharp > 1 && std::fabs(z - surface_z) < 1e-9;   // a step reached, not a glide's frame
     }
     if (g_view != was_view) {   // the interface's layout space changed: the window's, or the level's screen
         move_interface(g_view);
@@ -1031,6 +1083,7 @@ void zoom_view_restored() {
     }
     if (ok) {
         fog_buffer_cover((std::max)(g_view_w, g_surface_w), (std::max)(g_view_h, g_surface_h));
+        g_sharp_grow = g_sharp > 1;   // the sharp stretch's texture made again too
         patch::log("zoom: the view's surfaces made again after the loss (%dx%d%s)", g_view_w, g_view_h,
                    g_menu ? ", a menu up" : "");
         return;
