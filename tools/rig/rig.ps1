@@ -34,6 +34,9 @@
 # -Scale       the guest's display scale in % for this job (default 100): only the scale of a host
 #              monitor (the box window is put on it) - said plainly when no host monitor has it; see
 #              -Monitors. Jobs with another display than the running ones wait until the box is empty.
+# -Shared      (-Job script) the script runs alongside other jobs instead of alone: only for a script
+#              that drives its games through test_game.ps1 / window messages, never the real cursor,
+#              and changes nothing the whole guest shares (the registry, the display, the scale)
 # -Exclusive   the job runs alone in the box (nothing else runs while it runs; it waits for the
 #              running jobs to end) - for a timing measurement or anything that touches the whole guest.
 #              Installer, script, visible, -Sound jobs run alone anyway.
@@ -80,7 +83,7 @@ param(
   [string]$Script = "", [hashtable]$ScriptArgs = @{},
   [hashtable]$DgVoodoo = @{}, [switch]$Warp, [switch]$Sound, [int]$Parallel = 0, [int]$MemoryMB = 24576,
   [string]$Out = "", [double]$Timeout = 30, [switch]$Fresh, [int]$IdleMinutes = 10,
-  [switch]$Exclusive, [int]$MaxJobs = 12, [int]$MaxGames = 16, [double]$GamesGB = 16, [string]$DefaultResolution = "", [double]$MaxWait = 120,
+  [switch]$Exclusive, [switch]$Shared, [int]$MaxJobs = 12, [int]$MaxGames = 16, [double]$GamesGB = 16, [string]$DefaultResolution = "", [double]$MaxWait = 120,
   [switch]$Status, [switch]$Monitors, [switch]$Look, [Alias("Show")][switch]$Peek, [switch]$Front, [switch]$Hide, [switch]$Stop, [switch]$Kill, [switch]$Restart
 )
 $ErrorActionPreference = "Stop"
@@ -484,6 +487,7 @@ if (-not $spec.Tools) { throw "-Tools must be under $hostRoot" }
 if ($Scale) { $spec.Scale = $Scale }
 if ($Resolution) { $spec.Resolution = $Resolution }
 if ($Exclusive) { $spec.Exclusive = $true }
+if ($Shared) { $spec.Shared = $true }
 if ($Fresh) { $spec.Fresh = $true }
 if ($TestArgs.Count) { $spec.Args = $TestArgs }
 if ($Registry.Count) { $spec.Registry = $Registry }
