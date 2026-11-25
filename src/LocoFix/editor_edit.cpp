@@ -11701,7 +11701,7 @@ const char* context_tip(POINT m) {
     return nullptr;
 }
 constexpr int CONTEXT_FONT = 2, CONTEXT_LIT = 7, CONTEXT_STEP = 6;
-constexpr float CONTEXT_ROW = 41, CONTEXT_WIDTH = 409, CONTEXT_LABEL = 15;   // the label's characters
+constexpr float CONTEXT_ROW = 41, CONTEXT_WIDTH = 489, CONTEXT_LABEL = 15;   // the label's characters; wide enough for a row of four bracketed choices in every language
 
 // ---- the neutrals and the pirates in a fight ----
 //
@@ -12555,14 +12555,16 @@ void draw_context() {
     const POINT m = ui_mouse();
     for (size_t r = 0; r <= rows.size(); ++r) {   // the title's row, then the rows
         const float ry = y + r * CONTEXT_ROW;
-        draw_screen(VID_STRIP, 0, x + CONTEXT_WIDTH / 2, ry + CONTEXT_ROW / 2, CONTEXT_STEP);
+        // the strip's picture is STRIP_WIDTH wide: one at each end covers the wider panel (they overlap in the middle)
+        draw_screen(VID_STRIP, 0, x + STRIP_WIDTH / 2, ry + CONTEXT_ROW / 2, CONTEXT_STEP);
+        draw_screen(VID_STRIP, 0, x + CONTEXT_WIDTH - STRIP_WIDTH / 2, ry + CONTEXT_ROW / 2, CONTEXT_STEP);
         if (r == 0) {
             draw_text(CONTEXT_LIT, x + 10, ry + (CONTEXT_ROW - ch) / 2, title, false, CONTEXT_STEP + 1);
             continue;
         }
         const ContextRow& row = rows[r - 1];
         if (row.tip.key || *row.tip.english) g_context_tips.push_back({x, ry, x + CONTEXT_WIDTH, ry + CONTEXT_ROW, row.tip.get()});
-        const std::vector<ContextPiece> pieces = context_pieces(row, x + 10 + CONTEXT_LABEL * cw, x + 10, right, cw);
+        const std::vector<ContextPiece> pieces = context_pieces(row, x + 10 + CONTEXT_LABEL * cw, x + 10 + CONTEXT_LABEL * cw, right, cw);
         const int lines = pieces.empty() ? 1 : pieces.back().line + 1;
         // one line in the row's middle as always; a row of two lines (a long one in German or Hungarian) has
         // them 4 px apart, room for the underline under the first
