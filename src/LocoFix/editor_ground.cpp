@@ -56,6 +56,7 @@ void edit_message_text(const char* key, const char* english);   // editor_edit.c
 namespace {
 
 // GroundVid (re/types.txt): its tiles, texture count and Texture objects; a Texture's surface
+constexpr float DEPTH_AGREE = 2;   // levels the picture's depth may stand off the ground it shows (ground_depth_repair)
 constexpr size_t GV_TILES = 0x41c, GV_TEXTURE_COUNT = 0x420, GV_TEXTURES = 0x424, V_IMAGE_FLAGS = 0x2a0;
 constexpr size_t TEXTURE_SURFACE = 0x4;
 constexpr int PATCH = 128;   // a texture's sample
