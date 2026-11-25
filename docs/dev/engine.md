@@ -160,7 +160,15 @@ descent compiler working straight on the text (no token list). `Script_SkipSpace
 lexer: it skips comments, evaluates `#ifdef/#ifndef/#else/#endif` and expands `#define`
 names in place; `#include "file"` is compiled where it stands. Errors go to the log as
 `LOGIC '<text>' line <n>` with the source around them; almost every error then ends the
-game (`exit(1)`).
+game (`exit(1)`, called where the compiler stands, deep in its recursion - the game window just
+closes and the dated `error<date>.log` stays; a name declared nowhere, `Undeclared identifier`,
+is one of them: the whole file is compiled at the load, so a slip in a function that runs late
+ends the game at the start all the same). A few are only logged: a missing file (`Couldn't open`;
+the level runs without a script), an `#ifdef` without `#endif` or an `#endif` without `#ifdef`.
+What the interpreter finds while the level runs - `stack error`, `Call unexisted function`, `Unknown
+extern Function`, `this variable is not unit` - is only logged, and the game goes on. The editor compiles a map's script
+before it runs or plays it, with this compiler and apart from the level (`script_check.cpp`,
+editor.md "A script that does not compile").
 
 **Language** (as compiled, not as documented in the scripts): `int` and `string` variables
 (`int x[5] = {..}`, `int *p`), functions `Name(int a, string b = "x") { ... }`, `extern

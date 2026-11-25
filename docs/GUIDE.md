@@ -816,6 +816,12 @@ menu, the reinforcement arriving, the enemy attacking. When it ends, the game co
 editor on your map; to go back at once, press Esc and click **BACK TO THE EDITOR** (on the briefing's
 page, and on the exit button's page, ABORT GAME, too). Unsaved changes are asked about first.
 
+A map whose script (its `.lgc`, edited by hand) has an error the game's script compiler stops at does
+not start - neither QUICK TEST nor PLAY THE SAVED MAP: the editor stays on the map and says the error -
+the file, the line and what is wrong - in the status line and in a message (before, the game closed).
+Opened in the editor, such a map is shown without its script, and the status line says so. Fix the
+script and try again.
+
 ### 12. Save
 
 `Ctrl+S` saves the map into its file; a map that has none yet (a campaign map, a new map) asks for
