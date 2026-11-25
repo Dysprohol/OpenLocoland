@@ -807,6 +807,12 @@ przybywające posiłki, atakujący wróg. Gdy się skończy, gra wraca do edytor
 wrócić od razu, naciśnij Esc i kliknij **WROC DO EDYTORA** (na stronie z odprawą, a także na stronie
 przycisku wyjścia, WYJDZ Z GRY). O niezapisane zmiany najpierw pyta.
 
+Mapa, której skrypt (jej plik `.lgc` poprawiany ręcznie) ma błąd, na którym kompilator skryptów gry się
+zatrzymuje, nie uruchamia się - ani TEST BEZ ZAPISU, ani ZAGRAJ ZAPISANA MAPE: edytor zostaje na mapie i
+podaje błąd - plik, wiersz i co jest nie tak - w wierszu stanu i w komunikacie (wcześniej gra się
+zamykała). Otwarta w edytorze, taka mapa jest pokazana bez skryptu i wiersz stanu to mówi. Popraw skrypt
+i spróbuj ponownie.
+
 ### 12. Zapisz
 
 `Ctrl+S` zapisuje mapę do jej pliku; mapa, która go jeszcze nie ma (mapa kampanii, nowa mapa), pyta

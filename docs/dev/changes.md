@@ -775,7 +775,15 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       from it again, so nothing changes there. `LocoFix.log` says the volumes before every level load.
       Checked in the test rig, old and new LocoFix, sound 11 and music 20 saved (37 and 68): every editor
       path and the way back at 100 before, at 37 and 68 now; mission 1 from the main menu 37 and 68 both
-      ways; the 20 missions pass.
+      ways; the 20 missions pass,
+  66. a map's script that does not compile no longer closes the editor (`script_check.cpp`, editor.md "A
+      script that does not compile"): the engine's compiler ends the game on almost every compile error, so
+      Run the level, Play the map or just opening such a map in the editor closed the game. The editor now
+      compiles the script first with the engine's compiler, apart from the level and on a thread of its own
+      whose `exit` ends only that thread; a run or a play of a script that does not compile (or is missing)
+      is not started - the editor stays on the map and says the compiler's first error as `error.log` has
+      it -, and a map opened in the editor with such a script is held without it. A map that compiles runs
+      as before; a game started from the menu is not touched.
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that

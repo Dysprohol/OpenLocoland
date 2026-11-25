@@ -285,6 +285,35 @@ back; the same straight after a run for a Paint stroke (sand) and two Water stro
 Shift over the hill after a run - the map's flat meadow back (v0.2.9: the hill, the copy's picture).
 RESTART of the same map keeps it running.
 
+**A script that does not compile** (`src/LocoFix/script_check.cpp`, engine.md "Loading"). The engine
+compiles a level's whole script as the level loads, and on almost every compile error the compiler ends
+the game where it stands (`exit(1)`): a map of the editor with a slip in its `.lgc` - a `)` missing, a
+name declared nowhere, `Undeclared identifier`, in a function that would run only late - closed the
+game at Run the level or as Play the map's game started, the editor with it, and a run's edits not saved
+were lost (a player's error logs of 2026-11-21 show it: Run the level's copy, then the map itself in the
+next game, both ending at `Undeclared identifier`). Now the
+editor compiles the script first - Run the level the copy it runs (after writing it), Play the map the
+saved map's - with the engine's own `Script_Load` into a script machine of LocoFix's, apart from the
+World's, on a thread of its own: the hook of the CRT's `exit` ends only that thread when the compiler
+gives up, and the files it had open on it are closed (the hooks of `fopen` and `fclose` keep the list;
+the engine's code runs on the main thread only, its CRT is the single-threaded one, and the main thread
+waits for the check). A script that does not compile, or a missing one (which ran the level without its
+script), is not run: the editor stays on the held map with its history and its edits, the status line
+says the compiler's first error as `error.log` has it (`LOGIC 'maps\_run\_run.lgc' line 2219: 0 Missing
+)`), and a message (not in a test) gives it with the 60 characters of source around it, says when the
+file is Run the level's copy and of which script, and that the game's error log has it (`ScriptErrorText`,
+`ScriptErrorCopy`, `ScriptMissingText`, `MsgScriptError`, `ScriptErrorTitle`). The editor's own load
+compiled the script too, so such a map closed the game as it was opened (File > Load, the start on it,
+the way back from Play the map): in editor mode a level loaded to be held is checked first (the hook of
+`Script_Load`), and one that does not compile is held without its script (released, as with a missing
+file) and the status line says why (`MsgScriptHeld`); the run's own load is not checked again. Each
+check is logged (`script check: ... compiles`, `... does not compile (...) - <the error> | <the source
+around it>`); a good script is compiled twice that way, once by the check and once by the load, and the
+check's success adds the compiler's `LoadScript::ByteCode` line to `error.log` a second time. A crash
+while the level loads is not caught by this (the engine's own filter writes `EXCEPTION!` and the game
+ends), and nor are the interpreter's errors while the level runs, which the engine only logs (engine.md
+"Loading").
+
 **Hints under the cursor** (`editor_edit.cpp`, "the hint under the cursor"). The status line explains
 the tool; a hint is a few words beside the cursor - the keys of the tool on the map, or of the bar's
 entry under the cursor (`hint_of`: `HintSelect` ... `HintRegion`, the Paint tool's gravel bed mode
