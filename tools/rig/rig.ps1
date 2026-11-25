@@ -147,9 +147,20 @@ function BoxRunning { if ($wsbExe) { return [bool](BoxIds).Count } else { return
 function Read-Box {
   for ($i = 0; $i -lt 10; $i++) {
     if (-not (Test-Path $boxFile)) { return $null }
-    try { return (Get-Content $boxFile -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop) } catch { Start-Sleep -Milliseconds 200 }
+    try { return (Get-Content $boxFile -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop) } catch { }
+    # a file two writers left with the object twice: the first whole object counts
+    try { $raw = Get-Content $boxFile -Raw -ErrorAction Stop; $cut = $raw.IndexOf("}`n{"); if ($cut -lt 0) { $cut = $raw.IndexOf("}`r`n{") }
+          if ($cut -gt 0) { return ($raw.Substring(0, $cut + 1) | ConvertFrom-Json -ErrorAction Stop) } } catch { }
+    Start-Sleep -Milliseconds 200
   }
   throw "$boxFile could not be read as JSON (another rig.ps1 kept writing it)"
+}
+# box.json written whole: to a file of its own, then moved over the old one, so two rig.ps1 writing at
+# once leave one whole object, never a mix
+function Write-Box($obj) {
+  $tmp = "$boxFile.$PID.tmp"
+  ($obj | ConvertTo-Json) | Set-Content $tmp -Encoding utf8
+  Move-Item $tmp $boxFile -Force
 }
 function AgentState {
   $f = Join-Path $io "agent\state.json"
@@ -282,7 +293,7 @@ function Start-Box {
     $h = HiddenClient; if ($h -ne [IntPtr]::Zero) { [void][RigHost]::Capture($h, (Join-Path $home_ "start-error.png")) }
     Kill-Box; throw "the box's agent did not come up in 180 s - box stopped (its window: $home_\start-error.png)"
   }
-  @{ started = $t.ToString("o"); vgpu = $gpu; wsb = [bool]$wsbExe } | ConvertTo-Json | Set-Content $boxFile -Encoding utf8
+  Write-Box @{ started = $t.ToString("o"); vgpu = $gpu; wsb = [bool]$wsbExe }
   Say "box up in $([int]((Get-Date) - $t).TotalSeconds) s"
 }
 
@@ -307,7 +318,7 @@ function Set-BoxDisplay([string]$res, [int]$scale) {
   $want = "${w}x${h}@$($mon.Dpi)"
   $b = Read-Box
   $b | Add-Member display ([pscustomobject]@{ res = "${w}x$h"; scale = $scale }) -Force
-  ($b | ConvertTo-Json) | Set-Content $boxFile -Encoding utf8
+  Write-Box $b
   # A display counts only once the guest has kept it for 3 s: the client changes its own size a
   # moment after a move between monitors of different scales, and a job must not start on a passing one.
   function Held([string]$want) {
