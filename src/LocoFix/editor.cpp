@@ -68,6 +68,7 @@
 #include "editor_mission.h"
 #include "editor_rows.h"
 #include "editor_text.h"
+#include "script_check.h"
 #include <shobjidl.h>
 #include <cctype>
 #include <cstdio>
@@ -1059,6 +1060,35 @@ std::string run_copy_map() {
     return g_run_folder + "\\" + g_run_folder.substr(5) + ".map";
 }
 
+// The map's script compiled before the level runs or the map is played (script_check.cpp): a script
+// the engine's compiler gives up on ended the game at the level's load - the editor with it, and Run
+// the level's edits not saved - and a missing one ran the level without its script. Such a map is not
+// started: the editor stays on it, the status line and a message say the compiler's first error, as
+// error.log has it. `copy_of` is the map's own script when `lgc` is Run the level's copy of it.
+bool script_compiles(HWND window, const std::string& lgc, const std::string& copy_of) {
+    const ScriptCheck check = script_check(lgc);
+    if (check.ok) return true;
+    const std::string what =
+        check.missing ? ui_printf(ui_format("ScriptMissing", "the script %s is missing"), lgc.c_str()) : check.line;
+    edit_message_line(ui_printf(ui_format("MsgScriptError", "The map's script does not compile, the map is not started: %s"),
+                                what.c_str()));
+    if (asks()) {
+        std::string text =
+            check.missing
+                ? ui_printf(ui_format("ScriptMissingText", "The map's script %s is missing, so the map is not started."), lgc.c_str())
+                : ui_printf(ui_format("ScriptErrorText", "The map's script does not compile, so the map is not started (the game "
+                                                         "would close as the level loads):\n\n%s\n\nnear: %s\n\nThe game's error "
+                                                         "log (the logs folder) has it too."),
+                            check.line.c_str(), check.near_text.c_str());
+        if (!copy_of.empty() && !check.missing)
+            text += "\n\n" + ui_printf(ui_format("ScriptErrorCopy", "%s is the copy of %s that the quick test runs."), lgc.c_str(),
+                                       copy_of.c_str());
+        DialogScope scope;
+        ui_message_box(window, text.c_str(), ui_text("ScriptErrorTitle", "Map script"), MB_OK | MB_ICONWARNING);
+    }
+    return false;
+}
+
 bool run_level(HWND window) {
     if (!g_held) return false;
     const std::string map = game_path(current_map());
@@ -1093,6 +1123,7 @@ bool run_level(HWND window) {
             return false;
         }
     }
+    if (!script_compiles(window, script_of(run), copy ? script_of(map) : "")) return false;
     if (uint8_t* w = world()) {
         g_run_view_x = *reinterpret_cast<float*>(w + 0x44);
         g_run_view_y = *reinterpret_cast<float*>(w + 0x48);
@@ -1548,6 +1579,7 @@ void handle_command(HWND window, int id) {
         } else if (!ask_save(window)) {
             return;
         }
+        if (!script_compiles(window, script_of(game_path(current_map())), "")) return;
         g_playing = true;   // the map stays for the game that plays it
         g_playing = restart_game(false, current_map(), true);   // back here when it ends
     } else if (id == ID_BACK) {
@@ -1835,6 +1867,13 @@ void editor_level_loaded(void* w) {
                     edit_message_size("MsgMapLarge", "a big map (%d x %d px): when painting the ground, save often", pw, ph);
             }
         }
+        // a script that does not compile: the level is held without it (script_check.cpp), said last so
+        // the status line keeps it
+        ScriptCheck script;
+        if (script_check_held(script))
+            edit_message_line(ui_printf(ui_format("MsgScriptHeld", "The map's script does not compile - the map is open without it, "
+                                                                   "fix the script before running the map: %s"),
+                                        script.line.c_str()));
         // the old folder of a map renamed or deleted (Rename or delete): its files are not in use now
         if (!g_remove_after_load.empty() && lower_path(folder_of(game_path(map))) != lower_path("maps\\" + g_remove_after_load)) {
             const std::string folder = g_remove_after_load;

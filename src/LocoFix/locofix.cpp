@@ -51,6 +51,7 @@ void install_script_log();
 void install_script_value();
 void install_world_script();
 void install_script_refs();
+void install_script_check();
 void install_player_registry();
 void install_level_save();
 void install_editor();
@@ -169,6 +170,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         install_script_value();
         install_world_script();
         install_script_refs();
+        install_script_check();   // the editor's check of a map's script before it runs (script_check.cpp)
         install_player_registry();
         install_mouse_pan();
         // Screen scaling hooks RegisterClassA after test mode and calls test mode's
