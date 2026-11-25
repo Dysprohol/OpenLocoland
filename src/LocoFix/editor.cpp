@@ -817,13 +817,18 @@ bool save_map(const std::string& path) {
         patch::log("editor: %s not saved - out of memory; the files on disk are as they were", target.c_str());
         if (attempt || !save_no_memory(window, scratch)) return false;
     }
+    const std::string from = g_current.empty() ? "" : game_path(g_current);   // the map the editor stands on
     g_current = path;
     if (!scratch) edit_saved();
     if (!image.empty() && !along) patch::log("ground: the painted picture saved as %s", image.c_str());
     if (along) patch::log("editor: %s takes its ground along as %s", target.c_str(), image.c_str());
     // its mission: the script (a new map gets one), the texts, the custom maps page
-    mission_save(target);
-    if (!scratch) edit_message_saved(target);
+    mission_save(target, from);
+    if (!scratch && mission_own_script())
+        edit_message_line(ui_printf(ui_format("MsgSavedOwnScript", "saved as %s - its script as it was: the editor does not "
+                                                                   "write it (Mission settings)"),
+                                    target.c_str()));
+    else if (!scratch) edit_message_saved(target);
     if (!scratch) panel_saved(target);   // SAVED in the middle of the view
     return true;
 }
@@ -1848,6 +1853,9 @@ void editor_level_loaded(void* w) {
         if (auto_folder(folder_of(g_current))) mark_folder(folder_of(g_current), nullptr);
         mission_load(game_path(map));
         hold_level(world, true);
+        if (mission_own_script() && !g_run_back)   // once when it is loaded; a message below may follow it
+            edit_message_line(ui_text("MsgOwnScript", "this map's script is the author's own: the editor does not write it "
+                                                      "(Mission settings)"));
         const std::string lost = missing_ground();
         if (!lost.empty()) {
             patch::log("editor: the ground image %s of %s is missing - the ground is black", lost.c_str(), map);

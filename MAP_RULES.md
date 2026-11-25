@@ -600,7 +600,10 @@ rules):
   before `// <editor>`, as `TrainsTactDeclares.lgc` takes them only when declared before it, and
   no `#ifdef` inside a block (a save writes the block without it). The enemy's trains have no
   object on the map (the AI makes them while the level runs); the editor marks where they start,
-  their patrols and the factory that builds them.
+  their patrols and the factory that builds them. A script with the line `// <editor off>`
+  (Mission settings: "The editor writes the map's script" unticked) is the author's own: the
+  editor writes nothing into it, also not under a new name (`docs/dev/editor-mission.md` "The
+  author's own script").
 - **[editor]** Train arrivals (the Arrivals panel): arrays `arrival_*[]` and `ARRIVALS` in the
   first block (a column per arrival; its own cars as `int this_trainNN[]`, a type no template uses,
   the enemy's posts and patrols as `ATA_STANDn_X/Y` and `ATA_PATROLn_*`), the factories' later

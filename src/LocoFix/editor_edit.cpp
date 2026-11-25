@@ -6856,6 +6856,10 @@ std::string order_problem(uint8_t* car, int task, int x, int y) {
 
 bool push_lines_editable() {
     if (mission_managed()) return true;
+    if (mission_own_script()) {
+        MESSAGE("MsgOwnScript", "this map's script is the author's own: the editor does not write it (Mission settings)");
+        return false;
+    }
     MESSAGE("MsgNoEditorBlocks", "this map's script has no editor blocks: save the map under a new name to edit its push lines");
     return false;
 }

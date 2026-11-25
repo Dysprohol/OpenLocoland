@@ -20,7 +20,9 @@
 // the blocks, otherwise the template's (maps\template\template.lgc, map_tool.py new --script) -
 // the settings and the SetPushLine calls read from the old script go into the new blocks. A
 // script without the blocks (the campaign) is not changed: its settings are shown and its push
-// lines drawn, read-only.
+// lines drawn, read-only. A script with the line "// <editor off>" (Mission settings: "The editor
+// writes the map's script" unticked) is the author's own: nothing is written into it - blocks, title,
+// texts -, also not under a new name or in Run the level's copy, which get it byte for byte.
 //
 // The texts are the map's files, in the pack's code page in capitals (the fonts have no small letters), at most 44
 // characters a line (the briefing's width), CRLF: objectives.txt, win.txt, loose.txt and the
@@ -38,6 +40,7 @@
 #include "editor_mission.h"
 #include "editor_text.h"
 #include "custom_maps.h"
+#include "zip_read.h"
 
 #include <algorithm>
 #include <cctype>
@@ -131,6 +134,13 @@ bool g_managed = false;
 std::string g_map;   // the map the mission was read from or saved with
 ArrivalsState g_arrivals;
 int g_arrivals_refusal = 0;   // why the script cannot run arrivals: 0 it can, 1 no editor blocks, 2 no TrainsTact();
+// The author's own script (Mission settings: "The editor writes the map's script" unticked, kept in the
+// script as the line OWN_MARK): a save writes nothing into it - no blocks, no title, no texts -, and a
+// save under a new name or Run the level's copy gets it byte for byte (own_script_save).
+bool g_own_script = false;
+const char OWN_MARK[] = "// <editor off>";
+const char OWN_LINE[] = "// <editor off> the map editor does not write this script (Mission settings: "
+                        "\"The editor writes the map's script\" unticked; delete this line to let it)";
 
 // ---- text ----
 
@@ -196,6 +206,38 @@ bool write_file(const std::string& path, const std::string& data) {
 }
 
 bool exists(const std::string& path) { return GetFileAttributesA(path.c_str()) != INVALID_FILE_ATTRIBUTES; }
+
+// A script's size and CRC-32 for LocoFix.log (a test compares the file before and after a save).
+std::string file_stamp(const std::string& data) {
+    char out[48];
+    std::snprintf(out, sizeof out, "%u bytes, CRC-32 %08X", static_cast<unsigned>(data.size()),
+                  static_cast<unsigned>(zipfile::crc32(data)));
+    return out;
+}
+
+// The line OWN_MARK, anywhere in a script, makes it the author's own.
+bool own_mark(const std::string& line) { return starts_with(trim(line), OWN_MARK); }
+bool has_own_mark(const std::string& text) {
+    for (const std::string& line : split_lines(text))
+        if (own_mark(line)) return true;
+    return false;
+}
+// The script without its OWN_MARK lines, every other line as it was (its line end too).
+std::string without_own_mark(const std::string& text) {
+    std::string out;
+    for (size_t a = 0; a < text.size();) {
+        size_t b = text.find('\n', a);
+        b = b == std::string::npos ? text.size() : b + 1;
+        if (!own_mark(text.substr(a, b - a))) out += text.substr(a, b - a);
+        a = b;
+    }
+    return out;
+}
+// The script with OWN_LINE first (a script that has the mark stays as it is).
+std::string with_own_mark(const std::string& text) {
+    if (has_own_mark(text)) return text;
+    return std::string(OWN_LINE) + (text.empty() || text.find("\r\n") != std::string::npos ? "\r\n" : "\n") + text;
+}
 
 // A map's texts are in the code page of the language pack they are written with (language.ini:
 // 1250 Polish and Hungarian, 1251 Russian, 1252 English and German), the one its fonts draw.
@@ -3287,7 +3329,8 @@ bool parse_patrol(const std::string& raw, TrainPatrol& out) {
 enum : int {
     IDC_TITLE = 100, IDC_HEADER, IDC_MONEY, IDC_TIME, IDC_RAIN, IDC_NUKE, IDC_LIMIT, IDC_WAVES, IDC_TRAIN, IDC_START,
     IDC_QUEUE, IDC_OBJECTIVES, IDC_WIN, IDC_LOSE, IDC_BRIEF, IDC_ARRIVALS, IDC_WEATHER, IDC_PLAN, IDC_MUSIC,
-    IDC_MUSIC_FILE, IDC_MUSIC_ADD, IDC_MUSIC_REMOVE, IDC_MUSIC_UP, IDC_MUSIC_DOWN, IDC_FLIES, IDC_FLY_COUNT
+    IDC_MUSIC_FILE, IDC_MUSIC_ADD, IDC_MUSIC_REMOVE, IDC_MUSIC_UP, IDC_MUSIC_DOWN, IDC_FLIES, IDC_FLY_COUNT,
+    IDC_WRITES, IDC_SCRIPT_NOTE
 };
 // The authors' fliers over the map (environmenttact.lgc calls Muxi(MUXI_NVID, MUXI) of civil.lgc: while
 // fewer than MUXI of the kind are there, one more comes in from beyond a map edge, army 2): none, the
@@ -3297,6 +3340,17 @@ const int FLY_KINDS[] = {0, 268, 416, 422};
 constexpr int FLY_MAX = 50;   // the missions have 2-20
 bool g_open_arrivals = false;   // the dialog ended with its Arrivals... button
 bool g_open_plan = false;       // ... or its Plan... button (the enemy factory's panel)
+
+// The line under the texts: what a save does with the script (`own`: the box "The editor writes the
+// map's script" unticked).
+std::wstring script_note(bool own) {
+    if (own)
+        return ui_wtext("MissionOwnScript", "The editor does not write this script: a save leaves the .lgc and the texts as they "
+                                            "are, also under a new name. The settings here are only shown.");
+    return g_managed ? ui_wtext("MissionManaged", "The texts are written in capitals, 44 characters a line, when the map is saved.")
+                     : ui_wtext("MissionUnmanaged", "This script has no editor blocks: the settings are written when the map is "
+                                                    "saved under a new name.");
+}
 
 
 std::wstring widen(const std::string& s) { return from_pack(s); }
@@ -3695,9 +3749,14 @@ INT_PTR CALLBACK mission_proc(HWND dialog, UINT m, WPARAM w, LPARAM) {
         SetDlgItemTextW(dialog, IDC_WIN, s.win.c_str());
         SetDlgItemTextW(dialog, IDC_LOSE, s.lose.c_str());
         SetDlgItemTextW(dialog, IDC_BRIEF, brief_text(s.brief).c_str());
+        CheckDlgButton(dialog, IDC_WRITES, g_own_script ? BST_UNCHECKED : BST_CHECKED);
         return TRUE;
     }
     if (m != WM_COMMAND) return FALSE;
+    if (LOWORD(w) == IDC_WRITES && HIWORD(w) == BN_CLICKED) {   // the note says what a save will do
+        SetDlgItemTextW(dialog, IDC_SCRIPT_NOTE, script_note(IsDlgButtonChecked(dialog, IDC_WRITES) != BST_CHECKED).c_str());
+        return TRUE;
+    }
     if (LOWORD(w) == IDCANCEL) {
         EndDialog(dialog, 0);
         return TRUE;
@@ -3724,6 +3783,10 @@ INT_PTR CALLBACK mission_proc(HWND dialog, UINT m, WPARAM w, LPARAM) {
         return TRUE;
     }
     s = n;
+    const bool own = IsDlgButtonChecked(dialog, IDC_WRITES) != BST_CHECKED;
+    if (own != g_own_script)
+        patch::log("mission: the editor %s the script from the next save", own ? "no longer writes" : "writes");
+    g_own_script = own;
     g_open_arrivals = LOWORD(w) == IDC_ARRIVALS;   // the settings as OK keeps them, then the panel
     g_open_plan = LOWORD(w) == IDC_PLAN;
     EndDialog(dialog, 1);
@@ -3767,7 +3830,9 @@ std::vector<int> mission_type_cars(const std::string& type) { return template_ca
 std::vector<PushLine>& mission_push_lines() { return g_lines; }
 const std::vector<TrainPatrol>& mission_patrols() { return g_patrols; }
 const std::vector<PushLine>& mission_script_push_lines() { return g_script_lines; }
-bool mission_managed() { return g_managed; }
+// The settings and push lines are written on a save: the script has the blocks and is not the author's own.
+bool mission_managed() { return g_managed && !g_own_script; }
+bool mission_own_script() { return g_own_script; }
 std::vector<EnemyTrainMark> mission_enemy_trains() {
     std::vector<EnemyTrainMark> out;
     for (const EnemyTrain& t : g_mission.start) out.push_back({type_name(t.type), t.time, t.patrol, t.x1, t.y1, t.x2, t.y2});
@@ -3782,9 +3847,11 @@ void mission_load(const std::string& map) {
     g_script_lines.clear();
     g_patrols.clear();
     g_map = map;
-    const std::vector<std::string> lines = split_lines(read_file(script_of(map)));
+    const std::string text = read_file(script_of(map));
+    const std::vector<std::string> lines = split_lines(text);
     const Blocks b = find_blocks(lines);
     g_managed = b.found();
+    g_own_script = std::any_of(lines.begin(), lines.end(), own_mark);
     Parsed p;
     for (int i = 0; i < static_cast<int>(lines.size()); ++i) {
         const bool in_block = i > b.open && i < b.close, in_main = i > b.main_open && i < b.main_close;
@@ -3812,8 +3879,9 @@ void mission_load(const std::string& map) {
     g_arrivals.waves = g_mission.reinforcements;
     if (g_arrivals.on) read_arrivals(p, g_arrivals);
     g_arrivals_refusal = !g_managed ? 1 : !g_arrivals.on && (b.trains_tact < 0 || b.header < 0) ? 2 : 0;
-    patch::log("mission: %s - %s, %u push lines of the editor, %u of the script, %u start trains, %u in the queue, %s",
-               script_of(map).c_str(), g_managed ? "an editor mission" : "no editor blocks",
+    patch::log("mission: %s (%s) - %s%s, %u push lines of the editor, %u of the script, %u start trains, %u in the queue, %s",
+               script_of(map).c_str(), file_stamp(text).c_str(), g_managed ? "an editor mission" : "no editor blocks",
+               g_own_script ? " - the author's own script, the editor writes nothing into it" : "",
                static_cast<unsigned>(g_lines.size()), static_cast<unsigned>(g_script_lines.size()),
                static_cast<unsigned>(g_mission.start.size()), static_cast<unsigned>(g_mission.factories.queue.size()),
                g_arrivals.on ? ui_printf("%u arrivals", static_cast<unsigned>(g_arrivals.list.size())).c_str()
@@ -3843,6 +3911,8 @@ std::vector<int> mission_reinforcement_train() {
     return cars;
 }
 std::string mission_arrivals_refusal() {
+    if (g_own_script && !g_arrivals.on)   // CONVERT would take the point locomotives away and write no arrivals
+        return ui_text("ArrOwnScript", "THE EDITOR DOES NOT WRITE THIS MAP'S SCRIPT (MISSION SETTINGS)");
     if (g_arrivals.on || !g_arrivals_refusal) return "";
     return g_arrivals_refusal == 1 ? ui_text("ArrNoBlocks", "THIS MAP'S SCRIPT HAS NO EDITOR BLOCKS (A CAMPAIGN MISSION, THE "
                                                             "SANDBOX): SAVE THE MAP UNDER A NEW NAME FIRST")
@@ -4084,12 +4154,10 @@ bool mission_dialog(HWND owner, bool* open_arrivals, bool* open_plan) {
     t.item(EDIT, L"", IDC_LOSE, MULTILINE, 8, 264, 200, 24);
     t.item(STATIC, ui_wtext("MissionBrief", "Briefing (a line --- starts the next page):").c_str(), -1, label, 214, 172, 198, 8);
     t.item(EDIT, L"", IDC_BRIEF, MULTILINE, 214, 182, 198, 106);
-    t.item(STATIC,
-           g_managed ? ui_wtext("MissionManaged", "The texts are written in capitals, 44 characters a line, when the map "
-                                                  "is saved.").c_str()
-                     : ui_wtext("MissionUnmanaged", "This script has no editor blocks: the settings are written when the "
-                                                    "map is saved under a new name.").c_str(),
-           -1, label, 8, 294, 404, 16);
+    t.item(STATIC, script_note(g_own_script).c_str(), IDC_SCRIPT_NOTE, label, 8, 290, 404, 16);
+    // the author's own script: unticked, a save writes nothing into it (the line OWN_MARK keeps the choice)
+    t.item(BUTTON, ui_wtext("MissionWritesScript", "The editor writes the map's script (its marked blocks)").c_str(), IDC_WRITES,
+           BS_AUTOCHECKBOX | WS_TABSTOP, 8, 312, 404, 12);
     t.item(BUTTON, ui_wtext("ButtonOk", "OK").c_str(), IDOK, BS_DEFPUSHBUTTON | WS_TABSTOP, 504, 312, 50, 14);
     t.item(BUTTON, ui_wtext("ButtonCancel", "Cancel").c_str(), IDCANCEL, BS_PUSHBUTTON | WS_TABSTOP, 562, 312, 50, 14);
     g_open_arrivals = g_open_plan = false;
@@ -4100,7 +4168,36 @@ bool mission_dialog(HWND owner, bool* open_arrivals, bool* open_plan) {
     return result == 1;
 }
 
-void mission_save(const std::string& map) {
+// The author's own script saved with `map`: written only when it is not there byte for byte as the
+// map's own (`from`'s script; a save in place: its own) with the mark - a save under a new name or Run the
+// level's copy gets it unchanged, the save that unticks the box adds the mark line and nothing else. No
+// block, no title or header, no text is written; the custom maps page reads the map's name as always.
+static void own_script_save(const std::string& map, const std::string& from) {
+    const std::string script = script_of(map);
+    std::string source = from.empty() ? std::string() : read_file(script_of(from));
+    if (source.empty()) source = read_file(script);
+    if (source.empty()) {
+        patch::log("mission: no script for %s - the author's own script is not there", map.c_str());
+        return;
+    }
+    const std::string data = with_own_mark(source);
+    if (exists(script) && read_file(script) == data) {
+        patch::log("mission: %s left as it is (%s) - the author's own script, the editor writes nothing into it", script.c_str(),
+                   file_stamp(data).c_str());
+    } else if (write_file(script, data)) {
+        patch::log("mission: %s %s (%s) - the author's own script, nothing else written into it", script.c_str(),
+                   data == source ? ("copied unchanged from " + script_of(from)).c_str() : "given the line \"// <editor off>\"",
+                   file_stamp(data).c_str());
+    }
+    g_map = map;
+    if (!editor_unsaved_map(map)) custom_maps_list();
+}
+
+void mission_save(const std::string& map, const std::string& from) {
+    if (g_own_script) {
+        own_script_save(map, from);
+        return;
+    }
     const std::string script = script_of(map);
     if (!exists(script)) {
         // a new map: the script of the map it comes from when that is an editor mission, else
@@ -4121,15 +4218,17 @@ void mission_save(const std::string& map) {
         patch::log("mission: %s made from %s", script.c_str(),
                    g_managed ? script_of(g_map).c_str() : (exists(TEMPLATE_SCRIPT) ? TEMPLATE_SCRIPT : "the map's script"));
     }
-    const std::string text = read_file(script);
+    // the box ticked again: the mark goes, the rest as before
+    const std::string disk = read_file(script), text = without_own_mark(disk);
+    if (text != disk) patch::log("mission: %s - the line \"// <editor off>\" taken out, the editor writes the script", script.c_str());
     std::vector<std::string> lines = split_lines(text);
     const Blocks b = find_blocks(lines);
     if (!b.found()) {
         patch::log("mission: %s has no editor blocks, its settings are not written", script.c_str());
-        if (!own_name(map).empty()) {   // only its title and header lines follow the map's name
-            const std::string retitled = custom_map_retitled(text, own_name(map));
-            if (retitled != text && write_file(script, retitled)) patch::log("mission: %s retitled after its name", script.c_str());
-        }
+        // only its title and header lines follow the map's name
+        const std::string retitled = own_name(map).empty() ? text : custom_map_retitled(text, own_name(map));
+        if (retitled != disk && write_file(script, retitled) && retitled != text)
+            patch::log("mission: %s retitled after its name", script.c_str());
         g_managed = false;
         g_map = map;
         return;
@@ -4347,7 +4446,8 @@ static bool plan_of_line(const std::string& text, FactoryTrain& t) {
 // ("arrivals: keep" keeps the authors' reinforcement waves, "arrivals:" alone sets them to 0); the
 // lines "limit: army nvid max" and "unlock: x y nvid seconds" (a factory's place on the map) replace
 // its unit limits and the units the factories get later, the lines "plan: ..." (plan_of_line) the
-// factories' plans ("plans:" alone empties them).
+// factories' plans ("plans:" alone empties them); "own_script: 1" unticks "The editor writes the map's
+// script", "own_script: 0" ticks it.
 bool mission_settings_from_file(const std::string& path) {
     static const std::map<std::string, int> KEYS = {
         {"title", IDC_TITLE}, {"header", IDC_HEADER}, {"money", IDC_MONEY}, {"time", IDC_TIME},
@@ -4364,6 +4464,7 @@ bool mission_settings_from_file(const std::string& path) {
     int red_lights = -1;   // the file's PASS_RED_LIGHTS, -1 the map's
     int neutral_trains = -1;   // the file's NEUTRAL_TRAINS, -1 the map's
     int peaceful = -1;         // the file's FACTIONS_PEACEFUL, -1 the map's
+    int own_script = -1;       // own_script: 1 the author's own script (the box unticked), 0 the editor writes it, -1 as it is
     bool orders_given = false;   // the file's orders replace the map's
     std::vector<FactoryTrain> plans;
     bool plans_given = false;
@@ -4394,6 +4495,10 @@ bool mission_settings_from_file(const std::string& path) {
             if (!orders_given) g_patrols.clear();
             orders_given = true;
             g_patrols.push_back(t);
+            continue;
+        }
+        if (name == "own_script") {   // own_script: 0|1 (Mission settings: "The editor writes the map's script" ticked / unticked)
+            own_script = to_int(trim(line.substr(colon + 1))) != 0;
             continue;
         }
         if (name == "red_lights") {   // red_lights: <mask> (PASS_RED_LIGHTS: 4 the neutrals, 8 the pirates)
@@ -4480,9 +4585,10 @@ bool mission_settings_from_file(const std::string& path) {
     if (plans_given) n.factories.queue = plans;   // the factories are found by their places (edit_level_held, a save)
     g_mission = n;
     g_arrivals = arrivals;
-    patch::log("mission test: settings of %s - %u start trains, %u in the queue, %u arrivals", path.c_str(),
+    if (own_script >= 0) g_own_script = own_script != 0;
+    patch::log("mission test: settings of %s - %u start trains, %u in the queue, %u arrivals%s", path.c_str(),
                static_cast<unsigned>(n.start.size()), static_cast<unsigned>(n.factories.queue.size()),
-               static_cast<unsigned>(g_arrivals.list.size()));
+               static_cast<unsigned>(g_arrivals.list.size()), g_own_script ? ", the author's own script" : "");
     return true;
 }
 std::vector<std::string> mission_music_files() {
