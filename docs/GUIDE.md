@@ -799,7 +799,16 @@ Menu → **MISSION SETTINGS** (or the gear in the strip):
 - **Enemy factory's plan**: how many trains it has; **Plan...** opens an enemy factory's panel, where
   they are set;
 - **Objectives**, the **win** and **loss** texts and the **briefing** (a line `---` starts the next
-  page). They are written in capitals, 44 characters a line, when the map is saved.
+  page). They are written in capitals, 44 characters a line, when the map is saved;
+- **The editor writes the map's script** - ticked as it comes. The editor keeps its settings in marked
+  blocks of the map's script (`<name>.lgc`): the lines from `// <editor>`, `// <editor main>`,
+  `// <editor arrivals>` and `// <editor tact>` to their `// </editor ...>` lines. It writes only those
+  blocks; whatever you write outside them stays. A script without the blocks is left alone, but saved
+  under a new name it gets them. If you write the whole script yourself, untick the box: the script
+  gets the line `// <editor off>` at its next save (you can also type it in yourself), and from then
+  on no save, save under a new name or quick test writes anything into it - nor into the texts; the
+  settings in this window are only shown, and the status line says so. Tick it again and the editor
+  writes its blocks as before.
 
 The mission is **won** when the enemy had units and has none left (its trains, its factory, the
 fort's guns), and **lost** when the player has no units left and no factory.

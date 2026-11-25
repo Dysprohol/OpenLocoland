@@ -112,6 +112,30 @@ page, and writes a text the language pack has a copy of (the sandbox's,
 `lang\<code>\maps\sandbox\`) into that copy - the game reads it instead of the root's, so an edit
 written to the root never showed.
 
+**The author's own script** (2026-11-25; `g_own_script`, `own_script_save` in `editor_mission.cpp`; a
+modder asked how to keep the editor from filling his `.lgc`). The rule above was hidden: the editor
+writes only its four blocks (`// <editor>`, `// <editor main>`, `// <editor arrivals>`,
+`// <editor tact>`, each to its `// </editor ...>` line), a script without them is left as it is (its
+title line and `BRIEF_HEADER` follow a custom map's name, nothing else), but a save under a new name
+builds the new map's script from the template with the blocks - so a hand-written script could not be
+saved under another name without being changed. Now Mission settings has a box, **The editor writes the
+map's script (its marked blocks)**, ticked by default. Unticked, the choice is kept in the script itself,
+where the editor keeps the map's other settings, so it goes with the map (export, a folder sent by hand):
+the next save puts the line `// <editor off> ...` first (`OWN_LINE`; the line anywhere in the script counts,
+so an author can type it in), and from then on a save writes nothing into the script - no block, no title,
+no text file (`objectives.txt` ...): in place the file is left as it is, a save under a new name and Run
+the level's copy get it byte for byte from the map the editor stands on (`save_map` passes it as `from`;
+a copy written only when its bytes differ). The settings, push lines, orders and plans of such a map are
+shown, not saved (`mission_managed()` is false, so the Push line tool says why and the building lines are
+not taken or given, CONVERT is refused with `ArrOwnScript`); the dialog's last line says so while the box is
+unticked, the status line when the map is loaded and on every save ("saved as ... - its script as it was").
+The paths in the script are the author's: a copy under a new name still names the old folder's files where
+the script does. Ticking it again takes the line out at the next save, and the blocks are written as before
+(the push lines of `main()`'s block were read as the editor's all the while). Rename and Import under another
+name still put the new folder's name into the script's paths and title (`exchange_renamed`), as for any map.
+A map without the line - every map before - behaves as before. `LocoFix.log` gives the script's size and
+CRC-32 when it is loaded and when an own script is saved; test mode's settings file takes `own_script: 0|1`.
+
 **The enemy's trains of the script** (`draw_enemy_trains`, `editor_edit.cpp`). The start trains
 and the factory's queue (`start_trains*`, `level_queue_*`) are made by the AI while the level
 runs (`TrainsTact.lgc`, `ai_events.lgc`), so the map has no object for them. On the held level the

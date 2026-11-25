@@ -795,7 +795,16 @@ Menu → **USTAWIENIA MISJI** (albo zębatka na listwie):
 - **plan fabryki wroga**: ile ma pociągów; **Plan...** otwiera panel fabryki wroga, gdzie się je
   ustawia;
 - **zadania**, teksty **zwycięstwa** i **porażki** oraz **odprawa** (linia `---` zaczyna następną
-  stronę). Przy zapisie mapy są zapisywane wielkimi literami, po 44 znaki w linii.
+  stronę). Przy zapisie mapy są zapisywane wielkimi literami, po 44 znaki w linii;
+- **Edytor zapisuje skrypt mapy** - zaznaczone na start. Edytor trzyma swoje ustawienia w oznaczonych
+  blokach skryptu mapy (`<nazwa>.lgc`): w liniach od `// <editor>`, `// <editor main>`,
+  `// <editor arrivals>` i `// <editor tact>` do ich linii `// </editor ...>`. Zapisuje tylko te bloki;
+  to, co napiszesz poza nimi, zostaje. Skrypt bez bloków zostaje nietknięty, ale zapisany pod nową
+  nazwą dostaje je. Jeśli cały skrypt piszesz sam, odznacz to pole: przy następnym zapisie skrypt
+  dostaje linię `// <editor off>` (możesz ją też wpisać sam) i od tej pory żaden zapis, zapis pod nową
+  nazwą ani test bez zapisu nic w nim nie zmienia - ani w tekstach; ustawienia w tym oknie są tylko
+  pokazane, a wiersz stanu mówi to wprost. Zaznacz je znowu, a edytor zapisuje swoje bloki jak
+  wcześniej.
 
 Misja jest **wygrana**, gdy wróg miał jednostki i nie zostało mu żadnej (pociągi, fabryka, działa
 fortyfikacji), a **przegrana**, gdy graczowi nie zostało żadnej jednostki ani fabryki.
