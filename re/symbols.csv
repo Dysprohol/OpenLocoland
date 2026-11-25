@@ -1008,7 +1008,7 @@
 0x44c190;f;Unit_Delete;Unit vtable slot 0: deleting destructor.
 0x42d3c0;f;Unit_DeleteDerived;Deleting destructor (slot 0) of Unit subclasses without their own destructor: Avia, Building, Creature, Balloon.
 0x44cbf0;f;Unit_Action;Unit vtable slot 1: items (ACT_ADD_ITEM..ACT_GET_ITEM), ammo, behave, ACT_SAVE/ACT_RESTORE of behave and items, steering around obstacles (ACT_PATH_BLOCK), ACT_NEXT_COMMAND (attack logic: Object_UpdateAttack, Object_FindTarget with BEH_ flags).
-0x44c640;f;Unit_Move;Unit vtable slot 3: movement of B_UNIT/B_AVIA with steering toward the goal and obstacle avoidance (avoidCounter).
+0x44c640;f;Unit_Move;Unit vtable slot 3: movement of B_UNIT/B_AVIA with steering toward the goal and obstacle avoidance (avoidCounter). LocoFix lava_robots.cpp hooks it: an infantry robot (VID 70) below a lava tile's (293) level on its place dies after its step.
 0x44c240;f;Unit_Draw;Unit vtable slot 5: health bar (VIDs 0x25d/0x1cc), ammo bar (0x1cd), unit bar number (VID 8), engine behave indicator, then the object.
 0x44d750;f;Unit_DrawDebug;Unit vtable slot 6: jump to Object_DrawDebug.
 0x44c840;f;Unit_GetItemsString;Item list as text (script GetCommands for units, depots, buildings, class 7).
