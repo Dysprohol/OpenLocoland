@@ -826,7 +826,14 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       whose command stack holds a walk to it is told through its own `OnObjectDeleted`, as the engine's round
       would; the robot strolls on. Checked in the test rig with a script destroying a house every 2 s among 30
       civil robots: the old build crashed at 0x4378d4 within two minutes, this one ran 13 minutes (330 houses,
-      more than 20 of them walked to) without an exception; the 20 missions pass.
+      more than 20 of them walked to) without an exception; the 20 missions pass,
+  70. lava glows at night (`game/objects.override/objects.tsv`, VID 293, editor-ground.md "Sheets of water and
+      lava"): the lava's tiles darkened with the time of day's gamma as all ground does, so lava went dark at
+      night - on the maps of the editor, whose night darkens red the most, it could hardly be told from grass.
+      The tiles get VID flag 0x800, as the lights and the lava stream (801) have it: the engine leaves their
+      colours as by day, so lava glows evenly by day and by night, at no cost (the gamma is not applied, the
+      frame does less). It holds for the missions' lava too (l12, l13). Checked in the test rig: an editor map's
+      lava at night, dark before, its day colours now.
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that

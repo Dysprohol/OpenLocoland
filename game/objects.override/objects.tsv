@@ -48,3 +48,7 @@ nvid	name	spriteType	spriteClass	flags	moveMask	sizeX	sizeY	sizeZ	maxHp	speed	sp
 # same way, their mouse tips MenuVid956AllDir/957
 956	Settings editor interface left	0x400	FRAME	0x2800	0xf	17	17	0	0	0	0	999999	999999	2500	1	1	1	1	vid\495menu.vid
 957	Settings editor interface right	0x400	FRAME	0x2800	0xf	17	17	0	0	0	0	999999	999999	2500	1	1	1	1	vid\496menu.vid
+# VID 293, the lava's tiles: flag 0x800 as the lights and the lava stream (801) have it, so the time of
+# day's gamma leaves them as by day and lava glows at night too (GroundVid_Draw adds the world's gamma
+# to a VID's own unless its flags have 0x800)
+293	лава	0x1	SPRITE	0x1010800	0xf	128	128	0	0	0	0	999999	999999	2500	1	1	1	1	vid\293.vid
