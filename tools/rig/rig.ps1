@@ -232,7 +232,11 @@ function Stop-Box([int]$wait = 60) {
 
 function Start-Box {
   if (BoxRunning) {
+    # a busy box (many games at once) can be late with its heartbeat: wait for it up to 3 minutes
+    $late = (Get-Date).AddMinutes(3)
+    while (-not (BoxUp) -and (BoxRunning) -and (Get-Date) -lt $late) { Start-Sleep -Seconds 3 }
     if (BoxUp) { Attach-Client; return }
+    if (-not (BoxRunning)) { return Start-Box }
     throw "a Windows Sandbox is running that is not the rig's, or its agent does not answer - only one can run at a time; close it, or rig.ps1 -Kill"
   }
   Close-Clients 0   # a client left from a box that shut itself down
