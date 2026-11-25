@@ -19,8 +19,9 @@
 // InterfaceScale "1", "2" or "3" in the Players key next to MinimapSize, absent = normal. It is read
 // each time the bar is built - a mission's start and the way back from the Esc menu (the bar is given
 // up while the menu is open) - and used only as far as it fits the game's screen at that moment:
-//   - twice from 960 px of height and 1328 of width, three times from 1440 and 1992 - the bar at most
-//     about a tenth of the screen's height, and the minimap at the same scale clear of the bar's
+//   - twice from 720 px of height and 1328 of width, three times from 1080 and 1992 - the bar at most
+//     about an eighth of the screen's height (960 and 1440 until 2026-11-25: a 1600 x 900 game had no bigger
+//     bar, though it fits; the editor keeps 960 and 1440, its panels must fit), and the minimap at the same scale clear of the bar's
 //     controls (they end 228 px right of the middle at the normal size, the frame is 104 px wide);
 //   - the screen is the game's logical one: a map smaller than the window (mission 1) is drawn at
 //     that size and stretched (screen_scaling.cpp), its bar with it - so mission 1's 1024x768 gets the
@@ -63,7 +64,8 @@ constexpr int CROP_NVID = 466, CROP_W = 584, CROP_H = 532;
 constexpr bool box_only(int nvid) { return nvid == 502 || nvid == 503; }   // vid\empty.vid: only the box grows
 // What each scale needs of the screen: the bar at most about a tenth of the height, and the minimap at
 // the same scale clear of the bar's controls (228 px right of the middle + a 104 px frame, times s).
-constexpr int HEIGHT_PER_STEP = 480;
+constexpr int HEIGHT_PER_STEP = 360;          // the play interface: the bar at most about an eighth of the height
+constexpr int EDITOR_HEIGHT_PER_STEP = 480;   // the editor's: its panels (the menu device's 479 px) must fit too
 constexpr int WIDTH_PER_STEP = 2 * (228 + 104);
 constexpr int VID_GAMMA_SLOT = 7;          // Vid vtable: SetGamma(Gamma*, army)
 constexpr int VID_ARMY_GAMMA = 0x398;      // Vid: Gamma[4] armyGamma
@@ -138,7 +140,7 @@ bool ready(int s, int* flags = g_ready, int from = 0, int to = PLAY_COUNT) {
     return flags[s] != 0;
 }
 
-bool fits(int s, int w, int h) { return s <= 1 || (h >= HEIGHT_PER_STEP * s && w >= WIDTH_PER_STEP * s); }
+bool fits(int s, int w, int h, int per_step = HEIGHT_PER_STEP) { return s <= 1 || (h >= per_step * s && w >= WIDTH_PER_STEP * s); }
 
 int biggest(int w, int h) {
     int s = MAX_SCALE;
@@ -266,7 +268,7 @@ int g_editor_ready[MAX_SCALE + 1] = {1, 1, -1, -1};
 bool editor_ready(int s) { return ready(s) && ready(s, g_editor_ready, PLAY_COUNT, COUNT); }
 int editor_biggest(int w, int h) {
     int s = MAX_SCALE;
-    while (s > 1 && (!fits(s, w, h) || !editor_ready(s))) --s;
+    while (s > 1 && (!fits(s, w, h, EDITOR_HEIGHT_PER_STEP) || !editor_ready(s))) --s;
     return s;
 }
 int editor_chosen() {
