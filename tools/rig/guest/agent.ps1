@@ -154,6 +154,11 @@ function Games-Running { $t = 0; foreach ($r in $running.Values) { $t += $r.Game
 function Pick($waiting) {
   if (Box-Fresh) { $f = $waiting | Where-Object { $_.Cls.Fresh } | Select-Object -First 1; if ($f) { return $f } }
   $best = $null; $bestKey = $null
+  # A job that must run alone (or in a fresh box) holds the whole box: it goes after the jobs that can
+  # share it, unless it has waited 20 minutes already (so it is not starved).
+  $shareable = @($waiting | Where-Object { -not $_.Cls.Excl -and -not $_.Cls.Fresh })
+  $overdue = @($waiting | Where-Object { ($_.Cls.Excl -or $_.Cls.Fresh) -and ((Get-Date) - $_.Since).TotalMinutes -ge 20 })
+  if ($shareable.Count -and -not $overdue.Count) { $waiting = $shareable }
   foreach ($w in $waiting) {
     $served = if ($lastServed.ContainsKey($w.Cls.Caller)) { $lastServed[$w.Cls.Caller] } else { [datetime]::MinValue }
     $key = "{0:yyyyMMddHHmmssfff}|{1}" -f $served, $w.Id
