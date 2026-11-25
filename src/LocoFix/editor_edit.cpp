@@ -6719,9 +6719,9 @@ void log_push_lines() {
     for (const auto* list : lists)
         for (const PushLine& l : *list) {
             const Trace t = trace(l);
-            patch::log("push line %d,%d -> %d,%d flag %d (%s): %s, %u points", l.bx, l.by, l.ex, l.ey, l.flag,
+            patch::log("push line %d,%d -> %d,%d flag %d (%s): %s, %u points%s", l.bx, l.by, l.ex, l.ey, l.flag,
                        list == &mission_push_lines() ? "editor" : "script", t.error ? t.error : "ok",
-                       static_cast<unsigned>(t.path.size()));
+                       static_cast<unsigned>(t.path.size()), l.no_building ? ", no building's" : "");
         }
 }
 
@@ -6884,7 +6884,7 @@ int line_at(int x, int y) {
 // clicked): drawn white, named in the status line; Del, T, R / E / the wheel and its panel act on it.
 void select_line(int i) {
     g_push_selected = i;
-    MESSAGE("MsgPushSelected", "push line selected: Del deletes it, T switches the flag, R / E turn it round, the right button: its panel");
+    MESSAGE("MsgPushSelected", "push line selected: Del deletes it, T switches the flag, R / E turn it round, B its building, drag an end to move it, the right button: its panel");
 }
 
 // A click of the Push line tool at a point of the map (screen coordinates plus the camera).
@@ -6942,7 +6942,7 @@ void push_change(int key) {
         return;
     }
     if (key == 'T') l.flag = l.flag ? 0 : 1;
-    if (key == 'R') l = {l.ex, l.ey, l.bx, l.by, l.flag};
+    if (key == 'R') l = {l.ex, l.ey, l.bx, l.by, l.flag, l.no_building};
     commit_lines(key == 'T' ? UiText{"OpPushFlag", "push flag"} : UiText{"OpPushTurn", "turn push line"}, before);
     MESSAGE("MsgPushLine", "now: %s", line_effect(l, false).c_str());
 }
@@ -7534,29 +7534,158 @@ bool building_line(uint8_t* o, PushLine& line) {
 // deleted).
 bool same_line(const PushLine& a, const PushLine& b);   // posts, below
 
-// The index of the editor's line that is `o`'s rule line (building_line), -1 for none.
-int rule_line_index(uint8_t* o) {
+// The index of the line among `lines` (the editor's) that is `o`'s rule line (building_line), -1 for none.
+int rule_line_index(uint8_t* o, const std::vector<PushLine>& lines) {
     if (nvid_of(o) != VID_DEPOT && nvid_of(o) != VID_WORKSHOP) return -1;
     PushLine rule;
     if (!building_line(o, rule)) return -1;
-    const std::vector<PushLine>& lines = mission_push_lines();
     for (int i = 0; i < static_cast<int>(lines.size()); ++i)
         if (same_line(lines[i], rule)) return i;
     return -1;
 }
+int rule_line_index(uint8_t* o) { return rule_line_index(o, mission_push_lines()); }
 
-// The editable line of a factory or repair point (its index; none, or one): its rule line, when no other
-// building has the same rule line.
+// A building's line (the maintainer's request and decision of 2026-11-17). Since v0.2.12 a factory's
+// exit line went the way building_line's walk chose at a switch - the branch nearest to the spur's way
+// - and nothing could change it: a line drawn by hand to the other branch was the map maker's, not the
+// factory's (no lights of its own, no capture at its end, the plan not waiting for a train on it). Now a
+// line's end is dragged onto the track the map maker wants (line_drag, below), and a line is a building's
+// own line when it is
+//  - the line the editor makes for it where it stands (its rule line, as before 2026-11-17), or else
+//  - a line through it: one that leaves a factory from the dead end it stands at (that rail point is the
+//    line's begin - a line ending there pushes trains into the factory, which is no exit) or that runs
+//    over a repair point's rail point (building_dot) anywhere on its way - a line drawn by hand or one
+//    whose end was moved; on a line through several buildings the first one met from its begin,
+// unless its panel says BUILDING'S: NO (PushLine::no_building, kept in the script). A building has one line:
+// its rule line first, else the first line through it (the editor's order, which a save keeps). A line of
+// two buildings' rule (one standing on the other's place) is neither's, as before, and a post's own line
+// (a light's L line, a pair's) stays the post's. What a line through a building does not change: the
+// building's move, turn or deletion takes only its rule line (and the lights of it) - a line drawn or
+// changed by the map maker is never erased by a building (the rule of 2026-11-14), its lights stay with
+// it - and a building moved or placed where a line runs through it keeps that line and gets no second one.
+// The runner gets the answer as push_of_x/y[] (edit_line_buildings): its OwnLine is the line of a
+// factory's plan exit (PlanExit) and of the capture (CaptureTact).
+
+// The rail point a building stands at: a factory's dead end (the begin of its rule line), a repair point's
+// point of its leg (the middle of its rule line); null for none.
+uint8_t* building_dot(uint8_t* o) {
+    const float x = at<float>(o, O_X), y = at<float>(o, O_Y);
+    if (nvid_of(o) == VID_DEPOT) {
+        const float a = at<int>(o, O_DIRECTION) * 6.2831853f / 256;
+        const float vx = std::sin(a), vy = -std::cos(a);
+        uint8_t* end = point_near(x - vx * FACTORY_INSIDE, y - vy * FACTORY_INSIDE, 1, 40);
+        return end && dot_links(end) == 1 ? end : nullptr;
+    }
+    if (nvid_of(o) == VID_WORKSHOP) return point_near(x, y, 2, 40);
+    return nullptr;
+}
+
+bool owns(uint8_t* o, const PushLine& l);   // posts, below
+
+// The building each of `lines` (the editor's, or a copy of them) is the own line of, null for none, as above.
+std::vector<uint8_t*> line_buildings_now(const std::vector<PushLine>& lines) {
+    std::vector<uint8_t*> out(lines.size(), nullptr);
+    std::vector<uint8_t*> buildings, posts;
+    for_each_object([&](uint8_t* o) {
+        if (removed(o)) return;
+        if (nvid_of(o) == VID_DEPOT || nvid_of(o) == VID_WORKSHOP) buildings.push_back(o);
+        else if (nvid_of(o) == VID_SEMAPHORE) posts.push_back(o);
+    });
+    std::sort(buildings.begin(), buildings.end(), [](uint8_t* a, uint8_t* b) {   // ties by place, not the objects' order
+        return at<float>(a, O_X) != at<float>(b, O_X) ? at<float>(a, O_X) < at<float>(b, O_X) : at<float>(a, O_Y) < at<float>(b, O_Y);
+    });
+    std::map<int, std::vector<uint8_t*>> rules;
+    for (uint8_t* b : buildings)
+        if (const int r = rule_line_index(b, lines); r >= 0) rules[r].push_back(b);
+    std::set<uint8_t*> has_line;
+    for (const auto& [r, of] : rules)
+        if (of.size() == 1 && !lines[r].no_building) {
+            out[r] = of[0];
+            has_line.insert(of[0]);
+        }
+    std::vector<uint8_t*> dots;
+    for (uint8_t* b : buildings) dots.push_back(building_dot(b));
+    for (size_t i = 0; i < lines.size(); ++i) {
+        if (out[i] || lines[i].no_building || rules.count(static_cast<int>(i))) continue;
+        const Trace t = trace(lines[i]);
+        if (t.error || t.path.size() < 2) continue;
+        if (std::any_of(posts.begin(), posts.end(), [&](uint8_t* p) { return owns(p, lines[i]); })) continue;
+        size_t best = SIZE_MAX;
+        uint8_t* found = nullptr;
+        for (size_t k = 0; k < buildings.size(); ++k) {
+            if (!dots[k] || has_line.count(buildings[k])) continue;
+            size_t at_point = SIZE_MAX;
+            if (nvid_of(buildings[k]) == VID_DEPOT) {
+                if (t.path.front() == dots[k]) at_point = 0;
+            } else {
+                const auto it = std::find(t.path.begin(), t.path.end(), dots[k]);
+                if (it != t.path.end()) at_point = static_cast<size_t>(it - t.path.begin());
+            }
+            if (at_point < best) best = at_point, found = buildings[k];
+        }
+        if (found) {
+            out[i] = found;
+            has_line.insert(found);
+        }
+    }
+    return out;
+}
+
+// The same, kept while the rail network, the lines, the buildings and the posts stay as they are: the
+// overlay asks it for every line and post every frame, and an edit asks it for every post (own_line) - each
+// answer a search of every line's way and every post's rail point. A scope of RailMemo of its own keeps
+// those searches; the answer is kept by the network's signature and a hash of the lines and of the
+// buildings' and posts' places, directions and colours, so any change of them is answered afresh.
+std::vector<uint8_t*> line_buildings(const std::vector<PushLine>& lines) {
+    const RailMemo memo;
+    uint64_t h = 1469598103934665603ull;
+    auto mix = [&](uint64_t v) { h = (h ^ v) * 1099511628211ull; };
+    for (const PushLine& l : lines)
+        for (int v : {l.bx, l.by, l.ex, l.ey, l.flag, l.no_building}) mix(static_cast<uint32_t>(v));
+    for_each_object([&](uint8_t* o) {
+        if (removed(o) || (nvid_of(o) != VID_DEPOT && nvid_of(o) != VID_WORKSHOP && nvid_of(o) != VID_SEMAPHORE)) return;
+        mix(reinterpret_cast<uintptr_t>(o));
+        uint32_t bits[2];
+        std::memcpy(&bits[0], o + O_X, 4);
+        std::memcpy(&bits[1], o + O_Y, 4);
+        mix(bits[0]);
+        mix(bits[1]);
+        mix(static_cast<uint32_t>(at<int>(o, O_DIRECTION)));
+        mix(red(o) ? 1u : 0u);
+    });
+    static std::map<std::pair<uint64_t, uint64_t>, std::vector<uint8_t*>> kept;   // (rails, lines and objects) -> answer
+    const auto key = std::make_pair(g_rail_memo.signature, h);
+    const auto found = kept.find(key);
+    if (found != kept.end()) return found->second;
+    if (kept.size() > 8) kept.clear();
+    return kept[key] = line_buildings_now(lines);
+}
+std::vector<uint8_t*> line_buildings() { return line_buildings(mission_push_lines()); }
+
+// The line of a factory or repair point (its index; none, or one), as above.
 std::vector<int> lines_of(uint8_t* o) {
     std::vector<int> out;
-    const int i = rule_line_index(o);
-    if (i < 0) return out;
-    bool shared = false;
-    for_each_object([&](uint8_t* b) {
-        if (!shared && b != o && !removed(b) && rule_line_index(b) == i) shared = true;
-    });
-    if (!shared) out.push_back(i);
+    const std::vector<uint8_t*> of = line_buildings();
+    for (size_t i = 0; i < of.size(); ++i)
+        if (of[i] == o) out.push_back(static_cast<int>(i));
     return out;
+}
+
+// Its line when that is its rule line - the one its move, turn or deletion takes with its lights.
+std::vector<int> rule_lines_of(uint8_t* o) {
+    std::vector<int> out = lines_of(o);
+    const int rule = out.empty() ? -1 : rule_line_index(o);
+    out.erase(std::remove_if(out.begin(), out.end(), [&](int i) { return i != rule; }), out.end());
+    return out;
+}
+
+// The building a line of the editor would be the own line of with its panel's BUILDING'S: YES (null: it runs
+// through none, or it is a post's or another building's line) - the panel shows its row then.
+uint8_t* line_building_candidate(int index) {
+    std::vector<PushLine> lines = mission_push_lines();
+    if (index < 0 || index >= static_cast<int>(lines.size())) return nullptr;
+    lines[index].no_building = 0;
+    return line_buildings(lines)[index];
 }
 
 // The posts of a factory or repair point (issue #14). The map keeps no tie between a post and a
@@ -7675,9 +7804,9 @@ PostOwners post_owners() {
     };
     std::vector<Line> lines;
     std::set<int> theirs;
-    for (uint8_t* b : buildings) {
-        for (int i : lines_of(b)) theirs.insert(i);
-        for (int i : lines_of(b)) {
+    for (uint8_t* b : buildings) {   // a line through a building (not its rule line) has its lights as any line: they stay with it
+        for (int i : rule_lines_of(b)) theirs.insert(i);
+        for (int i : rule_lines_of(b)) {
             const Trace t = trace(mission_push_lines()[i]);
             lines.push_back({b, line_posts(t), line_reach(t), mission_push_lines()[i]});
         }
@@ -7819,7 +7948,7 @@ std::vector<uint8_t*> posts_of_others(uint8_t* o, const PostOwners& owners) {
 bool take_building_lines(uint8_t* o, std::vector<uint8_t*>& posts, const PostOwners* owners) {
     if (!o || (nvid_of(o) != VID_DEPOT && nvid_of(o) != VID_WORKSHOP)) return false;
     if (!mission_managed()) return false;   // lines the editor does not save: none is taken, nor a post (give_building_line)
-    std::vector<int> own = lines_of(o);
+    std::vector<int> own = rule_lines_of(o);   // a line through it (not its rule line) stays, with its lights
     const PostOwners mine = owners ? PostOwners() : post_owners();
     const PostOwners& all = owners ? *owners : mine;
     const size_t first = posts.size();
@@ -7997,10 +8126,9 @@ bool same_line(const PushLine& a, const PushLine& b) {
 // The lines of the factories and repair points of the map (never a post's own).
 std::set<int> building_lines() {
     std::set<int> out;
-    for_each_object([&](uint8_t* o) {
-        if (!removed(o) && (nvid_of(o) == VID_DEPOT || nvid_of(o) == VID_WORKSHOP))
-            for (int i : lines_of(o)) out.insert(i);
-    });
+    const std::vector<uint8_t*> of = line_buildings();
+    for (size_t i = 0; i < of.size(); ++i)
+        if (of[i]) out.insert(static_cast<int>(i));
     return out;
 }
 
@@ -8219,6 +8347,15 @@ void turn_post(uint8_t* o) {
 // building there made a new line and posts beside the script's (the third review).
 void give_building_line(uint8_t* o) {
     if (!mission_managed()) return;
+    // a line runs through it where it stands now (a factory's exit drawn to another branch, a hand line over
+    // a repair point's track): that is its line ("A building's line"), it gets no second one
+    if (const std::vector<int> through = lines_of(o); !through.empty() && through[0] != rule_line_index(o)) {
+        const PushLine& l = mission_push_lines()[through[0]];
+        MESSAGE("MsgBuildingLineThrough", "%s at %.0f,%.0f direction %d keeps the push line %d,%d -> %d,%d that runs through it as its own",
+                nvid_of(o) == VID_DEPOT ? ui_text("WordFactory", "factory") : ui_text("WordRepairPoint", "repair point"),
+                at<float>(o, O_X), at<float>(o, O_Y), at<int>(o, O_DIRECTION), l.bx, l.by, l.ex, l.ey);
+        return;
+    }
     PushLine line;
     if (!building_line(o, line)) return;
     const Trace t = trace(line);
@@ -8362,6 +8499,183 @@ void end_sweep() {
 // over it, and the first one's changes stayed on the map without a step of the history.
 int g_held_button = 0;
 
+// ---- a line's end dragged, a line's building ----
+//
+// The button pressed on an end of a push line (within 10 px of its bar or arrow, line_at) in the Select or
+// the Push line tool selects the line and begins a drag of that end (the nearer one): the end follows the
+// rail point under the cursor (drawn, draw_push_lines) and let go there the line runs to it - one step of
+// the history, the line keeping its flag, its direction's sense and its panel's BUILDING'S. So a factory's
+// exit line is dragged from the branch the editor chose at a switch onto the other one, and the factory's
+// trains leave by it (the engine pushes the cars along the line's way, the shortest from begin to end); its
+// line stays the factory's own (it leaves the factory's dead end: "A building's line"). Laid as asked: the
+// only refusal is the engine's - no way between the two points ("Can't PushLineFindDot"), then the end
+// stays. The line's lights go with it: the posts standing as its lights before (post_owners: its building's,
+// when it was the building's rule line, or the line's own) are moved to the places its new way gives
+// (line_posts: the red one at its end, a green one at a begin joined on), a missing one made, one too many
+// deleted; a line without lights gets none, and a line a post owns (a light's L line) leaves its post as
+// it is. Let go where it began - a click - it is only selected, as before; any other end of the drag (a
+// tool, a panel, the window left) leaves the line as it was.
+struct LineDrag {
+    bool active = false, moved = false;
+    int line = -1;      // its index among the editor's lines
+    bool end = true;    // the end dragged (false: the begin)
+    POINT from{};       // where the button went down (the view's point)
+    PushLine was{};     // the line as it was
+};
+LineDrag g_line_drag;
+
+// The button down at a map point: on an end of a line it is selected and the drag begins; false: no line there.
+bool start_line_drag(float x, float y, POINT m) {
+    const int i = line_at(static_cast<int>(x), static_cast<int>(y));
+    if (i < 0) return false;
+    select_line(i);
+    if (!mission_managed()) return true;   // the script's lines: selected, not moved (push_lines_editable says so)
+    const PushLine& l = mission_push_lines()[i];
+    g_line_drag = LineDrag();
+    g_line_drag.active = true;
+    g_line_drag.line = i;
+    g_line_drag.end = std::hypot(static_cast<float>(l.ex) - x, static_cast<float>(l.ey) - y) <=
+                      std::hypot(static_cast<float>(l.bx) - x, static_cast<float>(l.by) - y);
+    g_line_drag.from = m;
+    g_line_drag.was = l;
+    return true;
+}
+
+void continue_line_drag(POINT m) {
+    if (g_line_drag.active && !g_line_drag.moved && (std::abs(m.x - g_line_drag.from.x) > 3 || std::abs(m.y - g_line_drag.from.y) > 3))
+        g_line_drag.moved = true;
+}
+
+// The line the drag gives with the end at the rail point nearest to a map point (screen coordinates).
+PushLine dragged_line(float x, float y, uint8_t** dot = nullptr) {
+    PushLine l = g_line_drag.was;
+    uint8_t* d = nearest_dot(static_cast<int>(x), static_cast<int>(y));
+    if (dot) *dot = d;
+    if (!d) return l;
+    const POINT p = dot_screen(d);
+    (g_line_drag.end ? l.ex : l.bx) = p.x;
+    (g_line_drag.end ? l.ey : l.by) = p.y;
+    return l;
+}
+
+std::string line_owner(int index);
+
+// Line `index` runs as `now` (it was `was`): its lights moved with it as above, all of it into one step.
+void move_line(int index, const PushLine& was, const PushLine& now, const UiText& what) {
+    std::vector<PushLine>& lines = mission_push_lines();
+    const std::vector<PushLine> lines_before = lines;
+    const PostOwners owners = post_owners();
+    std::vector<uint8_t*> lights;
+    bool post_line = false;
+    for_each_object([&](uint8_t* p) {
+        if (!post_line && !removed(p) && nvid_of(p) == VID_SEMAPHORE && owns(p, was)) post_line = true;
+    });
+    if (!post_line) {
+        for (const auto& [post, b] : owners.building) {
+            const std::vector<int> rule = rule_lines_of(b);
+            if (!rule.empty() && rule[0] == index) lights.push_back(post);
+        }
+        for (const auto& [post, l] : owners.line_of)
+            if (same_line(l, was) && std::find(lights.begin(), lights.end(), post) == lights.end()) lights.push_back(post);
+    }
+    lines[index] = now;
+    std::vector<uint8_t*> objects;
+    std::vector<State> before;
+    if (!lights.empty()) {
+        std::vector<char> used(lights.size(), 0);
+        for (const Post& place : line_posts(trace(now))) {
+            int best = -1;   // the nearest unused light, its colour first
+            float best_d = 1e9f;
+            for (int pass = 0; pass < 2 && best < 0; ++pass)
+                for (size_t k = 0; k < lights.size(); ++k) {
+                    if (used[k] || (pass == 0 && red(lights[k]) != place.red)) continue;
+                    const float d = std::hypot(at<float>(lights[k], O_X) - place.x, at<float>(lights[k], O_Y) - place.y);
+                    if (d < best_d) best_d = d, best = static_cast<int>(k);
+                }
+            uint8_t* v = vid_by_number(VID_SEMAPHORE);
+            const float z = v ? ground_z(v, place.x, place.y) : 0;
+            uint8_t* p = nullptr;
+            if (best >= 0) {
+                used[best] = 1;
+                p = lights[best];
+                objects.push_back(p);
+                before.push_back(state_of(p));
+                reinterpret_cast<MoveTo_t>(OBJECT_MOVE_TO)(p, nullptr, place.x, place.y, z);
+                set_direction(p, place.direction);
+            } else if (v && (p = create(VID_SEMAPHORE, place.x, place.y, z, place.direction, 0)) != nullptr) {
+                objects.push_back(p);
+                State gone = state_of(p);
+                gone.present = false;
+                before.push_back(gone);
+            }
+            if (p && red(p) != place.red) set_red(p, place.red);
+        }
+        for (size_t k = 0; k < lights.size(); ++k)
+            if (!used[k]) {   // a light the new way has no place for
+                objects.push_back(lights[k]);
+                before.push_back(state_of(lights[k]));
+                State gone = before.back();
+                gone.present = false;
+                apply(lights[k], gone);
+            }
+    }
+    commit(what, objects, before);
+    lines_into_step(lines_before);
+    g_push_selected = index;
+}
+
+// The button let go: the end goes to the rail point under the cursor, as above.
+void finish_line_drag() {
+    if (!g_line_drag.active) return;
+    const LineDrag d = g_line_drag;
+    g_line_drag = LineDrag();
+    std::vector<PushLine>& lines = mission_push_lines();
+    if (!d.moved || d.line < 0 || d.line >= static_cast<int>(lines.size()) || !(lines[d.line] == d.was)) return;   // a click: selected
+    if (!view().contains(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) return;
+    float x, y;
+    mouse_on_map(x, y);
+    g_line_drag = d;   // dragged_line reads it
+    const PushLine now = dragged_line(x, y);
+    g_line_drag = LineDrag();
+    if (now == d.was) {
+        MESSAGE("MsgLineEndStays", "the push line's %s stays at %d,%d", d.end ? ui_text("WordLineEnd", "end") : ui_text("WordLineBegin", "begin"),
+                d.end ? d.was.ex : d.was.bx, d.end ? d.was.ey : d.was.by);
+        return;
+    }
+    const Trace t = trace(now);
+    if (t.error || t.path.size() < 2) {
+        MESSAGE("MsgLineEndNoWay", "push line %d,%d -> %d,%d: %s - it stays as it was", now.bx, now.by, now.ex, now.ey,
+                t.error ? push_error(t.error) : ui_text("WordSamePoint", "the same point"));
+        return;
+    }
+    move_line(d.line, d.was, now, d.end ? UiText{"OpLineEnd", "move a line's end"} : UiText{"OpLineBegin", "move a line's begin"});
+    MESSAGE("MsgLineEndMoved", "%s, over %u rail points%s", line_effect(now, false).c_str(), static_cast<unsigned>(t.path.size()),
+            line_owner(d.line).c_str());
+}
+
+// The panel's BUILDING'S (B): line `index` a building's own line again (`no` false) or no building's (true).
+void set_line_building(int index, bool no) {
+    std::vector<PushLine>& lines = mission_push_lines();
+    if (index < 0 || index >= static_cast<int>(lines.size()) || !push_lines_editable()) return;
+    if ((lines[index].no_building != 0) == no) return;
+    const std::vector<PushLine> before = lines;
+    lines[index].no_building = no ? 1 : 0;
+    commit_lines({"OpLineBuilding", "a line's building"}, before);
+    g_push_selected = index;
+    const std::vector<uint8_t*> of = line_buildings();
+    uint8_t* b = index < static_cast<int>(of.size()) ? of[index] : nullptr;
+    if (no)
+        MESSAGE("MsgLineNoBuilding", "the push line is no building's now: a building's move or deletion leaves it, and in play it is no "
+                                     "factory's exit and no building's capture line");
+    else if (b)
+        MESSAGE("MsgLineOfBuilding", "the push line is the own line of the %s at %.0f,%.0f now",
+                nvid_of(b) == VID_DEPOT ? ui_text("WordFactory", "factory") : ui_text("WordRepairPoint", "repair point"), at<float>(b, O_X),
+                at<float>(b, O_Y));
+    else
+        MESSAGE("MsgLineNoBuildingThrough", "the push line may be a building's again, but it is none's: it leaves no factory's dead end "
+                                            "and runs over no repair point's track, or that building has another line");
+}
+
 // Dragging an entry's mark (the Select tool; GitHub issue #9): the button pressed on an entry's square
 // or its "ENTRY n" begins it (start_entry_drag), the mark follows the rail point under the cursor, and
 // let go there every arrival from that entry comes from it (finish_entry_drag: one step of the history,
@@ -8377,14 +8691,16 @@ EntryDrag g_entry_drag;
 void finish_entry_drag();   // below, by the arrivals' marks
 
 bool stroke_under_way() {
-    return g_stroke.active || g_gstroke.active || g_drag.active || g_sweep.active || g_region_drag || g_entry_drag.active;
+    return g_stroke.active || g_gstroke.active || g_drag.active || g_sweep.active || g_region_drag || g_entry_drag.active ||
+           g_line_drag.active;
 }
 
 const char* stroke_kind() {
     return g_stroke.active && tool() == Tool::Height ? "ground height" : g_stroke.active && tool() == Tool::Place ? "scatter"
          : g_stroke.active ? "decals"
          : g_gstroke.active ? (g_gstroke.water ? "water" : g_gstroke.gravel ? "gravel bed" : "paint")
-         : g_drag.active ? "drag" : g_sweep.active ? "delete sweep" : g_entry_drag.active ? "entry drag" : "region";
+         : g_drag.active ? "drag" : g_sweep.active ? "delete sweep" : g_entry_drag.active ? "entry drag"
+         : g_line_drag.active ? "line end drag" : "region";
 }
 
 // The cursor is over the game's view (always in test mode, whose mouse is the messages' own).
@@ -8430,6 +8746,16 @@ void end_strokes(const char* why) {
             patch::log("edit: entry drag cancelled - %s; the entry stays at %d,%d", why ? why : "ended by the editor", g_entry_drag.x,
                        g_entry_drag.y);
             g_entry_drag = EntryDrag();
+        }
+    }
+    if (g_line_drag.active) {   // a line's end: the same - only the button let go moves it
+        if (why && std::strcmp(why, "the button let go") == 0) {
+            finish_line_drag();
+        } else {
+            if (g_line_drag.moved)
+                patch::log("edit: line end drag cancelled - %s; the line stays %d,%d -> %d,%d", why ? why : "ended by the editor",
+                           g_line_drag.was.bx, g_line_drag.was.by, g_line_drag.was.ex, g_line_drag.was.ey);
+            g_line_drag = LineDrag();
         }
     }
     if (!g_test && GetCapture()) ReleaseCapture();
@@ -9203,6 +9529,7 @@ std::string line_owner(int index) {
         out = ui_printf(ui_format("LineOfGreenPost", " - the green semaphore's at %.0f,%.0f: it lets the trains going %s in"),
                         at<float>(green, O_X), at<float>(green, O_Y), way_name(at<int>(green, O_DIRECTION)));
     if (out.empty() && building_lines().count(index)) out = ui_text("LineOfBuilding", " - a factory's or repair point's");
+    if (out.empty() && lines[index].no_building) out = ui_text("LineNoBuilding", " - no building's (its panel)");
     if (out.empty() && outside_map(lines[index].bx, lines[index].by)) out = ui_text("LineEntry", " - the level's entry or exit");
     return out;
 }
@@ -9213,7 +9540,7 @@ std::string line_status(const PushLine& shown, bool script, int index) {
     const bool editor = index >= 0 && index < static_cast<int>(mission_push_lines().size());
     const PushLine& l = editor ? mission_push_lines()[index] : shown;   // a red post's indicator names its line
     const std::string owner = line_owner(index);
-    if (index >= 0 && !owner.empty() && !building_lines().count(index) && !outside_map(l.bx, l.by))
+    if (index >= 0 && !owner.empty() && !building_lines().count(index) && !outside_map(l.bx, l.by) && !(editor && l.no_building))
         return owner.substr(3) + ui_printf(" (%d,%d -> %d,%d)", l.bx, l.by, l.ex, l.ey);   // " - " left out
     return line_effect(l, script) + owner;
 }
@@ -9310,6 +9637,20 @@ void draw_push_lines(bool tool) {
             draw_line(stop, selected ? selected : POST_RED, false, true, i, true);
         if (!red_post[i] || green[i])   // the line itself: a green post's way in, a line of no post
             draw_line(lines[i], selected ? selected : green[i] ? POST_GREEN : line_colour(lines[i]), false, true, i);
+    }
+    if (g_line_drag.active && g_line_drag.moved) {   // a line's end dragged: the line it would be, in cyan, to the rail point under the cursor
+        uint8_t* d = nullptr;
+        const PushLine l = dragged_line(mx, my, &d);
+        draw_line(l, 0xf000ffff, false, false);
+        if (d) {
+            const float sx = at<int>(d, DOT_X) - at<float>(w, W_CAMERA_X), sy = screen_y(d) - at<float>(w, W_CAMERA_Y);
+            reinterpret_cast<FillRect_t>(FILL_RECT)(graphics(), nullptr, sx - 5, sy - 5, sx + 5, sy + 5, 0xe000ffff);
+        }
+        const Trace t = trace(l);
+        g_line_status = t.error || t.path.size() < 2
+                            ? ui_printf(ui_format("StatusLineDragBad", "push line %d,%d -> %d,%d: %s - let go here and it stays as it was"), l.bx,
+                                        l.by, l.ex, l.ey, t.error ? push_error(t.error) : ui_text("WordSamePoint", "the same point"))
+                            : ui_printf(ui_format("StatusLineDrag", "let go: %s"), line_effect(l, false).c_str());
     }
     if (g_line_status.empty() && g_push_selected >= 0 && g_push_selected < static_cast<int>(lines.size()))
         g_line_status = ui_printf(ui_format("StatusLineSelected", "selected: %s"),
@@ -10126,7 +10467,7 @@ const char* hint_of(Tool t) {
     case Tool::Decals:
         return bed_brush() ? ui_text("HintBedBrush", "click / drag on the track: this gravel bed, Shift: beds away")
                            : ui_text("HintDecals", "click / drag: scatter, R / E: turn, [ ]: decal, Shift: take away");
-    case Tool::PushLine: return ui_text("HintPushLine", "click: begin, click: end; on a line: Del, T, R");
+    case Tool::PushLine: return ui_text("HintPushLine", "click: begin, click: end; on a line: Del, T, R, B, drag an end");
     case Tool::Height: return ui_text("HintHeight", "drag: the mode, right: lower, M: mode, Alt+click: level");
     case Tool::Paint:
         return g_paint_bed ? ui_text("HintBed", "drag along the rails: gravel bed, right: original back")
@@ -12040,6 +12381,12 @@ std::vector<ContextRow> line_rows(int i) {
                           g_push_selected = i;
                           if (mission_push_lines()[i].flag) push_change('T');
                       }}}});
+    // whether it is the own line of the building it leaves or runs over ("A building's line"): shown when it
+    // runs through one, or when it was set to no building's
+    if (line_building_candidate(i) || l.no_building)
+        rows.push_back({{"CtxLineBuilding", "BUILDING'S (B):"},
+                        {{{"CtxYes", "YES"}, !l.no_building, [i] { set_line_building(i, false); }},
+                         {{"CtxNo", "NO"}, l.no_building != 0, [i] { set_line_building(i, true); }}}});
     rows.push_back({{"CtxDelete", "DELETE (DEL):"}, {{{"CtxDeleteIt", "DELETE"}, false, [i] {
                                                          g_push_selected = i;
                                                          push_change(VK_DELETE);
@@ -12065,6 +12412,8 @@ const LabelTip LABEL_TIPS[] = {
     {"CtxLine", "TipCtxLine", "Line: the post's own one-way line - what it does to its trains (L / Shift+L)"},
     {"CtxLineAction", "TipCtxLineAction", "Action: pushes the trains along it, or only forbids the way against it (T)"},
     {"CtxLineWay", "TipCtxLineWay", "Direction: the way the line runs - R turns it round"},
+    {"CtxLineBuilding", "TipCtxLineBuilding", "Building's: the own line of the factory it leaves or the repair point it runs over - "
+                                              "the factory's trains leave by it, a train at it captures the building; NO: the map maker's alone (B)"},
     {"CtxHeight", "TipCtxHeight", "Height: above the ground (PgUp / PgDn, Home: on the ground)"},
 };
 
@@ -12691,6 +13040,7 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         }
         if (g_drag.active) continue_drag(g_mouse);
         continue_entry_drag(g_mouse);
+        continue_line_drag(g_mouse);
         if (panel_open() || !view().contains(static_cast<float>(g_mouse.x), static_cast<float>(g_mouse.y))) {
             // nothing is painted or raised under a panel (opening one ends the stroke) nor out of the window
             // (the mouse captured: a drag out of it painted and raised the map beyond the view along the way);
@@ -12801,7 +13151,11 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         } else if (tool() == Tool::PushLine) {
             float px, py;
             mouse_on_map(px, py);
-            push_click(static_cast<int>(px), static_cast<int>(py));
+            if (!g_push_started && mission_managed() && start_line_drag(px, py, g_mouse)) {   // an end of a line: selected, its drag begun
+                if (g_line_drag.active && !g_test) SetCapture(window);
+            } else {
+                push_click(static_cast<int>(px), static_cast<int>(py));
+            }
         } else if (tool() == Tool::Delete) {   // a click, and a sweep while the button is held
             start_sweep(g_mouse);
             if (!g_test) SetCapture(window);
@@ -12810,8 +13164,9 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
             g_patrol_train = nullptr;
             set_train_patrol(c, true, x, y);
         } else if (const int li = tool() == Tool::Select ? line_at(static_cast<int>(x), static_cast<int>(y)) : -1; li >= 0) {
-            select(nullptr);   // a push line, by its bar or its arrow
-            select_line(li);
+            select(nullptr);   // a push line, by its bar or its arrow: selected, and the drag of that end begun
+            start_line_drag(x, y, g_mouse);
+            if (g_line_drag.active && !g_test) SetCapture(window);
         } else {
             uint8_t* o = pick(x, y);
             select(o);
@@ -13004,6 +13359,9 @@ bool edit_message(HWND window, UINT m, WPARAM w, LPARAM l) {
         }
         else if (tool() == Tool::PushLine && (w == VK_DELETE || w == 'T' || w == 'R')) push_change(static_cast<int>(w));
         else if (tool() == Tool::PushLine && w == 'S') push_semaphores();
+        else if (w == 'B' && tool() != Tool::Track && g_push_selected >= 0 && g_push_selected < static_cast<int>(mission_push_lines().size()) &&
+                 (tool() == Tool::PushLine || g_selection.empty()))   // the selected line's BUILDING'S: YES / NO
+            set_line_building(g_push_selected, !mission_push_lines()[g_push_selected].no_building);
         else if (tool() == Tool::Height && w == 'M') {
             g_brush = g_brush == Brush::Raise ? Brush::Flatten : g_brush == Brush::Flatten ? Brush::Smooth
                     : g_brush == Brush::Smooth ? Brush::Ramp : g_brush == Brush::Ramp ? Brush::Rough : Brush::Raise;
@@ -13941,25 +14299,28 @@ void edit_object_place(void* o, int& x, int& y) {
     y = static_cast<int>(std::lround(at<float>(o, O_Y)));
 }
 
+// The building each line of the editor is the own line of ("A building's line"), its map point ({0, 0}
+// none), for the runner's push_of_x/y[] (editor_mission.cpp).
+std::vector<POINT> edit_line_buildings() {
+    std::vector<POINT> out;
+    for (uint8_t* b : line_buildings())
+        out.push_back(b ? POINT{std::lround(at<float>(b, O_X)), std::lround(at<float>(b, O_Y))} : POINT{0, 0});
+    return out;
+}
+
 // The runner's PlanExit on the held level (editor_mission.cpp, the factories' plans; the same numbers):
 // a car standing on the exit of `factory` that a train of `cars` cars comes out of, null for none. The
-// exit is the factory's own push line - the editor's line whose begin is within 75 px of the factory's
-// screen point and whose end is not nearer (the runner's FactoryLine) - from its begin, behind the
-// factory's place, to `cars` x 48 px past its end, 20 px to either side; without such a line the
-// factory's place, 48 px round it. The panel says so: the plan waits while a car stands there.
+// exit is the factory's own push line (lines_of, "A building's line": what the runner's OwnLine reads
+// from push_of_x/y[]) from its begin, behind the factory's place, to `cars` x 48 px past its end, 20 px
+// to either side; without such a line the factory's place, 48 px round it. The panel says so: the plan
+// waits while a car stands there.
 void* edit_factory_exit_car(void* factory, int cars) {
     uint8_t* f = static_cast<uint8_t*>(factory);
     if (!f || removed(f)) return nullptr;
     constexpr int WIDE = 20, CAR = 48;
-    const int x = static_cast<int>(at<float>(f, O_X)), y = static_cast<int>(at<float>(f, O_Y)) - static_cast<int>(at<float>(f, O_Z));
-    int line = -1, best = 999999;
     const std::vector<PushLine>& lines = mission_push_lines();
-    for (int i = 0; i < static_cast<int>(lines.size()); ++i) {
-        const int dx = x - lines[i].bx, dy = y - lines[i].by, d = dx * dx + dy * dy;
-        if (std::abs(dx) > 75 || std::abs(dy) > 75 || d > 5625 || d >= best) continue;
-        const int ex = x - lines[i].ex, ey = y - lines[i].ey;
-        if (std::abs(ex) > 100 || std::abs(ey) > 100 || ex * ex + ey * ey > d) best = d, line = i;
-    }
+    const std::vector<int> own = lines_of(f);
+    const int line = own.empty() ? -1 : own[0];
     for (uint8_t* c : all_cars()) {
         const int cx = static_cast<int>(at<float>(c, O_X)), cy = static_cast<int>(at<float>(c, O_Y));
         if (line < 0) {
@@ -14329,9 +14690,9 @@ void edit_log_building_posts(const char* tag) {
         if (removed(b) || (nvid_of(b) != VID_DEPOT && nvid_of(b) != VID_WORKSHOP)) return;
         const float bx = at<float>(b, O_X), by = at<float>(b, O_Y);
         std::string lines, places, posts;
-        for (int i : lines_of(b)) {
+        for (int i : lines_of(b)) {   // its own line: its rule line, or a line through it ("A building's line")
             const PushLine& l = mission_push_lines()[i];
-            lines += ui_printf(" e%d(%d,%d->%d,%d)", i, l.bx, l.by, l.ex, l.ey);
+            lines += ui_printf(" e%d(%d,%d->%d,%d %s)", i, l.bx, l.by, l.ex, l.ey, rule_line_index(b) == i ? "rule" : "through");
             for (const Post& p : line_posts(trace(l))) places += ui_printf(" (%.0f,%.0f d%d %s)", p.x, p.y, p.direction, p.red ? "red" : "green");
         }
         for (const PushLine& l : mission_script_push_lines())
@@ -14348,7 +14709,8 @@ void edit_log_building_posts(const char* tag) {
             for (uint8_t* d : t.path) nearest = (std::min)(nearest, std::hypot(dot_wx(d) - bx, dot_wy(d) - by));
             if (nearest >= 60) continue;
             near_lines += ui_printf(" e%d[near %.0f, ends %.0f/%.0f, %s]", i, nearest, std::hypot(dot_wx(t.path.front()) - bx, dot_wy(t.path.front()) - by),
-                                    std::hypot(dot_wx(t.path.back()) - bx, dot_wy(t.path.back()) - by), rule_line_index(b) == i ? "its rule line" : "not its rule line");
+                                    std::hypot(dot_wx(t.path.back()) - bx, dot_wy(t.path.back()) - by),
+                                    rule_line_index(b) == i ? "its rule line" : mission_push_lines()[i].no_building ? "not its rule line, no building's" : "not its rule line");
         }
         if (!near_lines.empty()) lines += " near:" + near_lines;
         unsigned nearby = 0;

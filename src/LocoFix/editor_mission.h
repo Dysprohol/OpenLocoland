@@ -6,12 +6,21 @@
 #include <vector>
 
 // SetPushLine(begin_x, begin_y, end_x, end_y, push_flag): screen coordinates (MAP_RULES.md 5).
+// `no_building`: the line's panel says it belongs to no building (BUILDING'S LINE: NO), so it is never a
+// factory's or repair point's own line, whatever it runs through (editor-mission.md "A building's line");
+// kept in the script as a comment after its SetPushLine call.
 struct PushLine {
     int bx, by, ex, ey, flag;
+    int no_building = 0;
     bool operator==(const PushLine& o) const {
-        return bx == o.bx && by == o.by && ex == o.ex && ey == o.ey && flag == o.flag;
+        return bx == o.bx && by == o.by && ex == o.ex && ey == o.ey && flag == o.flag && no_building == o.no_building;
     }
 };
+
+// The factory or repair point each line of mission_push_lines() is the own line of - its map point,
+// {0, 0} for none (editor_edit.cpp, the held level): written with the lines for the runner (push_of_x[],
+// push_of_y[]).
+std::vector<POINT> edit_line_buildings();
 
 // The push lines of the editor's block in main(): the Push line tool edits them.
 std::vector<PushLine>& mission_push_lines();
