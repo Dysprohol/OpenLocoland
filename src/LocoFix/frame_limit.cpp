@@ -45,6 +45,7 @@ void red_lights_level_loading(const char* map);  // red_lights.cpp
 const char* custom_maps_level_guard(const char* map);   // custom_maps.cpp: a map that is not there - the menu
 void zoom_after_frame();   // zoom.cpp: the wheel's zoom changes the screen between two frames
 void sound_volumes_level_loading(const char* map);   // sound_volumes.cpp
+bool editor_level_running();   // editor.cpp: the editor's Run the level (Ctrl+R) is on
 
 namespace {
 
@@ -337,8 +338,14 @@ void draw_fps_counter(IDirectDrawSurface7* back_buffer, const RECT& picture, dou
     }
     HDC dc;
     if (FAILED(back_buffer->GetDC(&dc))) return;
-    wchar_t text[16];
-    const int length = std::swprintf(text, 16, L"%d FPS", g_counter_value);
+    wchar_t text[48];
+    int length = std::swprintf(text, 48, L"%d FPS", g_counter_value);
+    if (editor_level_running()) {   // the editor's Run the level: the mission's time beside it (issue #23.8)
+        // the script's clock (GetTime): 10 ms at the level's start, stopped while the game is paused
+        const uint32_t ms = *reinterpret_cast<uint32_t*>(G_GAME_TIME), s = ms > 10 ? (ms - 10) / 1000 : 0;
+        length += s >= 3600 ? std::swprintf(text + length, 48 - length, L"   %u:%02u:%02u", s / 3600, s / 60 % 60, s % 60)
+                            : std::swprintf(text + length, 48 - length, L"   %u:%02u", s / 60, s % 60);
+    }
     const HGDIOBJ old_font = SelectObject(dc, g_font);
     SIZE size;
     GetTextExtentPoint32W(dc, text, length, &size);

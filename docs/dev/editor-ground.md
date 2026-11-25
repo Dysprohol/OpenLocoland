@@ -644,7 +644,7 @@ trains would drive onto it; now the point and its neighbour have `sem 4` + army 
 level runs. It is placed in the army of the palette's row and is marked with its
 army by the editor (`draw_mines`: a square in the army's colour and MINE: ENEMY; the engine hides a
 mine of another army than the player's, also on the held level, so the editor draws its sprite, and
-`pick` takes it although its VID has the screen flag 0x800); the authors' marker (89) is marked MINE
+`pick` takes it although its VID has the flag 0x800 - "select", editor-objects.md); the authors' marker (89) is marked MINE
 1 IN 3: ENEMY, and its panel makes it a mine of the enemy's. In play the engine shows a mine to its
 own army only (VID flag 0x20000), as it always did.
 Checked in the game (a map made in the editor: a line, four of our locomotives, a citadel, Charybdis

@@ -175,6 +175,9 @@ constexpr size_t V_DIR_HALF_STEP = 0x340;
 // Vid
 constexpr size_t V_NVID = 0x04, V_CLASS = 0x10, V_FLAGS = 0x14, V_SIZE_X = 0x1c, V_SIZE_Y = 0x20, V_SIZE_Z = 0x24, V_MAX_HP = 0x28;
 constexpr size_t V_ND_DIR = 0x64, V_ANIM_FRAMES = 0x68, V_MOVE_MASK = 0x18, V_FRAME_COUNT = 0x2a4;
+constexpr size_t V_SPRITE_TYPE = 0x0c;   // U_... of export.lgc
+constexpr uint32_t U_MENU = 16, U_CANNON = 512, U_SPRITE = 1024;
+// VID flag 0x800: drawn in its own colours, without the scene's gamma (pickable, below); the name is older
 constexpr uint32_t VID_SCREEN = 0x800, VID_HIDDEN = 0x400;
 // classes (B_... of export.lgc)
 constexpr int B_UNIT = 2, B_BUILDING = 3, B_AVIA = 4, B_FRAME = 10, B_LINKER = 12, B_TEXT = 19, B_CIV_ROBOT = 20,
@@ -1371,9 +1374,18 @@ bool pickable(uint8_t* o) {
     const int c = at<int>(v, V_CLASS);
     if (is_bed(at<int>(v, V_NVID))) return false;   // a rail's gravel bed goes with the rail
     if (is_water_tile(at<int>(v, V_NVID))) return false;   // the Water tool's
-    // the mine has the screen flag too (0x800), but is an object of the map
-    return at<int>(v, V_NVID) != VID_GROUND && (!(at<uint32_t>(v, V_FLAGS) & VID_SCREEN) || at<int>(v, V_NVID) == VID_MINE) &&
-           c != B_FRAME && c != B_TEXT && c != B_LINKER;
+    // VID flag 0x800 is not the interface's mark: it is "drawn in its own colours" (no gamma: the scene's
+    // light and the army's colour leave it as it is - ColorVid_Draw, SpriteVid_Draw), which the interface
+    // has, and so do objects of the map: the lava stream (801, issue #20.13: placed, it could not be
+    // selected again), the lantern plant (216), the golem (409), the mine (86), the golden gear (835). The
+    // interface is told by its sprite type: U_MENU (16) and U_SPRITE (1024, the cursor, the selection's
+    // circle, the health and ammo lines); the shots and explosions, U_CANNON (512), are never the map's.
+    // None of them is picked, and neither are the flat light spots (size z 1: the glows 311, 365, 555, 361,
+    // up to 200 px wide) - picked, a glow would take the clicks on the ground
+    // all round the campaign maps' lanterns and chimneys, as it was before; the rest is picked
+    const uint32_t type = at<uint32_t>(v, V_SPRITE_TYPE);
+    const bool on_screen = (at<uint32_t>(v, V_FLAGS) & VID_SCREEN) && ((type & (U_MENU | U_CANNON | U_SPRITE)) || at<float>(v, V_SIZE_Z) <= 1);
+    return at<int>(v, V_NVID) != VID_GROUND && !on_screen && c != B_FRAME && c != B_TEXT && c != B_LINKER;
 }
 
 // A point at a region's frame (inside it the objects under the region are picked first, pick).
@@ -11078,12 +11090,17 @@ std::vector<OptionGroup> option_groups() {
     return groups;
 }
 
+// A text cell's text: a button's in brackets (ui_clickable), a label or a value as it is.
+std::string option_text(const OptionItem& i) {
+    const std::string text = i.value.empty() ? i.text.get() : i.value;
+    return i.button ? ui_clickable(text) : text;
+}
+
 float option_width(const OptionItem& i, float cw) {
     if (i.swatch >= 0) return SWATCH + 5;
     if (i.rail) return RAIL_ICON + 8;
     if (i.object) return DECAL_ICON + 4;
-    const char* text = i.value.empty() ? i.text.get() : i.value.c_str();
-    return std::strlen(text) * cw + cw;
+    return option_text(i).size() * cw + cw;
 }
 
 float group_width(const OptionGroup& g, float cw) {
@@ -11222,9 +11239,11 @@ void draw_options() {
                     fill(graphics(), nullptr, l, t0, l + SWATCH, t0 + SWATCH, 0xff000000 | rgb);
                 }
             } else {
-                const char* text = i.value.empty() ? i.text.get() : i.value.c_str();
-                if (pass == 2) draw_text(i.lit || hover ? CONTEXT_FONT_LIT : CONTEXT_FONT_VID, x + (i.button ? 0 : 0), cy - ch / 2, text, false, OPTION_STEP);
-                if (pass == 1 && i.lit) fill(graphics(), nullptr, x, cy + ch / 2 + 1, x + iw - 8, cy + ch / 2 + 3, 0xe0f0e080);
+                const std::string text = option_text(i);
+                if (pass == 2) draw_text(i.lit || hover ? CONTEXT_FONT_LIT : CONTEXT_FONT_VID, x, cy - ch / 2, text.c_str(), false, OPTION_STEP);
+                // what is set: underlined - a button's words, not its brackets (iw: the text and a character)
+                const float inner = i.button ? iw / (text.size() + 1) : 0;
+                if (pass == 1 && i.lit) fill(graphics(), nullptr, x + inner, cy + ch / 2 + 1, x + iw - 8 - inner, cy + ch / 2 + 3, 0xe0f0e080);
             }
             if (pass == 2 && i.button) g_option_hits.push_back({x - 2, cy - SLOT / 2, x + iw, cy + SLOT / 2, i.act, i.object, i.rail, i.tip});
         });
@@ -11712,7 +11731,7 @@ void faction_rows(uint8_t* o, std::vector<ContextRow>& rows) {
     const bool on = std::any_of(members.begin(), members.end(), [](uint8_t* m) { return (at<int>(m, O_BEHAVE) & 1) != 0; });
     if (!mission_managed()) {   // a campaign map: the engine's rules
         if (army != 2) return;
-        rows.push_back({{"CtxNeutralFight", "IN A FIGHT:"}, {{{"CtxNobodyFires", "NO ONE FIRES AT IT"}, true, [] {}}}});
+        rows.push_back({{"CtxNeutralFight", "IN A FIGHT:"}, {{{"CtxNobodyFires", "NO ONE FIRES AT IT"}, true, nullptr}}});
         if (members.empty()) return;
         const UiText yes{"CtxFiresYes", "AT ALL IN RANGE"}, no{"CtxFiresNo", "NO"};
         rows.push_back({{"CtxFires", "IT FIRES:"},
@@ -11792,7 +11811,7 @@ void area_row(uint8_t* o, const Order& order, std::vector<ContextRow>& rows) {
     radius_text = ui_printf(ui_format("CtxAreaRadius", "%d PX"), r);
     rows.push_back({{"CtxArea", "AREA:"},
                     {{{nullptr, "-"}, false, [set, r, c] { set(r - 50, c); }},
-                     {{nullptr, radius_text.c_str()}, true, [] {}},
+                     {{nullptr, radius_text.c_str()}, true, nullptr},
                      {{nullptr, "+"}, false, [set, r, c] { set(r + 50, c); }},
                      {{"CtxAreaReturns", "RETURNS"}, c == 0, [set, r] { set(r, 0); }},
                      {{"CtxAreaChases", "CHASES"}, c != 0, [set, r] { set(r, 1); }}},
@@ -11820,7 +11839,7 @@ void target_rows(uint8_t* o, std::vector<ContextRow>& rows) {
                         }}},
                       {"TipTarget", "Target: a unit or building the train attacks when the level starts, in place of its other order (the "
                                     "enemy's train goes to its AI to attack once the target is gone; the others' stay)"}};
-    if (!target_text.empty()) target.choices.insert(target.choices.begin(), {{nullptr, target_text.c_str()}, true, [] {}});
+    if (!target_text.empty()) target.choices.insert(target.choices.begin(), {{nullptr, target_text.c_str()}, true, nullptr});
     rows.push_back(target);
     if (!has) return;
     auto set_wait = [o](int wait) {
@@ -11883,7 +11902,7 @@ void rebuild_row(uint8_t* o, std::vector<ContextRow>& rows) {
         wait_text = ui_printf(ui_format("CtxRebuildWait", "%d S AFTER THE LOSS"), w);
         rows.push_back({{"CtxRebuildAfter", "REBUILT IN:"},
                         {{{nullptr, "-"}, false, [set, r, w] { set(r, w - edit_time_step()); }},
-                         {{nullptr, wait_text.c_str()}, true, [] {}},
+                         {{nullptr, wait_text.c_str()}, true, nullptr},
                          {{nullptr, "+"}, false, [set, r, w] { set(r, w + edit_time_step()); }}},
                         {"TipRebuildWait", "Rebuilt in: how long after the loss the factory starts the new train (- +: 10 s, with Shift 1 s)"}});
     }
@@ -12055,7 +12074,7 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
     if (is_marker(o)) {
         // the authors' reinforcement point (a map with waves): the army it gets in play (never its
         // parking army 3, which ReinforcementInit takes it away by), and the panel that makes such trains now
-        rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{marker_in_play(), true, [] {}}}});
+        rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{marker_in_play(), true, nullptr}}});
         rows.push_back({{"CtxArrivals", "ARRIVALS:"},
                         {{{"CtxOpenArrivals", "OPEN THE PANEL (0)"}, false, [] {
                               g_context = nullptr;
@@ -12221,12 +12240,12 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
     if (post_on_track(o)) {   // the trains of one way or the other along its track
         const int way = trains_way(at<int>(o, O_DIRECTION)), other = (way + 4) & 7;
         rows.push_back({{"CtxPostFor", "FOR TRAINS:"},
-                        {{{WAY_CAPS_KEYS[way], WAY_CAPS[way]}, true, [] {}},
+                        {{{WAY_CAPS_KEYS[way], WAY_CAPS[way]}, true, nullptr},
                          {{WAY_CAPS_KEYS[other], WAY_CAPS[other]}, false, [o] { turn_post(o); }}}});
     } else if (nvid == VID_WORKSHOP) {   // turned round on its leg
         rows.push_back({{"CtxTurn", "TURN:"}, {{{"CtxTurnRound", "ROUND (R / E)"}, false, [] { turn(1); }}}});
     } else if (nvid == VID_DEPOT || nvid == VID_CRUSHER || nvid == VID_SCYLLA) {
-        rows.push_back({{"CtxTurn", "TURN:"}, {{{"CtxTurnByTrack", "BY ITS TRACK (DRAG IT)"}, true, [] {}}}});
+        rows.push_back({{"CtxTurn", "TURN:"}, {{{"CtxTurnByTrack", "BY ITS TRACK (DRAG IT)"}, true, nullptr}}});
     } else if (wreck_on_track(o)) {
         rows.push_back({{"CtxTurn", "TURN:"}, {{{"CtxTurnRound", "ROUND (R / E)"}, false, [] { turn(1); }}}});
     } else if (movable(o) && at<int>(vid_of(o), V_ND_DIR) > 1)
@@ -12250,11 +12269,11 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
                          {{"CtxLineNone", "NONE"}, !own, [] { post_line(false, true); }}}});
     }
     if (nvid == VID_CITADEL)
-        rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxCitadelPlay", "KILLS ALL BUT ITS TOWER'S ARMY"}, true, [] {}}}});
+        rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxCitadelPlay", "KILLS ALL BUT ITS TOWER'S ARMY"}, true, nullptr}}});
     if (nvid == VID_CHARYBDIS)
-        rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxCharybdisPlay", "PULLS IN OTHERS, EATS YOURS"}, true, [] {}}}});
+        rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxCharybdisPlay", "PULLS IN OTHERS, EATS YOURS"}, true, nullptr}}});
     if (nvid == VID_CRUSHER) {
-        rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxCrusherPlay", "BITES ALL BUT ITS ARMY EVERY 25 S"}, true, [] {}}}});
+        rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxCrusherPlay", "BITES ALL BUT ITS ARMY EVERY 25 S"}, true, nullptr}}});
         ContextRow stops{{"CtxCrusherStops", "STOPS WHEN:"}, {}};
         for (int end = 0; end < 2; ++end)
             stops.choices.push_back({CRUSHER_ENDS[end], crusher_end(o) == end, [o, end] { set_crusher_end(o, end); }});
@@ -12264,7 +12283,7 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
         rows.push_back({{"CtxInPlay", "IN PLAY:"},
                         {{faction_of(o) == 2 ? UiText{"CtxScyllaPlay", "BITES EVERYONE EVERY 15 S"}
                                              : UiText{"CtxScyllaPlayArmy", "BITES ALL BUT ITS ARMY EVERY 15 S"},
-                          true, [] {}}}});
+                          true, nullptr}}});
     if (!pieces_of_kind(nvid).empty()) {   // a row for each slot of several VIDs, the missing put back
         const std::vector<Piece>& kinds = kinds_of(o);
         const std::vector<uint8_t*> pieces = pieces_on(o);
@@ -12289,9 +12308,9 @@ std::vector<ContextRow> context_rows(uint8_t* o) {
                         {{{"CtxNestWaves", "GREEN, IN WAVES"}, !nest_guards(o), [o] { set_nest_kind(o, false); }},
                          {{"CtxNestGuard", "GREY, ON GUARD"}, nest_guards(o), [o] { set_nest_kind(o, true); }}}});
     if (nvid == VID_MINE)
-        rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxMinePlay", "SEEN BY ITS ARMY ONLY"}, true, [] {}}}});
+        rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxMinePlay", "SEEN BY ITS ARMY ONLY"}, true, nullptr}}});
     if (nvid == VID_MINE_MARKER) {
-        rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxMarkerPlay", "AN ENEMY MINE ONE TIME IN THREE"}, true, [] {}}}});
+        rows.push_back({{"CtxInPlay", "IN PLAY:"}, {{{"CtxMarkerPlay", "AN ENEMY MINE ONE TIME IN THREE"}, true, nullptr}}});
         rows.push_back({{"CtxMakeIt", "MAKE IT:"}, {{{"CtxMakeMine", "A MINE"}, false, [o] { mine_from_marker(o); }}}});
     }
     if (nvid == VID_DEPOT)
@@ -12433,6 +12452,54 @@ std::vector<ContextRow> open_rows() {
     return rows;
 }
 
+// A row's texts as the panel lays them out: each choice in brackets (ui_clickable), a statement that is
+// no choice (IN PLAY: ..., the value between - and +) as it is. They go on from `first` (the value column)
+// a character apart; one that does not fit before `right` goes to the next line, which starts at `next`
+// (under the label) - a choice whole, a statement broken at its spaces.
+struct ContextPiece {
+    size_t choice;
+    std::string text;
+    int line;
+    float x;
+};
+
+std::vector<ContextPiece> context_pieces(const ContextRow& row, float first, float next, float right, float cw) {
+    std::vector<ContextPiece> out;
+    int line = 0;
+    float cx = first;
+    auto start = [&](int l) { return l == 0 ? first : next; };
+    for (size_t c = 0; c < row.choices.size(); ++c) {
+        const std::string text = row.choices[c].text.get();
+        if (row.choices[c].act) {
+            const std::string shown = ui_clickable(text);
+            if (cx > start(line) && cx + shown.size() * cw > right) cx = start(++line);
+            out.push_back({c, shown, line, cx});
+            cx += (shown.size() + 1) * cw;
+            continue;
+        }
+        std::string part;   // the statement's words on this line
+        for (size_t p = 0; p <= text.size();) {
+            size_t e = text.find(' ', p);
+            if (e == std::string::npos) e = text.size();
+            const std::string word = text.substr(p, e - p);
+            p = e + 1;
+            const std::string joined = part.empty() ? word : part + " " + word;
+            if (cx + joined.size() * cw <= right || (part.empty() && cx == start(line))) {
+                part = joined;
+            } else {
+                if (!part.empty()) out.push_back({c, part, line, cx});
+                cx = start(++line);
+                part = word;
+            }
+        }
+        if (!part.empty()) {
+            out.push_back({c, part, line, cx});
+            cx += (part.size() + 1) * cw;
+        }
+    }
+    return out;
+}
+
 void draw_context() {
     UiDrawing ui;
     g_context_hits.clear();
@@ -12460,29 +12527,46 @@ void draw_context() {
     }
     // the title in capitals, in the pack's code page (Czech "Lávový štěrk" -> "LÁVOVÝ ŠTĚRK")
     std::snprintf(title, sizeof title, "%s", ui_upper(title).c_str());
+    const float right = x + CONTEXT_WIDTH - 8;   // where a row's texts end
+    const POINT m = ui_mouse();
     for (size_t r = 0; r <= rows.size(); ++r) {   // the title's row, then the rows
         const float ry = y + r * CONTEXT_ROW;
         draw_screen(VID_STRIP, 0, x + CONTEXT_WIDTH / 2, ry + CONTEXT_ROW / 2, CONTEXT_STEP);
-        const float ty = ry + (CONTEXT_ROW - ch) / 2;
         if (r == 0) {
-            draw_text(CONTEXT_LIT, x + 10, ty, title, false, CONTEXT_STEP + 1);
+            draw_text(CONTEXT_LIT, x + 10, ry + (CONTEXT_ROW - ch) / 2, title, false, CONTEXT_STEP + 1);
             continue;
         }
         const ContextRow& row = rows[r - 1];
         if (row.tip.key || *row.tip.english) g_context_tips.push_back({x, ry, x + CONTEXT_WIDTH, ry + CONTEXT_ROW, row.tip.get()});
-        draw_text(CONTEXT_FONT, x + 10, ty, row.label.get(), false, CONTEXT_STEP + 1);
-        float cx = x + 10 + CONTEXT_LABEL * cw;
-        for (size_t c = 0; c < row.choices.size(); ++c) {
-            const char* text = row.choices[c].text.get();
-            const float width = std::strlen(text) * cw;
-            const POINT m = ui_mouse();
-            const bool hover = m.x >= cx - 3 && m.x < cx + width + 3 && m.y >= ry && m.y < ry + CONTEXT_ROW;
-            draw_text(row.choices[c].current || hover ? CONTEXT_LIT : CONTEXT_FONT, cx, ty, text, false, CONTEXT_STEP + 1);
-            if (row.choices[c].current) {   // what is set: underlined
-                ui_fill(graphics(), nullptr, cx, ty + ch + 1, cx + width, ty + ch + 3, 0xe0f0e080);
+        const std::vector<ContextPiece> pieces = context_pieces(row, x + 10 + CONTEXT_LABEL * cw, x + 10, right, cw);
+        const int lines = pieces.empty() ? 1 : pieces.back().line + 1;
+        // one line in the row's middle as always; a row of two lines (a long one in German or Hungarian) has
+        // them 4 px apart, room for the underline under the first
+        const float gap = ch + 4, top = ry + (CONTEXT_ROW - (lines * gap - 4)) / 2;
+        auto line_top = [&](int l) { return top + l * gap; };
+        auto box_top = [&](int l) { return lines == 1 || l == 0 ? ry : line_top(l) - 2; };
+        auto box_bottom = [&](int l) { return lines == 1 || l == lines - 1 ? ry + CONTEXT_ROW : line_top(l) + ch + 2; };
+        draw_text(CONTEXT_FONT, x + 10, line_top(0), row.label.get(), false, CONTEXT_STEP + 1);
+        for (const ContextPiece& p : pieces) {
+            const Choice& choice = row.choices[p.choice];
+            const float ty = line_top(p.line), width = p.text.size() * cw;
+            const float t = box_top(p.line), b = box_bottom(p.line);
+            const bool hover = choice.act && m.x >= p.x - 3 && m.x < p.x + width + 3 && m.y >= t && m.y < b;
+            draw_text(choice.current || hover ? CONTEXT_LIT : CONTEXT_FONT, p.x, ty, p.text.c_str(), false, CONTEXT_STEP + 1);
+            if (choice.current) {   // what is set: underlined - a choice's words, not its brackets
+                const float inner = choice.act ? cw : 0;
+                ui_fill(graphics(), nullptr, p.x + inner, ty + ch + 1, p.x + width - inner, ty + ch + 3, 0xe0f0e080);
             }
-            g_context_hits.push_back({cx - 3, ry, cx + width + 3, ry + CONTEXT_ROW, static_cast<int>(r - 1), static_cast<int>(c)});
-            cx += width + 2 * cw;
+            if (choice.act) g_context_hits.push_back({p.x - 3, t, p.x + width + 3, b, static_cast<int>(r - 1), static_cast<int>(p.choice)});
+        }
+        const bool past = std::any_of(pieces.begin(), pieces.end(), [&](const ContextPiece& p) { return p.x + p.text.size() * cw > right + 0.5f; });
+        if (g_test && (lines > 2 || past)) {
+            static std::vector<std::string> said;   // a test's log line once a row: it does not fit the panel
+            const std::string what = std::string(title) + " / " + row.label.get();
+            if (std::find(said.begin(), said.end(), what) == said.end()) {
+                said.push_back(what);
+                patch::log("edit: context panel %s: the row runs past the panel (%d lines)", what.c_str(), lines);
+            }
         }
     }
 }
