@@ -73,6 +73,13 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
   patrol), so its loss went unseen. The train built again goes back to the lost one's place and watches,
   hunts or guards from there. A map gets the new runner when it is saved again in the editor
   (editor-mission.md "Rebuilt when lost").
+- Maps made in the editor: a push line's end is dragged to another point of the track (its lights go
+  with it), so a factory's exit line can lead onto the other branch at a switch and its trains leave
+  that way; a line that leaves a factory from its dead end or runs over a repair point's track is that
+  building's own line (its capture, the factory's plan waiting for a train on its exit), unless the
+  line's panel says BUILDING'S: NO. The runner takes the building's line from the editor (`push_of_x/y[]`)
+  instead of guessing it from the line's shape. A map gets it when it is saved again in the editor
+  (editor-mission.md "A building's line").
 - The strategic map of the menu has a second page with the custom maps (every map folder of
   `maps\`, POLIGON first: "Map files") and the map editor entry (`game/maps/menu.lgc.patch`; "The custom
   maps page" above).

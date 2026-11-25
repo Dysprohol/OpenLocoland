@@ -527,9 +527,12 @@ shows where; away from the track, or with Shift, they stay where the cursor is, 
 Dragging one of them moves it, with its line and its semaphores, to the nearest right place (dropped away from the
 track or with Shift: where it is dropped); deleting it deletes them too. Its semaphores are those at
 the ends of its line, also one you moved closer or along the line - in a map loaded from a file too;
-one of its own colour, facing its trains, at each end. Its line is the one the editor made for it; a line you
-drew yourself, or its own after you turned it round or laid track past the dead end, stays yours - the
-building then makes a new one. In a mission opened as it is the lines belong to the mission's script: moving a
+one of its own colour, facing its trains, at each end. Its line is the one the editor made for it, or else a
+line that runs through it: one that leaves the factory from its dead end - for example its exit line with the
+end dragged onto the other branch at a switch, so its trains leave that way - or one over the repair point's
+track. Such a line counts as the building's in play (its trains, its capture), but moving or deleting the
+building leaves it where it is, with its semaphores; the building gets no second line where one runs through
+it. A line's panel says **BUILDING'S: YES / NO** (`B`): NO makes it a line of no building at all. In a mission opened as it is the lines belong to the mission's script: moving a
 building changes no line and no semaphore - save the mission under a new name first. Any other semaphore - moved far away, another colour, turned the other way, a second one at the same end - is not the building's and stays where you put it. A **blocker** (the buffer stop, in the RAILWAY group of All objects) is placed freely and
 turned with R / E like any object: set it at the end of a track yourself.
 
@@ -538,7 +541,9 @@ direction, as the missions mark the entry onto the map, the exit, the factories 
 points. Click its beginning and its end on the track - on the map a line has a bar at its beginning
 and arrows the way it runs, and the mouse over it tells what it does; then, on a selected line - the status line names its beginning, its end and what it does; in the
 Select tool too a click on a line's bar or arrow selects it, and the right button opens its panel -, `T` switches
-pushing on or off, `R` turns it round, `S` puts its semaphores, Del deletes it. Make two:
+pushing on or off, `R` turns it round, `S` puts its semaphores, `B` makes it its building's or no
+building's, Del deletes it. Drag a line's bar or arrow to move that end to another point of the track
+(its semaphores go with it); a point no track leads to from the other end leaves it as it was. Make two:
 
 - the **map's entry**: from the main line's end past the edge onto the map, pushing on - if the
   arrival's **PUT LIGHTS** (step 5) made it, it is there already;
@@ -889,6 +894,7 @@ tools, the rarer things placed, the two panels last.
 | G | Track tool: the ground under rising rails as it is / raised soft / raised hard |
 | W | water, swamp or lava |
 | S | the selected line's semaphores (Push line tool) |
+| B | the selected line: its building's or no building's |
 | Shift (with a brush) | take away |
 | Esc, right button | back to Select; cancel a section of track started; close a panel. Esc with nothing under way: the editor's menu |
 | middle button | drag the map; in the Track tool a click deletes the rail under the cursor (at a junction too) |

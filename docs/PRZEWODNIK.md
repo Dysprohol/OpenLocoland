@@ -525,8 +525,12 @@ Przeciągnięcie przenosi je razem z linią i semaforami na najbliższe właści
 albo z Shiftem: tam, gdzie upuszczone); usunięcie usuwa też linię i semafory. Jego semafory to te
 na końcach jego linii, także przesunięty bliżej albo wzdłuż linii - również w mapie wczytanej z
 pliku; po jednym w swoim kolorze, zwróconym do swoich pociągów, na każdym końcu. Jego linia to ta, którą
-zrobił dla niego edytor; linia narysowana przez ciebie albo jego własna po obróceniu jej czy dołożeniu
-toru za ślepy koniec zostaje twoja - budynek robi wtedy nową. W misji otwartej tak, jak jest, linie
+zrobił dla niego edytor, albo linia, która przez niego biegnie: wychodzi z fabryki z jej ślepego końca - na
+przykład linia wyjazdu z końcem przeciągniętym na drugą odnogę rozjazdu, żeby pociągi wyjeżdżały tamtędy - albo
+idzie przez tor punktu naprawczego. Taka linia liczy się w grze jako linia budynku (jego pociągi, przejęcie), ale
+przesunięcie albo usunięcie budynku zostawia ją na miejscu razem z jej semaforami; budynek, przez który biegnie
+linia, nie dostaje drugiej. Panel linii ma wiersz **BUDYNKU: TAK / NIE** (`B`): NIE robi z niej linię żadnego
+budynku. W misji otwartej tak, jak jest, linie
 należą do skryptu misji: przesunięcie budynku nie zmienia żadnej linii ani semafora - zapisz najpierw
 misję pod nową nazwą. Każdy inny semafor - odsunięty daleko, w innym kolorze, obrócony w drugą stronę, drugi na tym samym końcu - nie należy do budynku i zostaje tam, gdzie go postawiłeś.
 **Bloker** (kozioł oporowy, w grupie KOLEJ we Wszystkich obiektach) stawia się swobodnie i obraca
@@ -537,7 +541,9 @@ pociąg nie wjedzie pod prąd - tak misje oznaczają wjazd na mapę, wyjazd, fab
 Kliknij jej początek i koniec na torze - na mapie linia ma kreskę na początku i strzałki w stronę,
 w którą biegnie, a mysz nad nią mówi, co robi; potem na zaznaczonej linii - wiersz stanu podaje jej początek, koniec i to, co robi; także narzędziem
 Zaznacz kliknięcie kreski lub strzałki linii ją zaznacza, a prawy przycisk otwiera jej panel - `T` włącza albo wyłącza
-pchanie, `R` ją odwraca, `S` stawia jej semafory, Del ją usuwa. Zrób dwie:
+pchanie, `R` ją odwraca, `S` stawia jej semafory, `B` robi z niej linię jej budynku albo żadnego, Del ją
+usuwa. Przeciągnięcie kreski albo strzałki linii przenosi ten koniec na inny punkt toru (semafory idą z nim);
+punkt, do którego nie prowadzi tor od drugiego końca, zostawia linię tak, jak była. Zrób dwie:
 
 - **wjazd na mapę**: od końca głównej linii za krawędzią na mapę, z pchaniem - jeśli zrobiło go
   **POSTAW SWIATLA** przyjazdu (krok 5), już jest;
@@ -885,6 +891,7 @@ rzadziej stawiane rzeczy, na końcu dwa panele.
 | G | narzędzie Tory: teren pod wznoszącymi się szynami bez zmian / podniesiony łagodnie / ostro |
 | W | woda, bagno albo lawa |
 | S | semafory zaznaczonej linii (narzędzie Linia jednokierunkowa) |
+| B | zaznaczona linia: linia jej budynku albo żadnego |
 | Shift (z pędzlem) | usuwanie |
 | Esc, prawy przycisk | powrót do Zaznacz; anulowanie zaczętego odcinka toru; zamknięcie panelu. Esc, gdy nic nie jest w toku: menu edytora |
 | środkowy przycisk | przeciąganie mapy; w narzędziu Tory kliknięcie usuwa szynę pod kursorem (także na rozjeździe) |

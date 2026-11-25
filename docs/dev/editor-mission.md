@@ -112,6 +112,59 @@ page, and writes a text the language pack has a copy of (the sandbox's,
 `lang\<code>\maps\sandbox\`) into that copy - the game reads it instead of the root's, so an edit
 written to the root never showed.
 
+**A building's line** (2026-11-17, the maintainer's request and decision; `editor_edit.cpp`
+`line_buildings`, `LineDrag`, `set_line_building`). A factory's exit line is two points, and the engine
+pushes the new cars along the shortest way between them (`SetPushLine`); the editor's own line for a
+factory (`building_line`) walks 140 px from the dead end and takes, at a switch, the branch nearest to
+the spur's way. Since v0.2.12 nothing could change that branch: a line drawn by hand to the other branch
+stayed the map maker's - not the factory's for its lights, its capture or its plan (the maintainer's
+map "Vulcanic Uprising": before v0.2.12 the order of laying the track chose the branch). Now:
+
+- *An end of a line is dragged.* In the Select or the Push line tool the button pressed within 10 px of
+  a line's bar or arrow selects the line (as a click did) and drags that end: it follows the rail point
+  under the cursor - the line it would be drawn in cyan, the status line saying what it would do - and
+  let go there the line runs to it, one step of the history (`OpLineEnd` / `OpLineBegin`), keeping its
+  flag and its BUILDING'S. The only refusal is the engine's: no way between the two points ("Can't
+  PushLineFindDot") - the line then stays as it was; let go where it began it is only selected; any other
+  end of the drag (another tool, a panel, the window left) leaves it. The line's lights go with it: the
+  posts that stood as its lights (`post_owners`: its building's when it was the building's rule line, or
+  the line's own) move to the places its new way gives (`line_posts`: red at the end, green at a begin
+  that is joined on), a missing one is made and one too many deleted; a line without lights gets none,
+  and a line a post owns (a light's L line, a pair's) leaves its post as it is. So a factory's exit is
+  dragged from the branch the editor chose onto the other one at the switch, and its red light with it.
+- *A line through a building is its line.* A factory's or repair point's own line is its rule line (the
+  one `building_line` gives it where it stands, as before) or else a line through it: one that leaves the
+  factory from the dead end it stands at (that rail point is the line's begin - a line ending there
+  pushes trains into the factory, no exit) or that runs over the repair point's rail point
+  (`building_dot`: its leg's point within 40 px) anywhere on its way - drawn by hand or with an end
+  moved; on a line through several buildings the first met from its begin. A building has one line: its
+  rule line first, else the first line through it in the editor's order (which a save keeps). A line of
+  two buildings' rule (one standing on the other's place) is neither's, and a post's own line stays the
+  post's, as before. The 2026-11-14 rule holds: a building's move, turn or deletion takes only its rule
+  line and the lights of it - a line drawn or changed by the map maker is never erased by a building, its
+  lights stay with it -, and a building moved or placed where a line runs through it keeps that line
+  (`MsgBuildingLineThrough`) instead of getting a second one. Turning a repair point round (R) turns only
+  its rule line; a line through it is turned with the line's own R.
+- *BUILDING'S: YES / NO.* The line's panel (the right button on it) has the row when the line runs through
+  a building or was set to no building's; B on a selected line switches it. NO keeps the line from every
+  building: in the editor it is the map maker's (no building's move takes it), in play no factory's exit
+  and no building's capture line; the building it ran through has then no line, or the next one through
+  it. The status line says " - no building's (its panel)". It is kept in the script as a comment after
+  the line's call, `SetPushLine(...);   // no building's line` (`NO_BUILDING_MARK`): the engine reads the
+  call alone, the editor reads the comment back.
+
+What the runner takes as a building's line is the editor's answer: the settings' block has, beside
+`push_bx/by/ex/ey[]`, `push_of_x[]` and `push_of_y[]` - the map point of the building each line is the own
+line of, 0 for none (`edit_line_buildings`) - and the runner's `OwnLine(b)` is the line whose point is the
+building's within 4 px. It replaces `FactoryLine` and `CaptureLine`, which guessed the line from its shape
+(a factory's: a begin within 75 px; a repair point's: a begin within 240 px, a chord of at most 480 px
+passing within 90 px of it), so a long hand line through a repair point was never its line in play, and a
+line the map maker set apart could still be taken. `PlanExit` (the plan waits while a car stands on the
+factory's exit) and `CaptureTact` read `OwnLine`; the editor's own `edit_factory_exit_car` (the factory
+panel's `A TRAIN ON ITS EXIT`) reads `lines_of`, the same answer. A map gets it when it is saved again in
+the editor (the runner and the arrays are written together); POLIGON's shipped script keeps its older
+runner (`CaptureLine` by shape) until it is saved.
+
 **The enemy's trains of the script** (`draw_enemy_trains`, `editor_edit.cpp`). The start trains
 and the factory's queue (`start_trains*`, `level_queue_*`) are made by the AI while the level
 runs (`TrainsTact.lgc`, `ai_events.lgc`), so the map has no object for them. On the held level the
@@ -294,7 +347,8 @@ either within 100 px of the building as before. It is a radius, not a stop: a tr
 the light takes the factory too, as the missions' radii (up to 150 at l07, l16) do. The runner reads the
 lines from `PUSH_LINES`, `push_bx/by/ex/ey[]`, which the editor writes into the settings' block with the
 arrivals' arrays - the same lines as main()'s `SetPushLine` calls, in the screen's points (y less the
-height). A building's own line (`CaptureLine`) is one of the shape the editor gives it: a factory's begins
+height). A building's own line is, since 2026-11-25, the editor's answer (`OwnLine`, `push_of_x/y[]`: "A
+building's line"); until then (`CaptureLine`) it was one of the shape the editor gives it: a factory's begins
 within 75 px of its middle (`building_line` takes the dead end within 40 px of a point 22 px behind the
 middle; rail and ground heights apart add a little) and its end is farther from it than its begin - the
 nearest such begin; a repair point's begins within 240 px of it, is at most 480 px from begin to end and
@@ -798,9 +852,10 @@ and not while a car stands on the factory's exit (`PlanExit`). The exit is where
 `Depo_ReleaseUnit` makes each one at the factory's place and deletes what stands there, and the push line
 pushes them along until the last one is past its end, coupling them to a train of their army they touch
 (the cars of the next train joined one that stayed at the door) and pushing another army's along
-(engine.md "How the cars follow"). So the runner takes the factory's own line (`FactoryLine`: the
-editor's line whose begin is within 75 px of the factory and whose end is not nearer - the rule
-`CaptureLine` uses for a factory too) from its begin, behind the place, to its end and on past it along
+(engine.md "How the cars follow"). So the runner takes the factory's own line (`OwnLine`, the editor's
+answer - "A building's line": its rule line, or an exit dragged onto another branch or drawn by hand from
+its dead end; until 2026-11-25 `FactoryLine`, the editor's line whose begin was within 75 px of the factory
+and whose end was not nearer) from its begin, behind the place, to its end and on past it along
 its direction by 48 px a car of the entry's train, 20 px to either side, and waits while a car of any
 army (not a dying one) has its screen point there; a factory without a line of its own waits while a
 car is within 48 px of its place, where the cars are made on one another. Until 2026-11 it waited while
