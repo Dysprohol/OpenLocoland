@@ -959,6 +959,13 @@ double zoom_view_whole() {
     return (std::min)(static_cast<double>(window_w()) / map_w(), static_cast<double>(window_h()) / map_h());
 }
 
+// The factor at which the map fills the window (its shorter side, relative to the window, fills it; the other one
+// goes on past the window's edges): the farthest out play goes, so that the view never leaves the map.
+double zoom_view_cover() {
+    if (map_w() <= 0 || map_h() <= 0) return 1.0;
+    return (std::max)(static_cast<double>(window_w()) / map_w(), static_cast<double>(window_h()) / map_h());
+}
+
 // The view z shows: the window / z on each axis, at most the map.
 void zoom_view_size(double z, int& w, int& h) {
     w = static_cast<int>(std::lround(window_w() / z));
