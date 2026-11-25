@@ -91,7 +91,7 @@
 # At the end it closes the game with WM_CLOSE, so error.log is complete.
 # If the full screen box is disabled and the test should run in a window, the game is
 # closed without clicking OK - so the display mode is not switched.
-param([string]$Exe = (Join-Path (Split-Path (Split-Path $PSScriptRoot)) "Locoland\Locoland.exe"), [int]$Wait = 10, [string]$Shot = "", [int]$ClickOk = 0, [switch]$Screen, [int]$SetFull = -1, [string]$Steps = "", [string]$WaitFor = "", [int]$LogWait = 60, [string]$Language = "", [string]$Map = "", [switch]$LastShotOnly, [switch]$Menu, [switch]$Editor, [switch]$Visible,
+param([string]$Exe = (Join-Path (Split-Path (Split-Path $PSScriptRoot)) "Locoland\Locoland.exe"), [int]$Wait = 60, [string]$Shot = "", [int]$ClickOk = 0, [switch]$Screen, [int]$SetFull = -1, [string]$Steps = "", [string]$WaitFor = "", [int]$LogWait = 60, [string]$Language = "", [string]$Map = "", [switch]$LastShotOnly, [switch]$Menu, [switch]$Editor, [switch]$Visible,
       [string]$Resolution = "1024x768", [int]$Cheats = 0, [int]$UnlockMissions = 0, [int]$FrameLimit = 60, [int]$FpsCounter = 0, [string]$Reg = "", [switch]$ResetTestKey, [string]$TestScreen = "", [string]$PickMode = "", [string]$TestDpi = "")
 Add-Type @"
 using System; using System.Runtime.InteropServices; using System.Text;
@@ -399,7 +399,7 @@ if ($Steps) {
   $p.Refresh()
   if (-not $game -and $p.HasExited -and (Follow-Restart 15)) { $game = $script:game }   # restarted already
   if (-not $game) {
-    "STOP: the Locoland window did not appear within 10 s - is the game still on the launcher dialog?"
+    "STOP: the Locoland window did not appear within $Wait s - is the game still on the launcher dialog?"
     Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
     return
   }

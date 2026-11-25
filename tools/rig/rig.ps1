@@ -53,10 +53,11 @@
 # -Script      (-Job script) a .ps1 under the host folder run inside the box; -ScriptArgs its parameters
 # -MemoryMB    the box's memory (default 24576, set when it starts): the guest uses 1.9 GB idle and about
 #              0.25 GB more per game running (file cache besides); the host gives only what the guest touches
-# -MaxJobs     at most this many jobs at once in the box (default 12; set when it starts)
-# -MaxGames    at most this many games at once (default 16; a missions job counts its lanes; set when
+# -MaxJobs     at most this many jobs at once in the box (default 10; set when it starts)
+# -MaxGames    at most this many games at once (default 12; a missions job counts its lanes; set when
 #              it starts; a single job larger than that still runs, alone)
-# -DefaultResolution  the display a job that names none runs under (default: the box's starting size)
+# -DefaultResolution  the display a job that names none runs under (default 1920x1080, so the jobs of a
+#              busy round share one display; "" = the box's starting size, which follows the host's window)
 # -GamesGB     the guest keeps copies of game folders for the next job of the same build up to this
 #              many GB (default 16; set when it starts) - the guest's disk lives on the host's disk
 # -MaxWait     minutes a job may wait in the queue before this script withdraws it (default 120)
@@ -83,7 +84,7 @@ param(
   [string]$Script = "", [hashtable]$ScriptArgs = @{},
   [hashtable]$DgVoodoo = @{}, [switch]$Warp, [switch]$Sound, [int]$Parallel = 0, [int]$MemoryMB = 24576,
   [string]$Out = "", [double]$Timeout = 30, [switch]$Fresh, [int]$IdleMinutes = 10,
-  [switch]$Exclusive, [switch]$Shared, [int]$MaxJobs = 12, [int]$MaxGames = 16, [double]$GamesGB = 16, [string]$DefaultResolution = "", [double]$MaxWait = 120,
+  [switch]$Exclusive, [switch]$Shared, [int]$MaxJobs = 10, [int]$MaxGames = 12, [double]$GamesGB = 16, [string]$DefaultResolution = "1920x1080", [double]$MaxWait = 120,
   [switch]$Status, [switch]$Monitors, [switch]$Look, [Alias("Show")][switch]$Peek, [switch]$Front, [switch]$Hide, [switch]$Stop, [switch]$Kill, [switch]$Restart
 )
 $ErrorActionPreference = "Stop"
@@ -141,6 +142,15 @@ $wsbExe = WsbExe
 function BoxIds { if ($wsbExe) { @(& $wsbExe list 2>$null | Where-Object { $_ -match '^[0-9a-f-]{36}$' }) } else { @() } }
 function Clients { @(Get-Process WindowsSandboxRemoteSession -ErrorAction SilentlyContinue) }
 function BoxRunning { if ($wsbExe) { return [bool](BoxIds).Count } else { return [bool](Clients).Count } }
+# box.json read again a moment later when another rig.ps1 is writing it (a read in the middle of a write
+# is not valid JSON); null when there is no box file
+function Read-Box {
+  for ($i = 0; $i -lt 10; $i++) {
+    if (-not (Test-Path $boxFile)) { return $null }
+    try { return (Get-Content $boxFile -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop) } catch { Start-Sleep -Milliseconds 200 }
+  }
+  throw "$boxFile could not be read as JSON (another rig.ps1 kept writing it)"
+}
 function AgentState {
   $f = Join-Path $io "agent\state.json"
   # read again a moment later when it is being swapped (the agent rewrites it every half second)
@@ -178,7 +188,7 @@ function Attach-Client {
     throw "the box's client did not connect in 60 s (its window: $home_\client-error.png)"
   }
   # a new client has the default size: the display the last job asked for is made again
-  $b = if (Test-Path $boxFile) { Get-Content $boxFile -Raw | ConvertFrom-Json } else { $null }
+  $b = Read-Box
   if ($b -and $b.display) {
     $deadline = (Get-Date).AddSeconds(30); do { Start-Sleep -Milliseconds 500 } while (-not (AgentState).screen -and (Get-Date) -lt $deadline)
     Say "client connected again - $(Set-BoxDisplay $b.display.res $b.display.scale)"
@@ -295,7 +305,7 @@ function Set-BoxDisplay([string]$res, [int]$scale) {
   if ($res) { if ($res -notmatch '^(\d+)x(\d+)$') { throw "-Resolution '$res' is not WxH" }; $w = [int]$Matches[1]; $h = [int]$Matches[2] }
   else { $null = $s.screen -match '^(\d+)x(\d+)@'; $w = [int]$Matches[1]; $h = [int]$Matches[2] }
   $want = "${w}x${h}@$($mon.Dpi)"
-  $b = Get-Content $boxFile -Raw | ConvertFrom-Json
+  $b = Read-Box
   $b | Add-Member display ([pscustomobject]@{ res = "${w}x$h"; scale = $scale }) -Force
   ($b | ConvertTo-Json) | Set-Content $boxFile -Encoding utf8
   # A display counts only once the guest has kept it for 3 s: the client changes its own size a
