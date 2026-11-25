@@ -150,6 +150,9 @@ The missions play as they always did. What changed:
 - **A second row in the factory panel.** A factory can build up to 14 kinds of cars (keys F1 - F12,
   `[` and `]`), but its panel showed ten. The 11th and further now show in a second row above the
   first, and a click on them works.
+- **The factory panel stays up to date.** A car that became affordable while the panel was open (or
+  whose limit freed up) stayed grey, and its click and key did nothing, until the factory was selected
+  again; now it lights up as soon as it can be built, and a car added to the list appears at once.
 - **The middle mouse button** drags the map, in the missions too.
 - **Zoom with the mouse wheel.** In a mission, turning the wheel away from you brings the map closer
   (up to three times), turning it towards you shows more of it (until the map fills the screen - nothing beyond its edges), a
@@ -567,7 +570,11 @@ selected semaphore its own line all the same, and its panel's LINE row takes it 
 **What a factory builds**: the right button on a factory, **WHAT IT BUILDS...**. For your factory
 (and a neutral one, whose list is yours once you capture it) click the units it may build - they keep
 the game's order and keys F1-F12, [ and ]; for the unit clicked last **IN THE LIST** sets from when (at
-the start or after a time) and **AT MOST** how many of them the player may have.
+the start or after a time) and **AT MOST** how many of them the player may have. In the game the
+factory's panel shows it: a car with a limit has a counter in its icon's bottom-left corner (`1/2`: one
+of the two allowed is on the map or in a factory's queue; at the limit the car is grey), and a car that
+comes later stands after the others, grey, with the time left (`1:30`); the mouse tip over it says the
+same in words.
 
 **What a factory builds by the script - its plan**: the enemy's factory shows the trains its AI
 builds (only the enemy has an AI), in the second tab **TRAINS IT BUILDS** of yours, a neutral one or a
