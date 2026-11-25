@@ -6,12 +6,21 @@
 #include <vector>
 
 // SetPushLine(begin_x, begin_y, end_x, end_y, push_flag): screen coordinates (MAP_RULES.md 5).
+// `no_building`: the line's panel says it belongs to no building (BUILDING'S LINE: NO), so it is never a
+// factory's or repair point's own line, whatever it runs through (editor-mission.md "A building's line");
+// kept in the script as a comment after its SetPushLine call.
 struct PushLine {
     int bx, by, ex, ey, flag;
+    int no_building = 0;
     bool operator==(const PushLine& o) const {
-        return bx == o.bx && by == o.by && ex == o.ex && ey == o.ey && flag == o.flag;
+        return bx == o.bx && by == o.by && ex == o.ex && ey == o.ey && flag == o.flag && no_building == o.no_building;
     }
 };
+
+// The factory or repair point each line of mission_push_lines() is the own line of - its map point,
+// {0, 0} for none (editor_edit.cpp, the held level): written with the lines for the runner (push_of_x[],
+// push_of_y[]).
+std::vector<POINT> edit_line_buildings();
 
 // The push lines of the editor's block in main(): the Push line tool edits them.
 std::vector<PushLine>& mission_push_lines();
@@ -72,8 +81,12 @@ struct EnemyTrainMark {
 };
 // The start trains, then the queue (read from the script, as File > Mission settings... has them).
 std::vector<EnemyTrainMark> mission_enemy_trains();
-// The script has the editor's blocks, so the settings and push lines are written on a save.
+// The script has the editor's blocks and is not the author's own, so the settings and push lines are
+// written on a save.
 bool mission_managed();
+// The author's own script (Mission settings: "The editor writes the map's script" unticked, the line
+// "// <editor off>" in the script): a save writes nothing into it, also under a new name.
+bool mission_own_script();
 // After a level is loaded in editor mode: reads the mission of the map's script.
 void mission_load(const std::string& map);
 // File > Mission settings...: true when the settings were changed; `open_arrivals` true when it
@@ -81,8 +94,9 @@ void mission_load(const std::string& map);
 // Plan... button (the enemy factory's panel).
 bool mission_dialog(HWND owner, bool* open_arrivals = nullptr, bool* open_plan = nullptr);
 // After the map was saved as `map`: its script (a new map gets one), the texts and its entry
-// on the custom maps page.
-void mission_save(const std::string& map);
+// on the custom maps page. `from`: the map the editor stood on (the author's own script is copied
+// from its script as it is).
+void mission_save(const std::string& map, const std::string& from = "");
 // Test mode: the settings of a file (editor_mission.cpp says how) instead of the dialog.
 bool mission_settings_from_file(const std::string& path);
 

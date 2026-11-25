@@ -182,13 +182,16 @@ std::string fit(const std::string& text, float x, float y, int reserve = 0) {
 
 // `head` + `tail` in the row at y from x; too long, `head` is cut (fit's mark) and `tail` - the task, the
 // price - stays whole; the whole text in the status line.
-std::string fit_head(const std::string& head, const std::string& tail, float x, float y) {
-    const int room = static_cast<int>((right_end() - x) / g_cw) - static_cast<int>(tail.size());
-    if (static_cast<int>(head.size()) <= room) return fit(head + tail, x, y);
-    if (room <= 2) return fit(head + tail, x, y);
+std::string fit_head(const std::string& head, const std::string& tail, float x, float y, int reserve = 0) {
+    const int room = static_cast<int>((right_end() - x) / g_cw) - static_cast<int>(tail.size()) - reserve;
+    if (static_cast<int>(head.size()) <= room) return fit(head + tail, x, y, reserve);
+    if (room <= 2) return fit(head + tail, x, y, reserve);
     g_rows.tip(x - 2, y - ROW / 2, right_end(), y + ROW / 2, head + tail, true);
     return cut_to(head, room) + tail;
 }
+
+// A choice's text cut to the row at y from x, with room for its brackets (PanelRows::put draws them).
+std::string fit_choice(const std::string& text, float x, float y) { return fit(text, x, y, UI_CLICKABLE_EXTRA); }
 
 // A note - what something means, never a choice: in parentheses.
 std::string paren(const std::string& text) { return text.empty() || text.front() == '(' ? text : "(" + text + ")"; }
@@ -236,7 +239,7 @@ void pages_at_right(int* page, int count) {
     if (count <= 1) return;
     const float y = row_y(ROW_ACTIONS);
     const std::string shown = ui_printf("%d/%d", *page + 1, count);
-    float x = right_end() - (shown.size() + 4) * g_cw;
+    float x = right_end() - (shown.size() + 4 + 2 * UI_CLICKABLE_EXTRA) * g_cw;   // [<] n/m [>]
     x = put(x, y, "<", false, [page] { *page = (std::max)(0, *page - 1); });
     x = put(x, y, shown);
     put(x, y, ">", false, [page, count] { *page = (std::min)(count - 1, *page + 1); });
@@ -338,7 +341,7 @@ void draw_list() {
     put(x, chosen, fit(ui_printf("%s (VID %d)", unit_name(nvid), nvid), x, chosen));
     if (!runs()) {
         note(ROW_CHOSEN + 1, 1, ui_text("FactoryNeedsArrivals", "LATER UNITS, LIMITS: IN A MAP WITH ARRIVALS"));
-        put(g_px + LEFT, most, fit(ui_text("FactoryConvert", "CONVERT IT IN THE ARRIVALS PANEL..."), g_px + LEFT, most), false,
+        put(g_px + LEFT, most, fit_choice(ui_text("FactoryConvert", "CONVERT IT IN THE ARRIVALS PANEL..."), g_px + LEFT, most), false,
             [] { panel_open_arrivals(); });
     } else {
         if (LATER_OFFERED && (in || later)) {
@@ -532,7 +535,7 @@ void draw_plan_list() {
     if (!enemy() && !runs()) {   // the runner orders the factory: a map that runs arrivals
         note(ROW_NOTE, 1, ui_text("PlanNeedsArrivals", "TRAINS BY THE SCRIPT: IN A MAP WITH ARRIVALS"));
         const float y = row_y(ROW_NOTE + 1);
-        put(g_px + LEFT, y, fit(ui_text("FactoryConvert", "CONVERT IT IN THE ARRIVALS PANEL..."), g_px + LEFT, y), false, [] { panel_open_arrivals(); });
+        put(g_px + LEFT, y, fit_choice(ui_text("FactoryConvert", "CONVERT IT IN THE ARRIVALS PANEL..."), g_px + LEFT, y), false, [] { panel_open_arrivals(); });
         return;
     }
     // what the factory does with them
@@ -552,7 +555,7 @@ void draw_plan_list() {
         const float x = g_px + LEFT;
         const std::string head = std::to_string(k + 1) + ". " + train_words(t), task = std::string(" - ") + ui_text(TASK_KEYS[t.task], TASK_NAMES[t.task]);
         const bool over = g_rows.hover(x - 2, y - ROW / 2, right_end(), y + ROW * 1.5f);
-        put(x, y, fit_head(head, task, x, y), i == g_entry || over);
+        put(x, y, ui_clickable(fit_head(head, task, x, y, UI_CLICKABLE_EXTRA)), i == g_entry || over);   // the choice's head row
         put(x + 3 * g_cw, y + ROW, fit(when_words(t, i), x + 3 * g_cw, y + ROW), i == g_entry || over);
         g_rows.area(x - 2, y - ROW / 2, right_end(), y + ROW * 1.5f, [i] { open_entry(i); });
         y += 2 * ROW;
@@ -600,6 +603,14 @@ float draw_name(const FactoryTrain& t, float y) {
     return y + ROW;
 }
 
+// The cars shown of a train of n from x: SHOWN_CARS, and a longer train scrolls - as many as leave room for
+// its [<] [>] at the row's end.
+int shown_cars(int n, float x) {
+    if (n <= SHOWN_CARS) return SHOWN_CARS;
+    const float arrows = 2 + (2 * (1 + UI_CLICKABLE_EXTRA) + 1) * g_cw;
+    return (std::max)(1, (std::min)(SHOWN_CARS, static_cast<int>((right_end() - x - arrows) / ICON)));
+}
+
 // The cars as icons over three rows, in the train's order (as it leaves the factory); in the
 // label's column + CAR and TEMPLATE... - or, for the car chosen with a click, < > and REMOVE.
 float draw_cars(const FactoryTrain& t, float y) {
@@ -640,18 +651,18 @@ float draw_cars(const FactoryTrain& t, float y) {
                 g_car = -1;
             });
     }
-    if (g_car >= 0 && g_car < g_first_car) g_first_car = g_car;
-    if (g_car >= g_first_car + SHOWN_CARS) g_first_car = g_car - SHOWN_CARS + 1;
-    g_first_car = (std::max)(0, (std::min)(g_first_car, n - SHOWN_CARS));
-    // the icons from the value column, or a character after the longest of CARS:, + CAR, TEMPLATE..., REMOVE,
-    // so a click on that text's end never lands on the first car's click-and-hold area (checked first)
-    size_t widest = 0;
-    for (const char* k : {ui_text("ArrCars", "CARS:"), ui_text("ArrAddCar", "+ CAR"), ui_text("ArrTemplates", "TEMPLATE..."),
-                          ui_text("ArrRemoveCar", "REMOVE")})
-        widest = (std::max)(widest, std::strlen(k));
+    // the icons from the value column, or a character after the longest of CARS:, [+ CAR], [TEMPLATE...],
+    // [REMOVE], so a click on that text's end never lands on the first car's click-and-hold area (checked first)
+    size_t widest = std::strlen(ui_text("ArrCars", "CARS:"));
+    for (const char* k : {ui_text("ArrAddCar", "+ CAR"), ui_text("ArrTemplates", "TEMPLATE..."), ui_text("ArrRemoveCar", "REMOVE")})
+        widest = (std::max)(widest, std::strlen(k) + UI_CLICKABLE_EXTRA);
     float x = (std::max)(g_px + LEFT + LABEL, g_px + LEFT + (widest + 1) * g_cw);
+    const int shown = shown_cars(n, x);
+    if (g_car >= 0 && g_car < g_first_car) g_first_car = g_car;
+    if (g_car >= g_first_car + shown) g_first_car = g_car - shown + 1;
+    g_first_car = (std::max)(0, (std::min)(g_first_car, n - shown));
     const float cy = y + ROW;
-    for (int i = g_first_car; i < n && i < g_first_car + SHOWN_CARS; ++i) {
+    for (int i = g_first_car; i < n && i < g_first_car + shown; ++i) {
         const float cx = x + ICON / 2;
         const int frame = palette_icon(t.cars[i]);
         if (frame >= 0) edit_draw_picture(VID_ICONS, frame, cx, cy, STEP - 1);
@@ -665,7 +676,7 @@ float draw_cars(const FactoryTrain& t, float y) {
                          }, ("car " + std::to_string(i + 1)).c_str());
         x += ICON;
     }
-    if (n > SHOWN_CARS) {
+    if (n > shown) {
         const float sx = put(x + 2, cy, "<", false, [] { g_first_car = (std::max)(0, g_first_car - 1); });
         put(sx, cy, ">", false, [] { ++g_first_car; });
     }
@@ -703,7 +714,7 @@ float draw_when(const FactoryTrain& t, float y) {
         const float vx = g_px + LEFT + LABEL;
         number(vx, y + ROW, seconds(t.time), time);
         put(vx, y + 2 * ROW, fit(paren(ui_text("PlanMoreArrivals", "MORE IN A MAP WITH ARRIVALS")), vx, y + 2 * ROW));
-        put(vx, y + 3 * ROW, fit(ui_text("FactoryConvert", "CONVERT IT IN THE ARRIVALS PANEL..."), vx, y + 3 * ROW), false,
+        put(vx, y + 3 * ROW, fit_choice(ui_text("FactoryConvert", "CONVERT IT IN THE ARRIVALS PANEL..."), vx, y + 3 * ROW), false,
             [] { panel_open_arrivals(); });
         return y + 4 * ROW;
     }
@@ -717,7 +728,7 @@ float draw_when(const FactoryTrain& t, float y) {
                                         r.cond_n = mission_condition(r.cond).first;
                                     }); });
         const Condition& c = mission_condition(t.cond);
-        x = put(x, y, fit(ui_text(c.key, c.english), x, y, 2), true);   // room for " >"
+        x = put(x, y, fit(ui_text(c.key, c.english), x, y, 2 + UI_CLICKABLE_EXTRA), true);   // room for " [>]"
         x = put(x, y, ">", false, [] { change({"OpPlanWhen", "factory plan time"}, [](FactoryTrain& r) {
                                         r.cond = next_condition(r.cond, 1);
                                         r.cond_n = mission_condition(r.cond).first;
@@ -770,7 +781,7 @@ float draw_repeat(const FactoryTrain& t, float y) {
             x = label(y, "PlanNext", "NEXT:");
             x = put(x, y, ui_text("PlanAfterMade", "AFTER THE LAST IS MADE"), !t.renew,
                     [] { change({"OpPlanRepeat", "factory plan repeat"}, [](FactoryTrain& r) { r.renew = false; }); });
-            put(x + g_cw, y, fit(ui_text("PlanAfterLost", "ITS LOSS"), x + g_cw, y), t.renew,
+            put(x + g_cw, y, fit_choice(ui_text("PlanAfterLost", "ITS LOSS"), x + g_cw, y), t.renew,
                 [] { change({"OpPlanRepeat", "factory plan repeat"}, [](FactoryTrain& r) { r.renew = true; }); });
             y += ROW;
         }
@@ -811,7 +822,7 @@ void draw_entry() {
     if (problem_of(t, p)) {
         const float py = g_py + PROBLEM_ROW;
         const float x = put(g_px + LEFT, py, fit(p.text, g_px + LEFT, py));
-        put(x, py, fit(p.button, x, py), false, p.act);
+        put(x, py, fit_choice(p.button, x, py), false, p.act);
     }
 }
 
@@ -825,7 +836,7 @@ void draw_templates() {
     put(g_px + LEFT, y, fit(ui_text("ArrTemplatesHead", "THE AUTHORS' TRAINS (A CLICK TAKES ONE):"), g_px + LEFT, y));
     y += ROW;
     for (int i = g_template_page * TEMPLATE_PAGE; i < static_cast<int>(t.size()) && i < (g_template_page + 1) * TEMPLATE_PAGE; ++i) {
-        put(g_px + LEFT + 2 * g_cw, y, fit(mission_author_train_name(t[i]), g_px + LEFT + 2 * g_cw, y), false, [i] {
+        put(g_px + LEFT + 2 * g_cw, y, fit_choice(mission_author_train_name(t[i]), g_px + LEFT + 2 * g_cw, y), false, [i] {
             const std::vector<int> cars = mission_author_trains()[i].cars;
             change({"OpQueueCars", "factory queue train"}, [cars](FactoryTrain& r) {
                 r.cars = cars;

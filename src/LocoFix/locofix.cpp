@@ -21,6 +21,7 @@ void install_view_culling();
 void install_profile();
 void install_birth_animation();
 void install_adopt_command();
+void install_lava_robots();
 void install_train_fold();
 void install_shadow_leak();
 void install_unit_limit();
@@ -51,6 +52,7 @@ void install_script_log();
 void install_script_value();
 void install_world_script();
 void install_script_refs();
+void install_script_check();
 void install_player_registry();
 void install_level_save();
 void install_editor();
@@ -149,6 +151,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         install_profile();
         install_birth_animation();
         install_adopt_command();
+        install_lava_robots();
         install_train_fold();
         install_shadow_leak();
         install_unit_limit();
@@ -169,6 +172,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
         install_script_value();
         install_world_script();
         install_script_refs();
+        install_script_check();   // the editor's check of a map's script before it runs (script_check.cpp)
         install_player_registry();
         install_mouse_pan();
         // Screen scaling hooks RegisterClassA after test mode and calls test mode's

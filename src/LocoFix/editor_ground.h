@@ -2,6 +2,7 @@
 // campaign grounds, lowering it for water, and saving it as the map's own image.
 #pragma once
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -151,6 +152,19 @@ int ground_height_at(float x, float y);
 // biggest difference in levels, at the screen point wx, wy). -1 when the picture is not read.
 int ground_depth_check(const short* grid, int gw, int gh, int cx0, int cy0, int cx1, int cy1, int& pixels, float& worst,
                        int& wx, int& wy);
+// The depth an older version's relief left standing over the ground: until 2026-11-20 ground a stroke
+// uncovered kept the height texels of the ground that had hidden it, so a map saved then has places
+// where its picture's depth is levels above the ground the picture shows there, and rails and objects
+// on that ground are drawn behind it. The GRID's ground (gw x gh) walked as the relief walks it over
+// the whole picture - the one in memory, else `image` read (centred on x, y) - where `skip` (the
+// ground's point) does not say to leave it: `seen` pixels, `agree` within 2 levels of the ground they
+// show, `above` more than 2 levels over it. With `fix` (the picture in memory only) those get the ground's own
+// height texel, the change noted for the stroke and the frame.
+struct DepthRepair {
+    int seen = 0, agree = 0, above = 0;
+};
+DepthRepair ground_depth_repair(const std::string& image, float x, float y, const short* grid, int gw, int gh,
+                                const std::function<bool(float, float)>& skip, bool fix);
 // Saving (editor.cpp save_map): whether the picture was painted and has to be written with the map;
 // the image file it is written as for the map file `map` (a game path) - <map's folder>\<name>.vid,
 // never a campaign ground's name; ground_write writes the picture into `file` a tile at a time (the

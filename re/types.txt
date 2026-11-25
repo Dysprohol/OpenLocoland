@@ -930,7 +930,7 @@ struct Vid 0x41c                  # object type ("sizeof VID" in the log); base 
   0x008 char* name                # object name from the OBJ record (String, CP1251)
   0x00c uint spriteType           # U_... (export.lgc), VID_SPRITETYPE
   0x010 int spriteClass           # B_... (export.lgc), VID_CLASS; 8 = decoration baked into the ground (shares images only with class 8)
-  0x014 uint flags                # 0x400 hidden (VID_HIDE), 0x800 screen coordinates, 0x8000 top layer, 0x10000 bobbing (sine * altitude), 0x20000 not baked into ground, 0x4000000 radial damage, 0x80000000 no damage to own army
+  0x014 uint flags                # 0x400 hidden (VID_HIDE), 0x800 drawn in its own colours: no gamma, neither the scene's light nor the army's colour (ColorVid_Draw, the sprites' draw; the interface, the fonts, the lights, lava, the golem - it was read as "screen coordinates"), 0x8000 top layer, 0x10000 bobbing (sine * altitude), 0x20000 not baked into ground, 0x4000000 radial damage, 0x80000000 no damage to own army
   0x018 uint moveMask             # VID_MOVE_MASK
   0x01c float sizeX               # object width in pixels
   0x020 float sizeY               # object depth (map y) in pixels

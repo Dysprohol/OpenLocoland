@@ -39,7 +39,7 @@ the name count from the byte after its 0):
 | 4 | var | name (+0x08) | CP1251 name |
 | +0x00 | 4 | spriteType (+0x0c) | `U_...` flags |
 | +0x04 | 4 | spriteClass (+0x10) | `B_...` class; 8 = decoration baked into the ground |
-| +0x08 | 4 | flags (+0x14) | 0x400 hidden, 0x800 screen coordinates, 0x10000 bobbing... |
+| +0x08 | 4 | flags (+0x14) | 0x400 hidden, 0x800 drawn in its own colours (no gamma), 0x10000 bobbing... |
 | +0x0c | 4 | moveMask (+0x18) | `VID_MOVE_MASK` |
 | +0x10 | 3x4 | sizeX, sizeY, sizeZ (+0x1c) | float, pixels |
 | +0x1c | 4 | maxHp (+0x28) | |

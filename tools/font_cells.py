@@ -24,6 +24,11 @@ take the letters (on the Russian fonts they replace Cyrillic, on the Polish ones
 letters of the same bytes). On a capture of the pack's own language (the Czech edition's fonts
 have every Czech letter) only the cells the font leaves empty are made (apply's only_empty).
 
+A cell of an ASCII sign (is_sign: "/", ":") has no base letter: it is drawn on the paper, and only
+into a cell the font leaves empty - every pack's font-unitnumbersonscreen.png gives the factory
+panel's small number font (VID 8, digits, F, [ and ] only) the "/" and ":" of its counters and
+times (LocoFix depot_rows.cpp).
+
 `preview` writes the pack's fonts as they would be assembled on a captured language (default:
 the pack's base) into a folder, with a picture of the changed cells enlarged next to the base
 letters, for checking the cells by eye.
@@ -111,6 +116,12 @@ def base_letter(byte, codepage):
     return ord(letter) if letter.isascii() and letter.isalpha() and letter != char else None
 
 
+def is_sign(byte):
+    """Whether a cell is an ASCII sign (a printable byte that is no letter or digit, "/" or ":"): a sign
+    is drawn into a cell the font leaves empty, on its paper, with no base letter."""
+    return 0x21 <= byte < 0x7F and not chr(byte).isalnum()
+
+
 def sheet_cells(sheet_path):
     """{byte: [(x, y, role)]} of a sheet: the pixels of each cell that hold anything."""
     from PIL import Image
@@ -142,17 +153,19 @@ def apply(font_data, sheet_path, codepage, only_empty=False):
         raise ValueError(f"{sheet_path} is {size[0]} x {size[1]}, the font {bitmap.width} x {bitmap.height}")
     paint = colours(bitmap)
     for byte, pixels in sorted(cells.items()):
-        if only_empty and not bitmap.empty(byte, paint["paper"]):
+        sign = is_sign(byte)
+        if (only_empty or sign) and not bitmap.empty(byte, paint["paper"]):
             continue
-        letter = base_letter(byte, codepage)
-        if letter is None:
-            raise ValueError(f"{sheet_path}: cell 0x{byte:02X} is not a letter with a mark in code page {codepage}")
-        sx, sy, cw, ch = bitmap.cell(letter)
         tx, ty, _, _ = bitmap.cell(byte)
-        letter_pixels = [[bitmap.get(sx + x, sy + y) for x in range(cw)] for y in range(ch)]
-        for y in range(ch):
-            for x in range(cw):
-                bitmap.put(tx + x, ty + y, letter_pixels[y][x])
+        if not sign:
+            letter = base_letter(byte, codepage)
+            if letter is None:
+                raise ValueError(f"{sheet_path}: cell 0x{byte:02X} is not a letter with a mark in code page {codepage}")
+            sx, sy, cw, ch = bitmap.cell(letter)
+            letter_pixels = [[bitmap.get(sx + x, sy + y) for x in range(cw)] for y in range(ch)]
+            for y in range(ch):
+                for x in range(cw):
+                    bitmap.put(tx + x, ty + y, letter_pixels[y][x])
         for x, y, role in pixels:
             bitmap.put(tx + x, ty + y, paint[role])
     return bytes(bitmap.data)
@@ -207,7 +220,8 @@ def preview(code, base=None, out=None, zoom=6):
         cw, ch = before.width // 16, before.height // 16
         picture = Image.new("RGB", (len(cells) * (cw + 2) * zoom, (3 * ch + 4) * zoom), (255, 0, 255))
         for i, byte in enumerate(sorted(cells)):
-            for row, (image, b) in enumerate(((before, base_letter(byte, codepage)), (before, byte), (after, byte))):
+            letter = base_letter(byte, codepage) if not is_sign(byte) else byte
+            for row, (image, b) in enumerate(((before, letter), (before, byte), (after, byte))):
                 x0, y0 = (b % 16) * cw, (b // 16) * ch
                 piece = image.crop((x0, y0, x0 + cw, y0 + ch)).resize((cw * zoom, ch * zoom), Image.NEAREST)
                 picture.paste(piece, (i * (cw + 2) * zoom, row * (ch + 2) * zoom))

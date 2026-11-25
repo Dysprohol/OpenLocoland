@@ -105,7 +105,8 @@ Gra startuje okienkiem startowym (z obrazkiem Locolandu):
   oznaczone „(nieoficjalne)”). Napisy okienka zmieniają się razem z nim. Jeśli wybranego języka już
   nie ma, gra startuje po angielsku, a bez angielskiego w języku twojej kopii ze Steama.
 - **Licznik FPS** i **Limit FPS** - wiersz pod rozdzielczością: mały licznik u góry ekranu i ile
-  klatek na sekundę rysuje gra (domyślnie 60; ∞ = bez limitu).
+  klatek na sekundę rysuje gra (domyślnie 60; ∞ = bez limitu). W szybkim teście mapy w edytorze
+  (TEST BEZ ZAPISU, Ctrl+R) obok licznika jest czas misji.
 - **Kody twórców** i **Wszystkie misje** - dwa dodatki, domyślnie wyłączone: klawisze twórców gry i
   wszystkie misje otwarte od początku (prawdziwe postępy zostają nietknięte).
 - **Sprawdź aktualizacje** - wiersz nad OK: czy jest nowsza wersja OpenLocoland, zob.
@@ -149,10 +150,14 @@ Misje grają się tak jak zawsze. Co się zmieniło:
 - **Drugi rząd w panelu fabryki.** Fabryka może budować do 14 rodzajów wagonów (klawisze F1 - F12,
   `[` i `]`), ale jej panel pokazywał dziesięć. Jedenasty i dalsze są teraz w drugim rzędzie nad
   pierwszym i można je klikać.
+- **Panel fabryki na bieżąco.** Wagon, na który przybyło pieniędzy przy otwartym panelu (albo którego
+  limit się zwolnił), zostawał szary, a jego kliknięcie i klawisz nic nie robiły, dopóki fabryki nie
+  wybrało się na nowo; teraz rozjaśnia się, gdy tylko można go zbudować, a wagon dodany do listy pojawia
+  się od razu.
 - **Środkowy przycisk myszy** przeciąga mapę, także w misjach.
 - **Przybliżanie i oddalanie kółkiem myszy.** W misji obrót kółka od siebie przybliża mapę (do trzech
-  razy), obrót do siebie pokazuje jej więcej (aż do całej mapy, jeśli się mieści), po trochu z każdym
-  ząbkiem i płynnie. Punkt pod kursorem zostaje na miejscu, a pasek, minimapa, komunikaty i kursor zachowują swój
+  razy), obrót do siebie pokazuje jej więcej (aż mapa wypełni ekran - nic poza jej brzegami), po trochu z każdym
+  ząbkiem i płynnie; przybliżony obraz zostaje ostry. Punkt pod kursorem zostaje na miejscu, a pasek, minimapa, komunikaty i kursor zachowują swój
   rozmiar. Nie nad interfejsem ani w menu; w edytorze też, nad mapą. Oddalony widok rysuje się dłużej, więc gra działa
   wtedy wolniej; przybliżony szybciej.
 - **Stała liczba klatek** (domyślnie 60) zamiast zajmowania przez grę całego rdzenia procesora.
@@ -311,7 +316,8 @@ flagę masztu, Shift+R / E flagę dworca.
 nim, a dla fortyfikacji, kopalni i cytadeli - działo w każdym gnieździe (puste, działo albo
 rakiety; gdy panel jest otwarty, gniazda są ponumerowane na murze, a kliknięcie działa otwiera panel
 jego budowli). Prawy przycisk gdzie indziej albo Esc go zamyka. W każdym panelu - obiektu,
-przyjazdów, fabryki - wiersz stanu u góry mówi, co robi wiersz panelu pod myszą.
+przyjazdów, fabryki - wiersz stanu u góry mówi, co robi wiersz panelu pod myszą, a to, co można
+kliknąć, jest w nawiasach, [TAK]; pozostałe napisy mówią, czym jest wiersz albo co jest ustawione.
 
 ![Panel fortyfikacji](img/editor-fort-panel-pl.jpg)
 
@@ -364,7 +370,9 @@ się razem z mapą.
 **Woda i lawa** z listwy: w rzędzie **RODZAJ** (jasna woda, ciemna woda, bagno, bagno 2, lawa; `W` je przełącza) i **ROZMIAR**; przeciągaj, żeby ją położyć. Przeciągnięcie jednym rodzajem po drugim podmienia go w całych kwadratach 128 px - jeden rodzaj na kwadrat, tak gra rysuje wodę -; kwadraty, które pociągnięcie podmieni, są obrysowane, zanim zaczniesz malować. Prawy przycisk albo Shift zabiera każdą wodę. Obniża teren
 w nieckę z brzegiem, kładzie powierzchnię wody i dodaje jej efekty (kręgi na wodzie, bąble, wybuchy
 lawy) oraz region, w którym wybuchy rozpryskują wodę. Shift+przeciąganie ją usuwa. Jeden rodzaj
-wody ma na mapie jeden poziom, tak jak w misjach.
+wody ma na mapie jeden poziom, tak jak w misjach. Robot piechoty, który wejdzie w lawę - poniżej
+jej poziomu tam, gdzie lawa przykrywa teren - ginie; woda nikomu nie szkodzi, chyba że skrypt mapy
+tak postanowi (misje 11, 16 i 17).
 
 Drugi sposób to **Region jasnej wody** (Wszystkie obiekty, temat **Efekty**): prostokąt wody o prostych
 brzegach, bez brzegu terenu i bez efektów - sadzawka, zalana łąka albo dalsza część tafli jeziora.
@@ -525,8 +533,12 @@ Przeciągnięcie przenosi je razem z linią i semaforami na najbliższe właści
 albo z Shiftem: tam, gdzie upuszczone); usunięcie usuwa też linię i semafory. Jego semafory to te
 na końcach jego linii, także przesunięty bliżej albo wzdłuż linii - również w mapie wczytanej z
 pliku; po jednym w swoim kolorze, zwróconym do swoich pociągów, na każdym końcu. Jego linia to ta, którą
-zrobił dla niego edytor; linia narysowana przez ciebie albo jego własna po obróceniu jej czy dołożeniu
-toru za ślepy koniec zostaje twoja - budynek robi wtedy nową. W misji otwartej tak, jak jest, linie
+zrobił dla niego edytor, albo linia, która przez niego biegnie: wychodzi z fabryki z jej ślepego końca - na
+przykład linia wyjazdu z końcem przeciągniętym na drugą odnogę rozjazdu, żeby pociągi wyjeżdżały tamtędy - albo
+idzie przez tor punktu naprawczego. Taka linia liczy się w grze jako linia budynku (jego pociągi, przejęcie), ale
+przesunięcie albo usunięcie budynku zostawia ją na miejscu razem z jej semaforami; budynek, przez który biegnie
+linia, nie dostaje drugiej. Panel linii ma wiersz **BUDYNKU: TAK / NIE** (`B`): NIE robi z niej linię żadnego
+budynku. W misji otwartej tak, jak jest, linie
 należą do skryptu misji: przesunięcie budynku nie zmienia żadnej linii ani semafora - zapisz najpierw
 misję pod nową nazwą. Każdy inny semafor - odsunięty daleko, w innym kolorze, obrócony w drugą stronę, drugi na tym samym końcu - nie należy do budynku i zostaje tam, gdzie go postawiłeś.
 **Bloker** (kozioł oporowy, w grupie KOLEJ we Wszystkich obiektach) stawia się swobodnie i obraca
@@ -537,7 +549,9 @@ pociąg nie wjedzie pod prąd - tak misje oznaczają wjazd na mapę, wyjazd, fab
 Kliknij jej początek i koniec na torze - na mapie linia ma kreskę na początku i strzałki w stronę,
 w którą biegnie, a mysz nad nią mówi, co robi; potem na zaznaczonej linii - wiersz stanu podaje jej początek, koniec i to, co robi; także narzędziem
 Zaznacz kliknięcie kreski lub strzałki linii ją zaznacza, a prawy przycisk otwiera jej panel - `T` włącza albo wyłącza
-pchanie, `R` ją odwraca, `S` stawia jej semafory, Del ją usuwa. Zrób dwie:
+pchanie, `R` ją odwraca, `S` stawia jej semafory, `B` robi z niej linię jej budynku albo żadnego, Del ją
+usuwa. Przeciągnięcie kreski albo strzałki linii przenosi ten koniec na inny punkt toru (semafory idą z nim);
+punkt, do którego nie prowadzi tor od drugiego końca, zostawia linię tak, jak była. Zrób dwie:
 
 - **wjazd na mapę**: od końca głównej linii za krawędzią na mapę, z pchaniem - jeśli zrobiło go
   **POSTAW SWIATLA** przyjazdu (krok 5), już jest;
@@ -561,7 +575,10 @@ jego panelu ją zabiera (BRAK).
 **Co buduje fabryka**: prawy przycisk na fabryce, **CO BUDUJE...**. Dla twojej fabryki (i neutralnej,
 której lista będzie twoja po jej zdobyciu) kliknij jednostki, które może budować - zachowują kolejność i
 klawisze gry F1-F12, [ i ]; dla ostatnio klikniętej **NA LISCIE** ustawia, od kiedy (od początku albo po
-czasie), a **NAJWYZEJ** - ile ich gracz może mieć.
+czasie), a **NAJWYZEJ** - ile ich gracz może mieć. W grze pokazuje to panel fabryki: wagon z limitem ma
+licznik w lewym dolnym rogu ikony (`1/2`: jeden z dwóch dozwolonych jest na mapie albo w kolejce
+fabryki; po osiągnięciu limitu wagon jest szary), a wagon, który przyjdzie później, stoi za pozostałymi,
+szary, z pozostałym czasem (`1:30`); podpowiedź pod kursorem mówi to samo słowami.
 
 **Co fabryka buduje ze skryptu - jej plan**: fabryka wroga pokazuje pociągi, które buduje jego AI (AI ma
 tylko wróg), a druga zakładka **BUDOWANE POCIAGI** twojej, neutralnej albo pirackiej - pociągi, które
@@ -795,7 +812,16 @@ Menu → **USTAWIENIA MISJI** (albo zębatka na listwie):
 - **plan fabryki wroga**: ile ma pociągów; **Plan...** otwiera panel fabryki wroga, gdzie się je
   ustawia;
 - **zadania**, teksty **zwycięstwa** i **porażki** oraz **odprawa** (linia `---` zaczyna następną
-  stronę). Przy zapisie mapy są zapisywane wielkimi literami, po 44 znaki w linii.
+  stronę). Przy zapisie mapy są zapisywane wielkimi literami, po 44 znaki w linii;
+- **Edytor zapisuje skrypt mapy** - zaznaczone na start. Edytor trzyma swoje ustawienia w oznaczonych
+  blokach skryptu mapy (`<nazwa>.lgc`): w liniach od `// <editor>`, `// <editor main>`,
+  `// <editor arrivals>` i `// <editor tact>` do ich linii `// </editor ...>`. Zapisuje tylko te bloki;
+  to, co napiszesz poza nimi, zostaje. Skrypt bez bloków zostaje nietknięty, ale zapisany pod nową
+  nazwą dostaje je. Jeśli cały skrypt piszesz sam, odznacz to pole: przy następnym zapisie skrypt
+  dostaje linię `// <editor off>` (możesz ją też wpisać sam) i od tej pory żaden zapis, zapis pod nową
+  nazwą ani test bez zapisu nic w nim nie zmienia - ani w tekstach; ustawienia w tym oknie są tylko
+  pokazane, a wiersz stanu mówi to wprost. Zaznacz je znowu, a edytor zapisuje swoje bloki jak
+  wcześniej.
 
 Misja jest **wygrana**, gdy wróg miał jednostki i nie zostało mu żadnej (pociągi, fabryka, działa
 fortyfikacji), a **przegrana**, gdy graczowi nie zostało żadnej jednostki ani fabryki.
@@ -806,6 +832,12 @@ Menu → **ZAGRAJ ZAPISANA MAPE**: gra uruchamia się od nowa z twoją zapisaną
 przybywające posiłki, atakujący wróg. Gdy się skończy, gra wraca do edytora na twoją mapę; żeby
 wrócić od razu, naciśnij Esc i kliknij **WROC DO EDYTORA** (na stronie z odprawą, a także na stronie
 przycisku wyjścia, WYJDZ Z GRY). O niezapisane zmiany najpierw pyta.
+
+Mapa, której skrypt (jej plik `.lgc` poprawiany ręcznie) ma błąd, na którym kompilator skryptów gry się
+zatrzymuje, nie uruchamia się - ani TEST BEZ ZAPISU, ani ZAGRAJ ZAPISANA MAPE: edytor zostaje na mapie i
+podaje błąd - plik, wiersz i co jest nie tak - w wierszu stanu i w komunikacie (wcześniej gra się
+zamykała). Otwarta w edytorze, taka mapa jest pokazana bez skryptu i wiersz stanu to mówi. Popraw skrypt
+i spróbuj ponownie.
 
 ### 12. Zapisz
 
@@ -885,6 +917,7 @@ rzadziej stawiane rzeczy, na końcu dwa panele.
 | G | narzędzie Tory: teren pod wznoszącymi się szynami bez zmian / podniesiony łagodnie / ostro |
 | W | woda, bagno albo lawa |
 | S | semafory zaznaczonej linii (narzędzie Linia jednokierunkowa) |
+| B | zaznaczona linia: linia jej budynku albo żadnego |
 | Shift (z pędzlem) | usuwanie |
 | Esc, prawy przycisk | powrót do Zaznacz; anulowanie zaczętego odcinka toru; zamknięcie panelu. Esc, gdy nic nie jest w toku: menu edytora |
 | środkowy przycisk | przeciąganie mapy; w narzędziu Tory kliknięcie usuwa szynę pod kursorem (także na rozjeździe) |

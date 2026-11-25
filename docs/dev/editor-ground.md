@@ -644,7 +644,7 @@ trains would drive onto it; now the point and its neighbour have `sem 4` + army 
 level runs. It is placed in the army of the palette's row and is marked with its
 army by the editor (`draw_mines`: a square in the army's colour and MINE: ENEMY; the engine hides a
 mine of another army than the player's, also on the held level, so the editor draws its sprite, and
-`pick` takes it although its VID has the screen flag 0x800); the authors' marker (89) is marked MINE
+`pick` takes it although its VID has the flag 0x800 - "select", editor-objects.md); the authors' marker (89) is marked MINE
 1 IN 3: ENEMY, and its panel makes it a mine of the enemy's. In play the engine shows a mine to its
 own army only (VID flag 0x20000), as it always did.
 Checked in the game (a map made in the editor: a line, four of our locomotives, a citadel, Charybdis
@@ -1290,3 +1290,8 @@ a copy of POLIGON (flat, ground 70): LAVA dragged over 300 x 200 px - 6 tiles at
 the Ground height tool's right button - lava in it; Shift+drag took 3 tiles, undone; saved: the 6 tiles
 293 at 69 on the 128 grid and the 751 at 70; loaded again - only the pits show lava; THE WHOLE MAP on a
 new sheet: 191 tiles under the ground.
+In the game the lava kills an infantry robot (VID 70) that walks into it, wherever its tiles come from
+(the missions' sheets, this tool's, the Water and lava tool's): one standing below the level of a lava tile that
+covers its place dies with the game's death and the explosion on lava (LocoFix `lava_robots.cpp`, changes.md 66);
+a sheet kept under the ground is harmless there, as it is hidden. The water stays as it was: only the scripts of
+missions 11, 16 and 17 harm units below their `WATER_Z`.

@@ -33,11 +33,15 @@
 // their last call, which the next call writes anyway - the engine's events leave the shell that hit
 // in TrainAttacked(train, enemy) and the handlers it calls, F070_0 the robot's link in its `link`,
 // and in the campaign they were cleared every few seconds.
+//
+// The same hook tells the objects that walk to a deleted house first (robot_walk.cpp, BUGS.md F35).
 #include "patch.h"
 #include "script_value.h"
 
 #include <string>
 #include <vector>
+
+void robot_walk_deleting(uint8_t* object);   // robot_walk.cpp
 
 namespace {
 
@@ -91,6 +95,8 @@ std::string slot_name(const uint8_t* script, int slot) {
 }
 
 void __fastcall object_destruct(uint8_t* object, void* edx) {
+    robot_walk_deleting(object);
+
     // what the line says, read while the object is whole
     const uint8_t* vid = at<uint8_t*>(object, OBJ_VID);
     const int nvid = vid ? at<int>(vid, VID_NVID) : -1;

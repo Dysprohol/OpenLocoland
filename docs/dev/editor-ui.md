@@ -70,6 +70,31 @@ pages, the bar and the status line, Help and the Menu panel, File > Mission sett
 texts of the pack) and the Load dialog - the Russian dialogs in Cyrillic -, and File > New, whose
 new map got the template's texts in the pack's language.
 
+**Clickable texts** (`ui_clickable` in `editor_text.h`; a suggestion of the Discord, 2026-11-16). A text the
+author can click in the editor's panels and rows is shown in brackets, `[TEXT]`, so it is told at once from the
+labels, values and notes beside it, which stay as they were (ARMY: `[OURS] [ENEMY]`, `[-] 120 PX [+]`). One function
+makes them, used by every place that draws one: an object's and a push line's panel (`draw_context`), the rows
+of the tools above the bar (`option_text`), the factory and Arrivals panels (`PanelRows::put` and `hold_text`
+bracket every text with an act, and a list's entry - two rows that are one choice - has its head row in brackets),
+the palette's groups and armies and the help's categories. Not bracketed: a row with a lamp before its text (the
+Menu panel's commands, its hints line, the help's pages and CONTENTS) - the lamp is the game's own menus' mark of a
+choice, and the Menu panel's two columns have no room for two more characters in German -, a text on a button's
+picture (BACK TO THE MAP), the icons, and a statement in a panel's row that is no choice (IN PLAY: ..., the value
+between `[-]` and `[+]`, BY ITS TRACK). Such a statement had an act that did nothing; it has none now, so it is not
+lit under the mouse any more. What is set keeps its underline, under the words only. A choice is a character
+wider on each side, so the room was made where it ran out: an object's panel puts the choices that do not fit
+after the label (from the value column to 8 px before the panel's end) on a second line in the same 41 px row,
+from the label's column, and breaks a statement at its spaces - the Hungarian TRAIN row and the German ARMY, SIZE
+and FOG rows were already wider than the panel before the brackets, the English TRAIN row with all three choices
+too; with LocoFix's test mode a row that still does not fit says so in `LocoFix.log` ("context panel ...: the row
+runs past the panel"). The factory and Arrivals panels keep their 46 characters: a choice cut to its row leaves
+room for its brackets, the page arrows `[<] n/m [>]` take four more, and a train longer than the panel shows
+scrolls with as many icons as leave room for its `[<] [>]` (five or four, not six); the Arrivals panel's cars now
+start after the longest of its left column's texts, as the factory's did (`[TEMPLATE...]` reached the first car).
+The rows above the bar wrap into another row by the same rule as before. The test steps `H`, `G` and `T` read the
+Arrivals panel too now, and the panels' rows are recorded from the start of a test (`PanelRows::record`); `T`
+matches a choice's words without its brackets.
+
 **The Help and Menu buttons** (`src/LocoFix/editor_panel.cpp`). The bar's two round sockets at its
 left end - in play the pause button (VID 498, 25 px, at x = the bar's middle - 274, y = the view's
 bottom - 19: `Player_ShowStateBar`) and "up to the menu" (VID 499, 38 px, at the middle - 236, the
@@ -103,9 +128,13 @@ in the category of the page before - so a new page is one line of the list, with
 own (a new `HelpCat...` key in the six packs) or an existing one. Six now: BASICS (1-4, 15, 31), TRACK AND
 TRAINS (5, 6, 23, 24, 28, 33), OBJECTS (7, 8, 16, 18, 22, 30), MISSION, SAVING (9, 10, 20, 21, 29), GROUND (11, 12,
 19, 32), ARRIVALS, FACTORIES (13, 14, 17, 25, 26, 27). The contents has a row for every page of a category and no
-second page, and the panel holds six rows: a category of more runs over the bottom strip and out of the panel
-(OBJECTS had 9 pages in v0.2.11, TRACK AND TRAINS 7 with page 33; 20, 26, 29 and 31 were moved on 2026-11-15) -
-a new page goes to a category with fewer than six. The 29 rows of categories and titles (up to 37 characters) do not fit a page's 14 lines, so
+second page. Six rows of two lines fill the panel's height above the bottom strip; until 2026-11-25 a category of
+more ran over the strip and out of the panel (OBJECTS had 9 pages in v0.2.11, TRACK AND TRAINS 7 with page 33; 20,
+26, 29 and 31 were moved on 2026-11-15, and the list kept to six a category). Now a column of more than six rows -
+a category's pages or the categories themselves - has them closer in the same height, one line each (a title cut to
+it), down to a line and 2 px apart: twelve at the normal font (`contents_layout` in `editor_panel.cpp`); what even
+that cannot hold is left out and `LocoFix.log` says "the help's contents lists 12 of 13 ...". Six a category keeps
+the two-line titles. The 29 rows of categories and titles (up to 37 characters) do not fit a page's 14 lines, so
 the contents are laid out as the palette: the categories down the left (two lines at most, the chosen
 one lit and underlined; the mouse over one, Up / Down or a click chooses it), the chosen one's pages on
 the right as the Menu panel's rows - the lamp (VID 472, pulsing under the mouse) and the page's title
@@ -127,7 +156,11 @@ closes an object's or a line's panel, drops a train's point being picked, ends a
 laid or a push line whose begin is picked, or leaves a tool for Select - before, Esc always opened
 Menu and none of these could be done with it.
 **Ctrl+R** runs the level or holds it again (Options > Run the level): the bar and its buttons are
-not there while the level runs. **Every save** (`save_map` in `editor.cpp`: Ctrl+S, Save map, a Yes to
+not there while the level runs. With the launcher's FPS counter on, the counter shows the mission's time beside the
+frames while the level runs - "60 FPS   2:35", m:ss, h:mm:ss past an hour (`draw_fps_counter` in
+`frame_limit.cpp`, issue #23.8): the script's clock (`GetTime`, `g_gameTime` 0x4a9d64, 10 ms when a level starts),
+so it stops while the game is paused and runs at the game's speed; in a mission played from the menu the counter is
+as it was. **Every save** (`save_map` in `editor.cpp`: Ctrl+S, Save map, a Yes to
 "Save the changes?", the save before Play the map; not Run the level's copy, which saves nothing) shows SAVED (`SavedNotice`, in the
 menu titles' font VID 3) in the middle of the view, the map's file under it in the menu font when it
 was saved under a name (not the scratch folder of a new map), on a dark box whose last 0.4 s fade -
@@ -221,7 +254,8 @@ Save and Load; the factory panel's 30 pages in Polish, German and Hungarian at b
 
 **Zoom in the editor** (`zoom.cpp`, `zoom_view.cpp`, `editor_edit.cpp`; engine.md "Zoom"). The **mouse
 wheel** over the map zooms the held level's map in and out by play's steps and caps (zoom.cpp's ladder, its
-ends and its glide, whatever they are), the map point under the cursor kept, as in a mission; **Ctrl+0** goes
+ends and its glide, whatever they are - except that out it goes on to the whole map with the void and the
+map's frame round it, where play stops at the map filling the window), the map point under the cursor kept, as in a mission; **Ctrl+0** goes
 back to 100 % (help page 3). What the wheel did for the tools until then moved to **Ctrl+wheel**: a brush's
 size, the Track tool's ramp, turning what is placed or selected, the scatter's radius, a post's side (the keys
 stay: R / E, + / -, PgUp / PgDn); Shift+wheel is as before (the selected object's height); an open panel takes

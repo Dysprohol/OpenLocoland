@@ -81,7 +81,7 @@ Paragraphs: Locks under dgVoodoo; Lost surfaces; The fog buffer; The rain; The l
 
 Sections: "Editor mode".
 
-Paragraphs: The level is held; The menu; Saving; Starting it and going back; Back to the editor; Hints under the cursor; Music while editing; The map the editor starts on; Scratch folders of one game; A level change resets the editor.
+Paragraphs: The level is held; The menu; Saving; Starting it and going back; Back to the editor; A script that does not compile; Hints under the cursor; Music while editing; The map the editor starts on; Scratch folders of one game; A level change resets the editor.
 
 ### [editor-objects.md](docs/dev/editor-objects.md) (~22 KB)
 
@@ -93,7 +93,7 @@ Paragraphs: Editing objects; Placing over objects, the track as a help; Placing 
 
 Sections: "Editor mode" (continued).
 
-Paragraphs: Mission settings and push lines; The enemy's trains of the script; Train arrivals; Capturing; The AI and the trains of an editor map - the review of 2026-11-05; The trains' orders; A train placed on a light's line did nothing; A target and a start; Every army the same orders; guarding an area; AREA watches from where the train stands; A captured train loses its order; The armies' fight rules; The pirates for the player; What a row does, and click-and-hold; The templates; The panel; A factory's build options; The panel's rows; A factory's plan; The data; The script; Rebuilt when lost; The AI's knobs.
+Paragraphs: Mission settings and push lines; A building's line; The author's own script; The enemy's trains of the script; Train arrivals; Capturing; The AI and the trains of an editor map - the review of 2026-11-05; The trains' orders; A train placed on a light's line did nothing; A target and a start; Every army the same orders; guarding an area; AREA watches from where the train stands; A captured train loses its order; The armies' fight rules; The pirates for the player; What a row does, and click-and-hold; The templates; The panel; A factory's build options; The panel's rows; A factory's plan; The data; The script; Rebuilt when lost; The AI's knobs.
 
 ### [editor-ground.md](docs/dev/editor-ground.md) (~95 KB)
 
@@ -105,7 +105,7 @@ Paragraphs: Ground, gravel bed, decals; The relief and the heights of objects; A
 
 Sections: "Editor mode" (continued).
 
-Paragraphs: Map exchange; The texts of the editor; The Help and Menu buttons; Ctrl+R; No window menu; Full screen, 1920 x 1080; The interface's size in the editor; Zoom in the editor; The frame and the profiler.
+Paragraphs: Map exchange; The texts of the editor; Clickable texts; The Help and Menu buttons; Ctrl+R; No window menu; Full screen, 1920 x 1080; The interface's size in the editor; Zoom in the editor; The frame and the profiler.
 
 ### [changes.md](docs/dev/changes.md) (~43 KB)
 

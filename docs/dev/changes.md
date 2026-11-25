@@ -73,6 +73,13 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
   patrol), so its loss went unseen. The train built again goes back to the lost one's place and watches,
   hunts or guards from there. A map gets the new runner when it is saved again in the editor
   (editor-mission.md "Rebuilt when lost").
+- Maps made in the editor: a push line's end is dragged to another point of the track (its lights go
+  with it), so a factory's exit line can lead onto the other branch at a switch and its trains leave
+  that way; a line that leaves a factory from its dead end or runs over a repair point's track is that
+  building's own line (its capture, the factory's plan waiting for a train on its exit), unless the
+  line's panel says BUILDING'S: NO. The runner takes the building's line from the editor (`push_of_x/y[]`)
+  instead of guessing it from the line's shape. A map gets it when it is saved again in the editor
+  (editor-mission.md "A building's line").
 - The strategic map of the menu has a second page with the custom maps (every map folder of
   `maps\`, POLIGON first: "Map files") and the map editor entry (`game/maps/menu.lgc.patch`; "The custom
   maps page" above).
@@ -631,8 +638,8 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       game's,
   52. zoom with the mouse wheel in play (`zoom.cpp`, `zoom_view.cpp`, engine.md "Zoom", working.md "Zoom
       with the wheel"): away from the player in, towards the player out, 12 % a notch (up to 3 times in, out
-      to the whole map), with a soft glide of 220 ms and the map point under the cursor kept, no sound; the world is drawn
-      at the zoom and stretched to the window, the interface after it at the window's own pixels, so it keeps
+      until the map fills the window - nothing beyond its edges, as at the level's own zoom), with a soft glide of 220 ms and the map point under the cursor kept, no sound; the world is drawn
+      at the zoom and stretched to the window - zoomed in sharp, exact big pixels at 2 and 3 -, the interface after it at the window's own pixels, so it keeps
       its size at every zoom and interface size; up to the whole view of a 3072 x 2304 map; border and arrow
       scrolling as fast on the screen at every zoom; nothing over the interface, in a menu, while paused,
       during an intro or in the editor (its own: 53); a menu keeps the zoom and looks as at zoom 1; a level change goes back
@@ -775,7 +782,58 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       from it again, so nothing changes there. `LocoFix.log` says the volumes before every level load.
       Checked in the test rig, old and new LocoFix, sound 11 and music 20 saved (37 and 68): every editor
       path and the way back at 100 before, at 37 and 68 now; mission 1 from the main menu 37 and 68 both
-      ways; the 20 missions pass.
+      ways; the 20 missions pass,
+  66. a map's script that does not compile no longer closes the editor (`script_check.cpp`, editor.md "A
+      script that does not compile"): the engine's compiler ends the game on almost every compile error, so
+      Run the level, Play the map or just opening such a map in the editor closed the game. The editor now
+      compiles the script first with the engine's compiler, apart from the level and on a thread of its own
+      whose `exit` ends only that thread; a run or a play of a script that does not compile (or is missing)
+      is not started - the editor stays on the map and says the compiler's first error as `error.log` has
+      it -, and a map opened in the editor with such a script is held without it. A map that compiles runs
+      as before; a game started from the menu is not touched,
+  67. the factory's panel in play (`depot_rows.cpp`, `BUGS.md` F34, engine.md "The factory panels",
+      editor-mission.md "A factory's build options"; issues #20 point 2 and #23 points 2 and 3): the list
+      follows what the factory can build while it is open - a unit that became affordable or whose limit
+      freed up lights up at once (its click and key work again), a unit put into the list appears at once.
+      On an editor map with the factory build options a unit with a limit shows `used/limit` in its
+      icon's bottom-left corner (its units on the map and in the factories' queues, as the engine counts
+      them), and a unit that comes later stands after the list's units, greyed, with no key and the time
+      left (`m:ss`, by the runner's own clock); the mouse tip over such an icon adds it in words
+      (`[Editor] PlayFactoryLimit`, `PlayFactoryUnlock`). A list with no limit and no later unit - every
+      campaign mission - looks as before. Every language pack's copy of the price's font (VID 8) gets `/`
+      and `:` (`lang/<code>/fonts/font-unitnumbersonscreen.png`, build.md "The Czech letters"),
+  68. an infantry robot dies in lava (`lava_robots.cpp`, editor-ground.md "Sheets of water and lava"): the lava
+      of a map is a sheet of the lava's tiles (VID 293) at one level, shown wherever the ground is lower, and the
+      engine let a unit walk through it as over any ground (its only lava rule turns the explosions over a lava
+      region into the explosion on lava, 528). Now the infantry robot (VID 70, which the paratrooper 84 becomes
+      when it lands) dies when it stands below the level of a lava tile covering its place: ACT_DAMAGE of all its
+      hp (the game's own death, its kill counted, its explosion 332) and the explosion on lava (528) at the
+      lava's level on its place - checked after `Unit_Move` (0x44c640), its step in every update of the world.
+      A robot on the shore, beside the lava or over a sheet below the ground (hidden there) is not touched, nor
+      any other unit; the water stays as it was (the scripts' own rule of missions 11, 16 and 17, `WATER_Z`).
+      `LocoFix.log` names the first 20 robots of a run (`lava: infantry robot (army 1) at 512,221, z 70 - in the
+      lava at 72 (tile at 576,192): it dies`). Checked in the test rig on a copy of POLIGON (flat, ground 70) with a
+      sheet of 10 lava tiles at 72 over the ground and one of 5 at 65 under it, seven robots sent across by the
+      script: the old build - the three sent through the lava walked through it and out on the far side; this
+      one - the three died at its edge (x 512) with the explosion on lava, the two sent to 5 px before the edge
+      and the two over the hidden sheet walked on as before, the 15 tiles all there to the end. (A sheet only 2
+      levels over the ground is sometimes not drawn for a moment in both builds - the tiles' depth against the
+      ground's, as found with the Region tool's sheets),
+  69. a civil robot is told when the house it walks to is deleted (`robot_walk.cpp`, `BUGS.md` F35): its walk
+      to a house kept the house in its command stack without a reference, the engine told nobody of a house
+      deleted while nobody held one, and the robot read the freed house at the end of its walk - a crash once
+      that memory was used again. When one of the 16 houses civil robots walk to is deleted, every object
+      whose command stack holds a walk to it is told through its own `OnObjectDeleted`, as the engine's round
+      would; the robot strolls on. Checked in the test rig with a script destroying a house every 2 s among 30
+      civil robots: the old build crashed at 0x4378d4 within two minutes, this one ran 13 minutes (330 houses,
+      more than 20 of them walked to) without an exception; the 20 missions pass,
+  70. lava glows at night (`game/objects.override/objects.tsv`, VID 293, editor-ground.md "Sheets of water and
+      lava"): the lava's tiles darkened with the time of day's gamma as all ground does, so lava went dark at
+      night - on the maps of the editor, whose night darkens red the most, it could hardly be told from grass.
+      The tiles get VID flag 0x800, as the lights and the lava stream (801) have it: the engine leaves their
+      colours as by day, so lava glows evenly by day and by night, at no cost (the gamma is not applied, the
+      frame does less). It holds for the missions' lava too (l12, l13). Checked in the test rig: an editor map's
+      lava at night, dark before, its day colours now.
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that

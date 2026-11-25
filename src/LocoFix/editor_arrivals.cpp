@@ -124,9 +124,9 @@ float number(float x, float y, const std::string& shown, std::function<void(int)
 
 std::string seconds(int s) { return ui_printf("%d:%02d", s / 60, s % 60); }
 
-// A text cut to the characters left of a row from x.
-std::string fit(const std::string& text, float x) {
-    const int room = static_cast<int>((g_px + LEFT + WIDTH * g_cw - x) / g_cw);
+// A text cut to the characters left of a row from x (`reserve` of them kept: a choice's brackets).
+std::string fit(const std::string& text, float x, int reserve = 0) {
+    const int room = static_cast<int>((g_px + LEFT + WIDTH * g_cw - x) / g_cw) - reserve;
     return room <= 0 ? std::string() : static_cast<int>(text.size()) <= room ? text : text.substr(0, room);
 }
 
@@ -317,7 +317,7 @@ void draw_list_screen() {
         head += ": " + train_words(a);
         // the two rows are one choice: lit together under the mouse
         const bool over = hover(x - 2, y - ROW / 2, x + WIDTH * g_cw, y + ROW * 1.5f);
-        put(x, y, fit(head, x), chosen || over);
+        put(x, y, ui_clickable(fit(head, x, UI_CLICKABLE_EXTRA)), chosen || over);   // the choice's head row
         put(x + 3 * g_cw, y + ROW, fit(when_words(a), x + 3 * g_cw), chosen || over);
         g_rows.area(x - 2, y - ROW / 2, x + WIDTH * g_cw, y + ROW * 1.5f, [i] { open_arrival(i); });
         y += 2 * ROW;
@@ -325,12 +325,14 @@ void draw_list_screen() {
     // the script's start trains and the authors' reinforcement go on beside the arrivals; the AI's limits
     if (!mission_start().empty()) {
         put(g_px + LEFT, g_py + BOTTOM - ROW,
-            ui_printf(ui_format("ArrStartConvert", "+ %d START TRAINS OF THE SCRIPT: CONVERT"), static_cast<int>(mission_start().size())),
+            fit(ui_printf(ui_format("ArrStartConvert", "+ %d START TRAINS OF THE SCRIPT: CONVERT"), static_cast<int>(mission_start().size())),
+                g_px + LEFT, UI_CLICKABLE_EXTRA),
             false, [] { edit_convert_arrivals(); });
     } else if (mission_arrivals().waves > 0) {
         int ex, ey, ez;
         if (edit_reinforcement_marker(ex, ey, ez))
-            put(g_px + LEFT, g_py + BOTTOM - ROW, ui_text("ArrLegacyConvert", "+ THE AUTHORS' REINFORCEMENT: CONVERT"), false,
+            put(g_px + LEFT, g_py + BOTTOM - ROW,
+                fit(ui_text("ArrLegacyConvert", "+ THE AUTHORS' REINFORCEMENT: CONVERT"), g_px + LEFT, UI_CLICKABLE_EXTRA), false,
                 [] { edit_convert_arrivals(); });
     } else {
         const std::string limit = ai_limit();
@@ -372,11 +374,23 @@ void draw_list_screen() {
 
 // ---- an arrival ----
 
+// The x for a clickable choice of `text` on row y: where it stands, or - when it would run past the panel's
+// right edge (the brackets made the rows longer) - the value column of the next row, y moving down with it.
+float wrap(float x, float& y, const std::string& text) {
+    const float right = g_px + LEFT + WIDTH * g_cw;
+    if (x + (text.size() + UI_CLICKABLE_EXTRA) * g_cw <= right) return x;
+    y += ROW;
+    return g_px + LEFT + LABEL;
+}
+
 float draw_who(const Arrival& a, float y) {
     float x = label(y, "ArrWho", "WHO:");
-    for (int army = 0; army < 4; ++army)
-        x = put(x, y, ui_text(ARMY_KEYS[army], ARMY_NAMES[army]), a.army == army,
+    for (int army = 0; army < 4; ++army) {
+        const std::string name = ui_text(ARMY_KEYS[army], ARMY_NAMES[army]);
+        x = wrap(x, y, name);
+        x = put(x, y, name, a.army == army,
                 [army] { change({"OpArrivalArmy", "arrival army"}, [army](Arrival& r) { set_army(r, army); }); });
+    }
     return y + ROW;
 }
 
@@ -420,13 +434,23 @@ float draw_cars(const Arrival& a, float y) {
                 g_car = -1;
             });
     }
-    // the cars shown: SHOWN_CARS from g_first_car, the chosen one among them
+    // the icons from the value column, or a character after the longest of CARS:, [+ CAR], [TEMPLATE...],
+    // [REMOVE] (as the factory's panel), so a click on that text's end never lands on the first car
+    size_t widest = std::strlen(ui_text("ArrCars", "CARS:"));
+    for (const char* k : {ui_text("ArrAddCar", "+ CAR"), ui_text("ArrTemplates", "TEMPLATE..."), ui_text("ArrRemoveCar", "REMOVE")})
+        widest = (std::max)(widest, std::strlen(k) + UI_CLICKABLE_EXTRA);
+    float x = (std::max)(g_px + LEFT + LABEL, g_px + LEFT + (widest + 1) * g_cw);
+    // the cars shown from g_first_car, the chosen one among them: SHOWN_CARS, and a longer train scrolls -
+    // as many as leave room for its [<] [>] at the row's end
+    int shown = SHOWN_CARS;
+    if (n > SHOWN_CARS)
+        shown = (std::max)(1, (std::min)(SHOWN_CARS, static_cast<int>((g_px + LEFT + WIDTH * g_cw - x - 2 -
+                                                                         (2 * (1 + UI_CLICKABLE_EXTRA) + 1) * g_cw) / ICON)));
     if (g_car >= 0 && g_car < g_first_car) g_first_car = g_car;
-    if (g_car >= g_first_car + SHOWN_CARS) g_first_car = g_car - SHOWN_CARS + 1;
-    g_first_car = (std::max)(0, (std::min)(g_first_car, n - SHOWN_CARS));
-    float x = g_px + LEFT + LABEL;
+    if (g_car >= g_first_car + shown) g_first_car = g_car - shown + 1;
+    g_first_car = (std::max)(0, (std::min)(g_first_car, n - shown));
     const float cy = y + ROW;   // the icons' middle
-    for (int i = g_first_car; i < n && i < g_first_car + SHOWN_CARS; ++i) {
+    for (int i = g_first_car; i < n && i < g_first_car + shown; ++i) {
         const float cx = x + ICON / 2;
         const int frame = palette_icon(a.cars[i]);
         if (frame >= 0) edit_draw_picture(VID_ICONS, frame, cx, cy, STEP - 1);
@@ -440,7 +464,7 @@ float draw_cars(const Arrival& a, float y) {
                          });
         x += ICON;
     }
-    if (n > SHOWN_CARS) {   // the rest of a long train: scrolled
+    if (n > shown) {   // the rest of a long train: scrolled
         const float sx = put(x + 2, cy, "<", false, [] { g_first_car = (std::max)(0, g_first_car - 1); });
         put(sx, cy, ">", false, [] { ++g_first_car; });
     }
@@ -521,7 +545,9 @@ float draw_repeat(const Arrival& a, float y) {
             repeat(r);
         });
     });
-    put(x + g_cw, y, ui_text("ArrEndlessChoice", "WITHOUT END"), a.times == 0, [repeat] {
+    const std::string endless = ui_text("ArrEndlessChoice", "WITHOUT END");
+    const float ex = wrap(x + g_cw, y, endless);   // first: it may move y to the next row
+    put(ex, y, endless, a.times == 0, [repeat] {
         change({"OpArrivalTimes", "arrival waves"}, [repeat](Arrival& r) {
             r.times = 0;
             repeat(r);
@@ -542,9 +568,12 @@ float draw_then(const Arrival& a, float y) {
     static const char* const KEYS[] = {"ArrTaskNone", "ArrTaskAttack", "ArrTaskForts", "ArrTaskGuard", "ArrTaskPatrol", "ArrTaskDrive"};
     static const char* const NAMES[] = {"STAYS", "ATTACKS", "THE FORTS", "GUARDS A POINT", "PATROLS", "DRIVES TO A POINT"};
     float x = label(y, "ArrThen", "THEN:");
-    for (int t : tasks_of(a.army))
-        x = put(x, y, ui_text(KEYS[t], NAMES[t]), a.task == t,
+    for (int t : tasks_of(a.army)) {
+        const std::string name = ui_text(KEYS[t], NAMES[t]);
+        x = wrap(x, y, name);
+        x = put(x, y, name, a.task == t,
                 [t] { change({"OpArrivalTask", "arrival task"}, [t](Arrival& r) { r.task = t; }); });
+    }
     y += ROW;
     if (needs_point(a)) {
         x = label(y, a.task == TASK_PATROL ? "ArrPoints" : "ArrPoint", a.task == TASK_PATROL ? "POINTS:" : "POINT:");
@@ -560,7 +589,7 @@ float draw_then(const Arrival& a, float y) {
 void draw_message(const Arrival& a, float y) {
     if (a.army > 1) return;   // only ours and the enemy's have one
     const std::string head = ui_text("ArrMessage", "MESSAGE:"), yes = ui_text("WordYes", "YES"), no = ui_text("WordNo", "NO");
-    float x = g_px + LEFT + WIDTH * g_cw - (head.size() + yes.size() + no.size() + 2) * g_cw;
+    float x = g_px + LEFT + WIDTH * g_cw - (head.size() + yes.size() + no.size() + 2 + 2 * UI_CLICKABLE_EXTRA) * g_cw;
     x = put(x, y, head);
     x = put(x, y, yes, a.message, [] { change({"OpArrivalMessage", "arrival message"}, [](Arrival& r) { r.message = true; }); });
     put(x, y, no, !a.message, [] { change({"OpArrivalMessage", "arrival message"}, [](Arrival& r) { r.message = false; }); });
@@ -585,7 +614,7 @@ void draw_arrival_screen() {
     Problem p;
     if (problem_of(a, g_selected, p)) {
         const float x = put(g_px + LEFT, g_py + PROBLEM_ROW, p.text);
-        put(x, g_py + PROBLEM_ROW, fit(p.button, x), false, p.act);
+        put(x, g_py + PROBLEM_ROW, fit(p.button, x, UI_CLICKABLE_EXTRA), false, p.act);
     }
 }
 
@@ -599,7 +628,7 @@ void draw_templates_screen() {
     put(g_px + LEFT, y, ui_text("ArrTemplatesHead", "THE AUTHORS' TRAINS (A CLICK TAKES ONE):"));
     y += ROW;
     for (int i = g_template_page * TEMPLATE_PAGE; i < static_cast<int>(t.size()) && i < (g_template_page + 1) * TEMPLATE_PAGE; ++i) {
-        put(g_px + LEFT + 2 * g_cw, y, fit(mission_author_train_name(t[i]), g_px + LEFT + 2 * g_cw), false, [i] {
+        put(g_px + LEFT + 2 * g_cw, y, fit(mission_author_train_name(t[i]), g_px + LEFT + 2 * g_cw, UI_CLICKABLE_EXTRA), false, [i] {
             const std::vector<int> cars = mission_author_trains()[i].cars;
             change({"OpArrivalTemplate", "arrival template"}, [cars](Arrival& r) { r.cars = cars; });
             g_screen = Screen::Arrival;
@@ -722,6 +751,8 @@ void arrivals_add_car(int nvid) {
 }
 
 int arrivals_selected() { return g_selected; }
+// Test mode (editor.cpp's panel commands): what the panel's last frame drew, as factory_rows.
+const PanelRows& arrivals_rows() { return g_rows; }
 // An arrival chosen on the map: the panel opens on it.
 void arrivals_select(int i) {
     g_selected = i;

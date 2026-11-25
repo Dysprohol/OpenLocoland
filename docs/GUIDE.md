@@ -105,7 +105,8 @@ The game starts with its launcher (the window with the Locoland picture):
   translation is marked "(unofficial)"). The launcher's labels change with it. If the language you
   chose is no longer there, the game starts in English, or without English in your Steam copy's.
 - **FPS counter** and **Frame limit** - the row under the resolution: a small counter at the top of
-  the screen and how many frames a second the game draws (60 by default; ∞ = no limit).
+  the screen and how many frames a second the game draws (60 by default; ∞ = no limit). In the
+  editor's quick test (QUICK TEST, NO SAVE, Ctrl+R) the counter shows the mission's time beside it.
 - **Cheat keys** and **All missions** - the two extras, off by default: the developers' keys and
   every mission open from the start (your real progress is not touched).
 - **Check for updates** - the row above OK: whether there is a newer OpenLocoland, see
@@ -150,10 +151,13 @@ The missions play as they always did. What changed:
 - **A second row in the factory panel.** A factory can build up to 14 kinds of cars (keys F1 - F12,
   `[` and `]`), but its panel showed ten. The 11th and further now show in a second row above the
   first, and a click on them works.
+- **The factory panel stays up to date.** A car that became affordable while the panel was open (or
+  whose limit freed up) stayed grey, and its click and key did nothing, until the factory was selected
+  again; now it lights up as soon as it can be built, and a car added to the list appears at once.
 - **The middle mouse button** drags the map, in the missions too.
 - **Zoom with the mouse wheel.** In a mission, turning the wheel away from you brings the map closer
-  (up to three times), turning it towards you shows more of it (up to the whole map where it fits), a
-  little with every notch and smoothly. The point under the cursor stays where it is, and the bar, the minimap,
+  (up to three times), turning it towards you shows more of it (until the map fills the screen - nothing beyond its edges), a
+  little with every notch and smoothly; zoomed in, the picture stays sharp. The point under the cursor stays where it is, and the bar, the minimap,
   the messages and the cursor keep their size. Not over the interface or in a menu; in the editor too, over the map. A
   zoomed-out view takes longer to draw, so the game runs slower while it is on; a zoomed-in one is
   quicker.
@@ -315,7 +319,8 @@ its line, and - for a fort, a mining plant or a citadel - the gun in each of its
 cannon or missiles; while the panel is open the sockets are numbered on the wall, and a click on a
 gun opens its host's panel). The right button elsewhere or Esc closes it. In every panel - an
 object's, the Arrivals panel, a factory's - the status line at the top says what the row under the
-mouse does.
+mouse does, and what you can click is in brackets, [LIKE THIS]; the other texts say what a row is or what
+is set.
 
 ![A fort's panel](img/editor-fort-panel-en.jpg)
 
@@ -368,7 +373,9 @@ patches of other textures. The painted picture is saved with the map.
 The strip's **Water and lava**: its row's **KIND** (light water, dark water, swamp, swamp 2, lava; `W` cycles them) and **SIZE**; drag to lay it. Dragging one kind over another replaces it in whole 128 px squares - one kind a square, as the game draws water -; the squares a stroke would replace are outlined before you paint. The right button or Shift takes any water away. It lowers the
 ground into a basin with a shore, lays the water's surface and adds its effects (circles on the
 water, bubbles, lava eruptions) and a region where explosions splash. Shift+drag takes it away.
-One kind of water has one level on a map, as in the missions.
+One kind of water has one level on a map, as in the missions. An infantry robot that walks into
+lava - below the lava's level where the lava covers the ground - dies there; water harms nobody
+unless a map's script says so (missions 11, 16 and 17 do).
 
 The other way is the **Region of light water** (All objects, theme **Effects**): a rectangle of
 water with straight edges and no shore or effects - a pool, a flooded field, or more of a lake's
@@ -527,9 +534,12 @@ shows where; away from the track, or with Shift, they stay where the cursor is, 
 Dragging one of them moves it, with its line and its semaphores, to the nearest right place (dropped away from the
 track or with Shift: where it is dropped); deleting it deletes them too. Its semaphores are those at
 the ends of its line, also one you moved closer or along the line - in a map loaded from a file too;
-one of its own colour, facing its trains, at each end. Its line is the one the editor made for it; a line you
-drew yourself, or its own after you turned it round or laid track past the dead end, stays yours - the
-building then makes a new one. In a mission opened as it is the lines belong to the mission's script: moving a
+one of its own colour, facing its trains, at each end. Its line is the one the editor made for it, or else a
+line that runs through it: one that leaves the factory from its dead end - for example its exit line with the
+end dragged onto the other branch at a switch, so its trains leave that way - or one over the repair point's
+track. Such a line counts as the building's in play (its trains, its capture), but moving or deleting the
+building leaves it where it is, with its semaphores; the building gets no second line where one runs through
+it. A line's panel says **BUILDING'S: YES / NO** (`B`): NO makes it a line of no building at all. In a mission opened as it is the lines belong to the mission's script: moving a
 building changes no line and no semaphore - save the mission under a new name first. Any other semaphore - moved far away, another colour, turned the other way, a second one at the same end - is not the building's and stays where you put it. A **blocker** (the buffer stop, in the RAILWAY group of All objects) is placed freely and
 turned with R / E like any object: set it at the end of a track yourself.
 
@@ -538,7 +548,9 @@ direction, as the missions mark the entry onto the map, the exit, the factories 
 points. Click its beginning and its end on the track - on the map a line has a bar at its beginning
 and arrows the way it runs, and the mouse over it tells what it does; then, on a selected line - the status line names its beginning, its end and what it does; in the
 Select tool too a click on a line's bar or arrow selects it, and the right button opens its panel -, `T` switches
-pushing on or off, `R` turns it round, `S` puts its semaphores, Del deletes it. Make two:
+pushing on or off, `R` turns it round, `S` puts its semaphores, `B` makes it its building's or no
+building's, Del deletes it. Drag a line's bar or arrow to move that end to another point of the track
+(its semaphores go with it); a point no track leads to from the other end leaves it as it was. Make two:
 
 - the **map's entry**: from the main line's end past the edge onto the map, pushing on - if the
   arrival's **PUT LIGHTS** (step 5) made it, it is there already;
@@ -562,7 +574,11 @@ selected semaphore its own line all the same, and its panel's LINE row takes it 
 **What a factory builds**: the right button on a factory, **WHAT IT BUILDS...**. For your factory
 (and a neutral one, whose list is yours once you capture it) click the units it may build - they keep
 the game's order and keys F1-F12, [ and ]; for the unit clicked last **IN THE LIST** sets from when (at
-the start or after a time) and **AT MOST** how many of them the player may have.
+the start or after a time) and **AT MOST** how many of them the player may have. In the game the
+factory's panel shows it: a car with a limit has a counter in its icon's bottom-left corner (`1/2`: one
+of the two allowed is on the map or in a factory's queue; at the limit the car is grey), and a car that
+comes later stands after the others, grey, with the time left (`1:30`); the mouse tip over it says the
+same in words.
 
 **What a factory builds by the script - its plan**: the enemy's factory shows the trains its AI
 builds (only the enemy has an AI), in the second tab **TRAINS IT BUILDS** of yours, a neutral one or a
@@ -799,7 +815,16 @@ Menu → **MISSION SETTINGS** (or the gear in the strip):
 - **Enemy factory's plan**: how many trains it has; **Plan...** opens an enemy factory's panel, where
   they are set;
 - **Objectives**, the **win** and **loss** texts and the **briefing** (a line `---` starts the next
-  page). They are written in capitals, 44 characters a line, when the map is saved.
+  page). They are written in capitals, 44 characters a line, when the map is saved;
+- **The editor writes the map's script** - ticked as it comes. The editor keeps its settings in marked
+  blocks of the map's script (`<name>.lgc`): the lines from `// <editor>`, `// <editor main>`,
+  `// <editor arrivals>` and `// <editor tact>` to their `// </editor ...>` lines. It writes only those
+  blocks; whatever you write outside them stays. A script without the blocks is left alone, but saved
+  under a new name it gets them. If you write the whole script yourself, untick the box: the script
+  gets the line `// <editor off>` at its next save (you can also type it in yourself), and from then
+  on no save, save under a new name or quick test writes anything into it - nor into the texts; the
+  settings in this window are only shown, and the status line says so. Tick it again and the editor
+  writes its blocks as before.
 
 The mission is **won** when the enemy had units and has none left (its trains, its factory, the
 fort's guns), and **lost** when the player has no units left and no factory.
@@ -810,6 +835,12 @@ Menu → **PLAY THE SAVED MAP**: the game starts again with your saved map as a 
 menu, the reinforcement arriving, the enemy attacking. When it ends, the game comes back to the
 editor on your map; to go back at once, press Esc and click **BACK TO THE EDITOR** (on the briefing's
 page, and on the exit button's page, ABORT GAME, too). Unsaved changes are asked about first.
+
+A map whose script (its `.lgc`, edited by hand) has an error the game's script compiler stops at does
+not start - neither QUICK TEST nor PLAY THE SAVED MAP: the editor stays on the map and says the error -
+the file, the line and what is wrong - in the status line and in a message (before, the game closed).
+Opened in the editor, such a map is shown without its script, and the status line says so. Fix the
+script and try again.
 
 ### 12. Save
 
@@ -889,6 +920,7 @@ tools, the rarer things placed, the two panels last.
 | G | Track tool: the ground under rising rails as it is / raised soft / raised hard |
 | W | water, swamp or lava |
 | S | the selected line's semaphores (Push line tool) |
+| B | the selected line: its building's or no building's |
 | Shift (with a brush) | take away |
 | Esc, right button | back to Select; cancel a section of track started; close a panel. Esc with nothing under way: the editor's menu |
 | middle button | drag the map; in the Track tool a click deletes the rail under the cursor (at a junction too) |

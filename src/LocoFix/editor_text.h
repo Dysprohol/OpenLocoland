@@ -45,6 +45,14 @@ bool ui_english(bool on);
 // printf into a string (at most 1023 characters).
 std::string ui_printf(const char* format, ...);
 
+// A text the author can click in the editor's panels and in the rows above the bar, as they show it:
+// in brackets, [TEXT], so it is told from the labels, values and notes beside it, which stay as they
+// are (docs/dev/editor-ui.md "Clickable texts"). The one way every panel marks them. A row with a lamp
+// before its text (the game's own menus' mark: the Menu panel, the help's contents) and a text on a
+// button's picture (BACK TO THE MAP) are marked already and keep their look. Empty stays empty.
+std::string ui_clickable(const std::string& text);
+constexpr int UI_CLICKABLE_EXTRA = 2;   // the characters the brackets add
+
 // A text kept by its key until it is shown (a reason found now and shown later).
 struct UiText {
     const char* key = nullptr;   // none: `english` as it is

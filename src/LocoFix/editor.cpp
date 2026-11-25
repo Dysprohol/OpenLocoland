@@ -68,6 +68,7 @@
 #include "editor_mission.h"
 #include "editor_rows.h"
 #include "editor_text.h"
+#include "script_check.h"
 #include <shobjidl.h>
 #include <cctype>
 #include <cstdio>
@@ -102,6 +103,7 @@ void edit_message_line(const std::string& text);
 void edit_message_size(const char* key, const char* english, int w, int h);
 void install_editor_edit();
 void edit_level_held();
+void edit_repair_depth();   // editor_edit.cpp: an older version's depth over the ground, repaired
 void edit_touch();
 void edit_assign_orders();   // editor_edit.cpp
 void edit_commit_mission(const ArrivalsState& arrivals_before, const FactoryState& factories_before);
@@ -114,6 +116,7 @@ bool zoom_editor_kept(double& z, float& x, float& y);   // zoom.cpp: the editor'
 void zoom_editor_restore(double z, float x, float y);
 void logical_to_window(POINT& p);                // screen_scaling.cpp
 const PanelRows& factory_rows();                // editor_factory.cpp: what the panel's last frame drew (test mode)
+const PanelRows& arrivals_rows();               // editor_arrivals.cpp: the same of the Arrivals panel
 bool edit_test_pick(int nvid, int army);   // editor_edit.cpp: test mode - the palette object to place
 void new_map_dialog(HWND owner);                // editor_newmap.cpp
 bool new_map_for_test(const std::string& text);  // editor_newmap.cpp
@@ -816,13 +819,18 @@ bool save_map(const std::string& path) {
         patch::log("editor: %s not saved - out of memory; the files on disk are as they were", target.c_str());
         if (attempt || !save_no_memory(window, scratch)) return false;
     }
+    const std::string from = g_current.empty() ? "" : game_path(g_current);   // the map the editor stands on
     g_current = path;
     if (!scratch) edit_saved();
     if (!image.empty() && !along) patch::log("ground: the painted picture saved as %s", image.c_str());
     if (along) patch::log("editor: %s takes its ground along as %s", target.c_str(), image.c_str());
     // its mission: the script (a new map gets one), the texts, the custom maps page
-    mission_save(target);
-    if (!scratch) edit_message_saved(target);
+    mission_save(target, from);
+    if (!scratch && mission_own_script())
+        edit_message_line(ui_printf(ui_format("MsgSavedOwnScript", "saved as %s - its script as it was: the editor does not "
+                                                                   "write it (Mission settings)"),
+                                    target.c_str()));
+    else if (!scratch) edit_message_saved(target);
     if (!scratch) panel_saved(target);   // SAVED in the middle of the view
     return true;
 }
@@ -996,17 +1004,17 @@ void about(HWND owner) {
                         "OpenLocoland\n\n"
                         "Locoland (Gromada, 2003) with the LocoFix fixes.\n\n"
                         "Editor mode - the engine's mode for the authors' map editor:\n"
-                        "File > Load (Alt+F3) loads a map, File > Save (Alt+F2) saves the\n"
+                        "Load (Alt+F3) loads a map, Save (Alt+F2) saves the\n"
                         "current state of the map as a .map file.\n\n"
                         "Click an object to select it, drag it to move it; R / E or\n"
                         "Ctrl+wheel turn it, A changes its army, T switches a semaphore, Del\n"
                         "removes it, Ctrl+Z / Ctrl+Y undo and redo. The bar at the bottom\n"
                         "places new objects ([ and ] pick the decal); Esc or the right\n"
                         "button go back to selecting. Track (3) lays rails, the Push line\n"
-                        "tool of the strip marks one-way lines (T flag, S semaphores),\n"
-                        "File > Mission settings edits the mission and its texts.\n\n"
+                        "tool (4) marks one-way lines (T flag, S semaphores),\n"
+                        "Mission settings (the gear) edits the mission and its texts.\n\n"
                         "The ? and the menu button at the left end of the bar: the help\n"
-                        "and every command of these menus; Ctrl+R runs or holds the level."),
+                        "and every command of the editor; Ctrl+R runs or holds the level."),
                 ui_text("AboutTitle", "About"), MB_OK | MB_ICONINFORMATION);
 }
 
@@ -1059,6 +1067,35 @@ std::string run_copy_map() {
     return g_run_folder + "\\" + g_run_folder.substr(5) + ".map";
 }
 
+// The map's script compiled before the level runs or the map is played (script_check.cpp): a script
+// the engine's compiler gives up on ended the game at the level's load - the editor with it, and Run
+// the level's edits not saved - and a missing one ran the level without its script. Such a map is not
+// started: the editor stays on it, the status line and a message say the compiler's first error, as
+// error.log has it. `copy_of` is the map's own script when `lgc` is Run the level's copy of it.
+bool script_compiles(HWND window, const std::string& lgc, const std::string& copy_of) {
+    const ScriptCheck check = script_check(lgc);
+    if (check.ok) return true;
+    const std::string what =
+        check.missing ? ui_printf(ui_format("ScriptMissing", "the script %s is missing"), lgc.c_str()) : check.line;
+    edit_message_line(ui_printf(ui_format("MsgScriptError", "The map's script does not compile, the map is not started: %s"),
+                                what.c_str()));
+    if (asks()) {
+        std::string text =
+            check.missing
+                ? ui_printf(ui_format("ScriptMissingText", "The map's script %s is missing, so the map is not started."), lgc.c_str())
+                : ui_printf(ui_format("ScriptErrorText", "The map's script does not compile, so the map is not started (the game "
+                                                         "would close as the level loads):\n\n%s\n\nnear: %s\n\nThe game's error "
+                                                         "log (the logs folder) has it too."),
+                            check.line.c_str(), check.near_text.c_str());
+        if (!copy_of.empty() && !check.missing)
+            text += "\n\n" + ui_printf(ui_format("ScriptErrorCopy", "%s is the copy of %s that the quick test runs."), lgc.c_str(),
+                                       copy_of.c_str());
+        DialogScope scope;
+        ui_message_box(window, text.c_str(), ui_text("ScriptErrorTitle", "Map script"), MB_OK | MB_ICONWARNING);
+    }
+    return false;
+}
+
 bool run_level(HWND window) {
     if (!g_held) return false;
     const std::string map = game_path(current_map());
@@ -1093,6 +1130,7 @@ bool run_level(HWND window) {
             return false;
         }
     }
+    if (!script_compiles(window, script_of(run), copy ? script_of(map) : "")) return false;
     if (uint8_t* w = world()) {
         g_run_view_x = *reinterpret_cast<float*>(w + 0x44);
         g_run_view_y = *reinterpret_cast<float*>(w + 0x48);
@@ -1548,6 +1586,7 @@ void handle_command(HWND window, int id) {
         } else if (!ask_save(window)) {
             return;
         }
+        if (!script_compiles(window, script_of(game_path(current_map())), "")) return;
         g_playing = true;   // the map stays for the game that plays it
         g_playing = restart_game(false, current_map(), true);   // back here when it ends
     } else if (id == ID_BACK) {
@@ -1664,14 +1703,15 @@ LRESULT CALLBACK editor_wndproc(HWND window, UINT m, WPARAM w, LPARAM l) {
                 return TRUE;
             }
             if (data->dwData == TEST_PANEL_ROW || data->dwData == TEST_PANEL_ROWS) {
-                // the factory panel's last frame, as PanelRows recorded it (recording starts with the
-                // first F step): every text and choice with its box - or the middle of the n-th one,
+                // the factory or the Arrivals panel's last frame, as PanelRows recorded it (recording is on
+                // in test mode): every text and choice with its box - or the middle of the n-th one,
                 // (y << 16) | x, for test_game.ps1 to click there as the mouse would (0: none)
-                if (!factory_rows().fresh()) {   // not drawn now: its boxes are an old frame's
-                    patch::log("panel rows: the factory panel is not open");
+                const PanelRows& panel = factory_rows().fresh() ? factory_rows() : arrivals_rows();
+                if (!panel.fresh()) {   // not drawn now: its boxes are an old frame's
+                    patch::log("panel rows: neither the factory panel nor the Arrivals panel is open");
                     return 0;
                 }
-                const std::vector<PanelRows::Drawn>& rows = factory_rows().drawn();
+                const std::vector<PanelRows::Drawn>& rows = panel.drawn();
                 const int scale = edit_interface_scale();   // the boxes are the interface's screen's (editor_edit.cpp)
                 if (data->dwData == TEST_PANEL_ROWS) {
                     patch::log("panel rows: %d (the interface's screen, scale %d)", static_cast<int>(rows.size()), scale);
@@ -1816,6 +1856,9 @@ void editor_level_loaded(void* w) {
         if (auto_folder(folder_of(g_current))) mark_folder(folder_of(g_current), nullptr);
         mission_load(game_path(map));
         hold_level(world, true);
+        if (mission_own_script() && !g_run_back)   // once when it is loaded; a message below may follow it
+            edit_message_line(ui_text("MsgOwnScript", "this map's script is the author's own: the editor does not write it "
+                                                      "(Mission settings)"));
         const std::string lost = missing_ground();
         if (!lost.empty()) {
             patch::log("editor: the ground image %s of %s is missing - the ground is black", lost.c_str(), map);
@@ -1834,7 +1877,15 @@ void editor_level_loaded(void* w) {
                 else if (band == 1)
                     edit_message_size("MsgMapLarge", "a big map (%d x %d px): when painting the ground, save often", pw, ph);
             }
+            edit_repair_depth();
         }
+        // a script that does not compile: the level is held without it (script_check.cpp), said last so
+        // the status line keeps it
+        ScriptCheck script;
+        if (script_check_held(script))
+            edit_message_line(ui_printf(ui_format("MsgScriptHeld", "The map's script does not compile - the map is open without it, "
+                                                                   "fix the script before running the map: %s"),
+                                        script.line.c_str()));
         // the old folder of a map renamed or deleted (Rename or delete): its files are not in use now
         if (!g_remove_after_load.empty() && lower_path(folder_of(game_path(map))) != lower_path("maps\\" + g_remove_after_load)) {
             const std::string folder = g_remove_after_load;
@@ -1911,6 +1962,7 @@ void install_editor() {
     char value[8] = {};
     g_test = GetEnvironmentVariableA("LOCOFIX_TEST", value, sizeof value) && value[0] == '1';
     g_test_ask = GetEnvironmentVariableA("LOCOFIX_TEST_ASK", value, sizeof value) && value[0] == '1';
+    if (g_test) PanelRows::record = true;   // the panels' rows for the H, G and T steps (test_game.ps1)
 #if LOCOFIX_SAVE_TEST
     patch::log("editor: THE SAVE TEST BUILD (LOCOFIX_SAVE_TEST) - LOCOFIX_FAIL, LOCOFIX_NO_BOUND and LOCOFIX_VID_COMPARE are read");
 #endif
