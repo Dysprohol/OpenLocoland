@@ -34,7 +34,7 @@
 // in TrainAttacked(train, enemy) and the handlers it calls, F070_0 the robot's link in its `link`,
 // and in the campaign they were cleared every few seconds.
 //
-// The same hook tells the objects that walk to a deleted house first (robot_walk.cpp, BUGS.md F34).
+// The same hook tells the objects that walk to a deleted house first (robot_walk.cpp, BUGS.md F35).
 #include "patch.h"
 #include "script_value.h"
 
