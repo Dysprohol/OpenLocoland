@@ -272,9 +272,51 @@ void __fastcall minimap_draw(void* m, void* edx) {
 
 // Graphics_DrawEffects at the end of the world pass: with the split its timing runs (the scroll effect moves the
 // camera at the zoom's screen) but nothing is drawn - the interface's pass draws the effects over the window.
+// Drawn in one pass (a menu's first frame under a zoom: its screen comes after it), the fade-in's snapshot (Effect 5,
+// the window's picture at the window's size - screen_scaling.cpp's Effect_hook) is laid over the view in 256 x 256
+// pieces, each copied out of the snapshot: on a view bigger than the window the pieces past the snapshot cannot be
+// copied (DDERR_INVALIDRECT, "TEXTURE: 0x88760096 Couldn't copy from surface" in error.log - the Esc menu over a
+// view of 2048x1355 on a 1920x1080 window logged 20 lines, over 3072x2132 80) and were never drawn. So the fade-in is run on its own with the view cut to the
+// snapshot - the same pieces drawn, none past it - and then the other effects with the view as it is (the scroll
+// effect places the camera by it).
 using Effects_t = void(__fastcall*)(void* g, void* edx, int draw);
+constexpr int EFF_ALPHAAPPEAR = 5, SNAPSHOT = 0xc08;
+constexpr int VIEW_LEFT = 0x220, VIEW_RIGHT = 0x224, VIEW_TOP = 0x228, VIEW_BOTTOM = 0x22c;
+bool snapshot_size(uint8_t* g, int& w, int& h) {
+    auto* s = at<IDirectDrawSurface7*>(g, SNAPSHOT);
+    if (!s) return false;
+    DDSURFACEDESC2 d = {};
+    d.dwSize = sizeof d;
+    if (FAILED(s->GetSurfaceDesc(&d))) return false;
+    w = static_cast<int>(d.dwWidth);
+    h = static_cast<int>(d.dwHeight);
+    return w > 0 && h > 0;
+}
 void __fastcall world_effects(void* g, void* edx, int draw) {
-    reinterpret_cast<Effects_t>(DRAW_EFFECTS)(g, edx, split_now() ? 0 : draw);
+    const auto effects = reinterpret_cast<Effects_t>(DRAW_EFFECTS);
+    if (split_now()) return effects(g, edx, 0);
+    auto* gr = static_cast<uint8_t*>(g);
+    uint32_t* start = &at<uint32_t>(gr, EFFECT_START);
+    int sw = 0, sh = 0;
+    float& right = at<float>(gr, VIEW_RIGHT);
+    float& bottom = at<float>(gr, VIEW_BOTTOM);
+    const float left = at<float>(gr, VIEW_LEFT), top = at<float>(gr, VIEW_TOP);
+    if (!draw || !start[EFF_ALPHAAPPEAR] || !snapshot_size(gr, sw, sh) || (right - left <= sw && bottom - top <= sh))
+        return effects(g, edx, draw);
+    uint32_t kept[16];
+    std::memcpy(kept, start, sizeof kept);
+    for (int i = 0; i < 16; ++i)
+        if (i != EFF_ALPHAAPPEAR) start[i] = 0;
+    const float kept_right = right, kept_bottom = bottom;
+    right = (std::min)(right, left + sw);
+    bottom = (std::min)(bottom, top + sh);
+    effects(g, edx, draw);   // the fade-in alone (it ends itself when its time is up)
+    right = kept_right;
+    bottom = kept_bottom;
+    const uint32_t fade_in = start[EFF_ALPHAAPPEAR];
+    for (int i = 0; i < 16; ++i) start[i] = i == EFF_ALPHAAPPEAR ? 0 : kept[i];
+    effects(g, edx, draw);   // the others
+    start[EFF_ALPHAAPPEAR] = fade_in;
 }
 
 // Script functions 119 ScreenX and 120 ScreenY, and MenuLoad: while a zoom view is in effect the window's size
