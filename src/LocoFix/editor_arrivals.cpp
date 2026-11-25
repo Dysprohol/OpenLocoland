@@ -514,6 +514,15 @@ float draw_when(const Arrival& a, float y) {
     return y;
 }
 
+// The x for a clickable choice of `text` on row y: where it stands, or - when it would run past the panel's
+// right edge (the brackets made the rows longer) - the value column of the next row, y moving down with it.
+float wrap(float x, float& y, const std::string& text) {
+    const float right = g_px + LEFT + WIDTH * g_cw;
+    if (x + (text.size() + UI_CLICKABLE_EXTRA) * g_cw <= right) return x;
+    y += ROW;
+    return g_px + LEFT + LABEL;
+}
+
 float draw_repeat(const Arrival& a, float y) {
     float x = label(y, "ArrRepeat", "REPEAT:");
     x = put(x, y, ui_text("ArrOnce", "ONCE"), a.times == 1,
@@ -533,7 +542,8 @@ float draw_repeat(const Arrival& a, float y) {
             repeat(r);
         });
     });
-    put(x + g_cw, y, ui_text("ArrEndlessChoice", "WITHOUT END"), a.times == 0, [repeat] {
+    const std::string endless = ui_text("ArrEndlessChoice", "WITHOUT END");
+    put(wrap(x + g_cw, y, endless), y, endless, a.times == 0, [repeat] {
         change({"OpArrivalTimes", "arrival waves"}, [repeat](Arrival& r) {
             r.times = 0;
             repeat(r);
@@ -554,9 +564,12 @@ float draw_then(const Arrival& a, float y) {
     static const char* const KEYS[] = {"ArrTaskNone", "ArrTaskAttack", "ArrTaskForts", "ArrTaskGuard", "ArrTaskPatrol", "ArrTaskDrive"};
     static const char* const NAMES[] = {"STAYS", "ATTACKS", "THE FORTS", "GUARDS A POINT", "PATROLS", "DRIVES TO A POINT"};
     float x = label(y, "ArrThen", "THEN:");
-    for (int t : tasks_of(a.army))
-        x = put(x, y, ui_text(KEYS[t], NAMES[t]), a.task == t,
+    for (int t : tasks_of(a.army)) {
+        const std::string name = ui_text(KEYS[t], NAMES[t]);
+        x = wrap(x, y, name);
+        x = put(x, y, name, a.task == t,
                 [t] { change({"OpArrivalTask", "arrival task"}, [t](Arrival& r) { r.task = t; }); });
+    }
     y += ROW;
     if (needs_point(a)) {
         x = label(y, a.task == TASK_PATROL ? "ArrPoints" : "ArrPoint", a.task == TASK_PATROL ? "POINTS:" : "POINT:");
