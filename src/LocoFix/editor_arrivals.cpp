@@ -374,11 +374,23 @@ void draw_list_screen() {
 
 // ---- an arrival ----
 
+// The x for a clickable choice of `text` on row y: where it stands, or - when it would run past the panel's
+// right edge (the brackets made the rows longer) - the value column of the next row, y moving down with it.
+float wrap(float x, float& y, const std::string& text) {
+    const float right = g_px + LEFT + WIDTH * g_cw;
+    if (x + (text.size() + UI_CLICKABLE_EXTRA) * g_cw <= right) return x;
+    y += ROW;
+    return g_px + LEFT + LABEL;
+}
+
 float draw_who(const Arrival& a, float y) {
     float x = label(y, "ArrWho", "WHO:");
-    for (int army = 0; army < 4; ++army)
-        x = put(x, y, ui_text(ARMY_KEYS[army], ARMY_NAMES[army]), a.army == army,
+    for (int army = 0; army < 4; ++army) {
+        const std::string name = ui_text(ARMY_KEYS[army], ARMY_NAMES[army]);
+        x = wrap(x, y, name);
+        x = put(x, y, name, a.army == army,
                 [army] { change({"OpArrivalArmy", "arrival army"}, [army](Arrival& r) { set_army(r, army); }); });
+    }
     return y + ROW;
 }
 
@@ -514,15 +526,6 @@ float draw_when(const Arrival& a, float y) {
     return y;
 }
 
-// The x for a clickable choice of `text` on row y: where it stands, or - when it would run past the panel's
-// right edge (the brackets made the rows longer) - the value column of the next row, y moving down with it.
-float wrap(float x, float& y, const std::string& text) {
-    const float right = g_px + LEFT + WIDTH * g_cw;
-    if (x + (text.size() + UI_CLICKABLE_EXTRA) * g_cw <= right) return x;
-    y += ROW;
-    return g_px + LEFT + LABEL;
-}
-
 float draw_repeat(const Arrival& a, float y) {
     float x = label(y, "ArrRepeat", "REPEAT:");
     x = put(x, y, ui_text("ArrOnce", "ONCE"), a.times == 1,
@@ -543,7 +546,8 @@ float draw_repeat(const Arrival& a, float y) {
         });
     });
     const std::string endless = ui_text("ArrEndlessChoice", "WITHOUT END");
-    put(wrap(x + g_cw, y, endless), y, endless, a.times == 0, [repeat] {
+    const float ex = wrap(x + g_cw, y, endless);   // first: it may move y to the next row
+    put(ex, y, endless, a.times == 0, [repeat] {
         change({"OpArrivalTimes", "arrival waves"}, [repeat](Arrival& r) {
             r.times = 0;
             repeat(r);
