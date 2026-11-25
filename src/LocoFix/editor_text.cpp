@@ -122,6 +122,8 @@ std::string ui_printf(const char* format, ...) {
 
 const char* UiText::get() const { return key ? ui_text(key, english) : english; }
 
+std::string ui_clickable(const std::string& text) { return text.empty() ? text : "[" + text + "]"; }
+
 unsigned ui_codepage() { return language_codepage(); }
 
 std::wstring ui_wide(const std::string& text) {

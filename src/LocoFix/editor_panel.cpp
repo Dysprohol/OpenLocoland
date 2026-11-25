@@ -432,26 +432,53 @@ bool on_next(POINT m) {
 }
 
 // The help's contents: the categories down the left, the pages of the chosen one on the right - the
-// lamp and the title, two lines at most -, a row each.
-Place contents_row(int i, bool page) {
+// lamp and the title -, a row each. CONTENTS_ROWS rows CONTENTS_DY apart, two lines of a title each, fill
+// the height above the bottom strip; a column of more rows (a seventh page of a category, a seventh
+// category) has them closer in that height, one line each (a title cut to it), at least a line and 2 px
+// apart: up to 12 at the normal font. What even that cannot hold is left out and LocoFix.log says so.
+// (Until 2026-11-25 a row a page with no limit: a seventh ran over the bottom strip and out of the panel.)
+constexpr int CONTENTS_ROWS = 6;
+
+struct ContentsLayout {
+    float dy;    // from a row's middle to the next one's
+    int lines;   // of a title
+    int shown;   // rows
+};
+
+ContentsLayout contents_layout(int count) {
+    float w = 8, h = 13;
+    edit_font_size(FONT_TEXT, w, h);
+    const float span = CONTENTS_ROWS * CONTENTS_DY;
+    const int shown = (std::min)(count, static_cast<int>(span / (h + 2)));
+    const float dy = shown <= CONTENTS_ROWS ? CONTENTS_DY : span / shown;
+    return {dy, dy >= 2 * h + 2 ? 2 : 1, shown};
+}
+
+// Row i of a column of `count`: its middle (the first row's top where it always was).
+Place contents_row(int i, bool page, int count) {
     const Place p = picture();
-    return {p.x + (page ? PAGE_LAMP_X : TEXT_X), p.y + CONTENTS_Y + i * CONTENTS_DY};
+    const float dy = contents_layout(count).dy;
+    return {p.x + (page ? PAGE_LAMP_X : TEXT_X), p.y + CONTENTS_Y - CONTENTS_DY / 2 + dy / 2 + i * dy};
 }
 
 int help_group_at(POINT m) {
-    for (int i = 0; i < static_cast<int>(g_help_groups.size()); ++i) {
-        const Place r = contents_row(i, false);
-        if (m.x >= r.x - 6 && m.x < r.x + GROUP_W && std::fabs(m.y - r.y) < CONTENTS_DY / 2) return i;
+    const int count = static_cast<int>(g_help_groups.size());
+    const ContentsLayout l = contents_layout(count);
+    for (int i = 0; i < l.shown; ++i) {
+        const Place r = contents_row(i, false, count);
+        if (m.x >= r.x - 6 && m.x < r.x + GROUP_W && std::fabs(m.y - r.y) < l.dy / 2) return i;
     }
     return -1;
 }
 
 int help_page_at(POINT m) {
     const std::vector<int> pages = group_pages(g_help_group);
+    const int count = static_cast<int>(pages.size());
+    const ContentsLayout l = contents_layout(count);
     const Place p = picture();
-    for (int i = 0; i < static_cast<int>(pages.size()); ++i) {
-        const Place r = contents_row(i, true);
-        if (m.x >= r.x - 12 && m.x < p.x + TEXT_RIGHT && std::fabs(m.y - r.y) < CONTENTS_DY / 2) return pages[i];
+    for (int i = 0; i < l.shown; ++i) {
+        const Place r = contents_row(i, true, count);
+        if (m.x >= r.x - 12 && m.x < p.x + TEXT_RIGHT && std::fabs(m.y - r.y) < l.dy / 2) return pages[i];
     }
     return -1;
 }
@@ -545,24 +572,37 @@ void draw_contents(POINT m) {
     edit_draw_text(FONT_LIT, p.x + STRIP_X - 7, p.y + STRIP_Y, ui_text("HelpContents", "CONTENTS"), STEP + 3);
     if (help_group_at(m) >= 0) g_help_group = help_group_at(m);
     g_help_group = (std::max)(0, (std::min)(g_help_group, static_cast<int>(g_help_groups.size()) - 1));
-    for (int i = 0; i < static_cast<int>(g_help_groups.size()); ++i) {
-        const Place r = contents_row(i, false);
-        const std::vector<std::string> lines = wrap(group_name(i), static_cast<size_t>(GROUP_W / w));
+    const int groups = static_cast<int>(g_help_groups.size());
+    const ContentsLayout gl = contents_layout(groups);
+    for (int i = 0; i < gl.shown; ++i) {   // a category: a choice, in brackets (the pages have their lamps)
+        const Place r = contents_row(i, false, groups);
+        const size_t width = static_cast<size_t>(GROUP_W / w);
+        std::vector<std::string> lines = wrap(ui_clickable(group_name(i)), width);
+        if (static_cast<int>(lines.size()) > gl.lines)   // one line: the name cut to it, in its brackets
+            lines = {ui_clickable(wrap(group_name(i), width - UI_CLICKABLE_EXTRA)[0])};
         const float top = r.y - lines.size() * h / 2;
         for (size_t k = 0; k < lines.size(); ++k)
             edit_draw_text(i == g_help_group ? FONT_LIT : FONT_TEXT, r.x, top + k * h, lines[k].c_str(), STEP + 3);
-        if (i == g_help_group) {
+        if (i == g_help_group) {   // underlined: its words, not the brackets
             float longest = 0;
             for (const std::string& l : lines) longest = (std::max)(longest, text_width(FONT_TEXT, l.c_str()));
-            edit_fill(r.x, top + lines.size() * h + 1, r.x + longest, top + lines.size() * h + 3, 0xe0f0e080);
+            edit_fill(r.x + w, top + lines.size() * h + 1, r.x + longest - w, top + lines.size() * h + 3, 0xe0f0e080);
         }
     }
     const std::vector<int> pages = group_pages(g_help_group);
+    const int count = static_cast<int>(pages.size());
+    const ContentsLayout pl = contents_layout(count);
+    static bool said = false;   // what the contents cannot hold, once
+    if (!said && (gl.shown < groups || pl.shown < count)) {
+        said = true;
+        patch::log("panel: the help's contents lists %d of %d categories and %d of %d pages of \"%s\"", gl.shown, groups, pl.shown, count,
+                   g_help_groups[g_help_group].english.c_str());
+    }
     const int hover = help_page_at(m);
-    for (int i = 0; i < static_cast<int>(pages.size()); ++i) {
-        const Place r = contents_row(i, true);
+    for (int i = 0; i < pl.shown; ++i) {
+        const Place r = contents_row(i, true, count);
         std::vector<std::string> lines = wrap(page_title(pages[i]), static_cast<size_t>((p.x + TEXT_RIGHT - r.x - LAMP_TEXT) / w));
-        if (lines.size() > 2) lines.resize(2);
+        if (static_cast<int>(lines.size()) > pl.lines) lines.resize(pl.lines);
         draw_lamp(r.x, r.y, pages[i] == hover);
         const float top = r.y - lines.size() * h / 2;
         for (size_t k = 0; k < lines.size(); ++k)
@@ -653,7 +693,7 @@ const PaletteObject* object_at(POINT m) {
 // The palette's army choices where they are drawn: -1 (as in the missions, All objects only), 0-3.
 struct ArmyChoice {
     int army;
-    const char* text;
+    std::string text;   // in brackets (ui_clickable)
     float x, y, w;
 };
 
@@ -665,12 +705,12 @@ std::vector<ArmyChoice> army_choices() {
     edit_font_size(FONT_TEXT, w, h);
     const float label = text_width(FONT_TEXT, ui_text("CtxArmy", "ARMY:")) + w;
     if (!g_vehicles) {
-        const char* missions = ui_text("PaletteArmyMissions", "AS IN THE MISSIONS");
-        out.push_back({-1, missions, p.x + GRID_X + label, p.y + ARMY_Y, text_width(FONT_TEXT, missions)});
+        const std::string missions = ui_clickable(ui_text("PaletteArmyMissions", "AS IN THE MISSIONS"));
+        out.push_back({-1, missions, p.x + GRID_X + label, p.y + ARMY_Y, text_width(FONT_TEXT, missions.c_str())});
     }
     for (int a = 0; a < 4; ++a) {
-        const char* text = ui_text(ARMY_KEYS[a], ARMY_WORDS[a]);
-        out.push_back({a, text, p.x + GRID_X + (a % 2) * ARMY_DX, p.y + ARMY_Y + (1 + a / 2) * ARMY_DY, text_width(FONT_TEXT, text)});
+        const std::string text = ui_clickable(ui_text(ARMY_KEYS[a], ARMY_WORDS[a]));
+        out.push_back({a, text, p.x + GRID_X + (a % 2) * ARMY_DX, p.y + ARMY_Y + (1 + a / 2) * ARMY_DY, text_width(FONT_TEXT, text.c_str())});
     }
     return out;
 }
@@ -707,7 +747,7 @@ void draw_palette(POINT m) {
     for (int i = 0; i < static_cast<int>(g_groups.size()); ++i) {
         const Place g = group_place(i);
         edit_draw_text(i == group_index() || i == hover_group ? FONT_LIT : FONT_TEXT, g.x, g.y,
-                       ui_text(g_groups[i].c_str(), g_groups[i].c_str() + 5), STEP + 3);
+                       ui_clickable(ui_text(g_groups[i].c_str(), g_groups[i].c_str() + 5)).c_str(), STEP + 3);
     }
     const std::vector<const PaletteObject*> objects = group_objects(group_index());
     const int per = PALETTE_COLUMNS * PALETTE_ROWS;
@@ -732,8 +772,8 @@ void draw_palette(POINT m) {
         const ArmyChoice* over = army_at(m, armies);
         for (const ArmyChoice& c : armies) {
             const bool chosen = g_palette_army[g_vehicles ? 1 : 0] == c.army;
-            edit_draw_text(chosen || &c == over ? FONT_LIT : FONT_TEXT, c.x, c.y, c.text, STEP + 3);
-            if (chosen) edit_fill(c.x, c.y + h + 1, c.x + c.w, c.y + h + 3, 0xe0f0e080);
+            edit_draw_text(chosen || &c == over ? FONT_LIT : FONT_TEXT, c.x, c.y, c.text.c_str(), STEP + 3);
+            if (chosen) edit_fill(c.x + w, c.y + h + 1, c.x + c.w - w, c.y + h + 3, 0xe0f0e080);   // its words, not the brackets
         }
     }
     if (g_palette_page > 0) edit_draw_picture(VID_PREVIOUS, 0, p.x + PREVIOUS_X, p.y + BUTTONS_Y, STEP + 2);

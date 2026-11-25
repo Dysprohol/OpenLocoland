@@ -105,7 +105,8 @@ The game starts with its launcher (the window with the Locoland picture):
   translation is marked "(unofficial)"). The launcher's labels change with it. If the language you
   chose is no longer there, the game starts in English, or without English in your Steam copy's.
 - **FPS counter** and **Frame limit** - the row under the resolution: a small counter at the top of
-  the screen and how many frames a second the game draws (60 by default; ∞ = no limit).
+  the screen and how many frames a second the game draws (60 by default; ∞ = no limit). In the
+  editor's quick test (QUICK TEST, NO SAVE, Ctrl+R) the counter shows the mission's time beside it.
 - **Cheat keys** and **All missions** - the two extras, off by default: the developers' keys and
   every mission open from the start (your real progress is not touched).
 - **Check for updates** - the row above OK: whether there is a newer OpenLocoland, see
@@ -315,7 +316,8 @@ its line, and - for a fort, a mining plant or a citadel - the gun in each of its
 cannon or missiles; while the panel is open the sockets are numbered on the wall, and a click on a
 gun opens its host's panel). The right button elsewhere or Esc closes it. In every panel - an
 object's, the Arrivals panel, a factory's - the status line at the top says what the row under the
-mouse does.
+mouse does, and what you can click is in brackets, [LIKE THIS]; the other texts say what a row is or what
+is set.
 
 ![A fort's panel](img/editor-fort-panel-en.jpg)
 

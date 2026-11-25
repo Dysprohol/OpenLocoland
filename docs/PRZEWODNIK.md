@@ -105,7 +105,8 @@ Gra startuje okienkiem startowym (z obrazkiem Locolandu):
   oznaczone „(nieoficjalne)”). Napisy okienka zmieniają się razem z nim. Jeśli wybranego języka już
   nie ma, gra startuje po angielsku, a bez angielskiego w języku twojej kopii ze Steama.
 - **Licznik FPS** i **Limit FPS** - wiersz pod rozdzielczością: mały licznik u góry ekranu i ile
-  klatek na sekundę rysuje gra (domyślnie 60; ∞ = bez limitu).
+  klatek na sekundę rysuje gra (domyślnie 60; ∞ = bez limitu). W szybkim teście mapy w edytorze
+  (TEST BEZ ZAPISU, Ctrl+R) obok licznika jest czas misji.
 - **Kody twórców** i **Wszystkie misje** - dwa dodatki, domyślnie wyłączone: klawisze twórców gry i
   wszystkie misje otwarte od początku (prawdziwe postępy zostają nietknięte).
 - **Sprawdź aktualizacje** - wiersz nad OK: czy jest nowsza wersja OpenLocoland, zob.
@@ -311,7 +312,8 @@ flagę masztu, Shift+R / E flagę dworca.
 nim, a dla fortyfikacji, kopalni i cytadeli - działo w każdym gnieździe (puste, działo albo
 rakiety; gdy panel jest otwarty, gniazda są ponumerowane na murze, a kliknięcie działa otwiera panel
 jego budowli). Prawy przycisk gdzie indziej albo Esc go zamyka. W każdym panelu - obiektu,
-przyjazdów, fabryki - wiersz stanu u góry mówi, co robi wiersz panelu pod myszą.
+przyjazdów, fabryki - wiersz stanu u góry mówi, co robi wiersz panelu pod myszą, a to, co można
+kliknąć, jest w nawiasach, [TAK]; pozostałe napisy mówią, czym jest wiersz albo co jest ustawione.
 
 ![Panel fortyfikacji](img/editor-fort-panel-pl.jpg)
 
