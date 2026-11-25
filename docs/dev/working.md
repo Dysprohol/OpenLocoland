@@ -462,16 +462,21 @@ from the player draws the map bigger, towards the player smaller, 12 % a notch, 
 out (quick at first, settling softly; a notch during a glide goes on from where it is, so a fast turn is one
 smooth move); the map point under the cursor stays under it (at the map's edges the camera's limits win). The
 steps are a ladder with the level's own zoom on it (1, or mission 1's stretch of its 1024x768 screen): inward
-1.12, 1.25, 1.40 ... up to 3 times (the last step 3 itself; 10 notches from 1), outward 0.89, 0.80, 0.71 ...
-while the view stays within the map on at least one axis, then the whole map (its longer side, against the
-window, fills the window: black at the sides or above and below) when that shows at least 3 % more; a step
-within half a notch of the whole map is left to it. Changing the zoom makes no sound. A view over
+1.12, 1.25, 1.40 ... up to 3 times (the last step 3 itself, and 2 instead of 1.97; 10 notches from 1), outward
+0.89, 0.80, 0.71 ... while the view stays within the map, then the map filling the window (its shorter side,
+against the window, fills the window) when that shows at least 3 % more; a step within half a notch of it is
+left to it. So the view never leaves the map, as at the level's own zoom: nothing beyond the map's edges and no
+black beside it (until v0.2.12 the steps went on while the view was within the map on one axis only, to the
+whole map, with black at the sides or above and below; issue #24). The held editor still goes out to the whole
+map (editor-ui.md "Zoom in the editor"). Changing the zoom makes no sound. A view over
 `MAX_PIXELS` map pixels - the whole of the biggest original map, 3072 x 2304 - is not offered (in test mode
 the test key's DWORD `ZoomMaxPixels` moves it, `ZoomGlide` sets the glide's ms, 0 none, and `ZoomFilter`
-the stretch: 0 nearest, 1 filtered, 2 by the zoom). The interface is drawn apart from the world, at the
+the stretch: 0 nearest, 1 filtered as until v0.2.12, 2 by the zoom). The interface is drawn apart from the world, at the
 window's own pixels, so the bar, the minimap, the messages, the money plate, the tooltip and the cursor keep
-their size at every step and at every interface size; the world is stretched nearest-pixel at 3
-(exact big pixels) and filtered elsewhere. Border and arrow scrolling are as fast on the screen at every
+their size at every step and at every interface size; the world is stretched nearest-pixel at 2 and 3
+(exact big pixels), zoomed in between them sharp (enlarged pixel by pixel first, then filtered: a map pixel's
+edge blends over at most half a window pixel - until v0.2.12 the whole picture looked soft there, issue #22)
+and zoomed out filtered. Border and arrow scrolling are as fast on the screen at every
 zoom. The wheel does nothing over the interface, in a menu, while paused and while the scripts hold the camera
 (an intro); the editor's held level has its own (editor-ui.md "Zoom in the editor"), and a level the editor runs
 (Run the level) zooms as a mission does; a menu keeps the zoom and looks as at zoom 1; a level change goes back to the

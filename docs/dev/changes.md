@@ -631,8 +631,8 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       game's,
   52. zoom with the mouse wheel in play (`zoom.cpp`, `zoom_view.cpp`, engine.md "Zoom", working.md "Zoom
       with the wheel"): away from the player in, towards the player out, 12 % a notch (up to 3 times in, out
-      to the whole map), with a soft glide of 220 ms and the map point under the cursor kept, no sound; the world is drawn
-      at the zoom and stretched to the window, the interface after it at the window's own pixels, so it keeps
+      until the map fills the window - nothing beyond its edges, as at the level's own zoom), with a soft glide of 220 ms and the map point under the cursor kept, no sound; the world is drawn
+      at the zoom and stretched to the window - zoomed in sharp, exact big pixels at 2 and 3 -, the interface after it at the window's own pixels, so it keeps
       its size at every zoom and interface size; up to the whole view of a 3072 x 2304 map; border and arrow
       scrolling as fast on the screen at every zoom; nothing over the interface, in a menu, while paused,
       during an intro or in the editor (its own: 53); a menu keeps the zoom and looks as at zoom 1; a level change goes back

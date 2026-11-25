@@ -60,6 +60,7 @@
 #include <ddraw.h>
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 bool screen_set_view(int w, int h, int surface_w, int surface_h, const RECT* target);   // screen_scaling.cpp
 bool screen_zoom_view();
@@ -505,15 +506,28 @@ int g_overlay_w = 0, g_overlay_h = 0;
 constexpr uint32_t KEY16 = 0xF81F;   // magenta in R5G6B5: the overlay's transparent colour (no picture of the
                                      // interface has it: its pictures come from 8-bit palettes through Gamma)
 
+// Only the parts of the overlay with something drawn go up: the interface covers a small part of the window (the
+// bar, the minimap, the message lines, the money plate, a tip), and dgVoodoo converts and uploads what a Blt from a
+// system-memory surface names, so a put of the whole window-sized overlay cost the frame time at every zoom.
+// put_overlay finds the bands of rows with pixels other than the key colour (and their columns) and puts those;
+// clear_overlay clears only what was put since the last clear - everywhere else the overlay is the key colour
+// already. The pixels on the picture are the same: the key colour is never put.
+std::vector<RECT> g_put;   // what was put since the last clear (the overlay is the key colour outside)
+constexpr int BAND_GAP = 16;   // rows of nothing within a band (fewer, bigger Blts)
+
 void release_overlay() {
     if (g_overlay) g_overlay->Release();
     g_overlay = nullptr;
     g_overlay_w = g_overlay_h = 0;
+    g_put.clear();
 }
 
 bool ensure_overlay(IDirectDrawSurface7* like, int w, int h) {
     if (g_overlay && g_overlay_w == w && g_overlay_h == h) {
-        if (g_overlay->IsLost() == DDERR_SURFACELOST) g_overlay->Restore();
+        if (g_overlay->IsLost() == DDERR_SURFACELOST) {
+            g_overlay->Restore();
+            g_put.assign(1, RECT{0, 0, w, h});   // its memory as it may be: cleared whole
+        }
         return true;
     }
     release_overlay();
@@ -523,24 +537,72 @@ bool ensure_overlay(IDirectDrawSurface7* like, int w, int h) {
     g_overlay->SetColorKey(DDCKEY_SRCBLT, &key);
     g_overlay_w = w;
     g_overlay_h = h;
+    g_put.assign(1, RECT{0, 0, w, h});   // new: cleared whole the first time
     return true;
 }
 
 void clear_overlay() {
+    if (g_put.empty()) return;
     DDSURFACEDESC2 d = {};
     d.dwSize = sizeof d;
     if (FAILED(g_overlay->Lock(nullptr, &d, DDLOCK_WAIT | DDLOCK_WRITEONLY, nullptr))) return;
-    const uint32_t pair = KEY16 | (KEY16 << 16);
-    for (int y = 0; y < g_overlay_h; ++y) {
-        auto* row = reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(d.lpSurface) + y * d.lPitch);
-        std::fill(row, row + g_overlay_w / 2, pair);
-    }
+    for (const RECT& r : g_put)
+        for (int y = r.top; y < r.bottom; ++y) {
+            auto* row = reinterpret_cast<uint16_t*>(static_cast<uint8_t*>(d.lpSurface) + y * d.lPitch);
+            std::fill(row + r.left, row + r.right, static_cast<uint16_t>(KEY16));
+        }
     g_overlay->Unlock(nullptr);
+    g_put.clear();
+}
+
+// The first and last column + 1 of a row with a pixel other than the key colour (left >= right: none).
+void row_extent(const uint16_t* row, int w, int& left, int& right) {
+    const uint32_t pair = KEY16 | (KEY16 << 16);
+    const auto* pairs = reinterpret_cast<const uint32_t*>(row);
+    const int n = w / 2;
+    int i = 0;
+    while (i < n && pairs[i] == pair) ++i;
+    left = 2 * i;
+    while (left < w && row[left] == KEY16) ++left;
+    if (left >= w) {
+        right = left;
+        return;
+    }
+    right = w;
+    while (right > left && row[right - 1] == KEY16) --right;
 }
 
 void put_overlay(IDirectDrawSurface7* picture) {
-    RECT r = {0, 0, g_overlay_w, g_overlay_h};
-    picture->Blt(&r, g_overlay, &r, DDBLT_KEYSRC | DDBLT_WAIT, nullptr);
+    DDSURFACEDESC2 d = {};
+    d.dwSize = sizeof d;
+    if (FAILED(g_overlay->Lock(nullptr, &d, DDLOCK_WAIT | DDLOCK_READONLY, nullptr))) {
+        RECT r = {0, 0, g_overlay_w, g_overlay_h};   // as before: the whole of it
+        picture->Blt(&r, g_overlay, &r, DDBLT_KEYSRC | DDBLT_WAIT, nullptr);
+        g_put.assign(1, r);
+        return;
+    }
+    const size_t first = g_put.size();
+    RECT band = {0, -1, 0, -1};   // top < 0: no band open
+    int empty_rows = 0;
+    for (int y = 0; y < g_overlay_h; ++y) {
+        int left, right;
+        row_extent(reinterpret_cast<const uint16_t*>(static_cast<uint8_t*>(d.lpSurface) + y * d.lPitch), g_overlay_w,
+                   left, right);
+        if (left < right) {
+            if (band.top < 0) band = {left, y, right, y + 1};
+            band.left = (std::min)(band.left, static_cast<LONG>(left));
+            band.right = (std::max)(band.right, static_cast<LONG>(right));
+            band.bottom = y + 1;
+            empty_rows = 0;
+        } else if (band.top >= 0 && ++empty_rows > BAND_GAP) {
+            g_put.push_back(band);
+            band.top = -1;
+        }
+    }
+    if (band.top >= 0) g_put.push_back(band);
+    g_overlay->Unlock(nullptr);
+    for (size_t i = first; i < g_put.size(); ++i)
+        picture->Blt(&g_put[i], g_overlay, &g_put[i], DDBLT_KEYSRC | DDBLT_WAIT, nullptr);
 }
 
 // The software layers' depth: plain memory, filled with the engine's empty value.
