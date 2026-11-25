@@ -204,8 +204,12 @@ with its own: `font8x13.png` (VID 2, the texts) also to `font8x13light.bmp` (7, 
 `font-Objectives.png` (14) to its `-green`, `-red` and `-yellow` copies, each in its own colours;
 `font-Mousetips.png` (6) and `font-MainMenuTitles.png` (3) to theirs. font8x13, font8x13light and
 font-Mousetips get the 30 letters, font-Objectives and font-MainMenuTitles the 15 capitals (their
-lower case is empty in every version); font5x5, font-unitnumbersonscreen and shiftb.bmp are left
-alone. On the Russian base the cells replace Cyrillic letters, on the Polish one its Ś Ź ś ź (8C
+lower case is empty in every version); font5x5 and shiftb.bmp are left alone. A sheet's cell of an
+ASCII sign (`font_cells.is_sign`) has no base letter: it is drawn on the paper, and only where the font
+leaves the cell empty - every pack (cs, de, en, hu, pl, ru) has `font-unitnumbersonscreen.png` with `/`
+(2F) and `:` (3A) in the style of its digits (3 x 5 px), for the factory panel's counters and times
+(engine.md "The factory panels"): that font (VID 8, identical in every captured edition) has only the
+digits, `F`, `[` and `]`. The game reads the pack's copy, and its bigger copies are made from it. On the Russian base the cells replace Cyrillic letters, on the Polish one its Ś Ź ś ź (8C
 8F 9C 9F; the Czech pack's Š Ť Ž are 8A 8D 8E) and Ó ó in the same bytes. The marks follow the
 Polish fonts' and the Czech edition's (a Czech edition of the game had all its fonts with
 diacritics; two screenshots of it were the reference): in font8x13 the capitals' acute and caron

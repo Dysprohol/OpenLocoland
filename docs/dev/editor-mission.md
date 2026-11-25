@@ -692,8 +692,19 @@ change is one step of the history (the factory's list is in the editor's state o
 Test mode: `limit: army nvid max` and `unlock: x y nvid seconds` lines of the `M<file>` settings.
 Checked in play: with a limit of 1 on VID 20, F3 twice queued one and F4 (no limit) twice queued two;
 a unit put into the list at 30 s (`UNLOCK vid 30 at 30 s, factory 1`) was there the next time the
-factory was selected (a factory already selected keeps showing its old list); the keys stay the game's
-own per unit (a list without the airship cart leaves F8 out).
+factory was selected; the keys stay the game's own per unit (a list without the airship cart leaves F8
+out). In play the factory's panel shows both (`depot_rows.cpp`, engine.md "The factory panels"): a
+unit with a limit has `used/limit` in its icon's bottom-left corner (the price is top left, the key
+bottom right) - used as `Player_CanBuild` counts it, the army's units of the VID on the map and the VID
+in the factories' queues; at the limit the icon is grey -, and a unit that comes later (the runner's
+`unlock_x/y/vid/time[]` of a factory within 30 px, its time still to come, read from the running
+script's variables) stands after the list's units in the order of the times, greyed (its click does
+nothing) with no key and the time left, `m:ss`, by the runner's clock (`(GetTime() - time_game_total)
+/ 1000` against `unlock_time`); at its time the runner puts it into the list and the open panel is made
+again, so it lights up with its key in the same place. The mouse tip over such an icon (the unit's name)
+adds "- at most 2 on this map, 1 built or queued" / "- can be built in 0:35" (`[Editor]` keys
+`PlayFactoryLimit`, `PlayFactoryUnlock`, in every pack). A map without the runner shows no later units;
+a unit without a limit gets an empty text, so a list without either looks as before.
 **The panel's rows** (2026-11-13; the maintainer's report: in the enemy factory's list of the authors' trains
 the last row lay on the page arrow, and every page should read more plainly - what can be clicked and what
 cannot). A page has 13 rows (`ROWS` from `TOP`, 14 px apart, the last clear of the button bar) and the strip

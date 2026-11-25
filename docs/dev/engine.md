@@ -786,7 +786,15 @@ two extra units) and its price, the build time in seconds. `Player_CanBuild` ref
 `Player_CanAfford` needs money for the build time - only the difference to the entry that is being
 replaced while it is picked. A click on an icon and the function keys add or replace an entry
 (`Player_HandlePanelAction`, `Depo_AddToQueue`...); the picked entry is edited from panel 5 (pause,
-up, down, remove). `StateBar_DrawUnitIcon` draws an entry.
+up, down, remove). `StateBar_DrawUnitIcon` draws an entry. An icon's army is its state: 3 buildable, 2
+not (greyed; `Player_HandlePanelAction` refuses its click and key by it), 1 an empty slot - decided only by
+`Player_SetPanel`; `Player_UpdateStateBar` draws the queue every frame but never the list, so in the
+original the list kept the state of the moment the factory was selected (`BUGS.md` F34). LocoFix
+(`depot_rows.cpp`) gives every icon the army `Player_SetPanel` would give it now after each
+`Player_UpdateStateBar`, makes the panel again when the factory's list changes while it is open, and shows
+an editor map's limits and units that come later (editor-mission.md "A factory's build options"). The
+price's font (VID 8, `fonts\font-UnitNumbersOnScreen.bmp`) has only the digits, `F`, `[` and `]`; every
+language pack adds `/` and `:` to its copy (build.md "The Czech letters", the signs).
 
 **Messages**: `Player.messages` is a `MessageList` (`MessageList_Construct`, vtable 0x47571c): three
 lines, the text in the message font (VID 14) with a clickable strip (VID 449, `vid\449.vid`, 30x21)

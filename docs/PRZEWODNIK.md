@@ -149,6 +149,10 @@ Misje grają się tak jak zawsze. Co się zmieniło:
 - **Drugi rząd w panelu fabryki.** Fabryka może budować do 14 rodzajów wagonów (klawisze F1 - F12,
   `[` i `]`), ale jej panel pokazywał dziesięć. Jedenasty i dalsze są teraz w drugim rzędzie nad
   pierwszym i można je klikać.
+- **Panel fabryki na bieżąco.** Wagon, na który przybyło pieniędzy przy otwartym panelu (albo którego
+  limit się zwolnił), zostawał szary, a jego kliknięcie i klawisz nic nie robiły, dopóki fabryki nie
+  wybrało się na nowo; teraz rozjaśnia się, gdy tylko można go zbudować, a wagon dodany do listy pojawia
+  się od razu.
 - **Środkowy przycisk myszy** przeciąga mapę, także w misjach.
 - **Przybliżanie i oddalanie kółkiem myszy.** W misji obrót kółka od siebie przybliża mapę (do trzech
   razy), obrót do siebie pokazuje jej więcej (aż do całej mapy, jeśli się mieści), po trochu z każdym
@@ -561,7 +565,10 @@ jego panelu ją zabiera (BRAK).
 **Co buduje fabryka**: prawy przycisk na fabryce, **CO BUDUJE...**. Dla twojej fabryki (i neutralnej,
 której lista będzie twoja po jej zdobyciu) kliknij jednostki, które może budować - zachowują kolejność i
 klawisze gry F1-F12, [ i ]; dla ostatnio klikniętej **NA LISCIE** ustawia, od kiedy (od początku albo po
-czasie), a **NAJWYZEJ** - ile ich gracz może mieć.
+czasie), a **NAJWYZEJ** - ile ich gracz może mieć. W grze pokazuje to panel fabryki: wagon z limitem ma
+licznik w lewym dolnym rogu ikony (`1/2`: jeden z dwóch dozwolonych jest na mapie albo w kolejce
+fabryki; po osiągnięciu limitu wagon jest szary), a wagon, który przyjdzie później, stoi za pozostałymi,
+szary, z pozostałym czasem (`1:30`); podpowiedź pod kursorem mówi to samo słowami.
 
 **Co fabryka buduje ze skryptu - jej plan**: fabryka wroga pokazuje pociągi, które buduje jego AI (AI ma
 tylko wróg), a druga zakładka **BUDOWANE POCIAGI** twojej, neutralnej albo pirackiej - pociągi, które

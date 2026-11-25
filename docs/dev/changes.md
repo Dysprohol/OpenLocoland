@@ -776,6 +776,17 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       Checked in the test rig, old and new LocoFix, sound 11 and music 20 saved (37 and 68): every editor
       path and the way back at 100 before, at 37 and 68 now; mission 1 from the main menu 37 and 68 both
       ways; the 20 missions pass.
+  66. the factory's panel in play (`depot_rows.cpp`, `BUGS.md` F34, engine.md "The factory panels",
+      editor-mission.md "A factory's build options"; issues #20 point 2 and #23 points 2 and 3): the list
+      follows what the factory can build while it is open - a unit that became affordable or whose limit
+      freed up lights up at once (its click and key work again), a unit put into the list appears at once.
+      On an editor map with the factory build options a unit with a limit shows `used/limit` in its
+      icon's bottom-left corner (its units on the map and in the factories' queues, as the engine counts
+      them), and a unit that comes later stands after the list's units, greyed, with no key and the time
+      left (`m:ss`, by the runner's own clock); the mouse tip over such an icon adds it in words
+      (`[Editor] PlayFactoryLimit`, `PlayFactoryUnlock`). A list with no limit and no later unit - every
+      campaign mission - looks as before. Every language pack's copy of the price's font (VID 8) gets `/`
+      and `:` (`lang/<code>/fonts/font-unitnumbersonscreen.png`, build.md "The Czech letters").
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
