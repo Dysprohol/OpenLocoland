@@ -173,7 +173,7 @@ function AgentState {
   if (-not $s) { return $null }
   $s | Add-Member age ((Get-Date) - [datetime]$s.time).TotalSeconds -PassThru
 }
-function BoxUp { $s = AgentState; return ($s -and $s.age -lt 15 -and $s.state -ne "stopping" -and (BoxRunning)) }
+function BoxUp { $s = AgentState; return ($s -and $s.age -lt 90 -and $s.state -ne "stopping" -and (BoxRunning)) }
 function Queued { @(Get-ChildItem (Join-Path $io "queue") -Filter *.json -ErrorAction SilentlyContinue) }
 # the box's client windows: the rig's, on its own desktop, and the user's own (-Peek)
 function HiddenClient { [void][RigHost]::SandboxWindows($desktop); [RigHost]::ClientWindow($desktop) }
