@@ -385,6 +385,10 @@ void parse_line(const std::string& raw, Parsed& p) {
     }
 }
 
+// The comment after a line's SetPushLine call when its panel says it belongs to no building
+// (PushLine::no_building): the engine reads the call alone, the editor reads the comment back.
+const char* const NO_BUILDING_MARK = "// no building's line";
+
 bool parse_push_line(const std::string& raw, PushLine& out) {
     const std::string code = code_of(raw);
     const size_t at = code.find("SetPushLine");
@@ -394,6 +398,7 @@ bool parse_push_line(const std::string& raw, PushLine& out) {
     int v[5];
     if (std::sscanf(code.c_str() + open, "( %d , %d , %d , %d , %d )", &v[0], &v[1], &v[2], &v[3], &v[4]) != 5) return false;
     out = {v[0], v[1], v[2], v[3], v[4]};
+    out.no_building = raw.find(NO_BUILDING_MARK) != std::string::npos ? 1 : 0;   // the comment push_block writes
     return true;
 }
 
@@ -1157,38 +1162,22 @@ const char* const ARRIVALS_RUNNER[] = {
     "  plan_unit[i]=0;",
     "  return 1;",
     "}",
-    "// FactoryLine(f): the factory's own push line (its index + 1), 0 for none, by the shape the editor gives",
-    "// it: it begins at the dead end behind the factory - the editor looks for it within 40 px of a point 22",
-    "// px behind the middle, so within 75 px of the middle here (rail and ground heights apart too) - and",
-    "// goes away from it: the nearest such begin. A push line's points are the screen's (y less the height,",
-    "// as SetPushLine takes them), so the factory is taken at its own (y - z). CaptureLine uses it too.",
-    "FactoryLine(int f)",
+    "// OwnLine(b): the own push line of factory or repair point b (its index + 1), 0 for none. The editor",
+    "// says which it is when it saves the map (editor-mission.md \"A building's line\"): push_of_x/y[] hold the",
+    "// map point of the building each line is the own line of (0, 0 for none) - the line the editor made for",
+    "// it, or one drawn by hand or with an end moved that leaves the factory from its dead end or runs through",
+    "// the repair point, unless the line's panel says it is no building's. A building is its point within 4 px.",
+    "OwnLine(int b)",
     "{",
-    "  int i,x,y,dx,dy,ex,ey,d,best,found;",
-    "  x=GetX(f);",
-    "  y=GetY(f)-GetZ(f);",
+    "  int i,x,y,found;",
+    "  x=GetX(b);",
+    "  y=GetY(b);",
     "  found=0;",
-    "  best=999999;",
     "#ifdef PUSH_LINES",
     "  for( i=0; i<PUSH_LINES; i++ )",
-    "  {",
-    "    dx=x-push_bx[i];",
-    "    dy=y-push_by[i];",
-    "    if( dx>=-75 && dx<=75 && dy>=-75 && dy<=75 )",
-    "    {",
-    "      d=dx*dx+dy*dy;",
-    "      if( d<=5625 && d<best )",
-    "      {",
-    "        ex=x-push_ex[i];",
-    "        ey=y-push_ey[i];",
-    "        if( ex<-100 || ex>100 || ey<-100 || ey>100 || ex*ex+ey*ey>d )",
-    "        {",
-    "          best=d;",
-    "          found=i+1;",
-    "        }",
-    "      }",
-    "    }",
-    "  }",
+    "    if( !found && push_of_x[i]+push_of_y[i]>0 )",
+    "      if( push_of_x[i]>=x-4 && push_of_x[i]<=x+4 && push_of_y[i]>=y-4 && push_of_y[i]<=y+4 )",
+    "        found=i+1;",
     "#endif",
     "  return found;",
     "}",
@@ -1211,7 +1200,7 @@ const char* const ARRIVALS_RUNNER[] = {
     "// none. The factory makes each car at its place - Depo_ReleaseUnit deletes what stands there - and its",
     "// push line pushes the cars along it until the last one is past its end, coupling them to a train of",
     "// their army that they touch and pushing another army's along: the exit is the factory's own line",
-    "// (FactoryLine) from its begin, behind the place, to its end and on past it, along the line's",
+    "// (OwnLine) from its begin, behind the place, to its end and on past it, along the line's",
     "// direction, as far as the new train reaches (48 px a car), EXIT_WIDE px to either side - a car of any",
     "// army whose screen point is there (a dying one is not). Without a line of its own the cars are made",
     "// on one another at the place: a car within 48 px of it. A train standing anywhere else near the",
@@ -1222,7 +1211,7 @@ const char* const ARRIVALS_RUNNER[] = {
     "PlanExit(int i,int f)",
     "{",
     "  int k,n,u,bx,by,vx,vy,l,reach,ex,ey,x0,y0,x1,y1,dx,dy,a,c,found;",
-    "  k=FactoryLine(f);",
+    "  k=OwnLine(f);",
     "  if( !k )",
     "    return FindNearestSprite(GETSPRITE_CLASS+B_ENGINE,GetX(f),GetY(f),48);",
     "  found=0;",
@@ -1387,8 +1376,8 @@ const char* const ARRIVALS_RUNNER[] = {
     "// train coming in stops at its light (within CAPTURE_FACTORY px of it - a train passing that near takes",
     "// it too, as in the missions), a repair point when one comes to the begin of its own line, where trains",
     "// enter it (CAPTURE_REPAIR px), and either when one comes within 100 px of the building itself. The",
-    "// lines are the map's push lines (PUSH_LINES, push_*[]); a building's own line is one of the shape the",
-    "// editor gives it (CaptureLine), and a building without one keeps the 100 px rule alone. A push line's",
+    "// lines are the map's push lines (PUSH_LINES, push_*[]); a building's own line is the one the editor",
+    "// gave it (OwnLine), and a building without one keeps the 100 px rule alone. A push line's",
     "// points are the screen's (y less the height, as SetPushLine takes them), so a building and a train are",
     "// compared at their own (y - z), whatever the height of the track there. Only the player's trains",
     "// capture, as in the missions, and a building captured stays the player's; ACT_SET_ARMY fires the",
@@ -1398,62 +1387,6 @@ const char* const ARRIVALS_RUNNER[] = {
     "#define CAPTURE_REPAIR 50",
     "#define CAPTURE_HIGH 400",
     "int capture_b[64];",
-    "// CaptureLine(b): the building's own line (its index + 1), 0 for none, by the shape the editor gives it.",
-    "// A factory's is FactoryLine's (the plans above). A repair point's follows the track each way from it until it has",
-    "// gone 120 px, so a rail more (up to about 87 px) may end it: it begins within 240 px, its chord (begin to",
-    "// end) is at most 480 px and the building lies along the chord within 90 px of it - on a track that curves",
-    "// within those 120-210 px (a radius of 250 px puts the building about 80 px off the chord), or on rails",
-    "// above the ground, it stands well off: the nearest such line. The vector is halved until it is short, so",
-    "// no product passes the 32 bits.",
-    "CaptureLine(int b)",
-    "{",
-    "  int i,v,x,y,dx,dy,ex,ey,vx,vy,s,l,t,d,best,found;",
-    "  v=GetUnitVid(b);",
-    "  if( v==102 )",
-    "    return FactoryLine(b);",
-    "  x=GetX(b);",
-    "  y=GetY(b)-GetZ(b);",
-    "  found=0;",
-    "  best=999999;",
-    "#ifdef PUSH_LINES",
-    "  for( i=0; i<PUSH_LINES; i++ )",
-    "  {",
-    "    dx=x-push_bx[i];",
-    "    dy=y-push_by[i];",
-    "    if( dx>=-240 && dx<=240 && dy>=-240 && dy<=240 )",
-    "    {",
-    "      d=dx*dx+dy*dy;",
-    "      if( v==104 )",
-    "      {",
-    "        vx=push_ex[i]-push_bx[i];",
-    "        vy=push_ey[i]-push_by[i];",
-    "        s=1;",
-    "        while( vx>256 || vx<-256 || vy>256 || vy<-256 )",
-    "        {",
-    "          vx=vx/2;",
-    "          vy=vy/2;",
-    "          s=s*2;",
-    "        }",
-    "        l=vx*vx+vy*vy;",
-    "        t=dx*vx+dy*vy;",
-    "        if( l>0 && s<=2 && t>=0 && t<=l*s )",
-    "          if( l*s*s<=230400 )",
-    "          {",
-    "            ex=dx-vx*t/l;",
-    "            ey=dy-vy*t/l;",
-    "            d=ex*ex+ey*ey;",
-    "            if( d<=8100 && d<best )",
-    "            {",
-    "              best=d;",
-    "              found=i+1;",
-    "            }",
-    "          }",
-    "      }",
-    "    }",
-    "  }",
-    "#endif",
-    "  return found;",
-    "}",
     "// CaptureTrain(x,y,r): a car of the player's train whose screen point (y less its height) lies within r",
     "// px of the screen point x,y, 0 for none; a car dying (its animation ANI_DEATH or after, as the engine's",
     "// AskPlace leaves them out) is not one. The engine's box is the map's (not the screen's): a car stands",
@@ -1497,7 +1430,7 @@ const char* const ARRIVALS_RUNNER[] = {
     "    y=GetY(b);",
     "    u=FindNearestSprite(GETSPRITE_UNIT+GETSPRITE_CLASS+B_ENGINE+GETSPRITE_ARMY0,x,y,100);",
     "#ifdef PUSH_LINES",
-    "    i=CaptureLine(b);",
+    "    i=OwnLine(b);",
     "    if( !u && i && v==102 )",
     "      u=CaptureTrain(push_ex[i-1],push_ey[i-1],CAPTURE_FACTORY);",
     "    if( !u && i && v==104 )",
@@ -3211,7 +3144,9 @@ std::vector<std::string> settings_block(const Mission& m, const ArrivalsState& a
         column("arrival_at_y", [](size_t) { return std::string("0"); });
         column("arrival_since", [](size_t) { return std::string("0"); });
         // the push lines of main() once more, as data: the runner's CaptureTact finds each neutral
-        // factory's and repair point's own line and captures where the missions do (MAP_RULES.md 7)
+        // factory's and repair point's own line and captures where the missions do (MAP_RULES.md 7);
+        // push_of_x/y[]: the building each line is the own line of (its map point, 0 for none - the
+        // editor's answer, editor-mission.md "A building's line"), which the runner's OwnLine reads
         define("PUSH_LINES", std::to_string(g_lines.size()));
         auto lines = [&](const char* name, int PushLine::*field) {
             std::vector<std::string> items;
@@ -3223,6 +3158,14 @@ std::vector<std::string> settings_block(const Mission& m, const ArrivalsState& a
         lines("push_by", &PushLine::by);
         lines("push_ex", &PushLine::ex);
         lines("push_ey", &PushLine::ey);
+        const std::vector<POINT> owners = edit_line_buildings();
+        for (const bool y : {false, true}) {
+            std::vector<std::string> items;
+            for (size_t i = 0; i < g_lines.size(); ++i)
+                items.push_back(std::to_string(i < owners.size() ? (y ? owners[i].y : owners[i].x) : 0));
+            items.push_back("0");
+            array(y ? "push_of_y" : "push_of_x", items);
+        }
         auto texts = [&](const char* name, const std::function<std::string(const Ordered&)>& of) {
             std::vector<std::string> items;
             for (const Ordered& o : orders) items.push_back(of(o));
@@ -3318,7 +3261,7 @@ std::vector<std::string> push_block(const std::string& indent) {
     for (const PushLine& l : g_lines) {
         char line[96];
         std::snprintf(line, sizeof line, "SetPushLine(%d, %d, %d, %d, %d);", l.bx, l.by, l.ex, l.ey, l.flag);
-        out.push_back(indent + line);
+        out.push_back(indent + line + (l.no_building ? std::string("   ") + NO_BUILDING_MARK : std::string()));
     }
     for (const TrainPatrol& p : edit_train_patrols()) {   // the trains' patrols, as the held level has them
         if (g_arrivals.on || p.task != TASK_PATROL) continue;   // the runner's arrays have them

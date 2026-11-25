@@ -300,7 +300,12 @@ Moving or deleting the building
 moves or deletes its line and posts. Its line is only the editor line equal to the one the editor's rule
 makes for it where it stands (one building's at most); any other line - drawn by hand, a post's own, a
 mission's of the authors' length, the building's own after it was turned with R or track was laid past the
-dead end - is the map maker's and is never taken or erased by the building. Its posts are found as the missions
+dead end - is the map maker's and is never taken or erased by the building. Such a line is still the
+building's own line when it runs through it - it leaves the factory from its dead end (an exit dragged onto
+another branch at a switch) or runs over the repair point's track - and the line's panel does not say
+BUILDING'S: NO: then it is the building's for its capture and the factory's plan in play, the building gets
+no second line, and it keeps its own lights, which go with the line (editor-mission.md "A building's line").
+Its posts are found as the missions
 place them (7), at that line's places only: for each place the post nearest to it within 90 px of that colour,
 facing the same trains, beside that line's track and with no line of its own - at most one a place; any other
 post (another colour, the other way, a second one at the same end) is not the building's - on a map loaded
@@ -338,11 +343,12 @@ for a neutral one) - any army takes it and may take it back (`FortCaptured<army>
 **[editor]** The runner's `CaptureTact` does the same on an editor map for every neutral factory and repair
 point: a car of the player's within 90 px of the outer end of the factory's own line (a train passing that
 near takes it too, as in the missions), 50 px of the begin of the repair point's own line, or 100 px of the
-building; the player's trains only, never a car dying. A building's own line has the shape the editor
-gives it - a factory's begins within 75 px of it and goes away from it, a repair point's begins within 240
-px, is at most 480 px from end to end and passes within 90 px of it (round a curve the building stands
-well off the straight from begin to end) -; a building without one keeps the 100 px alone. The editor writes the lines as `PUSH_LINES`,
-`push_bx/by/ex/ey[]` too, so a map made before gets this when it is saved again (editor-mission.md "Capturing").
+building; the player's trains only, never a car dying. A building's own line is the editor's answer - the
+line it made for the building, or a line that leaves the factory from its dead end or runs over the repair
+point's track, unless the line's panel says BUILDING'S: NO (editor-mission.md "A building's line") -; a
+building without one keeps the 100 px alone. The editor writes the lines as `PUSH_LINES`,
+`push_bx/by/ex/ey[]` and the building of each as `push_of_x/y[]` too, so a map made before gets this when it
+is saved again (editor-mission.md "Capturing").
 
 ## 6a. Trains on the map
 
