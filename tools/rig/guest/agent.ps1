@@ -34,7 +34,7 @@ $ErrorActionPreference = "Continue"
 $Proto = 2
 $agentDir = Join-Path $Io "agent"; $queue = Join-Path $Io "queue"; $jobs = Join-Path $Io "jobs"
 New-Item -ItemType Directory -Force $agentDir, $queue, $jobs | Out-Null
-$config = @{ IdleMinutes = 10; ScreenSeconds = 5; MaxGames = 6; MaxJobs = 4; DefaultResolution = ""; MinFreeGB = 6; GamesGB = 16 }
+$config = @{ IdleMinutes = 10; ScreenSeconds = 5; MaxGames = 6; MaxJobs = 4; DefaultResolution = ""; MinFreeGB = 6; GamesGB = 16; BackfillSeconds = 0 }
 $cfgFile = Join-Path $agentDir "config.json"
 if (Test-Path $cfgFile) { (Get-Content $cfgFile -Raw | ConvertFrom-Json).PSObject.Properties | ForEach-Object { $config[$_.Name] = $_.Value } }
 $logFile = Join-Path $agentDir "agent.log"
@@ -389,10 +389,14 @@ while ($true) {
         # fresh box), the jobs queued BEFORE it that fit the display and the room start meanwhile:
         # jobs of one display go together, and the waiting job is held up by no job newer than itself.
         # (A job that waits for a fresh box also lets the jobs of older rig.ps1 scripts go first, see Blocked.)
+        # For its first BackfillSeconds (rig.ps1's config) the jobs queued AFTER it that fit start too, so
+        # one job that needs another display does not stop the whole queue; after that only older ones do,
+        # so the waiting job is not starved.
         $freshWait = $c.Cls.Fresh -and -not (Box-Fresh) -and ((Get-Date) - $c.Since).TotalMinutes -lt 10
+        $backfill = $config.BackfillSeconds -and ((Get-Date) - $c.Since).TotalSeconds -lt $config.BackfillSeconds
         if (($running.Count -and ($c.Cls.Excl -or $c.Cls.Fresh -or $now -ne $c.Cls.Display)) -or $freshWait) {
-          foreach ($o in @($waiting | Where-Object { $_.Id -ne $c.Id -and ([string]::CompareOrdinal($_.Id, $c.Id) -lt 0 -or ($freshWait -and $_.Cls.Legacy)) } | Sort-Object Id)) {
-            if (Fits $o) { $notes[$o.Id] = "started while $($c.Id) (its turn first) waited for the box to empty: queued before it, same display"; Start-Run $o
+          foreach ($o in @($waiting | Where-Object { $_.Id -ne $c.Id -and ([string]::CompareOrdinal($_.Id, $c.Id) -lt 0 -or $backfill -or ($freshWait -and $_.Cls.Legacy)) } | Sort-Object Id)) {
+            if (Fits $o) { $notes[$o.Id] = "started while $($c.Id) (its turn first) waited for the box to empty: same display, $(if ([string]::CompareOrdinal($o.Id, $c.Id) -lt 0) { 'queued before it' } else { 'within its first ' + $config.BackfillSeconds + ' s' })"; Start-Run $o
                            $waiting = @($waiting | Where-Object { $_.Id -ne $o.Id }) }
           }
         }

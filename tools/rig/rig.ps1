@@ -44,14 +44,14 @@
 #              itself); Setup is copied in and marked as downloaded (Zone.Identifier) unless -NoMotw;
 #              the installed game then runs mission 1 unless -NoGame
 # -Parallel    (-Job missions) how many missions run at once, each lane with its own copy of the game
-#              (default 4; 1 = one after another, as on the host)
+#              (default 8; 1 = one after another, as on the host)
 # -Sound       let this job's sound out (it plays on the host's speakers): the guest's playback is
 #              muted from the box's start and before every job, never the host's mixer
 # -Script      (-Job script) a .ps1 under the host folder run inside the box; -ScriptArgs its parameters
-# -MemoryMB    the box's memory (default 12288, set when it starts): the guest uses 1.9 GB idle and about
+# -MemoryMB    the box's memory (default 24576, set when it starts): the guest uses 1.9 GB idle and about
 #              0.25 GB more per game running (file cache besides); the host gives only what the guest touches
-# -MaxJobs     at most this many jobs at once in the box (default 6; set when it starts)
-# -MaxGames    at most this many games at once (default 9; a missions job counts its lanes; set when
+# -MaxJobs     at most this many jobs at once in the box (default 12; set when it starts)
+# -MaxGames    at most this many games at once (default 16; a missions job counts its lanes; set when
 #              it starts; a single job larger than that still runs, alone)
 # -DefaultResolution  the display a job that names none runs under (default: the box's starting size)
 # -GamesGB     the guest keeps copies of game folders for the next job of the same build up to this
@@ -78,9 +78,9 @@ param(
   [int]$Scale = 0, [string]$Resolution = "",
   [string]$Setup = "", [string]$SetupArgs = "--silent", [switch]$NoMotw, [switch]$NoGame,
   [string]$Script = "", [hashtable]$ScriptArgs = @{},
-  [hashtable]$DgVoodoo = @{}, [switch]$Warp, [switch]$Sound, [int]$Parallel = 0, [int]$MemoryMB = 12288,
+  [hashtable]$DgVoodoo = @{}, [switch]$Warp, [switch]$Sound, [int]$Parallel = 0, [int]$MemoryMB = 24576,
   [string]$Out = "", [double]$Timeout = 30, [switch]$Fresh, [int]$IdleMinutes = 10,
-  [switch]$Exclusive, [int]$MaxJobs = 6, [int]$MaxGames = 9, [double]$GamesGB = 16, [string]$DefaultResolution = "", [double]$MaxWait = 120,
+  [switch]$Exclusive, [int]$MaxJobs = 12, [int]$MaxGames = 16, [double]$GamesGB = 16, [string]$DefaultResolution = "", [double]$MaxWait = 120,
   [switch]$Status, [switch]$Monitors, [switch]$Look, [Alias("Show")][switch]$Peek, [switch]$Front, [switch]$Hide, [switch]$Stop, [switch]$Kill, [switch]$Restart
 )
 $ErrorActionPreference = "Stop"
@@ -226,7 +226,7 @@ function Start-Box {
       (@{ exit = 125; seconds = 0; killed = "the box stopped while the job ran" } | ConvertTo-Json -Compress) | Set-Content (Join-Path $d.FullName "done.json") -Encoding utf8 }
   }
   $q = @(Queued).Count; if ($q) { Say "$q job(s) of earlier calls wait in the queue for this box" }
-  [ordered]@{ IdleMinutes = $IdleMinutes; ScreenSeconds = 5; MaxJobs = $MaxJobs; MaxGames = $MaxGames; GamesGB = $GamesGB; DefaultResolution = $DefaultResolution } |
+  [ordered]@{ IdleMinutes = $IdleMinutes; ScreenSeconds = 5; MaxJobs = $MaxJobs; MaxGames = $MaxGames; GamesGB = $GamesGB; BackfillSeconds = 180; DefaultResolution = $DefaultResolution } |
     ConvertTo-Json | Set-Content (Join-Path $io "agent\config.json") -Encoding utf8
   $agent = GuestPath (Join-Path $rigDir "guest\agent.ps1")
   if (-not $agent) { throw "the rig must live under $hostRoot (it is mapped into the box from there)" }
@@ -490,7 +490,7 @@ if ($Registry.Count) { $spec.Registry = $Registry }
 if ($RegistryKey) { $spec.RegistryKey = $RegistryKey }
 if ($Warp) { $DgVoodoo["OutputAPI"] = "d3d11warp" }
 if ($Sound) { $spec.Sound = $true }
-if ($Job -eq "missions") { $spec.Parallel = if ($Parallel) { $Parallel } else { 4 } }
+if ($Job -eq "missions") { $spec.Parallel = if ($Parallel) { $Parallel } else { 8 } }
 if ($DgVoodoo.Count) { $spec.DgVoodoo = $DgVoodoo }
 if ($Game) {
   if (-not (Test-Path (Join-Path $Game "Locoland.exe"))) { throw "no Locoland.exe in $Game" }
