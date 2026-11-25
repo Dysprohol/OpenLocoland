@@ -12,13 +12,17 @@
 //
 // A zoom z is window pixels per map pixel; the level's own zoom is 1 (or a small map's own stretch: mission 1 at
 // 1920x1080 is 1.40625). The steps are a ladder of 12 % a notch with the level's own zoom on it: inward own x
-// 1.12^k up to 3 (the last step 3 itself), outward own / 1.12^k while the view is within the map on at least one
-// axis, then the whole map (the zoom at which its longer side, against the window, fills the window) when that
-// shows at least 3 % more than the last of them (a step within half a notch of the whole map is left out, the
-// whole map taking its place). A view the map
-// caps on one axis keeps the zoom (the picture is narrower or lower than the window, black round it); views
-// bigger than MAX_PIXELS map pixels are not offered (the frame's cost follows the logical pixels: the whole view
-// of the biggest original map, 3072x2304, is the most; the test key's DWORD ZoomMaxPixels moves it in test mode).
+// 1.12^k up to 3 (the last step 3 itself; a step within 3 % of a whole zoom is that zoom - 2 instead of 1.974 -,
+// whose picture is exact big pixels), outward own / 1.12^k while the view is within the map, then the farthest
+// view when that shows at least 3 % more than the last of them (a step within half a notch of it is left out, the
+// farthest view taking its place). In play the farthest view is the map filling the window (the zoom at which its
+// shorter side, against the window, fills the window; zoom_view_cover): the view never leaves the map, as the
+// camera never does at the level's own zoom, so nothing beyond its edges is shown (issue #24). In the held editor
+// it is the whole map (its longer side fills the window; zoom_view_whole), the void and the map's frame round it -
+// the editor's camera goes past the map anyway. A view the map caps on one axis (the editor's whole map) keeps the
+// zoom (the picture is narrower or lower than the window, black round it); views bigger than MAX_PIXELS map pixels
+// are not offered (the frame's cost follows the logical pixels: the whole view of the biggest original map,
+// 3072x2304, is the most; the test key's DWORD ZoomMaxPixels moves it in test mode).
 //
 // The wheel (Mouse+0x04 = World+0x234, delta / 120: the engine stores it and nothing in a mission reads it;
 // script function 201 GetMouseWheel reads it in the main menu's custom maps page, menu_input.cpp): towards the
@@ -61,6 +65,7 @@ void frame_rate_section(const char* part);     // frame_limit.cpp
 bool zoom_view_installed();                    // zoom_view.cpp
 double zoom_view_base();
 double zoom_view_whole();
+double zoom_view_cover();
 void zoom_view_size(double z, int& w, int& h);
 bool zoom_view_apply(double z, double surface_z);
 void zoom_view_between_frames();
@@ -90,6 +95,7 @@ constexpr int MAX_PIXELS = 3072 * 2304;
 // same (zoom_ladder_step, zoom_glide_ms).
 constexpr double LADDER = 1.12;
 constexpr double MAX_IN = 3.0;
+constexpr double SNAP_WHOLE = 0.03;   // an inward step this near a whole zoom is that zoom (zoom_view.cpp: exact pixels)
 constexpr int GLIDE_MS = 220;
 constexpr double MEASURE_SECONDS = 3.0;   // the frame time logged for a step: over its first seconds
 
@@ -169,6 +175,11 @@ double pixels(double z) {
     return static_cast<double>(w) * h;
 }
 
+// The map editor's zoom: its level held (paused, its own scroll type; the wheel comes from its window procedure).
+// Editor mode with the level not held - Run the level, the menu's maps - zooms as play does, from the game's own
+// wheel: the mode's flag stays for the whole run of the game, so it does not tell the two apart.
+bool editor_zoom(uint8_t* w) { return (at<unsigned>(w, WORLD_FLAGS) & WORLD_EDITOR) && editor_level_held(); }
+
 // The zooms of this level and window (at its own zoom, when the wheel is first turned).
 void make_steps() {
     const double own = zoom_view_base(), whole = zoom_view_whole();
@@ -176,23 +187,30 @@ void make_steps() {
     double in[MAX_STEPS];
     int n_in = 0;
     if (own < MAX_IN * 0.9999) {
-        for (double z = own * LADDER; z < MAX_IN * 0.9999 && n_in < MAX_STEPS / 2 - 1; z *= LADDER) in[n_in++] = z;
+        for (double z = own * LADDER; z < MAX_IN * 0.9999 && n_in < MAX_STEPS / 2 - 1; z *= LADDER) {
+            // a step within SNAP_WHOLE of a whole zoom (2: 1.974 from 1) is that zoom: exact big pixels
+            const double whole_z = std::round(z);
+            in[n_in++] = whole_z >= 2.0 && std::fabs(z - whole_z) < SNAP_WHOLE * z ? whole_z : z;
+        }
         in[n_in++] = MAX_IN;
     }
     g_step_count = 0;
     for (int i = n_in - 1; i >= 0; --i) g_steps[g_step_count++] = in[i];
     g_own = g_step_count;
     g_steps[g_step_count++] = own;
-    // outward: own / 1.12^k while the view is within the map on an axis and within the cap, then the whole map
+    // outward: own / 1.12^k while the view is within the map and within the cap, then the farthest view: in play the
+    // map filling the window (nothing beyond its edges is shown, as at the level's own zoom: the camera stays on the
+    // map), in the held editor the whole map (its frame and the void beyond the edges around it)
+    const double edge = editor_zoom(world()) ? whole : zoom_view_cover();
     double last = own;
     for (double z = own / LADDER; g_step_count < MAX_STEPS - 1; z /= LADDER) {
-        if (z <= whole * 1.0001 || pixels(z) > max_pixels()) break;
-        // a step within half a notch of the whole map is left to the whole map (no notch that hardly moves)
-        if (z <= whole * 1.06 && pixels(whole) <= max_pixels()) break;
+        if (z <= edge * 1.0001 || pixels(z) > max_pixels()) break;
+        // a step within half a notch of the farthest view is left to it (no notch that hardly moves)
+        if (z <= edge * 1.06 && pixels(edge) <= max_pixels()) break;
         g_steps[g_step_count++] = z;
         last = z;
     }
-    if (whole < last * 0.97 && pixels(whole) <= max_pixels() && g_step_count < MAX_STEPS) g_steps[g_step_count++] = whole;
+    if (edge < last * 0.97 && pixels(edge) <= max_pixels() && g_step_count < MAX_STEPS) g_steps[g_step_count++] = edge;
     g_step = g_own;
     g_zoom = own;   // the level's own (mission 1: its stretch), where a first glide starts
     g_made = true;
@@ -221,11 +239,6 @@ void log_memory(double ms, double z) {
                w, h, ms, pmc.WorkingSetSize / mb, pmc.PrivateUsage / mb,
                (status.ullTotalVirtual - status.ullAvailVirtual) / mb, status.ullTotalVirtual / mb);
 }
-
-// The map editor's zoom: its level held (paused, its own scroll type; the wheel comes from its window procedure).
-// Editor mode with the level not held - Run the level, the menu's maps - zooms as play does, from the game's own
-// wheel: the mode's flag stays for the whole run of the game, so it does not tell the two apart.
-bool editor_zoom(uint8_t* w) { return (at<unsigned>(w, WORLD_FLAGS) & WORLD_EDITOR) && editor_level_held(); }
 
 // Why the wheel does not zoom now, or nullptr.
 const char* refused(uint8_t* w) {

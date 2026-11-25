@@ -16,8 +16,9 @@
 // - The world pass is Graphics_DrawScene as it is, without the interface's objects; Graphics_DrawEffects runs its
 //   timing there but draws nothing (the scroll effect moves the camera there, at the zoom's screen).
 // - After Direct3D's EndScene (screen_scaling.cpp's scale_frame) the logical picture is stretched into the
-//   window-sized back buffer - a nearest-pixel Blt at whole zooms (3: exact big pixels), else a Blt into a
-//   texture drawn as one linear-filtered quad (checked to the pixel at zoom 1: no shift) - and the interface's
+//   window-sized back buffer - a nearest-pixel Blt at whole zooms (2, 3: exact big pixels), else a Blt into a
+//   texture drawn as one linear-filtered quad (checked to the pixel at zoom 1: no shift), zoomed in through the
+//   picture enlarged k times first ("the sharp stretch") - and the interface's
 //   pass draws layers 2-10 again with only the interface's objects, at the window's size, then the minimap's
 //   inside (Minimap_Draw: the engine calls it in the update, after the frame's drawing - held for this pass),
 //   then the screen effects over everything (the fades cover the bar, as in the original).
@@ -59,6 +60,7 @@
 #include <ddraw.h>
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 bool screen_set_view(int w, int h, int surface_w, int surface_h, const RECT* target);   // screen_scaling.cpp
 bool screen_zoom_view();
@@ -272,9 +274,51 @@ void __fastcall minimap_draw(void* m, void* edx) {
 
 // Graphics_DrawEffects at the end of the world pass: with the split its timing runs (the scroll effect moves the
 // camera at the zoom's screen) but nothing is drawn - the interface's pass draws the effects over the window.
+// Drawn in one pass (a menu's first frame under a zoom: its screen comes after it), the fade-in's snapshot (Effect 5,
+// the window's picture at the window's size - screen_scaling.cpp's Effect_hook) is laid over the view in 256 x 256
+// pieces, each copied out of the snapshot: on a view bigger than the window the pieces past the snapshot cannot be
+// copied (DDERR_INVALIDRECT, "TEXTURE: 0x88760096 Couldn't copy from surface" in error.log - the Esc menu over a
+// view of 2048x1355 on a 1920x1080 window logged 20 lines, over 3072x2132 80) and were never drawn. So the fade-in is run on its own with the view cut to the
+// snapshot - the same pieces drawn, none past it - and then the other effects with the view as it is (the scroll
+// effect places the camera by it).
 using Effects_t = void(__fastcall*)(void* g, void* edx, int draw);
+constexpr int EFF_ALPHAAPPEAR = 5, SNAPSHOT = 0xc08;
+constexpr int VIEW_LEFT = 0x220, VIEW_RIGHT = 0x224, VIEW_TOP = 0x228, VIEW_BOTTOM = 0x22c;
+bool snapshot_size(uint8_t* g, int& w, int& h) {
+    auto* s = at<IDirectDrawSurface7*>(g, SNAPSHOT);
+    if (!s) return false;
+    DDSURFACEDESC2 d = {};
+    d.dwSize = sizeof d;
+    if (FAILED(s->GetSurfaceDesc(&d))) return false;
+    w = static_cast<int>(d.dwWidth);
+    h = static_cast<int>(d.dwHeight);
+    return w > 0 && h > 0;
+}
 void __fastcall world_effects(void* g, void* edx, int draw) {
-    reinterpret_cast<Effects_t>(DRAW_EFFECTS)(g, edx, split_now() ? 0 : draw);
+    const auto effects = reinterpret_cast<Effects_t>(DRAW_EFFECTS);
+    if (split_now()) return effects(g, edx, 0);
+    auto* gr = static_cast<uint8_t*>(g);
+    uint32_t* start = &at<uint32_t>(gr, EFFECT_START);
+    int sw = 0, sh = 0;
+    float& right = at<float>(gr, VIEW_RIGHT);
+    float& bottom = at<float>(gr, VIEW_BOTTOM);
+    const float left = at<float>(gr, VIEW_LEFT), top = at<float>(gr, VIEW_TOP);
+    if (!draw || !start[EFF_ALPHAAPPEAR] || !snapshot_size(gr, sw, sh) || (right - left <= sw && bottom - top <= sh))
+        return effects(g, edx, draw);
+    uint32_t kept[16];
+    std::memcpy(kept, start, sizeof kept);
+    for (int i = 0; i < 16; ++i)
+        if (i != EFF_ALPHAAPPEAR) start[i] = 0;
+    const float kept_right = right, kept_bottom = bottom;
+    right = (std::min)(right, left + sw);
+    bottom = (std::min)(bottom, top + sh);
+    effects(g, edx, draw);   // the fade-in alone (it ends itself when its time is up)
+    right = kept_right;
+    bottom = kept_bottom;
+    const uint32_t fade_in = start[EFF_ALPHAAPPEAR];
+    for (int i = 0; i < 16; ++i) start[i] = i == EFF_ALPHAAPPEAR ? 0 : kept[i];
+    effects(g, edx, draw);   // the others
+    start[EFF_ALPHAAPPEAR] = fade_in;
 }
 
 // Script functions 119 ScreenX and 120 ScreenY, and MenuLoad: while a zoom view is in effect the window's size
@@ -462,15 +506,28 @@ int g_overlay_w = 0, g_overlay_h = 0;
 constexpr uint32_t KEY16 = 0xF81F;   // magenta in R5G6B5: the overlay's transparent colour (no picture of the
                                      // interface has it: its pictures come from 8-bit palettes through Gamma)
 
+// Only the parts of the overlay with something drawn go up: the interface covers a small part of the window (the
+// bar, the minimap, the message lines, the money plate, a tip), and dgVoodoo converts and uploads what a Blt from a
+// system-memory surface names, so a put of the whole window-sized overlay cost the frame time at every zoom.
+// put_overlay finds the bands of rows with pixels other than the key colour (and their columns) and puts those;
+// clear_overlay clears only what was put since the last clear - everywhere else the overlay is the key colour
+// already. The pixels on the picture are the same: the key colour is never put.
+std::vector<RECT> g_put;   // what was put since the last clear (the overlay is the key colour outside)
+constexpr int BAND_GAP = 16;   // rows of nothing within a band (fewer, bigger Blts)
+
 void release_overlay() {
     if (g_overlay) g_overlay->Release();
     g_overlay = nullptr;
     g_overlay_w = g_overlay_h = 0;
+    g_put.clear();
 }
 
 bool ensure_overlay(IDirectDrawSurface7* like, int w, int h) {
     if (g_overlay && g_overlay_w == w && g_overlay_h == h) {
-        if (g_overlay->IsLost() == DDERR_SURFACELOST) g_overlay->Restore();
+        if (g_overlay->IsLost() == DDERR_SURFACELOST) {
+            g_overlay->Restore();
+            g_put.assign(1, RECT{0, 0, w, h});   // its memory as it may be: cleared whole
+        }
         return true;
     }
     release_overlay();
@@ -480,24 +537,72 @@ bool ensure_overlay(IDirectDrawSurface7* like, int w, int h) {
     g_overlay->SetColorKey(DDCKEY_SRCBLT, &key);
     g_overlay_w = w;
     g_overlay_h = h;
+    g_put.assign(1, RECT{0, 0, w, h});   // new: cleared whole the first time
     return true;
 }
 
 void clear_overlay() {
+    if (g_put.empty()) return;
     DDSURFACEDESC2 d = {};
     d.dwSize = sizeof d;
     if (FAILED(g_overlay->Lock(nullptr, &d, DDLOCK_WAIT | DDLOCK_WRITEONLY, nullptr))) return;
-    const uint32_t pair = KEY16 | (KEY16 << 16);
-    for (int y = 0; y < g_overlay_h; ++y) {
-        auto* row = reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(d.lpSurface) + y * d.lPitch);
-        std::fill(row, row + g_overlay_w / 2, pair);
-    }
+    for (const RECT& r : g_put)
+        for (int y = r.top; y < r.bottom; ++y) {
+            auto* row = reinterpret_cast<uint16_t*>(static_cast<uint8_t*>(d.lpSurface) + y * d.lPitch);
+            std::fill(row + r.left, row + r.right, static_cast<uint16_t>(KEY16));
+        }
     g_overlay->Unlock(nullptr);
+    g_put.clear();
+}
+
+// The first and last column + 1 of a row with a pixel other than the key colour (left >= right: none).
+void row_extent(const uint16_t* row, int w, int& left, int& right) {
+    const uint32_t pair = KEY16 | (KEY16 << 16);
+    const auto* pairs = reinterpret_cast<const uint32_t*>(row);
+    const int n = w / 2;
+    int i = 0;
+    while (i < n && pairs[i] == pair) ++i;
+    left = 2 * i;
+    while (left < w && row[left] == KEY16) ++left;
+    if (left >= w) {
+        right = left;
+        return;
+    }
+    right = w;
+    while (right > left && row[right - 1] == KEY16) --right;
 }
 
 void put_overlay(IDirectDrawSurface7* picture) {
-    RECT r = {0, 0, g_overlay_w, g_overlay_h};
-    picture->Blt(&r, g_overlay, &r, DDBLT_KEYSRC | DDBLT_WAIT, nullptr);
+    DDSURFACEDESC2 d = {};
+    d.dwSize = sizeof d;
+    if (FAILED(g_overlay->Lock(nullptr, &d, DDLOCK_WAIT | DDLOCK_READONLY, nullptr))) {
+        RECT r = {0, 0, g_overlay_w, g_overlay_h};   // as before: the whole of it
+        picture->Blt(&r, g_overlay, &r, DDBLT_KEYSRC | DDBLT_WAIT, nullptr);
+        g_put.assign(1, r);
+        return;
+    }
+    const size_t first = g_put.size();
+    RECT band = {0, -1, 0, -1};   // top < 0: no band open
+    int empty_rows = 0;
+    for (int y = 0; y < g_overlay_h; ++y) {
+        int left, right;
+        row_extent(reinterpret_cast<const uint16_t*>(static_cast<uint8_t*>(d.lpSurface) + y * d.lPitch), g_overlay_w,
+                   left, right);
+        if (left < right) {
+            if (band.top < 0) band = {left, y, right, y + 1};
+            band.left = (std::min)(band.left, static_cast<LONG>(left));
+            band.right = (std::max)(band.right, static_cast<LONG>(right));
+            band.bottom = y + 1;
+            empty_rows = 0;
+        } else if (band.top >= 0 && ++empty_rows > BAND_GAP) {
+            g_put.push_back(band);
+            band.top = -1;
+        }
+    }
+    if (band.top >= 0) g_put.push_back(band);
+    g_overlay->Unlock(nullptr);
+    for (size_t i = first; i < g_put.size(); ++i)
+        picture->Blt(&g_put[i], g_overlay, &g_put[i], DDBLT_KEYSRC | DDBLT_WAIT, nullptr);
 }
 
 // The software layers' depth: plain memory, filled with the engine's empty value.
@@ -523,16 +628,64 @@ float g_brighten[4] = {};
 uint32_t g_brighten_color = 0;
 using Brighten_t = void(__fastcall*)(void* g, void* edx, float l, float t, float r, float b, uint32_t color);
 
-// The filtered stretch: `source` of `from` copied into the texture (outside a scene), drawn as one quad.
-bool upload_filtered(IDirectDrawSurface7* from, const RECT& source) {
+// THE SHARP STRETCH. Between whole zooms a plain linear stretch blends every map pixel with its neighbours over a
+// window pixel or more - the whole picture looks soft (issue #22) - and a nearest one gives pixels of uneven size
+// that crawl as the map scrolls. So zoomed in the picture is first enlarged k times pixel by pixel (a Blt into the
+// texture: nearest, as dgVoodoo's Blts are with Bilinear2DOperations off) and that is drawn filtered down to the
+// zoom: every map pixel is a sharp block of the zoom's size, only its edges blended, over at most half a window
+// pixel (z / k <= 0.5: k = ceil(2z), within SHARP_SIDE and SHARP_TEXELS). Zoomed out (z < 1) the plain filtered
+// stretch stays. The texture is made bigger only when a step is reached, not in a glide's frames (a glide takes the k
+// that fits the texture it has, down to the plain stretch); if it cannot be made, the plain stretch. (dgVoodoo tells
+// the game its textures go up to 2048 x 2048, but makes and draws bigger ones - the whole-map view's 3072 x 2304
+// texture has been drawn so since the zoom came.)
+constexpr int SHARP_SIDE = 8192;
+constexpr double SHARP_TEXELS = 4096.0 * 3072.0;   // the most texels of the enlarged picture (25 MB at 16 bits)
+int g_sharp = 1;          // the k this view's stretch wants (1: the plain filtered one)
+bool g_sharp_grow = false;   // the texture may be made bigger for it (a step reached), once
+
+// The k of zoom z for a view of w x h (1: the plain filtered stretch).
+int sharp_scale(double z, int w, int h) {
+    if (z <= 1.0 + 1e-6) return 1;
+    int k = static_cast<int>(std::ceil(2.0 * z - 1e-6));
+    while (k > 1 && (k * w > SHARP_SIDE || k * h > SHARP_SIDE || static_cast<double>(k) * w * k * h > SHARP_TEXELS))
+        --k;
+    return k;
+}
+
+// The texture at least w x h, for the sharp stretch: false (the texture as it was) when it cannot be made.
+bool grow_texture(IDirectDrawSurface7* like, int w, int h) {
+    if (g_texture && g_texture_w >= w && g_texture_h >= h) return true;
+    IDirectDrawSurface7* t = make_surface(like, (std::max)(w, g_texture_w), (std::max)(h, g_texture_h),
+                                          DDSCAPS_TEXTURE | DDSCAPS_VIDEOMEMORY);
+    if (!t) return false;
+    if (g_texture) g_texture->Release();
+    g_texture = t;
+    g_texture_w = (std::max)(w, g_texture_w);
+    g_texture_h = (std::max)(h, g_texture_h);
+    return true;
+}
+
+// The filtered stretch: `source` of `from` copied into the texture (outside a scene) - enlarged k times for the sharp
+// stretch -, drawn as one quad.
+bool upload_filtered(IDirectDrawSurface7* from, const RECT& source, int& k) {
     const int w = source.right - source.left, h = source.bottom - source.top;
-    if (!ensure_texture(from, (std::max)(w, g_surface_w), (std::max)(h, g_surface_h))) return false;
-    RECT to = {0, 0, w, h};
+    k = g_sharp;
+    if (k > 1 && g_sharp_grow) {
+        g_sharp_grow = false;
+        if (!grow_texture(from, k * w, k * h)) {
+            patch::log("zoom: no %dx%d texture for the sharp stretch - the plain one", k * w, k * h);
+            g_sharp = k = 1;
+        }
+    }
+    while (k > 1 && !(g_texture && g_texture_w >= k * w && g_texture_h >= k * h)) --k;
+    if (k == 1 && !ensure_texture(from, (std::max)(w, g_surface_w), (std::max)(h, g_surface_h))) return false;
+    if (g_texture->IsLost() == DDERR_SURFACELOST) g_texture->Restore();
+    RECT to = {0, 0, k * w, k * h};
     return SUCCEEDED(g_texture->Blt(&to, from, const_cast<RECT*>(&source), DDBLT_WAIT, nullptr));
 }
 
-bool draw_filtered(uint8_t* g, const RECT& source, const RECT& target) {
-    const int w = source.right - source.left, h = source.bottom - source.top;
+bool draw_filtered(uint8_t* g, const RECT& source, const RECT& target, int k) {
+    const int w = (source.right - source.left) * k, h = (source.bottom - source.top) * k;
     struct Vertex { float x, y, z, rhw, u, v; };
     const float u = static_cast<float>(w) / g_texture_w, v = static_cast<float>(h) / g_texture_h;
     const float l = target.left - 0.5f, t = target.top - 0.5f, r = target.right - 0.5f, b = target.bottom - 0.5f;
@@ -783,7 +936,8 @@ bool zoom_view_present(uint8_t* g, IDirectDrawSurface7* back_buffer, IDirectDraw
     if (!ensure_overlay(picture, W, H)) return false;
     unlock_all(g);
     IDirectDrawSurface7* ours[3] = {field(g, BACK), field(g, ZBUF), field(g, DEPTH)};
-    const bool uploaded = g_filtered && upload_filtered(back_buffer, source);
+    int k = 1;
+    const bool uploaded = g_filtered && upload_filtered(back_buffer, source, k);
     if (!screen_set_render_target(g, game[0])) return false;
     field(g, BACK) = game[0];
     field(g, ZBUF) = game[1];
@@ -794,7 +948,7 @@ bool zoom_view_present(uint8_t* g, IDirectDrawSurface7* back_buffer, IDirectDraw
     screen_set_screen(g, W, H);
     if (!uploaded) picture->Blt(const_cast<RECT*>(&target), back_buffer, const_cast<RECT*>(&source), DDBLT_WAIT, nullptr);
     begin_scene(g);
-    if (uploaded && !draw_filtered(g, source, target)) {
+    if (uploaded && !draw_filtered(g, source, target, k)) {
         end_scene(g);
         picture->Blt(const_cast<RECT*>(&target), back_buffer, const_cast<RECT*>(&source), DDBLT_WAIT, nullptr);
         begin_scene(g);
@@ -867,6 +1021,13 @@ double zoom_view_whole() {
     return (std::min)(static_cast<double>(window_w()) / map_w(), static_cast<double>(window_h()) / map_h());
 }
 
+// The factor at which the map fills the window (its shorter side, relative to the window, fills it; the other one
+// goes on past the window's edges): the farthest out play goes, so that the view never leaves the map.
+double zoom_view_cover() {
+    if (map_w() <= 0 || map_h() <= 0) return 1.0;
+    return (std::max)(static_cast<double>(window_w()) / map_w(), static_cast<double>(window_h()) / map_h());
+}
+
 // The view z shows: the window / z on each axis, at most the map.
 void zoom_view_size(double z, int& w, int& h) {
     w = static_cast<int>(std::lround(window_w() / z));
@@ -932,6 +1093,8 @@ bool zoom_view_apply(double z, double surface_z) {
         g_target = target;
         const bool whole = std::fabs(z - std::round(z)) < 1e-6 && z >= 1.0;   // 2, 3: exact big pixels
         g_filtered = g_filter_setting == 1 || (g_filter_setting == 2 && !whole);
+        g_sharp = g_filtered && g_filter_setting == 2 ? sharp_scale(z, w, h) : 1;
+        g_sharp_grow = g_sharp > 1 && std::fabs(z - surface_z) < 1e-9;   // a step reached, not a glide's frame
     }
     if (g_view != was_view) {   // the interface's layout space changed: the window's, or the level's screen
         move_interface(g_view);
@@ -989,6 +1152,7 @@ void zoom_view_restored() {
     }
     if (ok) {
         fog_buffer_cover((std::max)(g_view_w, g_surface_w), (std::max)(g_view_h, g_surface_h));
+        g_sharp_grow = g_sharp > 1;   // the sharp stretch's texture made again too
         patch::log("zoom: the view's surfaces made again after the loss (%dx%d%s)", g_view_w, g_view_h,
                    g_menu ? ", a menu up" : "");
         return;

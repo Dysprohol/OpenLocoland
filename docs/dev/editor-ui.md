@@ -221,7 +221,8 @@ Save and Load; the factory panel's 30 pages in Polish, German and Hungarian at b
 
 **Zoom in the editor** (`zoom.cpp`, `zoom_view.cpp`, `editor_edit.cpp`; engine.md "Zoom"). The **mouse
 wheel** over the map zooms the held level's map in and out by play's steps and caps (zoom.cpp's ladder, its
-ends and its glide, whatever they are), the map point under the cursor kept, as in a mission; **Ctrl+0** goes
+ends and its glide, whatever they are - except that out it goes on to the whole map with the void and the
+map's frame round it, where play stops at the map filling the window), the map point under the cursor kept, as in a mission; **Ctrl+0** goes
 back to 100 % (help page 3). What the wheel did for the tools until then moved to **Ctrl+wheel**: a brush's
 size, the Track tool's ramp, turning what is placed or selected, the scatter's radius, a post's side (the keys
 stay: R / E, + / -, PgUp / PgDn); Shift+wheel is as before (the selected object's height); an open panel takes

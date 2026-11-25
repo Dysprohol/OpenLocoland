@@ -738,7 +738,12 @@ interface drawn in the second pass: editor-ui.md "Zoom in the editor"; a level t
 logical screen of the window / z, at most the map on each axis, made between two frames (`screen_set_view`:
 the back, z and depth surfaces of that size, also in full screen, the screen size and `Graphics_SetViewport`;
 the fog texture big enough, `fog_buffer_cover`), and the camera put with `SetPosition` so that the map point
-under the cursor stays under it. The frame is drawn in two passes. The interface is every object of class
+under the cursor stays under it. In play the zoom goes out only until the map fills the window
+(`zoom_view_cover`: the bigger of window / map on the two axes), so the view is within the map on both axes
+and `SetPosition`'s limits keep it there, as at the level's own zoom - nothing beyond the map's edges is shown
+(issue #24; before, the last steps out were within the map on one axis only and the whole map, with black
+beside or below the map); the held editor goes out to the whole map, its camera past the edges anyway (editor-ground.md
+"The map's frame"). The frame is drawn in two passes. The interface is every object of class
 FRAME (10) or TEXT (0x13): `Frame_Construct` (0x40c4d0) puts each on `World.menu`, and a text's constructor
 calls it (`GameWorld_CreateObject` case 0x13) - the bar, the minimap's frame, the money plate, the messages,
 the mouse tip and the scripts' texts (`PrintFile` is `CreateTextFromFile`; l01's
@@ -746,8 +751,14 @@ the mouse tip and the scripts' texts (`PrintFile` is `CreateTextFromFile`; l01's
 the world pass is `Graphics_DrawScene` without them (the culling test at 0x41faf2 and the shadow test
 `view_culling.cpp` replaces, and the draw call of layers 0 and 7, 0x41fbe0, which have none, ask
 `zoom_draw_filter`). After Direct3D's `EndScene` the logical picture is stretched into the window-sized back
-buffer - a Blt at a whole zoom (3, the top of the ladder), else a Blt into a texture drawn as one linear-filtered quad
-(vertices at -0.5: pixel for pixel at zoom 1, checked) - and the interface's pass draws layers 2-10 again with
+buffer - a Blt at a whole zoom (2 and 3: dgVoodoo's Blts are nearest-pixel, exact big pixels), else a Blt into a
+texture drawn as one linear-filtered quad (vertices at -0.5: pixel for pixel at zoom 1, checked); zoomed in, the
+Blt enlarges the picture k = ceil(2z) times pixel by pixel first (at most 8192 on a side and 4096 x 3072 texels,
+the texture made bigger only when a step is reached, not in a glide), so the quad's filter blends a map pixel's
+edges over at most half a window pixel and the rest of it stays sharp - a plain filtered stretch blended every
+pixel with its neighbours over z window pixels and the whole picture looked soft (issue #22); zoomed out it
+stays the plain one (dgVoodoo tells the game its textures go up to 2048 x 2048 but makes and draws bigger ones) -
+and the interface's pass draws layers 2-10 again with
 only those objects at the window's size. Its software sprites (layers 2-4, 10) go into a system-memory
 overlay put on with a colour-keyed Blt, their depth buffer is memory of ours (`depthBits` / `depthPitch`: the
 engine locks only when they are 0), and the hardware z-buffer is cleared to the engine's empty value (0x3ff)
@@ -760,7 +771,12 @@ called by `Player_UpdateStateBar` in the update, after the frame's drawing: unde
 kept and it is drawn in the interface's pass, its highlight from the world's view and after the overlay, so it
 brightens the dots as before. `Graphics_DrawEffects` (the fades, the nuke's flash, the snapshot of
 `Effect` 5) runs its timing in the world pass but draws in the interface's, over the whole window, as the
-original covers the bar; the scroll effect moves the camera and runs only in the world pass. The mouse: the
+original covers the bar; the scroll effect moves the camera and runs only in the world pass. A frame drawn in one
+pass on a view bigger than the window (a menu's first frame, before its window-sized screen comes) has the
+fade-in run alone with the view cut to its snapshot, the window's picture at the window's size: its 256 x 256
+pieces are copied out of the snapshot over the view, and those past it failed (`TEXTURE: 0x88760096 Couldn't
+copy from surface` in `error.log`, 80 lines for the Esc menu over a 3072x2132 view at 1920x1080) and were never
+drawn; the other effects follow with the view as it is. The mouse: the
 engine's cursor stays logical (`WM_NCHITTEST` mapped) for world picking, orders and edge scrolling;
 `Menu_Update`, `MouseTip_Update` and `Player_UpdateStateBar` (the minimap's hover and click) get it in the
 window's pixels, and the minimap's right-click order its rectangle in logical pixels (0x431fce: the engine
