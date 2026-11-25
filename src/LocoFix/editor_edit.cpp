@@ -14287,6 +14287,65 @@ void edit_assign_orders() {
 }
 
 // editor.cpp after a level is held: the decals it has, for the bar.
+// editor.cpp, a map loaded (not the way back from Run the level): the depth an older version's relief
+// left standing over the ground (ground_depth_repair) put down to the ground seen there, its colours
+// untouched - rails and objects there were drawn behind grass that looks flat. One step of the
+// history (Ctrl+Z puts it back), said in the status line, saved with the map. Only a picture of the
+// map's own whose depth agrees with its ground almost everywhere (the editor's relief made it: a
+// campaign's picture and one made by other means differ widely, and are left as they are), and not
+// over water or within a square of it (the Water tool lowers the picture where it paints, not as the
+// ground lowered there shows).
+void edit_repair_depth() {
+    const char* map = at<const char*>(world(), W_LEVEL_FILE);
+    if (!map || !grid()) return;
+    const std::string image = map_ground_image(map);
+    int pw = 0, ph = 0;
+    if (image.empty() || campaign_ground_image(image) || ground_too_big(map, pw, ph)) return;
+    uint8_t* ground = nullptr;
+    for_each_object([&](uint8_t* o) {
+        if (!ground && nvid_of(o) == VID_GROUND) ground = o;
+    });
+    if (!ground) return;
+    // the 128 px squares with water or beside it (every pixel of the picture asks)
+    const int sw = grid_width() / 16 + 1, sh = grid_height() / 16 + 1;
+    std::vector<uint8_t> near_water(static_cast<size_t>(sw) * sh, 0);
+    for (const auto& s : water_squares().kinds)
+        for (int dj = -1; dj <= 1; ++dj)
+            for (int di = -1; di <= 1; ++di) {
+                const int i = s.first.first + di, j = s.first.second + dj;
+                if (i >= 0 && i < sw && j >= 0 && j < sh) near_water[static_cast<size_t>(j) * sw + i] = 1;
+            }
+    const auto skip = [&](float x, float y) {
+        const int i = static_cast<int>(std::floor(x / 128)), j = static_cast<int>(std::floor(y / 128));
+        return i >= 0 && i < sw && j >= 0 && j < sh && near_water[static_cast<size_t>(j) * sw + i] != 0;
+    };
+    const float gx = at<float>(ground, O_X), gy = at<float>(ground, O_Y);
+    const double began = ground_clock();
+    const DepthRepair d = ground_depth_repair(image, gx, gy, grid(), grid_width(), grid_height(), skip, false);
+    patch::log("edit: the ground's depth against its ground: %d px seen, %d agree, %d above it (%.0f ms)", d.seen, d.agree, d.above,
+               ground_clock() - began);
+    if (!d.above) return;
+    if (d.agree < d.seen * 0.95) {
+        patch::log("edit: the ground's depth stands over its ground at %d px - left as it is: the picture agrees with its ground at %d of "
+                   "%d px only (not the editor's relief)", d.above, d.agree, d.seen);
+        return;
+    }
+    if (!ground_paintable(true)) return;
+    ground_stroke_begin();
+    ground_depth_repair(image, gx, gy, grid(), grid_width(), grid_height(), skip, true);
+    if (std::shared_ptr<PaintPatch> p = ground_stroke_end()) {
+        Operation op{{"OpDepthRepaired", "the ground's depth repaired"}, {}, {}, false, {}, {}};
+        op.paint = p;
+        g_undo.push_back(op);
+        trim_history();
+    }
+    g_dirty = true;
+    MESSAGE("MsgDepthRepaired",
+            "the ground's depth put down to the ground at %d px, where an older version's levelling left it over rails and objects "
+            "(Ctrl+Z puts it back; saved with the map)",
+            d.above);
+}
+
 void edit_level_held() {
     for (UnitUnlock& u : mission_factories().unlocks) find_unlock_factory(u);
     for (FactoryTrain& t : mission_factories().queue)

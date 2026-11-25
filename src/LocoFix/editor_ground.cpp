@@ -38,6 +38,7 @@
 #include <cstring>
 #include <cwchar>
 #include <cwctype>
+#include <functional>
 #include <map>
 #include <new>
 
@@ -1305,6 +1306,39 @@ int ground_height_at(float x, float y) {
     return g_heights[static_cast<size_t>(py) * g_w + px];
 }
 
+namespace {
+
+// The GRID's ground as the picture (w x h, its top left corner at left, top) shows it, the columns x0
+// to x1 - 1 of the map, front to back: f(px, py, x, r, y, z) for every pixel some ground reaches - the
+// ground's point x, y at level z, seen at the screen row r.
+template <typename F> void each_seen(const Grid& t, int x0, int x1, int w, int h, float left, float top, F f) {
+    for (int x = x0; x < x1; ++x) {
+        const int px = static_cast<int>(std::floor(x - left));
+        if (px < 0 || px >= w) continue;
+        const float fx = x + 0.5f;
+        int reached = 1 << 20;
+        float ya = static_cast<float>(t.h * 8), za = t.at(fx, ya);
+        for (int m = t.h - 1; ya > 0; --m) {
+            const float yb = static_cast<float>((std::max)(0, 8 * m + 4)), zb = t.at(fx, yb);
+            const float sa = ya - za, sb = yb - zb;
+            if (sb < sa) {
+                const int first = (std::min)(reached - 1, static_cast<int>(std::ceil(sa)) - 1);
+                const int last = static_cast<int>(std::ceil(sb));
+                for (int r = first; r >= last; --r) {
+                    const float y = ya - (sa - r) * (ya - yb) / (sa - sb), z = za + (zb - za) * (ya - y) / (ya - yb);
+                    reached = r;
+                    const int py = static_cast<int>(std::floor(r - top));
+                    if (py >= 0 && py < h) f(px, py, x, r, y, z);
+                }
+            }
+            ya = yb;
+            za = zb;
+        }
+    }
+}
+
+}  // namespace
+
 int ground_depth_check(const short* grid, int gw, int gh, int cx0, int cy0, int cx1, int cy1, int& pixels, float& worst,
                        int& wx, int& wy) {
     pixels = 0;
@@ -1313,35 +1347,58 @@ int ground_depth_check(const short* grid, int gw, int gh, int cx0, int cy0, int 
     if (!g_ready || !grid) return -1;
     const Grid t{grid, gw, gh};
     int off = 0;
-    for (int x = (std::max)(0, cx0) * 8; x < ((std::min)(gw - 1, cx1) + 1) * 8; ++x) {
-        const int px = static_cast<int>(std::floor(x - g_left));
-        if (px < 0 || px >= g_w) continue;
-        const float fx = x + 0.5f;
-        int top = 1 << 20;
-        float ya = static_cast<float>(gh * 8), za = t.at(fx, ya);
-        for (int m = gh - 1; ya > 0; --m) {
-            const float yb = static_cast<float>((std::max)(0, 8 * m + 4)), zb = t.at(fx, yb);
-            const float sa = ya - za, sb = yb - zb;
-            if (sb < sa) {
-                const int first = (std::min)(top - 1, static_cast<int>(std::ceil(sa)) - 1);
-                const int last = static_cast<int>(std::ceil(sb));
-                for (int r = first; r >= last; --r) {
-                    const float y = ya - (sa - r) * (ya - yb) / (sa - sb), z = za + (zb - za) * (ya - y) / (ya - yb);
-                    top = r;
-                    const int py = static_cast<int>(std::floor(r - g_top));
-                    if (y < cy0 * 8 || y >= (cy1 + 1) * 8 || py < 0 || py >= g_h) continue;
-                    ++pixels;
-                    const float d = (g_heights[static_cast<size_t>(py) * g_w + px] - (1026 + 8 * z)) / 8;
-                    if (std::fabs(d) <= 1.5f) continue;
-                    ++off;
-                    if (std::fabs(d) > std::fabs(worst)) worst = d, wx = x, wy = r;
-                }
-            }
-            ya = yb;
-            za = zb;
-        }
-    }
+    each_seen(t, (std::max)(0, cx0) * 8, ((std::min)(gw - 1, cx1) + 1) * 8, g_w, g_h, g_left, g_top,
+              [&](int px, int py, int x, int r, float y, float z) {
+                  if (y < cy0 * 8 || y >= (cy1 + 1) * 8) return;
+                  ++pixels;
+                  const float d = (g_heights[static_cast<size_t>(py) * g_w + px] - (1026 + 8 * z)) / 8;
+                  if (std::fabs(d) <= 1.5f) return;
+                  ++off;
+                  if (std::fabs(d) > std::fabs(worst)) worst = d, wx = x, wy = r;
+              });
     return off;
+}
+
+// The depth an older version's relief left standing over the ground (editor_ground.h).
+DepthRepair ground_depth_repair(const std::string& image, float x, float y, const short* grid, int gw, int gh,
+                                const std::function<bool(float, float)>& skip, bool fix) {
+    DepthRepair d;
+    if (!grid) return d;
+    const Grid t{grid, gw, gh};
+    // not fixing: the picture of the file (or the one in memory) only read; fixing: the one in memory
+    std::vector<uint16_t> pixels, heights;
+    const std::vector<uint16_t>* hs = &g_heights;
+    int w = g_w, h = g_h;
+    float left = g_left, top = g_top;
+    if (!g_ready) {
+        if (fix || !read_ground_picture(image, w, h, pixels, heights)) return d;
+        release(pixels);
+        hs = &heights;
+        left = x - w / 2.0f;
+        top = y - h / 2.0f;
+    }
+    int px0 = w, py0 = h, px1 = -1, py1 = -1;
+    each_seen(t, 0, gw * 8, w, h, left, top, [&](int px, int py, int gx, int, float gy, float z) {
+        if (skip(static_cast<float>(gx), gy)) return;
+        ++d.seen;
+        const size_t i = static_cast<size_t>(py) * w + px;
+        const float level = 1026 + 8 * z, over = ((*hs)[i] - level) / 8;
+        if (std::fabs(over) <= DEPTH_AGREE) ++d.agree;
+        if (over <= DEPTH_AGREE) return;
+        ++d.above;
+        if (!fix) return;
+        g_heights[i] = static_cast<uint16_t>(std::lround(level));
+        px0 = (std::min)(px0, px);
+        py0 = (std::min)(py0, py);
+        px1 = (std::max)(px1, px);
+        py1 = (std::max)(py1, py);
+    });
+    if (fix && px1 >= px0) {
+        touch(px0, py0);
+        touch(px1, py1);
+        upload(px0, py0, px1 + 1, py1 + 1);
+    }
+    return d;
 }
 
 double ground_clock() {

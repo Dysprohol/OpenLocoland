@@ -103,6 +103,7 @@ void edit_message_line(const std::string& text);
 void edit_message_size(const char* key, const char* english, int w, int h);
 void install_editor_edit();
 void edit_level_held();
+void edit_repair_depth();   // editor_edit.cpp: an older version's depth over the ground, repaired
 void edit_touch();
 void edit_assign_orders();   // editor_edit.cpp
 void edit_commit_mission(const ArrivalsState& arrivals_before, const FactoryState& factories_before);
@@ -1876,6 +1877,7 @@ void editor_level_loaded(void* w) {
                 else if (band == 1)
                     edit_message_size("MsgMapLarge", "a big map (%d x %d px): when painting the ground, save often", pw, ph);
             }
+            edit_repair_depth();
         }
         // a script that does not compile: the level is held without it (script_check.cpp), said last so
         // the status line keeps it
