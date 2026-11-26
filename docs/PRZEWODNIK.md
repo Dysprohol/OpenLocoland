@@ -603,8 +603,8 @@ pociągiem raz o czasie wymaga mapy z przyjazdami (starsze mapy: PRZESTAW w pane
 
 ### 7. Wróg
 
-- **Fortyfikacja** (klawisz 7, wroga): staje **na torze**, obrócona wzdłuż niego - to brama, przez
-  którą przejeżdżają pociągi (`R` albo `E` obraca ją tam). Jest od razu uzbrojona: jej panel (prawy przycisk) ustawia działo w każdym
+- **Fortyfikacja** (klawisz 7, wroga): staje **na torze** - to brama, przez którą przejeżdżają pociągi - i
+  obraca się na każdy kierunek jak inne obiekty (`R`, `E`, Ctrl+kółko), razem ze swoimi działami; w misjach stoi wzdłuż toru. Jest od razu uzbrojona: jej panel (prawy przycisk) ustawia działo w każdym
   gnieździe - działo albo rakiety. Samej fortyfikacji nie da się zniszczyć; jej działa tak.
 - **Wszystkie obiekty** (klawisz 0) otwiera paletę ze wszystkimi obiektami z misji, według tematów
   (łąka, las, pustynia, lód, wulkan, bagno, park, piraci, miasto, przemysł, kolej, flagi i skrzynie,

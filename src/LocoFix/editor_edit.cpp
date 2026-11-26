@@ -3164,15 +3164,6 @@ void turn(int steps) {
             MESSAGE("MsgDirection", "direction %d", g_place_direction);
             return;
         }
-        if (v && (place_nvid() == VID_FORT || place_nvid() == VID_MINE_BUILDING)) {   // a fort, a mining plant: round along its track
-            float x, y, z;
-            map_point(g_mouse, v, x, y, z);
-            int direction = g_place_direction;
-            UiText why;
-            g_place_direction = ((snap(place_nvid(), x, y, direction, why) ? direction : g_place_direction) + 128) & 255;
-            MESSAGE("MsgDirection", "direction %d", g_place_direction);
-            return;
-        }
         if (v && place_nvid() == VID_WORKSHOP) {   // a repair point: round along its leg
             float x, y, z;
             map_point(g_mouse, v, x, y, z);
@@ -3183,7 +3174,9 @@ void turn(int steps) {
             return;
         }
         const int dirs = v ? (std::max)(1, at<int>(v, V_ND_DIR)) : 8;
-        if (on_track_vid(place_nvid()) && dirs > 1) {   // turned as chosen where it stays free (Shift, no track near)
+        if (on_track_vid(place_nvid()) && place_nvid() != VID_FORT && place_nvid() != VID_MINE_BUILDING &&
+            dirs > 1) {   // turned as chosen where it stays free (Shift, no track near); a fort, a mining plant: any way
+
             g_place_direction = to_step(g_place_direction + steps * (256 / dirs) + 256, dirs);
             MESSAGE("MsgPlaceByTrackFree", "%s: direction %d where it stays free - near the track its track turns it", place_label(),
                     g_place_direction);
@@ -3240,10 +3233,6 @@ void turn(int steps) {
         }
     }
     if (wreck_on_track(o)) steps = (std::max)(1, at<int>(vid_of(o), V_ND_DIR)) / 2;   // a wreck on the track: round
-    float rx, ry;
-    int along;
-    if ((nvid_of(o) == VID_FORT || nvid_of(o) == VID_MINE_BUILDING) && rail_line_spot(at<float>(o, O_X), at<float>(o, O_Y), 8, false, rx, ry, along))
-        steps = (std::max)(1, at<int>(vid_of(o), V_ND_DIR)) / 2;   // a fort or a mining plant on its track: round
     const int dirs = (std::max)(1, at<int>(vid_of(o), V_ND_DIR));
     if (dirs <= 1) {
         MESSAGE("MsgOneDirection", "VID %d has one direction only", nvid_of(o));
@@ -7413,10 +7402,12 @@ bool rail_line_spot(float x, float y, float reach, bool diagonal, float& sx, flo
     return found;
 }
 
-// A fort on the line of the nearest straight track, along it the way nearest to `wanted`; a mining plant
-// (165) the same way: 29 of the missions' 30 stand 0-6 px from a straight rail's line, along it as the
-// forts (l18's nine with its track through them, l14's sixteen in rows), and F165_0 / F162_0 let a
-// train of another army take it from within 75 px.
+// A fort on the line of the nearest straight track, turned the way the author chose (`wanted`, a step of its
+// eight directions - R / E and Ctrl+wheel turn it every way, as other objects); a mining plant (165) the same
+// way: 29 of the missions' 30 stand 0-6 px from a straight rail's line, along it as the forts (l18's nine
+// with its track through them, l14's sixteen in rows), and F165_0 / F162_0 let a train of another army take
+// it from within 75 px. Before, the track turned it along itself, R / E only round on it (by 128) and away
+// from it by 32 - placing, turning and dragging each did it another way (reported 2026-11-26).
 Snap snap_fort(float x, float y, int wanted, int nvid) {
     Snap s;
     int along;
@@ -7427,8 +7418,8 @@ Snap snap_fort(float x, float y, int wanted, int nvid) {
         return s;
     }
     s.ok = true;
-    const int back = (along + 128) & 255;
-    s.direction = direction_gap(along, wanted) <= direction_gap(back, wanted) ? along : back;
+    (void)along;
+    s.direction = to_step(wanted, 8);
     return s;
 }
 

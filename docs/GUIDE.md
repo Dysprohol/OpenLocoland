@@ -605,8 +605,8 @@ that runs arrivals (older maps: CONVERT in the Arrivals panel).
 
 ### 7. The enemy
 
-- **Fort** (key 7, the enemy's): it goes **onto the track**, turned along it - it is a gate the
-  trains drive through (`R` or `E` turns it round there). It comes armed: its panel (right button) sets the gun in each socket - a cannon or
+- **Fort** (key 7, the enemy's): it goes **onto the track** - it is a gate the trains drive through - and
+  turns every way as other objects (`R`, `E`, Ctrl+wheel), its guns with it; the missions' forts stand along their track. It comes armed: its panel (right button) sets the gun in each socket - a cannon or
   missiles. The fort itself cannot be destroyed; its guns can.
 - **All objects** (key 0) opens the palette with every object the missions use, by theme (meadow,
   forest, desert, ice, volcanic, swamp, park, pirates, city, industry, railway, flags and crates,
