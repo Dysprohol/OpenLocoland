@@ -196,6 +196,54 @@ std::string fit_choice(const std::string& text, float x, float y) { return fit(t
 // A note - what something means, never a choice: in parentheses.
 std::string paren(const std::string& text) { return text.empty() || text.front() == '(' ? text : "(" + text + ")"; }
 
+// ---- a row of choices ----
+// The brackets around a choice (ui_clickable) made the rows longer. A row of choices that would run past
+// its right end laid as usual - from the value column, a character or two apart - is laid tight: from a
+// character after its label's own text, half a character apart (a click takes a choice 2 px beyond its
+// text, so the two areas only touch), and a choice that still does not fit is cut (fit's mark, its whole
+// text in the status line). An entry's page has no row to spare below (a patrol's POINTS: can be on its
+// last row), so the arrival panel's move to the next row (editor_arrivals.cpp wrap) is not used here.
+struct RowItem {
+    std::string text;
+    bool current = false;
+    std::function<void()> act;     // a choice
+    std::function<void(int)> by;   // a number: [-] text [+]
+    float extra = 0;               // the usual layout's room before it beyond put's own character
+};
+
+float item_width(const RowItem& i) {
+    const size_t chars = i.by ? 2 * (1 + UI_CLICKABLE_EXTRA) + i.text.size() + 2 : i.text.size() + (i.act ? UI_CLICKABLE_EXTRA : 0);
+    return static_cast<float>(chars) * g_cw;
+}
+
+// The row's end (the last item's text) laid from x, as usual or tight.
+float row_end(float x, const std::vector<RowItem>& items, bool tight) {
+    for (size_t k = 0; k < items.size(); ++k) x += item_width(items[k]) + (k ? (tight ? g_cw / 2 : g_cw + items[k].extra) : 0);
+    return x;
+}
+
+// The row's items from x, tight from tight_x when the usual layout ends past `right` (0: the row's right
+// end); a choice is cut at `cut_right` (0: `right`). The x after the last item, as put gives it.
+float choices_row(float x, float tight_x, float y, const std::vector<RowItem>& items, float right = 0, float cut_right = 0) {
+    if (right <= 0) right = right_end();
+    if (cut_right <= 0) cut_right = right;
+    const bool tight = row_end(x, items, false) > right;
+    if (tight) x = (std::min)(x, tight_x);
+    const int keep = static_cast<int>((right_end() - cut_right) / g_cw + 0.99f);   // fit's room ends at the row's end
+    for (size_t k = 0; k < items.size(); ++k) {
+        const RowItem& i = items[k];
+        if (k) x += tight ? -g_cw / 2 : i.extra;
+        if (i.by) x = number(x, y, i.text, i.by);
+        else x = put(x, y, i.act ? fit(i.text, x, y, UI_CLICKABLE_EXTRA + keep) : fit(i.text, x, y, keep), i.current, i.act);
+    }
+    return x;
+}
+
+// Where a tight row starts: a character after its label's text.
+float tight_after(const char* key, const char* english) {
+    return g_px + LEFT + static_cast<float>(std::strlen(ui_text(key, english)) + 1) * g_cw;
+}
+
 // A note over `rows` rows from row k, wrapped at spaces; the last row cut (fit) when it is still too long.
 // (`rows` >= 1)
 void note(int k, int rows, const std::string& text) {
@@ -234,14 +282,24 @@ void draw_line_under() {
     g_line_y = 0;
 }
 
-// A list's pages at the right end of the actions' row: < n/m >.
-void pages_at_right(int* page, int count) {
+// A list's pages at the right end of the actions' row: [<] n/m [>]; where the row's actions run up to it
+// (they end at `after`), [<] [>] half a character apart without n/m.
+std::string pages_shown(int page, int count) { return ui_printf("%d/%d", page + 1, count); }
+float pages_left(int page, int count) {   // [<] n/m [>]
+    return right_end() - static_cast<float>(pages_shown(page, count).size() + 4 + 2 * UI_CLICKABLE_EXTRA) * g_cw;
+}
+float pages_left_short() { return right_end() - (2 * (1 + UI_CLICKABLE_EXTRA) + 0.5f) * g_cw; }   // [<] [>]
+void pages_at_right(int* page, int count, float after = 0) {
     if (count <= 1) return;
     const float y = row_y(ROW_ACTIONS);
-    const std::string shown = ui_printf("%d/%d", *page + 1, count);
-    float x = right_end() - (shown.size() + 4 + 2 * UI_CLICKABLE_EXTRA) * g_cw;   // [<] n/m [>]
+    if (after > pages_left(*page, count) - g_cw / 2) {
+        const float x = put(pages_left_short(), y, "<", false, [page] { *page = (std::max)(0, *page - 1); });
+        put(x - g_cw / 2, y, ">", false, [page, count] { *page = (std::min)(count - 1, *page + 1); });
+        return;
+    }
+    float x = pages_left(*page, count);
     x = put(x, y, "<", false, [page] { *page = (std::max)(0, *page - 1); });
-    x = put(x, y, shown);
+    x = put(x, y, pages_shown(*page, count));
     put(x, y, ">", false, [page, count] { *page = (std::min)(count - 1, *page + 1); });
 }
 
@@ -563,35 +621,43 @@ void draw_plan_list() {
     if (enemy()) put(g_px + LEFT, row_y(ROW_SPARE), fit(ai_limit(), g_px + LEFT, row_y(ROW_SPARE)));   // empty until reached
     else if (n > 0) exit_taken();   // a train on the factory's exit (only then, so the page's texts keep their numbers)
     line_under(ROW_LINE);
-    // + NEW, COPY n, DELETE n (the entry opened last), AI... at the left, the pages at the right
+    // + NEW, COPY n, DELETE n (the entry opened last), AI... at the left, the pages at the right: tight when
+    // they would reach the pages' [<] n/m [>], and then the pages without n/m if they still do
     y = row_y(ROW_ACTIONS);
-    float x = put(g_px + LEFT, y, ui_text("ArrNew", "+ NEW"), false, [] {
-        change_all({"OpQueueAdd", "factory queue train"}, [](FactoryState& f) {
-            FactoryTrain t;
-            const std::vector<int> e = entries();
-            if (!e.empty()) t.time = f.queue[e.back()].time + 60;
-            if (!enemy()) {
-                t.factory = g_factory;
-                edit_object_place(g_factory, t.fx, t.fy);
-                t.task = TASK_DRIVE;
-                t.time = e.empty() ? 30 : t.time;
-            }
-            f.queue.push_back(t);
-            open_entry(static_cast<int>(f.queue.size()) - 1);
-        });
-    });
+    std::vector<RowItem> acts;
+    acts.push_back({ui_text("ArrNew", "+ NEW"), false, [] {
+                        change_all({"OpQueueAdd", "factory queue train"}, [](FactoryState& f) {
+                            FactoryTrain t;
+                            const std::vector<int> e = entries();
+                            if (!e.empty()) t.time = f.queue[e.back()].time + 60;
+                            if (!enemy()) {
+                                t.factory = g_factory;
+                                edit_object_place(g_factory, t.fx, t.fy);
+                                t.task = TASK_DRIVE;
+                                t.time = e.empty() ? 30 : t.time;
+                            }
+                            f.queue.push_back(t);
+                            open_entry(static_cast<int>(f.queue.size()) - 1);
+                        });
+                    }});
     if (valid()) {
         const int shown = number_of(g_entry);
-        x = put(x + g_cw, y, ui_printf(ui_format("ArrCopyN", "COPY %d"), shown), false, [] {
-            change_all({"OpPlanCopy", "factory plan copy"}, [](FactoryState& f) { f.queue.insert(f.queue.begin() + g_entry + 1, f.queue[g_entry]); });
-        });
-        x = put(x + g_cw, y, ui_printf(ui_format("ArrDeleteN", "DELETE %d"), shown), false, [] {
-            change_all({"OpQueueDelete", "factory queue train deleted"}, [](FactoryState& f) { f.queue.erase(f.queue.begin() + g_entry); });
-            g_entry = -1;
-        });
+        acts.push_back({ui_printf(ui_format("ArrCopyN", "COPY %d"), shown), false, [] {
+                            change_all({"OpPlanCopy", "factory plan copy"},
+                                       [](FactoryState& f) { f.queue.insert(f.queue.begin() + g_entry + 1, f.queue[g_entry]); });
+                        }, nullptr, g_cw});
+        acts.push_back({ui_printf(ui_format("ArrDeleteN", "DELETE %d"), shown), false, [] {
+                            change_all({"OpQueueDelete", "factory queue train deleted"},
+                                       [](FactoryState& f) { f.queue.erase(f.queue.begin() + g_entry); });
+                            g_entry = -1;
+                        }, nullptr, g_cw});
     }
-    if (enemy()) x = put(x + g_cw, y, ui_text("PlanAi", "AI..."), false, [] { g_screen = Screen::Ai; });
-    pages_at_right(&g_list_page, pages);
+    if (enemy()) acts.push_back({ui_text("PlanAi", "AI..."), false, [] { g_screen = Screen::Ai; }, nullptr, g_cw});
+    const float left = g_px + LEFT;
+    const float right = pages > 1 ? pages_left(g_list_page, pages) - g_cw / 2 : 0;
+    const float cut_right = pages > 1 ? pages_left_short() - g_cw / 2 : 0;
+    const float end = choices_row(left, left, y, acts, right, cut_right) - g_cw;   // the last text's end
+    pages_at_right(&g_list_page, pages, end);
 }
 
 // ---- an entry ----
@@ -709,8 +775,8 @@ float draw_when(const FactoryTrain& t, float y) {
         change({"OpPlanWhen", "factory plan time"}, [by](FactoryTrain& r) { r.time = (std::max)(0, r.time + by * edit_time_step()); });
     };
     float x = label(y, "ArrWhen", "WHEN:");
-    x = put(x, y, ui_text("PlanWhenAt", "AT"), t.when == WHEN_AT, pick(WHEN_AT));
-    if (!runs()) {   // the authors' queue: each entry once, at its time
+    if (!runs()) {
+        put(x, y, ui_text("PlanWhenAt", "AT"), t.when == WHEN_AT, pick(WHEN_AT));   // the authors' queue: each entry once, at its time
         const float vx = g_px + LEFT + LABEL;
         number(vx, y + ROW, seconds(t.time), time);
         put(vx, y + 2 * ROW, fit(paren(ui_text("PlanMoreArrivals", "MORE IN A MAP WITH ARRIVALS")), vx, y + 2 * ROW));
@@ -718,8 +784,10 @@ float draw_when(const FactoryTrain& t, float y) {
             [] { panel_open_arrivals(); });
         return y + 4 * ROW;
     }
-    x = put(x + g_cw, y, ui_text("PlanWhenAfter", "AFTER ANOTHER"), t.when == WHEN_AFTER, pick(WHEN_AFTER));
-    put(x + g_cw, y, ui_text("PlanWhenIf", "WHILE"), t.when == WHEN_IF, pick(WHEN_IF));
+    choices_row(x, tight_after("ArrWhen", "WHEN:"), y,
+                {{ui_text("PlanWhenAt", "AT"), t.when == WHEN_AT, pick(WHEN_AT)},
+                 {ui_text("PlanWhenAfter", "AFTER ANOTHER"), t.when == WHEN_AFTER, pick(WHEN_AFTER), nullptr, g_cw},
+                 {ui_text("PlanWhenIf", "WHILE"), t.when == WHEN_IF, pick(WHEN_IF), nullptr, g_cw}});
     y += ROW;
     const float vx = g_px + LEFT + LABEL;
     if (t.when == WHEN_IF) {   // the condition: < > go through the list, - n + its number
@@ -758,17 +826,23 @@ float draw_when(const FactoryTrain& t, float y) {
 float draw_repeat(const FactoryTrain& t, float y) {
     if (!runs()) return y;
     float x = label(y, "ArrRepeat", "REPEAT:");
-    x = put(x, y, ui_text("ArrOnce", "ONCE"), t.times == 1, [] { change({"OpPlanRepeat", "factory plan repeat"}, [](FactoryTrain& r) { r.times = 1; }); });
-    x = number(x + g_cw, y, std::to_string(t.times >= 2 ? t.times : 3), [](int by) {
-        change({"OpPlanRepeat", "factory plan repeat"}, [by](FactoryTrain& r) { r.times = (std::max)(2, (r.times >= 2 ? r.times : 3) + by); });
-    });
-    x = put(x, y, ui_text("ArrTimesWord", "TIMES"), t.times >= 2, [] {
-        change({"OpPlanRepeat", "factory plan repeat"}, [](FactoryTrain& r) {
-            if (r.times < 2) r.times = 3;
-        });
-    });
-    put(x + g_cw, y, ui_text("ArrEndlessChoice", "WITHOUT END"), t.times == 0,
-        [] { change({"OpPlanRepeat", "factory plan repeat"}, [](FactoryTrain& r) { r.times = 0; }); });
+    choices_row(x, tight_after("ArrRepeat", "REPEAT:"), y,
+                {{ui_text("ArrOnce", "ONCE"), t.times == 1,
+                  [] { change({"OpPlanRepeat", "factory plan repeat"}, [](FactoryTrain& r) { r.times = 1; }); }},
+                 {std::to_string(t.times >= 2 ? t.times : 3), false, nullptr,
+                  [](int by) {
+                      change({"OpPlanRepeat", "factory plan repeat"},
+                             [by](FactoryTrain& r) { r.times = (std::max)(2, (r.times >= 2 ? r.times : 3) + by); });
+                  },
+                  g_cw},
+                 {ui_text("ArrTimesWord", "TIMES"), t.times >= 2,
+                  [] {
+                      change({"OpPlanRepeat", "factory plan repeat"}, [](FactoryTrain& r) {
+                          if (r.times < 2) r.times = 3;
+                      });
+                  }},
+                 {ui_text("ArrEndlessChoice", "WITHOUT END"), t.times == 0,
+                  [] { change({"OpPlanRepeat", "factory plan repeat"}, [](FactoryTrain& r) { r.times = 0; }); }, nullptr, g_cw}});
     y += ROW;
     if (t.times != 1) {
         x = put(g_px + LEFT + LABEL, y, ui_text("ArrEveryWord", "EVERY"));
@@ -779,10 +853,11 @@ float draw_repeat(const FactoryTrain& t, float y) {
         y += ROW;
         if (army() != 0) {   // an AI army's: counted from the last one made, or rebuilt once it is lost
             x = label(y, "PlanNext", "NEXT:");
-            x = put(x, y, ui_text("PlanAfterMade", "AFTER THE LAST IS MADE"), !t.renew,
-                    [] { change({"OpPlanRepeat", "factory plan repeat"}, [](FactoryTrain& r) { r.renew = false; }); });
-            put(x + g_cw, y, fit_choice(ui_text("PlanAfterLost", "ITS LOSS"), x + g_cw, y), t.renew,
-                [] { change({"OpPlanRepeat", "factory plan repeat"}, [](FactoryTrain& r) { r.renew = true; }); });
+            choices_row(x, tight_after("PlanNext", "NEXT:"), y,
+                        {{ui_text("PlanAfterMade", "AFTER THE LAST IS MADE"), !t.renew,
+                          [] { change({"OpPlanRepeat", "factory plan repeat"}, [](FactoryTrain& r) { r.renew = false; }); }},
+                         {ui_text("PlanAfterLost", "ITS LOSS"), t.renew,
+                          [] { change({"OpPlanRepeat", "factory plan repeat"}, [](FactoryTrain& r) { r.renew = true; }); }, nullptr, g_cw}});
             y += ROW;
         }
     }
@@ -791,9 +866,11 @@ float draw_repeat(const FactoryTrain& t, float y) {
 
 float draw_then(const FactoryTrain& t, float y) {
     float x = label(y, "ArrThen", "THEN:");
+    std::vector<RowItem> tasks;
     for (int task : tasks_here())
-        x = put(x, y, ui_text(TASK_KEYS[task], TASK_NAMES[task]), t.task == task,
-                [task] { change({"OpQueueTask", "factory queue task"}, [task](FactoryTrain& r) { r.task = task; }); });
+        tasks.push_back({ui_text(TASK_KEYS[task], TASK_NAMES[task]), t.task == task,
+                         [task] { change({"OpQueueTask", "factory queue task"}, [task](FactoryTrain& r) { r.task = task; }); }});
+    choices_row(x, tight_after("ArrThen", "THEN:"), y, tasks);
     y += ROW;
     if (needs_point(t)) {
         x = label(y, t.task == TASK_PATROL ? "ArrPoints" : "ArrPoint", t.task == TASK_PATROL ? "POINTS:" : "POINT:");
@@ -881,8 +958,9 @@ float knob_number(float y, const char* key, const char* english, const char* nam
 
 float knob_choice(float y, const char* key, const char* english, const char* name,
                   const std::vector<std::pair<std::string, std::function<void()>>>& choices, int current, const char* note_key, const char* note) {
-    float x = knob_x(key, english);
-    for (size_t i = 0; i < choices.size(); ++i) x = put(x, y, choices[i].first, static_cast<int>(i) == current, choices[i].second) + g_cw;
+    std::vector<RowItem> items;
+    for (size_t i = 0; i < choices.size(); ++i) items.push_back({choices[i].first, static_cast<int>(i) == current, choices[i].second, nullptr, i ? g_cw : 0});
+    choices_row(knob_x(key, english), tight_after(key, english), y, items);
     return knob_rows(y, key, english, name, note_key, note);
 }
 
@@ -922,7 +1000,7 @@ void draw_ai() {
                         ai.clever ? 0 : 1, runs() ? "AiCleverNote" : "AiCleverArrivals",
                         runs() ? "THE ENGINE'S, WITH THE WEAPONS' RANGE" : "ONLY IN A MAP WITH ARRIVALS");
         y = knob_choice(y, "AiNeutralTrains", "NEUTRAL TRAINS:", "SETENEMYCANATTACKNEUTRALTRAINS",
-                        {{ui_text("AiNeutralHit", "FIRES AT THEM"), [] { change_ai([](AiKnobs& a) { a.neutral_trains = 1; }); }},
+                        {{ui_text("AiNeutralHit", "FIRES"), [] { change_ai([](AiKnobs& a) { a.neutral_trains = 1; }); }},
                          {ui_text("AiNeutralSpare", "ONLY WHEN HIT"), [] { change_ai([](AiKnobs& a) { a.neutral_trains = 0; }); }}},
                         ai.neutral_trains ? 0 : 1, runs() ? "AiNeutralNote" : "AiCleverArrivals",
                         runs() ? "THE ENEMY'S GUNS TAKE NEUTRAL TRAINS AS TARGETS" : "ONLY IN A MAP WITH ARRIVALS");

@@ -91,6 +91,17 @@ runs past the panel"). The factory and Arrivals panels keep their 46 characters:
 room for its brackets, the page arrows `[<] n/m [>]` take four more, and a train longer than the panel shows
 scrolls with as many icons as leave room for its `[<] [>]` (five or four, not six); the Arrivals panel's cars now
 start after the longest of its left column's texts, as the factory's did (`[TEMPLATE...]` reached the first car).
+The rows of several choices still ran past the 46 characters with their brackets (the gate's factory panel walk,
+`tools\rig\panel_rows_check.py`: REPEAT, THEN, the AI's NEUTRAL TRAINS, `[AI...]` over the pages' `[<]`, in every
+language). The Arrivals panel moves such a choice to the next row (`wrap`); the factory panel has no row to spare
+(an entry's POINTS: can be on its last row), so a row that does not fit as usual is laid tight
+(`editor_factory.cpp` `choices_row`): from a character after its label's own text, the choices half a character
+apart - a click takes a choice 2 px beyond its text, so the two click areas only touch - and a choice that still
+does not fit is cut (fit's mark, the whole text in the status line). The plan's actions row is laid tight the same
+way when it would reach the pages' arrows, and the arrows lose their `n/m` when it still does. The texts that were
+the longest were made shorter so that nothing is cut: NEUTRAL TRAINS: FIRES (English, Czech, Hungarian and Polish
+said "fires at them", the German and Russian only "fires"), and the first choice of NEXT: in Polish, Russian and
+Hungarian ("after the last is made" now says "after the last" or "after it is made").
 The rows above the bar wrap into another row by the same rule as before. The test steps `H`, `G` and `T` read the
 Arrivals panel too now, and the panels' rows are recorded from the start of a test (`PanelRows::record`); `T`
 matches a choice's words without its brackets.

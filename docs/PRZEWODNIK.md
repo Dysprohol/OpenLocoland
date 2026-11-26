@@ -586,7 +586,7 @@ skrypt mapy każe jej zbudować. Ich lista i ekran każdego, jak w panelu przyja
 wagony po kolei - lokomotywa gdziekolwiek -, **+ WAGON**, **SZABLON...** pociągi autorów), **KIEDY**
 (**O CZASIE**, **PO INNYM** - tyle po zrobieniu pociągu przed nim na liście - albo **GDY** zachodzi
 warunek, np. gracz ma mniej pociągów niż n, nie przed czasem), **POWTORZ** (raz, n razy albo bez końca,
-co tyle - **PO ZROBIENIU OSTATNIEGO** albo **PO STRACIE**) i **POTEM** (wroga atakuje, pilnuje punktu albo patroluje; pozostałych stoi, jedzie
+co tyle - **PO OSTATNIM** albo **PO STRACIE**) i **POTEM** (wroga atakuje, pilnuje punktu albo patroluje; pozostałych stoi, jedzie
 do punktu albo patroluje). Pociąg twój, neutralnych albo piratów powstaje wagon po wagonie, gdy fabryka
 jest wolna, a jego strona ma pieniądze na następny wagon (cena pod każdym), niezależnie od listy fabryki,
 i tylko wtedy, gdy na **wyjeździe** fabryki nie stoi żaden pociąg - na jej linii wyjazdowej albo tuż za
@@ -596,7 +596,7 @@ który czekał, gdy jakikolwiek pociąg stał blisko fabryki, dopóki nie zapisz
 Wróg buduje po jednym, gdy atakuje mniej jego pociągów, niż pozwala **AI...**. **AI...** ma pozostałe
 ustawienia wroga od autorów, każde z linijką opisu: czy stracony pociąg startowy jest budowany na nowo i
 po jakim czasie, wypady pociągów startowych, od kiedy są wypady i ile trwają, mądry atak oraz to, czy
-jego działa strzelają do pociągów neutralnych (**POCIAGI NEUTR.: STRZELA DO NICH** albo **GDY OBERWIE**). Wszystko poza
+jego działa strzelają do pociągów neutralnych (**POCIAGI NEUTR.: STRZELA** albo **GDY OBERWIE**). Wszystko poza
 pociągiem raz o czasie wymaga mapy z przyjazdami (starsze mapy: PRZESTAW w panelu przyjazdów).
 
 ![Plan fabryki wroga](img/factory-plan-pl.jpg)

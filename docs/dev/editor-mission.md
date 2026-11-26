@@ -501,7 +501,7 @@ then. A train with a target is not rebuilt (the AI's queue has no such task). Ch
 copy: a neutral train 5,20 stood until 20 s, drove to the enemy fort and destroyed the gun it was told to
 (hp 40, 30, 15, 5, gone at 55 s, `ORDER n target gone`), then stood; the enemy's patrolling train told to
 attack the player's factory drove round to the factory's spur and fired at it. Per army, beside the red
-lights and the AI's knobs: the enemy factory's AI screen has NEUTRAL TRAINS: FIRES AT THEM / ONLY WHEN HIT
+lights and the AI's knobs: the enemy factory's AI screen has NEUTRAL TRAINS: FIRES / ONLY WHEN HIT
 (`AiKnobs.neutral_trains`, `#define NEUTRAL_TRAINS 1`, the runner calls `SetEnemyCanAttackNeutralTrains(1)`
 - World flags 2, which `Object_FindTarget` and `factions.cpp`'s `may_target` read): with it the neutral
 train above was shot from 250 to 0 hp by the enemy on its way, without it not once. Not offered: "hold

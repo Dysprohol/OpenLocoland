@@ -598,7 +598,7 @@ editor. The enemy builds one at a time while fewer of its trains
 attack than **AI...** allows. **AI...** has the authors' other settings of the enemy, a line on each:
 whether a lost start train is built again and after how long, the start trains' raids, when raids begin
 and how long they last, the clever attack, and whether its guns fire at neutral trains (**NEUTRAL
-TRAINS: FIRES AT THEM** or **ONLY WHEN HIT**). Everything except a train at a time once needs a map
+TRAINS: FIRES** or **ONLY WHEN HIT**). Everything except a train at a time once needs a map
 that runs arrivals (older maps: CONVERT in the Arrivals panel).
 
 ![The enemy factory's plan](img/factory-plan-en.jpg)
