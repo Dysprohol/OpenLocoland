@@ -61,6 +61,8 @@ std::vector<int> edit_place_plans(std::vector<FactoryTrain>& plans);   // editor
 int unit_price(int nvid);   // depot_rows.cpp: a unit's price in a factory
 const char* object_name(int nvid);   // editor_panel.cpp: the palette's (the game's) name of an object
 
+int map_water_z();   // editor_edit.cpp: the level of the map's water for WATER_Z, -1 none
+
 namespace {
 
 constexpr int MUSIC_MAX = 30;           // files in a level's music list
@@ -2904,6 +2906,10 @@ std::vector<std::string> settings_block(const Mission& m, const ArrivalsState& a
     define("RAIN", std::to_string(m.rain));
     if (m.weather) define("RAIN_TYPE", std::to_string(m.weather));   // rain is daynight.lgc's default
     define("NUKE", m.nuke ? "1" : "0");
+    if (const int wz = map_water_z(); wz >= 0) {   // the water drowns units, as the missions' does
+        define("WATER_Z", std::to_string(wz));
+        patch::log("mission: WATER_Z %d - a unit below the water takes damage every second (gametact.lgc)", wz);
+    }
     const AiKnobs& ai = m.factories.ai;
     const std::map<std::string, int> knobs = {{"RENEW_TIMEOUT", ai.renew_wait}, {"FIRSTCONTACTTIME", ai.raid_length},
                                               {"FIRSTATTACKTIME", ai.raids_from}, {"STG_DESTROY_TIME", ai.all_attack}};

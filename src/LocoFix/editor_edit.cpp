@@ -5837,6 +5837,20 @@ int water_level_of(int nvid) {
     return level;
 }
 
+// The level the missions' drowning rule takes (WATER_Z, gametact.lgc: a unit below it takes damage every second, as
+// in l11, l16, l17): the highest level of the map's water - its light, dark and swamp water, not the lava, whose
+// robots die at once (lava_robots.cpp) -, or -1 when the map has none. editor_mission.cpp writes it.
+}  // namespace
+
+int map_water_z() {
+    int z = -1;
+    for (const WaterKind& k : WATER_KINDS)
+        if (k.splash == 1) z = (std::max)(z, water_level_of(k.nvid));
+    return z;
+}
+
+namespace {
+
 bool under_water(float sx, float sy, int level, int margin);   // below
 
 std::pair<int, int> tile_square(float sx, float sy, int level) {   // the tile over a screen point

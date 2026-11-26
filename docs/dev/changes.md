@@ -833,7 +833,14 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       The tiles get VID flag 0x800, as the lights and the lava stream (801) have it: the engine leaves their
       colours as by day, so lava glows evenly by day and by night, at no cost (the gamma is not applied, the
       frame does less). It holds for the missions' lava too (l12, l13). Checked in the test rig: an editor map's
-      lava at night, dark before, its day colours now.
+      lava at night, dark before, its day colours now,
+  71. the water of an editor map drowns units as the missions' water does (`editor_mission.cpp`, `map_water_z` in
+      `editor_edit.cpp`): the missions 11, 16 and 17 define `WATER_Z` and `gametact.lgc` gives every unit below it damage
+      every second (1 + its depth / 3, bubbles and a sound); the editor's maps defined none, so their water harmed
+      nobody. The editor now writes `WATER_Z`, the highest level of the map's light, dark and swamp water (not the
+      lava, whose robots die at once), with the mission's other settings. As in the missions it holds for the whole
+      map: dry ground lower than the water is under the rule too. A map gets it when it is saved again. Checked in
+      the test rig: WinterLake run from the editor writes `WATER_Z 34` and its script compiles and runs.
   The parts of the state bar are FRAME objects (texts too): `Frame_Construct` (0x40c4d0)
   takes a screen position, adds the camera to it and puts the object on `World.menu`, whose
   objects `SetPosition` moves with the camera, so they stay on the screen. Objects that
