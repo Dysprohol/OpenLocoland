@@ -801,7 +801,12 @@ Part of the developer documentation; the index of all parts is [DEVELOPERS.md](.
       left (`m:ss`, by the runner's own clock); the mouse tip over such an icon adds it in words
       (`[Editor] PlayFactoryLimit`, `PlayFactoryUnlock`). A list with no limit and no later unit - every
       campaign mission - looks as before. Every language pack's copy of the price's font (VID 8) gets `/`
-      and `:` (`lang/<code>/fonts/font-unitnumbersonscreen.png`, build.md "The Czech letters"),
+      and `:` (`lang/<code>/fonts/font-unitnumbersonscreen.png`, build.md "The Czech letters"). The counter
+      and the time stand on the unit's picture, where the white font alone was hard to read on its light parts:
+      they have a dark outline, eight copies one font pixel round them in a dark copy of the price's font that
+      the build makes (VIDs 1200-1202 for the interface at x1, x2, x3, `tools/patch_data.py` SHADOW_FONTS,
+      every language pack's font too); the price and the key, on the icon's dark ground, stay as the game
+      draws them,
   68. an infantry robot dies in lava (`lava_robots.cpp`, editor-ground.md "Sheets of water and lava"): the lava
       of a map is a sheet of the lava's tiles (VID 293) at one level, shown wherever the ground is lower, and the
       engine let a unit walk through it as over any ground (its only lava rule turns the explosions over a lava

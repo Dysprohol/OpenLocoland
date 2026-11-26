@@ -362,6 +362,13 @@ INTERFACE_BOX_ONLY = (502, 503)   # vid\empty.vid: nothing drawn, only their box
 # are only this much of it, centred (so drawn at the same place), 2.8 instead of 7 million pixels at three times.
 INTERFACE_CROP = {466: (584, 532)}
 _crops = {}   # an enlarged picture's name (lower case) -> its crop, from add_interface_rows
+# The factory list's counters and times (LocoFix depot_rows.cpp) stand in the icon's corner on the unit's picture,
+# where the price's white font alone was hard to read: a dark copy of that font draws an outline round each. VID 8
+# (the price's font) at x1, x2, x3 -> VIDs 1200, 1201, 1202, its characters in SHADOW_COLOUR (not black: black is
+# the font's transparent background), from the same picture as the font of that size (enlarge_font).
+SHADOW_FONTS = {8: 1200}
+SHADOW_COLOUR = (16, 16, 16)   # dark, and not 0 at 16 bits a pixel (5-6-5), where it would turn transparent
+_shadows = set()   # the dark copies' file names (lower case, no folder), from add_interface_rows
 TEXTURE_MAX = 256   # the biggest texture the engine loads at 16 bits a pixel (GroundVid_LoadImage)
 
 
@@ -370,6 +377,13 @@ def interface_picture(image_file, k):
     fonts\\font8x13.bmp -> fonts\\font8x13x2.bmp."""
     stem, ext = os.path.splitext(image_file)
     return "%sx%d%s" % (stem, k, ext)
+
+
+def shadow_picture(image_file, k):
+    """The dark copy's name for a font's image name at the scale k: fonts\\font8x13.bmp -> fonts\\font8x13shadow.bmp,
+    at 2 fonts\\font8x13x2shadow.bmp."""
+    stem, ext = os.path.splitext(interface_picture(image_file, k) if k > 1 else image_file)
+    return "%sshadow%s" % (stem, ext)
 
 
 def add_interface_rows(objects_res):
@@ -397,6 +411,25 @@ def add_interface_rows(objects_res):
                 pictures.append((source["imageFile"], row["imageFile"], k))
                 if nvid in INTERFACE_CROP:
                     _crops[row["imageFile"].lower()] = INTERFACE_CROP[nvid]
+            tables["objects"].append(row)
+            objects[new] = row
+            for a in animations:
+                if a["nvid"].strip() == str(nvid):
+                    tables["animations"].append(dict(a, nvid=new))
+    for nvid, first in SHADOW_FONTS.items():
+        source = objects.get(str(nvid))
+        for k in (1,) + INTERFACE_SCALES:
+            new = str(first + k - 1)
+            if source is None or new in objects:
+                continue
+            row = dict(source)
+            row["nvid"] = new
+            row["name"] = "Shadow x%d of %d" % (k, nvid)
+            for c in ("sizeX", "sizeY", "sizeZ"):
+                row[c] = str(int(float(source[c]) * k))
+            row["imageFile"] = shadow_picture(source["imageFile"], k)
+            pictures.append((source["imageFile"], row["imageFile"], k))
+            _shadows.add(os.path.basename(row["imageFile"].replace("\\", "/")).lower())
             tables["objects"].append(row)
             objects[new] = row
             for a in animations:
@@ -533,6 +566,33 @@ def enlarge_font(source, output, k):
     big.save(output, "BMP")
 
 
+def darken_font(source, output, k):
+    """Writes `output`: the font picture `source` as enlarge_font makes it at k (as it is at 1) with every pixel of
+    its characters in SHADOW_COLOUR - the background (the colour most cells have, the transparent one) and the grid
+    line kept. Raises on another shape."""
+    from collections import Counter
+    from PIL import Image
+    if k > 1:
+        enlarge_font(source, output, k)
+        source = output
+    image = Image.open(source)
+    image.load()
+    image = image.convert("RGB")
+    if image.width % 16 or image.height % 16 or image.width < 32 or image.height < 32:
+        raise ValueError("not a 16 x 16 grid")
+    cw, ch = image.width // 16, image.height // 16
+    background = Counter(image.crop((c * cw, r * ch, c * cw + cw - 1, r * ch + ch - 1)).getpixel((0, 0))
+                         for r in range(16) for c in range(16)).most_common(1)[0][0]
+    px = image.load()
+    for y in range(image.height):
+        if y % ch == ch - 1:
+            continue   # a grid line
+        for x in range(image.width):
+            if x % cw != cw - 1 and px[x, y] != background:
+                px[x, y] = SHADOW_COLOUR
+    image.save(output, "BMP")
+
+
 # The settings page's preview of the interface's size (LocoFix menu_version.cpp): the bottom of a screen 3840 px
 # wide as the state bar stands there at the normal size - the side tiles out to the edges, the base in the middle,
 # the two round buttons, ten empty slots with their empty lines - laid out as Player_ShowStateBar and status_bar.cpp
@@ -656,10 +716,12 @@ def make_interface_pictures(game_folder, pictures, outputs):
     all of its pictures really are that many times bigger. Returns the originals copied (not enlarged)."""
     import shutil
     copied = []
-    for (original, _, k), output in zip(pictures, outputs):
+    for (original, name, k), output in zip(pictures, outputs):
         source = os.path.join(game_folder, original)
         try:
-            if original.lower().endswith(".bmp"):
+            if os.path.basename(name.replace("\\", "/")).lower() in _shadows:   # a font's dark copy
+                darken_font(source, output, k)
+            elif original.lower().endswith(".bmp"):
                 enlarge_font(source, output, k)
             else:
                 enlarge_vid(source, output + ".part", k, _crops.get(interface_picture(original, k).lower()))
@@ -667,6 +729,13 @@ def make_interface_pictures(game_folder, pictures, outputs):
         except Exception:   # never stop the build: the original, which LocoFix sees as not enlarged
             if os.path.exists(output + ".part"):
                 os.remove(output + ".part")
+            if os.path.basename(name.replace("\\", "/")).lower() in _shadows:
+                try:   # a shadow that could not be made: nothing drawn (all of it the transparent black)
+                    from PIL import Image
+                    Image.new("RGB", Image.open(source).size, (0, 0, 0)).save(output, "BMP")
+                    continue
+                except Exception:
+                    pass
             if os.path.isfile(source):
                 shutil.copyfile(source, output)
             copied.append(original)

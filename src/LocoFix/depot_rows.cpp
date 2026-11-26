@@ -117,6 +117,7 @@ constexpr int STRIP = 100;
 constexpr int PANEL_OBJECTS = 101;            // the bar with the depot list
 constexpr int EXTRA_FIRST_ICON = PANEL_OBJECTS + 1;  // our strip, then ten icons, prices, labels
 constexpr int EXTRA_OBJECTS = 1 + 3 * ROW;
+constexpr int SHADOW_FONT = 1200;   // the price font's dark copies at x1, x2, x3 (tools/patch_data.py SHADOW_FONTS)
 
 using SetPanel_t = void(__fastcall*)(void* player, void* edx, int panel);
 using HandlePanelAction_t = void(__fastcall*)(void* player, void* edx, int object, int* index);
@@ -385,6 +386,7 @@ struct Slot {
     uint32_t at = 0;        // later: when it comes
     uint8_t* icon = nullptr;
     uint8_t* note = nullptr;
+    std::vector<uint8_t*> outline;   // the note's dark copies round it (none without the dark font)
     std::string text;       // the note's text now
     bool limited = false;   // a limit: `used` of `max`
     int used = 0, max = 0;
@@ -402,19 +404,49 @@ struct Menu {
 
 Menu g_menu;
 
-// Our text in an icon's bottom-left corner: the font, depth and alignment of its price (top left, at the
-// icon's left edge) on the line of its key (bottom right), so it follows the interface's scale as they do.
-uint8_t* add_note(void* player, uint8_t* price, uint8_t* label) {
+// A text of the bar at x, y (the view's) in `font`, with the depth and behaviour of the price.
+uint8_t* add_text(void* player, uint8_t* price, void* font, float x, float y) {
     auto create = reinterpret_cast<CreateObject_t>(at<void**>(world(), 0)[0x20 / 4]);
-    const float x = at<float>(price, 0x30) - at<float>(world(), WORLD_CAMERA_X);
-    const float y = at<float>(label, 0x34) - at<float>(label, 0x38) - at<float>(world(), WORLD_CAMERA_X + 4) +
-                    at<float>(price, 0x38);
-    uint8_t* text = create(world(), nullptr, at<void*>(price, 0x1c), x, y, at<float>(price, 0x38), 0, nullptr);
+    uint8_t* text = create(world(), nullptr, font, x, y, at<float>(price, 0x38), 0, nullptr);
     if (!text) return nullptr;
     reinterpret_cast<ObjectListAdd_t>(OBJECTLIST_ADD)(static_cast<uint8_t*>(player) + 0x14, nullptr, text);
     act(text, ACT_SET_BEHAVE, at<int>(price, 0x7c));
     set_text(text, "");
     return text;
+}
+
+// The dark copy of the price's font (VID 8, or its bigger copy of the interface's scale - Player_SetPanel makes
+// the list with it) and the scale it was made for; nullptr without one.
+uint8_t* shadow_font(void* font, int& scale) {
+    for (int s = 1; s <= 3; ++s)
+        if (font == interface_vid(8, s)) {
+            scale = s;
+            return vid_by_number(SHADOW_FONT + s - 1);
+        }
+    return nullptr;
+}
+
+// Our text in an icon's bottom-left corner: the font, depth and alignment of its price (top left, at the
+// icon's left edge) on the line of its key (bottom right), so it follows the interface's scale as they do.
+// Round it a dark outline - eight dark copies one font pixel away in each direction, made after it, which the
+// bar draws under it (a bar object added later is drawn earlier): the corner stands on the unit's picture,
+// where the white text alone was hard to read on its light parts (the price and the key stand on the icon's
+// dark ground and stay as the game draws them).
+uint8_t* add_note(void* player, uint8_t* price, uint8_t* label, std::vector<uint8_t*>& outline) {
+    const float x = at<float>(price, 0x30) - at<float>(world(), WORLD_CAMERA_X);
+    const float y = at<float>(label, 0x34) - at<float>(label, 0x38) - at<float>(world(), WORLD_CAMERA_X + 4) +
+                    at<float>(price, 0x38);
+    void* font = at<void*>(price, 0x1c);
+    uint8_t* note = add_text(player, price, font, x, y);
+    int scale = 1;
+    outline.clear();
+    if (uint8_t* dark = note ? shadow_font(font, scale) : nullptr)
+        for (int dy = -1; dy <= 1; ++dy)
+            for (int dx = -1; dx <= 1; ++dx)
+                if (dx || dy)
+                    if (uint8_t* o = add_text(player, price, dark, x + static_cast<float>(dx * scale), y + static_cast<float>(dy * scale)))
+                        outline.push_back(o);
+    return note;
 }
 
 bool menu_valid(void* player) {
@@ -444,6 +476,7 @@ void refresh_menu(void* player) {
         if (s.icon && army_of(s.icon) != army) reinterpret_cast<SetInt_t>(OBJECT_SET_ARMY)(s.icon, nullptr, army);
         if (s.note && s.text != text) {
             set_text(s.note, text);
+            for (uint8_t* o : s.outline) set_text(o, text);
             s.text = text;
         }
     }
@@ -492,7 +525,7 @@ void make_menu(void* player) {
         s.icon = first_row ? items[FIRST_ICON + e] : items[second + e - ROW];
         uint8_t* price = first_row ? items[FIRST_PRICE + e] : items[second + ROW + e - ROW];
         uint8_t* label = first_row ? items[FIRST_LABEL + e] : items[second + 2 * ROW + e - ROW];
-        s.note = add_note(player, price, label);
+        s.note = add_note(player, price, label, s.outline);
         m.slots.push_back(s);
     }
     m.bar = bar_count(player);
